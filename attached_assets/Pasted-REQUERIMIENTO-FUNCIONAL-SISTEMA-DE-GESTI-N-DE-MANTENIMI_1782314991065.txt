@@ -1,0 +1,503 @@
+REQUERIMIENTO FUNCIONAL
+SISTEMA DE GESTIÓN DE MANTENIMIENTO Y ACTIVOS (SGMA)
+1. OBJETIVO DEL PROYECTO
+
+Desarrollar una plataforma web integral para la gestión de mantenimiento de activos de la empresa, permitiendo controlar en tiempo real el estado de equipos, mantenimientos, inspecciones, inventarios de repuestos, órdenes de trabajo, historial técnico y trazabilidad completa de las actividades ejecutadas.
+
+La plataforma debe ser accesible desde computadores, tablets y teléfonos móviles.
+
+Idioma principal: Español.
+
+Zona horaria obligatoria: Colombia (GMT-5).
+
+2. TIPO DE EMPRESA
+
+Empresa logística dedicada al manejo de:
+
+Fertilizantes
+Carbón
+Carga general
+
+Activos a controlar:
+
+Maquinaria Amarilla
+Montacargas
+Cargadores
+Retroexcavadoras
+Minicargadores
+Camiones
+Tractocamiones
+Volquetas
+Equipos Estáticos
+Bandas transportadoras
+Tolvas
+Sistemas de cargue
+Empacadoras
+Cocedoras de sacos
+Compresores
+Equipos eléctricos
+Equipos hidráulicos
+Equipos neumáticos
+3. ARQUITECTURA GENERAL
+
+Aplicación SaaS Multiusuario.
+
+Responsive Design.
+
+Compatible con:
+
+Windows
+Android
+iPhone
+Tablets
+
+Tecnologías sugeridas:
+
+Frontend:
+
+React
+TailwindCSS
+PWA
+
+Backend:
+
+Python Flask o FastAPI
+
+Base de datos:
+
+PostgreSQL
+
+Almacenamiento:
+
+Documentos
+Imágenes
+Manuales
+Certificados
+4. DASHBOARD PRINCIPAL
+
+Al ingresar al sistema se debe visualizar:
+
+Indicadores Generales
+Total de equipos
+Equipos operativos
+Equipos en mantenimiento
+Equipos fuera de servicio
+OT abiertas
+OT vencidas
+Mantenimientos programados
+Mantenimientos ejecutados
+Disponibilidad mecánica
+Disponibilidad operacional
+MTTR
+MTBF
+Gráficos
+Estado de equipos
+Costos por mantenimiento
+Costos por activo
+Consumo de repuestos
+Horas de mantenimiento
+Tendencias de fallas
+5. MÓDULO DE ACTIVOS
+
+Administración completa de activos.
+
+Información General
+Código del activo
+Nombre
+Tipo
+Marca
+Modelo
+Serie
+Año
+Ubicación
+Centro de trabajo
+Estado
+Responsable
+Datos Operacionales
+Horómetro
+Kilometraje
+Horas acumuladas
+Vida útil
+Documentación
+Manuales
+Fichas técnicas
+Certificados
+Fotografías
+6. HOJA DE VIDA DEL EQUIPO
+
+Cada activo debe tener historial completo.
+
+Mostrar:
+
+Información general
+Historial de mantenimientos
+Fallas
+Repuestos utilizados
+Costos
+Checklists
+Fotografías
+Documentos
+
+Línea de tiempo interactiva.
+
+7. MÓDULO DE UBICACIONES
+
+Control de:
+
+Sedes
+Bodegas
+Patios
+Terminales
+Plantas
+
+Mapa visual de ubicación de equipos.
+
+8. MANTENIMIENTO PREVENTIVO
+
+Permitir programación por:
+
+Tiempo
+Diario
+Semanal
+Mensual
+Trimestral
+Semestral
+Anual
+Horómetro
+
+Ejemplo:
+
+Cada 250 horas
+Cada 500 horas
+Cada 1000 horas
+Kilometraje
+
+Ejemplo:
+
+Cada 5.000 km
+Cada 10.000 km
+
+Generar alertas automáticas.
+
+9. MANTENIMIENTO CORRECTIVO
+
+Registro de:
+
+Reporte de falla
+Diagnóstico
+Causa raíz
+Solución aplicada
+Tiempo de reparación
+
+Estados:
+
+Pendiente
+Asignado
+En proceso
+Esperando repuesto
+Finalizado
+Cerrado
+10. MANTENIMIENTO PREDICTIVO
+
+Registro de:
+
+Vibraciones
+Temperaturas
+Inspecciones
+Mediciones
+Condiciones operativas
+
+Generación de alertas.
+
+11. ÓRDENES DE TRABAJO (OT)
+
+Generación de OT.
+
+Campos:
+
+Número OT
+Fecha
+Equipo
+Tipo mantenimiento
+Prioridad
+Técnico asignado
+Centro de trabajo
+Horas estimadas
+Horas reales
+
+Adjuntos:
+
+Fotos
+Videos
+Documentos
+
+Firma digital.
+
+12. CHECKLIST PREOPERACIONAL
+
+Diseñador dinámico de formularios.
+
+Permitir crear checklists para:
+
+Montacargas
+Bandas
+Tolvas
+Empacadoras
+Vehículos
+
+Tipos de respuesta:
+
+Cumple
+No cumple
+N/A
+
+Permitir:
+
+Fotografías
+Observaciones
+Firma
+13. INVENTARIO DE REPUESTOS
+
+Control de almacén.
+
+Información:
+
+Código
+Descripción
+Categoría
+Stock
+Stock mínimo
+Stock máximo
+
+Movimientos:
+
+Entradas
+Salidas
+Ajustes
+
+Alertas automáticas.
+
+14. SOLICITUD DE REPUESTOS
+
+Flujo de aprobación.
+
+Estados:
+
+Solicitado
+Aprobado
+Rechazado
+Entregado
+
+Registro de:
+
+Solicitante
+Aprobador
+Fecha
+OT relacionada
+15. CENTROS DE TRABAJO
+
+Administración de:
+
+Taller Mecánico
+Taller Eléctrico
+Patio de Equipos
+Planta Fertilizantes
+Planta Carbón
+
+Asignación de recursos.
+
+16. GESTIÓN DE COSTOS
+
+Control de:
+
+Mano de obra
+Técnico
+Horas
+Tarifa
+Repuestos
+Costo unitario
+Cantidad
+Servicios externos
+Proveedores
+
+Indicadores financieros.
+
+17. GESTIÓN DE PROVEEDORES
+
+Registro de:
+
+Talleres externos
+Contratistas
+Proveedores de repuestos
+
+Evaluación de desempeño.
+
+18. GESTIÓN DE PERSONAL
+
+Registro de:
+
+Técnicos
+Supervisores
+Coordinadores
+
+Control de:
+
+Certificaciones
+Competencias
+Capacitaciones
+19. AUDITORÍA Y LOGS
+
+Registrar absolutamente todo.
+
+Guardar:
+
+Usuario
+Fecha
+Hora
+IP
+Acción realizada
+
+Ejemplos:
+
+Creó OT
+Modificó equipo
+Eliminó repuesto
+Aprobó solicitud
+
+Módulo exclusivo para auditoría.
+
+20. SISTEMA DE PERMISOS
+
+Roles configurables.
+
+Administrador
+
+Control total.
+
+Coordinador de Mantenimiento
+
+Gestión operativa.
+
+Supervisor
+
+Aprueba trabajos.
+
+Técnico
+
+Ejecuta OT.
+
+Operador
+
+Realiza checklist.
+
+Almacén
+
+Gestiona repuestos.
+
+Gerencia
+
+Consulta indicadores.
+
+Permisos por módulo.
+
+Permisos por acción:
+
+Ver
+Crear
+Editar
+Aprobar
+Eliminar
+21. NOTIFICACIONES
+
+Enviar alertas por:
+
+Correo
+WhatsApp (fase futura)
+Notificaciones internas
+
+Eventos:
+
+OT vencidas
+Preventivos próximos
+Stock bajo
+Equipos fuera de servicio
+22. REPORTES
+
+Exportación:
+
+Excel
+PDF
+
+Reportes:
+
+Disponibilidad
+Costos
+Fallas recurrentes
+Inventario
+OT
+Mantenimientos ejecutados
+Cumplimiento del plan de mantenimiento
+23. MÓDULO DE AYUDA
+
+Centro de ayuda integrado.
+
+Debe incluir:
+
+Manual de usuario
+Videos tutoriales
+Preguntas frecuentes
+Búsqueda inteligente
+24. INTELIGENCIA ARTIFICIAL (FASE 2)
+
+Asistente IA integrado.
+
+Capaz de responder:
+
+Estado de equipos
+Próximos mantenimientos
+Equipos críticos
+Consumo de repuestos
+
+Ejemplo:
+
+"¿Qué equipos tienen mantenimiento vencido?"
+
+"¿Cuál fue el costo de mantenimiento del montacargas MT-001 este año?"
+
+25. REQUERIMIENTOS NO FUNCIONALES
+
+Seguridad:
+
+HTTPS
+JWT
+Control de sesiones
+MFA opcional
+
+Rendimiento:
+
+Más de 500 activos
+Más de 100 usuarios simultáneos
+
+Disponibilidad:
+
+99.9%
+
+Diseño:
+
+Moderno
+Interactivo
+Intuitivo
+Modo oscuro
+Modo claro
+RESULTADO ESPERADO
+
+Una plataforma tipo CMMS/EAM profesional similar a:
+
+IBM Maximo
+SAP PM
+UpKeep
+Fiix
+
+pero adaptada específicamente a la operación logística de fertilizantes y carbón de tu empresa.
+
+Mi recomendación para Replit es que les pidas además un MVP Fase 1 con Activos + Hoja de Vida + OT + Preventivos + Checklists + Inventario + Roles, y luego desarrollar las demás fases. Esto reduce costos, acelera la puesta en marcha y evita que el proyecto se vuelva demasiado grande desde el inicio.

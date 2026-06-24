@@ -1,0 +1,3 @@
+- [Drizzle push needs TTY](drizzle-push-tty.md) — `drizzle-kit push`/`push-force` prompt for a TTY on constraint changes; apply such DDL via SQL instead.
+- [Recharts pie in narrow cell](recharts-pie-render.md) — donut renders tiny if screenshot catches the entrance animation; set `isAnimationActive={false}`.
+- [Orval query-key invalidation](orval-query-invalidation.md) — call `getListXQueryKey()` with no args to invalidate all filter variants (prefix match).
