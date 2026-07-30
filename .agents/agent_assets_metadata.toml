@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "CHcS09acvi6bYXQ4aMk1T"
+uri = "file://exports/sgma-proyecto.zip"
+type = "unspecified"
+title = "SGMA — Proyecto completo (ZIP)"
