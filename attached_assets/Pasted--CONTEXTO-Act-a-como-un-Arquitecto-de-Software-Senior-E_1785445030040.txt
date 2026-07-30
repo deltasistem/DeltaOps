@@ -1,0 +1,279 @@
+# CONTEXTO
+
+Actúa como un Arquitecto de Software Senior, Enterprise Software Engineer, Solution Architect y Tech Lead con más de 20 años de experiencia desarrollando plataformas EAM (Enterprise Asset Management), CMMS (Computerized Maintenance Management System), ERP y sistemas empresariales de misión crítica.
+
+NO eres un desarrollador junior.
+
+NO debes escribir código nuevo.
+
+NO debes implementar funcionalidades.
+
+NO debes modificar la arquitectura existente.
+
+Tu única misión es realizar una auditoría técnica completa del proyecto existente.
+
+El objetivo es preparar el sistema para una refactorización completa.
+
+----------------------------------------------------------------------
+
+# CONTEXTO DEL NEGOCIO
+
+La aplicación pertenece a una empresa de logística industrial.
+
+Actualmente controla:
+
+• Montacargas
+• Cargadores
+• Vehículos
+• Maquinaria Amarilla
+• Equipos Estáticos
+• Bandas Transportadoras
+• Tolvas
+• Empacadoras
+• Cocedoras
+• Equipos Industriales
+
+La empresa trabaja con:
+
+• Fertilizantes
+• Carbón
+• Logística Portuaria
+• Operaciones industriales
+
+Actualmente existen procesos de:
+
+- Checklist Preoperacional
+- Planes de mantenimiento
+- Hoja de Vida
+- Control de Combustible
+- Horas Hombre
+- Indicadores
+- Power BI
+
+Pero la nueva plataforma será mucho más grande.
+
+----------------------------------------------------------------------
+
+# IMPORTANTE
+
+NO estamos desarrollando un simple CMMS.
+
+Estamos construyendo una plataforma EAM modular.
+
+----------------------------------------------------------------------
+
+# REQUERIMIENTOS IMPORTANTES
+
+El sistema será:
+
+✔ Multiempresa
+
+✔ Multicentros de costo
+
+✔ Multioperación
+
+✔ Multiproyecto
+
+✔ Multiubicación
+
+✔ Multiactivo
+
+✔ Multiusuario
+
+✔ Multirol
+
+✔ Responsive
+
+✔ Mobile First
+
+✔ PWA
+
+✔ Escalable
+
+----------------------------------------------------------------------
+
+# ACLARACIÓN IMPORTANTE
+
+Los activos NO pertenecen permanentemente a un centro de costo.
+
+Los activos pueden cambiar durante su vida útil entre:
+
+- Empresas
+- Operaciones
+- Centros de costo
+- Proyectos
+- Ubicaciones
+
+Por lo tanto el sistema deberá soportar historial de asignaciones.
+
+NO asumir relaciones fijas.
+
+----------------------------------------------------------------------
+
+# TU MISIÓN
+
+Analiza TODO el proyecto.
+
+Quiero un informe técnico extremadamente detallado.
+
+----------------------------------------------------------------------
+
+# ANALIZA
+
+1. Arquitectura
+
+2. Backend
+
+3. Frontend
+
+4. Base de datos
+
+5. API
+
+6. Modelos
+
+7. Servicios
+
+8. Componentes
+
+9. Hooks
+
+10. Contextos
+
+11. Tipos
+
+12. Librerías
+
+13. Dependencias
+
+14. Rutas
+
+15. Seguridad
+
+16. Autenticación
+
+17. Permisos
+
+18. Performance
+
+19. Escalabilidad
+
+20. Deuda técnica
+
+----------------------------------------------------------------------
+
+# IDENTIFICA
+
+Qué partes son reutilizables.
+
+Qué partes deben eliminarse.
+
+Qué partes deben refactorizarse.
+
+Qué partes deben dividirse.
+
+Qué módulos están acoplados.
+
+Qué componentes violan SOLID.
+
+Qué código está duplicado.
+
+Qué procesos son muy rígidos.
+
+----------------------------------------------------------------------
+
+# DOCUMENTA
+
+Genera un documento llamado:
+
+ARQUITECTURA_ACTUAL.md
+
+Que contenga mínimo:
+
+## Tecnologías
+
+## Estructura de carpetas
+
+## Flujo de navegación
+
+## Dependencias
+
+## Base de datos
+
+## Relaciones
+
+## APIs
+
+## Estado actual
+
+## Riesgos
+
+## Oportunidades
+
+## Deuda técnica
+
+## Recomendaciones
+
+----------------------------------------------------------------------
+
+Genera además
+
+MODULOS_EXISTENTES.md
+
+Con TODOS los módulos encontrados.
+
+----------------------------------------------------------------------
+
+Genera
+
+MODELO_DATOS_ACTUAL.md
+
+Con todas las tablas.
+
+Todas las relaciones.
+
+Todas las llaves.
+
+Todas las restricciones.
+
+----------------------------------------------------------------------
+
+Genera
+
+REUTILIZACION.md
+
+Clasificando todo el proyecto en:
+
+REUTILIZAR
+
+REFACTORIZAR
+
+ELIMINAR
+
+----------------------------------------------------------------------
+
+# IMPORTANTE
+
+NO modifiques ningún archivo.
+
+NO implementes nada.
+
+NO escribas código.
+
+NO optimices.
+
+NO elimines.
+
+NO cambies arquitectura.
+
+NO generes migraciones.
+
+NO instales paquetes.
+
+NO hagas commits.
+
+Solo analiza.
+
+----------------------------------------------------------------------
+
+Cuando termines, espera nuevas instrucciones.
