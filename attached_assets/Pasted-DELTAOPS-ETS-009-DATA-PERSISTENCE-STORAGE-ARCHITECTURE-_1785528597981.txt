@@ -1,0 +1,424 @@
+DELTAOPS
+ETS-009
+DATA PERSISTENCE & STORAGE ARCHITECTURE
+VERSION 1.0
+
+======================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO CREES TABLAS.
+
+NO GENERES SQL.
+
+NO CREES MIGRACIONES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO IMPLEMENTES.
+
+Tu única misión es diseñar la estrategia completa de persistencia de datos de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Utilizar como entrada:
+
+ETS-001
+
+ETS-002
+
+ETS-003
+
+ETS-004
+
+ETS-005
+
+ETS-006
+
+ETS-007
+
+ETS-008
+
+No volver a auditarlos.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar cómo persisten TODOS los datos de DeltaOps.
+
+No diseñar PostgreSQL.
+
+Diseñar la estrategia de persistencia.
+
+======================================================================
+
+PRINCIPIOS
+
+Organization First
+
+Append Only
+
+Audit by Design
+
+CQRS
+
+API First
+
+Offline First
+
+Configuration First
+
+UUID First
+
+Version First
+
+Single Source of Truth
+
+======================================================================
+
+DISEÑAR
+
+1.
+
+Persistence Strategy
+
+======================================================================
+
+2.
+
+Aggregate Persistence
+
+Cómo persiste
+
+Activo
+
+OT
+
+Inventario
+
+Proveedor
+
+Usuario
+
+Organización
+
+Configuración
+
+======================================================================
+
+3.
+
+Transactional Persistence
+
+Checklist
+
+Combustible
+
+Horas Hombre
+
+Compras
+
+Movimientos
+
+Asignaciones
+
+Lecturas
+
+======================================================================
+
+4.
+
+Append Only Strategy
+
+Qué aplica.
+
+Qué no.
+
+Cómo funciona.
+
+======================================================================
+
+5.
+
+Versioning Strategy
+
+Configuraciones
+
+Documentos
+
+Formularios
+
+Workflow
+
+Reglas
+
+======================================================================
+
+6.
+
+Audit Persistence
+
+Separación.
+
+Integridad.
+
+Cadena.
+
+Consulta.
+
+======================================================================
+
+7.
+
+Read Model Persistence
+
+Dashboards
+
+Power BI
+
+IA
+
+Buscador
+
+Reportes
+
+======================================================================
+
+8.
+
+Materialized Views Strategy
+
+Qué vistas existirán.
+
+Cómo se reconstruyen.
+
+Cuándo.
+
+======================================================================
+
+9.
+
+Snapshot Strategy
+
+Qué dominios usan snapshots.
+
+Frecuencia.
+
+Recuperación.
+
+======================================================================
+
+10.
+
+Archiving Strategy
+
+Archivado.
+
+Retención.
+
+Recuperación.
+
+Costo.
+
+======================================================================
+
+11.
+
+Soft Delete Strategy
+
+Cuándo.
+
+Cómo.
+
+Restricciones.
+
+======================================================================
+
+12.
+
+Identity Strategy
+
+UUID
+
+Identidades provisionales
+
+Offline IDs
+
+Resolución
+
+======================================================================
+
+13.
+
+Storage Strategy
+
+Datos
+
+Archivos
+
+Objetos
+
+Metadatos
+
+Miniaturas
+
+======================================================================
+
+14.
+
+Partitioning Strategy
+
+Tiempo
+
+Tenant
+
+Operación
+
+Datos históricos
+
+======================================================================
+
+15.
+
+Performance Strategy
+
+Lecturas
+
+Escrituras
+
+Consultas
+
+Históricos
+
+======================================================================
+
+16.
+
+Consistency Strategy
+
+Fuerte
+
+Eventual
+
+Compensaciones
+
+======================================================================
+
+17.
+
+Backup Strategy
+
+Datos
+
+Configuración
+
+Archivos
+
+Eventos
+
+Read Models
+
+======================================================================
+
+18.
+
+Recovery Strategy
+
+Tenant
+
+Módulo
+
+Objeto
+
+Evento
+
+Configuración
+
+======================================================================
+
+19.
+
+Migration Strategy
+
+Cambios
+
+Versiones
+
+Compatibilidad
+
+Rollback
+
+======================================================================
+
+20.
+
+Future Evolution
+
+Time Series
+
+Lakehouse
+
+Data Warehouse
+
+IoT
+
+Gemelos Digitales
+
+IA
+
+======================================================================
+
+ENTREGABLES
+
+01_PERSISTENCE_STRATEGY.md
+
+02_AGGREGATE_PERSISTENCE.md
+
+03_TRANSACTIONAL_PERSISTENCE.md
+
+04_APPEND_ONLY.md
+
+05_VERSIONING.md
+
+06_AUDIT_PERSISTENCE.md
+
+07_READ_MODEL_PERSISTENCE.md
+
+08_MATERIALIZED_VIEWS.md
+
+09_SNAPSHOTS.md
+
+10_ARCHIVING.md
+
+11_SOFT_DELETE.md
+
+12_IDENTITY_STRATEGY.md
+
+13_STORAGE_STRATEGY.md
+
+14_PARTITIONING.md
+
+15_PERFORMANCE_STORAGE.md
+
+16_CONSISTENCY.md
+
+17_BACKUP_RECOVERY.md
+
+18_MIGRATION_STRATEGY.md
+
+19_FUTURE_EVOLUTION.md
+
+20_PERSISTENCE_GUIDELINES.md
+
+======================================================================
+
+NO escribir código.
+
+NO diseñar PostgreSQL.
+
+NO crear tablas.
+
+Esperar nuevas instrucciones.
