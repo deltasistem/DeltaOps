@@ -1,0 +1,427 @@
+# DELTAOPS
+# ETS-005
+# CONFIGURATION PLATFORM
+# PLATFORM CONFIGURATION ARCHITECTURE
+# VERSION 1.0
+
+=====================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO CREES TABLAS.
+
+NO IMPLEMENTES.
+
+NO GENERES COMPONENTES.
+
+NO HAGAS API.
+
+NO HAGAS FRONTEND.
+
+Tu única misión es diseñar la Plataforma de Configuración de DeltaOps.
+
+=====================================================================
+
+# CONTEXTO
+
+Ya existen:
+
+ETS-001
+
+ETS-002
+
+ETS-003
+
+ETS-004
+
+Utilízalos como entrada.
+
+NO volver a analizarlos.
+
+=====================================================================
+
+# OBJETIVO
+
+Diseñar cómo DeltaOps podrá adaptarse a cualquier empresa SIN modificar código.
+
+Pensar como arquitecto de plataformas SaaS Enterprise.
+
+NO pensar como desarrollador.
+
+=====================================================================
+
+# PRINCIPIO
+
+Todo lo que pueda parametrizarse
+
+NO debe programarse.
+
+=====================================================================
+
+# IDENTIFICAR
+
+Qué pertenece al Core.
+
+Qué pertenece a Configuración.
+
+Qué pertenece al Tenant.
+
+Qué pertenece al Usuario.
+
+=====================================================================
+
+# DISEÑAR
+
+## 1.
+
+Configuration Engine
+
+=====================================================================
+
+## 2.
+
+Catalog Engine
+
+Ejemplos
+
+Tipos de activos
+
+Combustibles
+
+Estados
+
+Prioridades
+
+Criticidades
+
+Especialidades
+
+Fabricantes
+
+Modelos
+
+Marcas
+
+Unidades
+
+Monedas
+
+Países
+
+Idiomas
+
+Tipos de documento
+
+Clasificaciones
+
+Causas raíz
+
+Etc.
+
+TODO configurable.
+
+=====================================================================
+
+## 3.
+
+Dynamic Forms Engine
+
+Diseñar un motor para construir:
+
+Checklists
+
+Inspecciones
+
+Permisos
+
+Combustible
+
+Horas Hombre
+
+OT
+
+Auditorías
+
+Encuestas
+
+Cualquier formulario
+
+Sin programación.
+
+Definir:
+
+Tipos de campos
+
+Validaciones
+
+Dependencias
+
+Secciones
+
+Versionado
+
+Firmas
+
+Fotografías
+
+GPS
+
+Adjuntos
+
+QR
+
+NFC
+
+=====================================================================
+
+## 4.
+
+Workflow Engine
+
+Diseñar un motor configurable para:
+
+Aprobaciones
+
+OT
+
+Compras
+
+Contratos
+
+Solicitudes
+
+Documentos
+
+Movimientos
+
+Definir
+
+Estados
+
+Transiciones
+
+SLA
+
+Responsables
+
+Escalamientos
+
+Aprobaciones
+
+Reglas
+
+=====================================================================
+
+## 5.
+
+Rules Engine
+
+Motor de reglas.
+
+Ejemplos
+
+SI
+
+Checklist crítico
+
+ENTONCES
+
+Crear Solicitud
+
+SI
+
+Stock mínimo
+
+ENTONCES
+
+Crear Compra
+
+SI
+
+Contrato vence
+
+ENTONCES
+
+Notificar
+
+Definir
+
+Eventos
+
+Condiciones
+
+Acciones
+
+Prioridades
+
+Versiones
+
+=====================================================================
+
+## 6.
+
+Notification Engine
+
+Configurable.
+
+Push
+
+Correo
+
+WhatsApp
+
+SMS
+
+Teams
+
+Webhooks
+
+=====================================================================
+
+## 7.
+
+Dashboard Engine
+
+Diseñar dashboards configurables.
+
+Widgets
+
+KPIs
+
+Filtros
+
+Gráficos
+
+Favoritos
+
+Exportaciones
+
+=====================================================================
+
+## 8.
+
+Branding Engine
+
+Logo
+
+Nombre
+
+Colores
+
+Tema
+
+Dominio
+
+Idiomas
+
+Monedas
+
+=====================================================================
+
+## 9.
+
+Feature Flags
+
+Activar módulos.
+
+Desactivar módulos.
+
+Por empresa.
+
+Por licencia.
+
+Por usuario.
+
+=====================================================================
+
+## 10.
+
+Integration Engine
+
+REST
+
+Webhooks
+
+IoT
+
+Power BI
+
+SAP
+
+Dynamics
+
+Odoo
+
+Microsoft 365
+
+Google Workspace
+
+=====================================================================
+
+## 11.
+
+AI Configuration
+
+Qué módulos usan IA.
+
+Qué modelos.
+
+Qué permisos.
+
+Qué sugerencias.
+
+=====================================================================
+
+## 12.
+
+Tenant Configuration
+
+Qué puede configurar cada empresa.
+
+Qué no.
+
+=====================================================================
+
+# ENTREGABLES
+
+Generar únicamente documentación.
+
+01_CONFIGURATION_PLATFORM.md
+
+02_CONFIGURATION_ENGINE.md
+
+03_DYNAMIC_FORMS.md
+
+04_WORKFLOW_ENGINE.md
+
+05_RULES_ENGINE.md
+
+06_NOTIFICATION_ENGINE.md
+
+07_DASHBOARD_ENGINE.md
+
+08_BRANDING_ENGINE.md
+
+09_FEATURE_FLAGS.md
+
+10_INTEGRATION_ENGINE.md
+
+11_AI_CONFIGURATION.md
+
+12_TENANT_CONFIGURATION.md
+
+13_CATALOG_ARCHITECTURE.md
+
+14_CONFIGURATION_GUIDELINES.md
+
+=====================================================================
+
+NO escribir código.
+
+NO crear tablas.
+
+NO implementar.
+
+Esperar nuevas instrucciones.
