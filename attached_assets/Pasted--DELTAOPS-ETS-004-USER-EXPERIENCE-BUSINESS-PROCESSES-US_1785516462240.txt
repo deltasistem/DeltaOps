@@ -1,0 +1,389 @@
+# DELTAOPS
+# ETS-004
+# USER EXPERIENCE
+# BUSINESS PROCESSES
+# USER FLOWS
+# USE CASES
+# VERSION 1.0
+
+=====================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO CREES COMPONENTES.
+
+NO CREES PANTALLAS.
+
+NO HAGAS FRONTEND.
+
+NO HAGAS BACKEND.
+
+NO IMPLEMENTES NADA.
+
+Tu única misión es diseñar la EXPERIENCIA DE USUARIO COMPLETA de DeltaOps.
+
+=====================================================================
+
+# CONTEXTO
+
+Ya existen:
+
+ETS-001
+
+ETS-002
+
+ETS-003
+
+Todo el trabajo debe respetar esos documentos.
+
+=====================================================================
+
+# OBJETIVO
+
+Diseñar cómo trabajarán los usuarios.
+
+NO diseñar pantallas.
+
+Diseñar EXPERIENCIAS.
+
+=====================================================================
+
+# IDENTIFICAR LOS ROLES
+
+Como mínimo
+
+Administrador Global
+
+Administrador Empresa
+
+Gerente
+
+Director
+
+Coordinador
+
+Supervisor
+
+Jefe de Taller
+
+Planeador de mantenimiento
+
+Técnico
+
+Operador
+
+Almacenista
+
+Comprador
+
+Contratista
+
+Auditor
+
+Consulta
+
+IA Assistant
+
+Permitir crear nuevos.
+
+=====================================================================
+
+# PARA CADA ROL
+
+Definir
+
+Objetivos
+
+Responsabilidades
+
+Permisos
+
+Pantallas utilizadas
+
+Flujos diarios
+
+Información crítica
+
+Alertas
+
+KPIs
+
+Acciones permitidas
+
+=====================================================================
+
+# CASOS DE USO
+
+Construir TODOS.
+
+Como mínimo.
+
+Inicio de sesión
+
+Cambio de contexto
+
+Asignar activo
+
+Trasladar activo
+
+Crear checklist
+
+Ejecutar checklist
+
+Registrar combustible
+
+Registrar carga eléctrica
+
+Registrar horas hombre
+
+Crear OT
+
+Ejecutar OT
+
+Cerrar OT
+
+Solicitar repuestos
+
+Aprobar compra
+
+Recibir compra
+
+Realizar inventario
+
+Consultar hoja de vida
+
+Consultar indicadores
+
+Consultar costos
+
+Adjuntar documentos
+
+Generar reportes
+
+Administrar catálogos
+
+Administrar usuarios
+
+Administrar permisos
+
+Etc.
+
+=====================================================================
+
+# USER FLOWS
+
+Construir diagramas de flujo.
+
+Ejemplo
+
+Operador
+
+↓
+
+Login
+
+↓
+
+Selecciona empresa
+
+↓
+
+Selecciona operación
+
+↓
+
+Selecciona activo
+
+↓
+
+Checklist
+
+↓
+
+Firma
+
+↓
+
+Enviar
+
+↓
+
+Resultado
+
+Otro ejemplo
+
+Mecánico
+
+↓
+
+OT
+
+↓
+
+Diagnóstico
+
+↓
+
+Repuestos
+
+↓
+
+Horas
+
+↓
+
+Fotos
+
+↓
+
+Cerrar
+
+Crear TODOS.
+
+=====================================================================
+
+# MOBILE FIRST
+
+Diseñar toda la experiencia móvil.
+
+Operación offline.
+
+Sin cobertura.
+
+Sincronización.
+
+GPS.
+
+Fotografía.
+
+Firma.
+
+Código QR.
+
+Código de barras.
+
+NFC (preparado).
+
+=====================================================================
+
+# UX
+
+Definir
+
+Máximo número de clics.
+
+Acciones rápidas.
+
+Acciones masivas.
+
+Atajos.
+
+Favoritos.
+
+Recientes.
+
+Búsquedas.
+
+Filtros.
+
+=====================================================================
+
+# DASHBOARDS
+
+Definir dashboards para
+
+Gerencia
+
+Supervisor
+
+Planeador
+
+Técnico
+
+Operador
+
+Almacén
+
+Compras
+
+SST
+
+Auditor
+
+=====================================================================
+
+# IA
+
+Definir cómo interactúa el asistente.
+
+Qué puede hacer.
+
+Qué no puede hacer.
+
+Cuándo aparece.
+
+Qué propone.
+
+Cómo aprende.
+
+=====================================================================
+
+# NOTIFICACIONES
+
+Diseñar todas.
+
+Push
+
+Correo
+
+WhatsApp (preparado)
+
+SMS (preparado)
+
+Dentro del sistema
+
+=====================================================================
+
+# ENTREGABLES
+
+Generar únicamente documentación.
+
+01_USER_PERSONAS.md
+
+02_USER_JOURNEYS.md
+
+03_USE_CASES.md
+
+04_USER_FLOWS.md
+
+05_UX_PRINCIPIOS.md
+
+06_MOBILE_FIRST.md
+
+07_DASHBOARDS.md
+
+08_IA_ASSISTANT.md
+
+09_NOTIFICACIONES.md
+
+10_MATRIZ_PERMISOS.md
+
+11_CRITERIOS_USABILIDAD.md
+
+12_MAPA_EXPERIENCIA.md
+
+=====================================================================
+
+# IMPORTANTE
+
+NO generar código.
+
+NO generar componentes.
+
+NO generar wireframes.
+
+NO implementar.
+
+Esperar nuevas instrucciones.
