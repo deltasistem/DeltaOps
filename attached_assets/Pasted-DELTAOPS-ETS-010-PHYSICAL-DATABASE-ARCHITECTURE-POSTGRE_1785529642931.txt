@@ -1,0 +1,191 @@
+DELTAOPS
+ETS-010
+PHYSICAL DATABASE ARCHITECTURE
+POSTGRESQL ENTERPRISE DESIGN
+VERSION 1.0
+
+======================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO CREES MIGRACIONES.
+
+NO GENERES SQL.
+
+NO IMPLEMENTES NADA.
+
+NO MODIFIQUES EL PROYECTO.
+
+Tu única misión es diseñar la Arquitectura Física de Base de Datos de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Utilizar como entrada:
+
+ETS-001
+ETS-002
+ETS-003
+ETS-004
+ETS-005
+ETS-006
+ETS-007
+ETS-008
+ETS-009
+
+Todos son obligatorios.
+
+No volver a auditarlos.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar la estructura física de PostgreSQL respetando toda la arquitectura definida.
+
+No generar SQL.
+
+No crear tablas implementadas.
+
+Diseñar el modelo físico.
+
+======================================================================
+
+PRINCIPIOS
+
+Organization First
+
+Multi-Tenant
+
+UUID First
+
+Schema by Domain
+
+Configuration First
+
+Append Only
+
+Audit by Design
+
+CQRS
+
+Offline First
+
+API First
+
+======================================================================
+
+DISEÑAR
+
+1. Arquitectura física general
+
+2. Esquemas por dominio
+
+3. Catálogo de tablas por esquema
+
+4. Relaciones conceptuales
+
+5. Estrategia de claves primarias
+
+6. Estrategia de claves foráneas
+
+7. Convenciones oficiales
+
+8. Estrategia de índices
+
+9. Estrategia de particiones
+
+10. Materialized Views
+
+11. Vistas de solo lectura
+
+12. Constraints de negocio
+
+13. Tipos de datos
+
+14. Uso oficial de JSONB
+
+15. Estrategia de auditoría
+
+16. Estrategia de historización
+
+17. Estrategia de archivos
+
+18. Estrategia de sincronización offline
+
+19. Estrategia de migraciones
+
+20. Estrategia de rendimiento
+
+21. Estrategia de almacenamiento futuro
+
+22. Diccionario Oficial de Datos
+
+======================================================================
+
+GENERAR EXACTAMENTE
+
+01_DATABASE_ARCHITECTURE.md
+
+02_DATABASE_SCHEMAS.md
+
+03_TABLE_CATALOG.md
+
+04_RELATIONSHIP_MODEL.md
+
+05_PRIMARY_KEYS.md
+
+06_FOREIGN_KEYS.md
+
+07_DATABASE_CONVENTIONS.md
+
+08_INDEX_STRATEGY.md
+
+09_PARTITIONING.md
+
+10_MATERIALIZED_VIEWS.md
+
+11_DATABASE_VIEWS.md
+
+12_BUSINESS_CONSTRAINTS.md
+
+13_DATA_TYPES.md
+
+14_JSONB_GUIDELINES.md
+
+15_AUDIT_STORAGE.md
+
+16_HISTORY_STRATEGY.md
+
+17_FILE_STORAGE.md
+
+18_OFFLINE_STORAGE.md
+
+19_MIGRATION_GUIDELINES.md
+
+20_DATABASE_PERFORMANCE.md
+
+21_STORAGE_EVOLUTION.md
+
+22_DATA_DICTIONARY.md
+
+======================================================================
+
+Cada documento debe terminar obligatoriamente con:
+
+1. Impacto sobre la implementación
+2. ETS relacionados
+3. Riesgos
+4. Decisiones habilitadas
+5. Decisiones bloqueadas hasta el siguiente ETS
+
+======================================================================
+
+NO escribir SQL.
+
+NO crear tablas implementadas.
+
+NO generar código.
+
+Esperar nuevas instrucciones.
