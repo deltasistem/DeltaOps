@@ -1,0 +1,359 @@
+# DELTAOPS
+# ETS-007
+# PLATFORM TECHNICAL ARCHITECTURE
+# TECHNICAL ARCHITECTURE
+# VERSION 1.0
+
+======================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO CREES APIs.
+
+NO IMPLEMENTES SERVICIOS.
+
+NO CREES TABLAS.
+
+NO GENERES COMPONENTES.
+
+NO MODIFIQUES EL FRONTEND.
+
+NO MODIFIQUES EL BACKEND.
+
+Tu única misión es diseñar la Arquitectura Técnica de DeltaOps.
+
+======================================================================
+
+# CONTEXTO
+
+Utilizar como entrada:
+
+ETS-001
+ETS-002
+ETS-003
+ETS-004
+ETS-005
+ETS-006
+
+No volver a auditarlos.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar la arquitectura técnica completa de la plataforma antes de escribir una sola línea de código.
+
+Pensar como arquitecto Enterprise.
+
+No como programador.
+
+======================================================================
+
+DEFINIR
+
+1. Arquitectura General de la Plataforma
+
+- Modular Monolith vs Modular Services
+- Justificación de la decisión
+- Estrategia de evolución futura
+
+======================================================================
+
+2. Arquitectura Modular
+
+Definir todos los módulos técnicos:
+
+Core
+Identity
+Organization
+Assets
+Maintenance
+Work Orders
+Inventory
+Fuel & Energy
+Purchasing
+Warehouse
+Analytics
+AI
+Notifications
+Workflow
+Rules
+Configuration
+Audit
+Files
+Search
+Reporting
+Mobile
+Integration
+
+Para cada módulo definir:
+
+- Responsabilidades
+- Límites
+- Dependencias permitidas
+- Eventos publicados
+- Eventos consumidos
+- Interfaces públicas
+
+======================================================================
+
+3. Comunicación entre módulos
+
+- Llamadas síncronas
+- Eventos
+- Contratos
+- Desacoplamiento
+- Anti-corruption Layer
+- Publicación de eventos
+
+======================================================================
+
+4. Arquitectura Multi-Tenant
+
+Definir:
+
+- Aislamiento lógico
+- Contexto activo
+- Cambio de tenant
+- Cambio de sede
+- Cambio de proyecto
+- Cambio de centro de costo
+- Herencia de configuración
+
+======================================================================
+
+5. Arquitectura Offline
+
+Diseñar:
+
+- Sincronización
+- Cola local
+- Resolución técnica
+- Reintentos
+- Compresión
+- Versionado
+
+======================================================================
+
+6. Arquitectura de Archivos
+
+Definir estrategia para:
+
+Fotografías
+Firmas
+Videos
+PDF
+Manuales
+Documentos
+Planos
+Adjuntos
+
+Versionado
+
+Miniaturas
+
+Metadatos
+
+Retención
+
+======================================================================
+
+7. Arquitectura de Integraciones
+
+REST API
+
+Webhooks
+
+Microsoft 365
+
+Power BI
+
+SAP
+
+Dynamics
+
+Odoo
+
+IoT
+
+Telemetría
+
+MQTT (preparado)
+
+======================================================================
+
+8. Arquitectura de IA
+
+Definir:
+
+Servicios IA
+
+Contexto
+
+Memoria
+
+Permisos
+
+Embeddings (preparado)
+
+RAG (preparado)
+
+Agentes
+
+Modelos
+
+======================================================================
+
+9. Arquitectura de Observabilidad
+
+Logs
+
+Métricas
+
+Tracing
+
+Health Checks
+
+Auditoría
+
+Alertas
+
+Diagnóstico
+
+======================================================================
+
+10. Arquitectura de Caché
+
+Cliente
+
+Servidor
+
+Configuración
+
+Read Models
+
+Catálogos
+
+Sesión
+
+======================================================================
+
+11. Arquitectura de Seguridad Técnica
+
+JWT
+
+Refresh
+
+Sesiones
+
+CSRF
+
+Rate Limit
+
+Secrets
+
+Cifrado
+
+Rotación
+
+======================================================================
+
+12. Estrategia de Escalabilidad
+
+Escalado horizontal
+
+Escalado vertical
+
+Separación futura
+
+Servicios
+
+Mensajería
+
+======================================================================
+
+13. Estrategia Cloud
+
+Docker
+
+Contenedores
+
+Balanceador
+
+Storage
+
+CDN
+
+Backups
+
+Entornos
+
+======================================================================
+
+14. Arquitectura de Despliegue
+
+DEV
+
+QA
+
+UAT
+
+PROD
+
+Migraciones
+
+Rollback
+
+Blue/Green preparado
+
+======================================================================
+
+ENTREGABLES
+
+Generar únicamente documentación.
+
+01_PLATFORM_ARCHITECTURE.md
+
+02_MODULAR_ARCHITECTURE.md
+
+03_MODULE_CATALOG.md
+
+04_MODULE_INTERACTIONS.md
+
+05_MULTITENANT_ARCHITECTURE.md
+
+06_OFFLINE_TECHNICAL.md
+
+07_FILE_ARCHITECTURE.md
+
+08_INTEGRATION_ARCHITECTURE.md
+
+09_AI_ARCHITECTURE.md
+
+10_OBSERVABILITY.md
+
+11_CACHE_ARCHITECTURE.md
+
+12_SECURITY_TECHNICAL.md
+
+13_SCALABILITY.md
+
+14_CLOUD_ARCHITECTURE.md
+
+15_DEPLOYMENT_ARCHITECTURE.md
+
+16_TECHNICAL_GUIDELINES.md
+
+======================================================================
+
+NO escribir código.
+
+NO crear APIs.
+
+NO crear tablas.
+
+NO implementar.
+
+Esperar nuevas instrucciones.
