@@ -1,0 +1,349 @@
+# DELTAOPS
+# ETS-003
+# DOMAIN DRIVEN DESIGN (DDD)
+# ENTERPRISE DOMAIN MODEL
+# VERSION 1.0
+
+======================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO CREES TABLAS.
+
+NO GENERES MIGRACIONES.
+
+NO HAGAS MODELOS.
+
+NO CREES COMPONENTES.
+
+NO HAGAS API.
+
+NO IMPLEMENTES NADA.
+
+Tu misión es diseñar el MODELO DE DOMINIO COMPLETO de DeltaOps.
+
+======================================================================
+
+# CONTEXTO
+
+Ya existen los documentos:
+
+ARQUITECTURA_ACTUAL.md
+
+REUTILIZACION.md
+
+01_ARQUITECTURA_EMPRESARIAL.md
+
+02_MAPA_MODULOS.md
+
+03_MAPA_NAVEGACION.md
+
+04_PRINCIPIOS_SGMA.md
+
+Utilízalos como entrada.
+
+NO volver a auditarlos.
+
+======================================================================
+
+# OBJETIVO
+
+Construir el Modelo de Dominio Empresarial de DeltaOps.
+
+NO pensar como desarrollador.
+
+Pensar como arquitecto empresarial.
+
+======================================================================
+
+# IMPORTANTE
+
+NO modelar tablas.
+
+NO modelar clases.
+
+NO modelar código.
+
+Modelar el NEGOCIO.
+
+======================================================================
+
+# IDENTIFICAR
+
+Todos los Aggregate Roots.
+
+Todas las Entidades.
+
+Todos los Value Objects.
+
+Todos los Domain Services.
+
+Todos los Domain Events.
+
+Todos los Bounded Contexts.
+
+Todas las relaciones.
+
+Todas las reglas.
+
+======================================================================
+
+# LOS DOMINIOS DEBEN CONTEMPLAR COMO MÍNIMO
+
+Organización
+
+Seguridad
+
+Usuarios
+
+Permisos
+
+Empresas
+
+Sedes
+
+Operaciones
+
+Proyectos
+
+Centros de costo
+
+Ubicaciones
+
+Activos
+
+Componentes
+
+Fabricantes
+
+Modelos
+
+Combustibles
+
+Documentos
+
+Checklist
+
+Plantillas
+
+Inspecciones
+
+Mantenimiento
+
+OT
+
+Preventivos
+
+Predictivos
+
+Correctivos
+
+Horas Hombre
+
+Horómetros
+
+Kilometraje
+
+Inventario
+
+Repuestos
+
+Compras
+
+Proveedores
+
+Contratos
+
+Costos
+
+Indicadores
+
+Analítica
+
+IA
+
+Auditoría
+
+Notificaciones
+
+Configuraciones
+
+Catálogos
+
+======================================================================
+
+# PARA CADA ENTIDAD
+
+Definir
+
+• Definición
+
+• Responsabilidad
+
+• Ciclo de vida
+
+• Estados
+
+• Relaciones
+
+• Eventos
+
+• Restricciones
+
+• Reglas
+
+• Indicadores
+
+• Riesgos
+
+======================================================================
+
+# DOMAIN EVENTS
+
+Identificar TODOS.
+
+Ejemplos
+
+ActivoCreado
+
+ActivoAsignado
+
+ActivoTrasladado
+
+ActivoRetirado
+
+ChecklistRealizado
+
+HallazgoRegistrado
+
+OTCreada
+
+OTAsignada
+
+OTCerrada
+
+CombustibleRegistrado
+
+StockActualizado
+
+ProveedorCalificado
+
+etc.
+
+No limitarse a estos.
+
+======================================================================
+
+# DOMAIN SERVICES
+
+Identificar todos.
+
+Ejemplos
+
+Motor de Asignaciones
+
+Motor de Preventivos
+
+Motor de Indicadores
+
+Motor de Notificaciones
+
+Motor de Auditoría
+
+Motor de Costos
+
+Motor de Combustible
+
+Motor de Checklist
+
+Motor de Reglas
+
+Motor de IA
+
+======================================================================
+
+# VALUE OBJECTS
+
+Identificar todos.
+
+Ejemplo
+
+Dinero
+
+Dirección
+
+Correo
+
+Teléfono
+
+Ubicación GPS
+
+Horómetro
+
+Kilometraje
+
+Moneda
+
+Periodo
+
+Rango de Fechas
+
+======================================================================
+
+# AGGREGATE ROOTS
+
+Identificar todos.
+
+No limitarse a:
+
+Organización
+
+Activo
+
+Orden de Trabajo
+
+Inventario
+
+Proveedor
+
+Usuario
+
+======================================================================
+
+# ENTREGABLES
+
+Generar únicamente documentación.
+
+01_DOMAIN_MODEL.md
+
+02_BOUNDED_CONTEXTS.md
+
+03_DOMAIN_EVENTS.md
+
+04_DOMAIN_SERVICES.md
+
+05_AGGREGATES.md
+
+06_VALUE_OBJECTS.md
+
+07_ENTIDADES.md
+
+08_DICCIONARIO_NEGOCIO.md
+
+09_GLOSARIO_DELTAOPS.md
+
+======================================================================
+
+# IMPORTANTE
+
+No generar código.
+
+No modificar código.
+
+No crear tablas.
+
+No crear migraciones.
+
+Esperar nuevas instrucciones.
