@@ -1,0 +1,222 @@
+DELTAOPS
+ETS-011
+APPLICATION CORE ARCHITECTURE
+ENTERPRISE APPLICATION CORE
+VERSION 1.0
+
+======================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO CREES CLASES.
+
+NO GENERES FRAMEWORKS.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO CREES SERVICIOS IMPLEMENTADOS.
+
+Tu única misión es diseñar el Núcleo de Aplicación de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como entrada:
+
+ETS-001
+ETS-002
+ETS-003
+ETS-004
+ETS-005
+ETS-006
+ETS-007
+ETS-008
+ETS-009
+ETS-010
+
+Todos son obligatorios.
+
+No volver a auditarlos.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar la arquitectura interna de la aplicación.
+
+No diseñar FastAPI.
+
+No diseñar Python.
+
+Diseñar el Core.
+
+======================================================================
+
+PRINCIPIOS
+
+Clean Architecture
+
+DDD
+
+Hexagonal
+
+CQRS
+
+SOLID
+
+API First
+
+Configuration First
+
+Offline First
+
+Event Driven
+
+Dependency Rule
+
+======================================================================
+
+DISEÑAR
+
+1. DeltaOps Kernel
+
+2. Capas del Core
+
+3. Casos de Uso (Application Services)
+
+4. Domain Services
+
+5. Policies
+
+6. Ports
+
+7. Adapters Conceptuales
+
+8. Unit of Work
+
+9. Transaction Boundaries
+
+10. Event Dispatcher
+
+11. Command Pipeline
+
+12. Query Pipeline
+
+13. Validation Pipeline
+
+14. Authorization Pipeline
+
+15. Configuration Resolution
+
+16. Notification Pipeline
+
+17. Audit Pipeline
+
+18. File Pipeline
+
+19. Search Pipeline
+
+20. Reporting Pipeline
+
+21. AI Pipeline
+
+22. Integration Pipeline
+
+23. Dependency Rules
+
+24. Package Structure
+
+25. Estrategia de Testing
+
+26. Estrategia de Manejo de Errores
+
+27. Estrategia de Observabilidad del Core
+
+28. Estrategia de Evolución
+
+======================================================================
+
+GENERAR
+
+01_APPLICATION_CORE.md
+
+02_KERNEL.md
+
+03_APPLICATION_SERVICES.md
+
+04_DOMAIN_SERVICES.md
+
+05_POLICIES.md
+
+06_PORTS.md
+
+07_ADAPTERS.md
+
+08_UNIT_OF_WORK.md
+
+09_TRANSACTION_BOUNDARIES.md
+
+10_EVENT_DISPATCHER.md
+
+11_COMMAND_PIPELINE.md
+
+12_QUERY_PIPELINE.md
+
+13_VALIDATION_PIPELINE.md
+
+14_AUTHORIZATION_PIPELINE.md
+
+15_CONFIGURATION_RESOLUTION.md
+
+16_NOTIFICATION_PIPELINE.md
+
+17_AUDIT_PIPELINE.md
+
+18_FILE_PIPELINE.md
+
+19_SEARCH_PIPELINE.md
+
+20_REPORTING_PIPELINE.md
+
+21_AI_PIPELINE.md
+
+22_INTEGRATION_PIPELINE.md
+
+23_DEPENDENCY_RULES.md
+
+24_PACKAGE_STRUCTURE.md
+
+25_TESTING_STRATEGY.md
+
+26_ERROR_HANDLING.md
+
+27_CORE_OBSERVABILITY.md
+
+28_CORE_EVOLUTION.md
+
+======================================================================
+
+Cada documento debe terminar obligatoriamente con:
+
+1. Impacto sobre la implementación
+
+2. ETS relacionados
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+======================================================================
+
+NO escribir código.
+
+NO crear clases.
+
+NO implementar.
+
+Esperar nuevas instrucciones.
