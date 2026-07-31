@@ -1,0 +1,553 @@
+DELTAOPS – ENTERPRISE TECHNICAL SPECIFICATION
+ETS-008
+API CONTRACT ARCHITECTURE
+
+IMPORTANTE
+
+No escribir código.
+
+No crear endpoints.
+
+No modificar absolutamente nada del proyecto.
+
+No instalar librerías.
+
+No generar OpenAPI.
+
+No crear Swagger.
+
+No generar archivos JSON.
+
+No generar DTOs de programación.
+
+ÚNICAMENTE generar documentación técnica.
+
+Toda la documentación debe escribirse en español.
+
+Todos los documentos deben quedar en la raíz del proyecto.
+
+--------------------------------------------------
+
+OBJETIVO
+
+Diseñar la arquitectura completa de contratos públicos de DeltaOps.
+
+Esta especificación será la fuente oficial para construir posteriormente:
+
+Backend
+
+Frontend
+
+Aplicación móvil
+
+SDK
+
+API Pública
+
+Integraciones
+
+IA
+
+Sin volver a discutir cómo funciona un módulo.
+
+Toda implementación futura deberá obedecer ETS-008.
+
+ETS-008 debe ser completamente coherente con:
+
+ETS-001
+ETS-002
+ETS-003
+ETS-004
+ETS-005
+ETS-006
+ETS-007
+
+No se permite contradecir ningún documento anterior.
+
+--------------------------------------------------
+
+GENERAR EXACTAMENTE LOS SIGUIENTES DOCUMENTOS
+
+01_API_PHILOSOPHY.md
+
+Definir:
+
+API First
+
+Contract First
+
+Backward Compatibility
+
+Versionado
+
+Idempotencia
+
+Consistencia
+
+Errores
+
+Naming Convention
+
+Resource Naming
+
+Commands
+
+Queries
+
+REST
+
+Eventos
+
+Sincronía
+
+Asincronía
+
+Paginación
+
+Filtros
+
+Sorting
+
+Búsqueda
+
+Batch
+
+Bulk Operations
+
+Offline
+
+--------------------------------------------------
+
+02_API_STANDARDS.md
+
+Convenciones completas.
+
+Rutas
+
+Headers
+
+Autenticación
+
+Tenant
+
+Contexto
+
+TraceId
+
+CorrelationId
+
+Version
+
+Localization
+
+Timezone
+
+Idempotency Key
+
+Response Time
+
+Rate Limit
+
+Cache
+
+Compression
+
+ETags
+
+--------------------------------------------------
+
+03_COMMAND_CATALOG.md
+
+Para TODOS los módulos.
+
+Definir TODOS los Commands.
+
+Ejemplo
+
+CrearActivo
+
+ActualizarActivo
+
+TrasladarActivo
+
+RegistrarLectura
+
+CrearOT
+
+CerrarOT
+
+RegistrarTanqueo
+
+CrearSolicitud
+
+etc.
+
+Cada command debe tener
+
+Objetivo
+
+Permisos
+
+Actor
+
+Precondiciones
+
+Postcondiciones
+
+Eventos emitidos
+
+Errores posibles
+
+Auditoría
+
+Offline
+
+Idempotencia
+
+--------------------------------------------------
+
+04_QUERY_CATALOG.md
+
+Todas las consultas.
+
+ConsultarHojaVida
+
+ConsultarOT
+
+ConsultarIndicadores
+
+ConsultarInventario
+
+ConsultarConsumo
+
+ConsultarAsignaciones
+
+ConsultarDashboard
+
+etc.
+
+Para cada consulta definir
+
+Filtros
+
+Ordenamiento
+
+Paginación
+
+DrillDown
+
+Read Model utilizado
+
+Permisos
+
+Cache
+
+--------------------------------------------------
+
+05_ENDPOINT_CATALOG.md
+
+Catalogar TODA la API.
+
+Agrupada por módulos.
+
+No implementar.
+
+Solo documentar.
+
+Con:
+
+Método
+
+Ruta
+
+Descripción
+
+Command o Query asociado
+
+Permisos
+
+Versiones
+
+Rate Limit
+
+Respuesta
+
+Eventos relacionados
+
+--------------------------------------------------
+
+06_REQUEST_RESPONSE_STANDARDS.md
+
+Diseñar completamente
+
+Request
+
+Response
+
+Envelope
+
+Metadata
+
+Errors
+
+Warnings
+
+Validation
+
+Paging
+
+Links
+
+Correlation
+
+Localization
+
+--------------------------------------------------
+
+07_ERROR_CATALOG.md
+
+Diseñar TODOS los errores.
+
+Negocio
+
+Validación
+
+Permisos
+
+Tenant
+
+Offline
+
+Sincronización
+
+Integraciones
+
+IA
+
+Infraestructura
+
+Con códigos estables.
+
+--------------------------------------------------
+
+08_SECURITY_CONTRACTS.md
+
+Contratos de seguridad.
+
+JWT
+
+Refresh
+
+Scopes
+
+Claims
+
+Tenant
+
+Delegación
+
+SSO
+
+API Keys
+
+Service Accounts
+
+Device Tokens
+
+IoT
+
+--------------------------------------------------
+
+09_EVENT_CONTRACTS.md
+
+Todos los eventos públicos.
+
+Payload conceptual.
+
+Versionado.
+
+Compatibilidad.
+
+Replay.
+
+Outbox.
+
+Orden.
+
+Idempotencia.
+
+--------------------------------------------------
+
+10_WEBHOOK_CONTRACTS.md
+
+Arquitectura completa.
+
+Eventos.
+
+Firmas.
+
+Reintentos.
+
+Seguridad.
+
+Payload.
+
+Headers.
+
+Versionado.
+
+--------------------------------------------------
+
+11_FILE_API.md
+
+Contratos para
+
+Subidas
+
+Descargas
+
+Versiones
+
+Miniaturas
+
+URLs firmadas
+
+Chunks
+
+Reanudación
+
+--------------------------------------------------
+
+12_SYNC_API.md
+
+Contratos móviles.
+
+Offline.
+
+Bitácoras.
+
+Paquetes.
+
+Conflictos.
+
+Versiones.
+
+--------------------------------------------------
+
+13_INTEGRATION_API.md
+
+ERP
+
+SAP
+
+Dynamics
+
+Odoo
+
+Power BI
+
+Power Platform
+
+Microsoft 365
+
+Google
+
+IoT
+
+MQTT
+
+--------------------------------------------------
+
+14_AI_API.md
+
+Contratos del asistente.
+
+Preguntas.
+
+Contexto.
+
+Sugerencias.
+
+Diagnóstico.
+
+Explicaciones.
+
+Retroalimentación.
+
+--------------------------------------------------
+
+15_SDK_GUIDE.md
+
+Cómo debería construirse el SDK oficial.
+
+JavaScript
+
+TypeScript
+
+Python
+
+.NET
+
+Móvil
+
+--------------------------------------------------
+
+16_OPENAPI_GUIDELINES.md
+
+NO generar OpenAPI.
+
+Únicamente definir cómo deberá construirse posteriormente.
+
+Versionado.
+
+Organización.
+
+Tags.
+
+Schemas.
+
+Examples.
+
+--------------------------------------------------
+
+17_API_GOVERNANCE.md
+
+Normas de gobierno.
+
+Versionado.
+
+Deprecaciones.
+
+Breaking Changes.
+
+Compatibilidad.
+
+Documentación.
+
+Testing.
+
+Revisión.
+
+--------------------------------------------------
+
+18_API_CHECKLIST.md
+
+Checklist completo para validar que cualquier endpoint nuevo cumple ETS-008.
+
+--------------------------------------------------
+
+REGLAS
+
+No escribir código.
+
+No generar OpenAPI.
+
+No modificar el proyecto.
+
+No asumir tecnologías distintas a ETS-007.
+
+No simplificar.
+
+Todo debe estar preparado para una plataforma Enterprise SaaS mundial.
+
+Al finalizar, detenerse y esperar instrucciones.
