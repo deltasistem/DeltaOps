@@ -1,0 +1,226 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-005
+
+BUSINESS MODULE ENGINEERING
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO GENERES PYTHON.
+
+NO GENERES FASTAPI.
+
+NO GENERES SQL.
+
+NO IMPLEMENTES MÓDULOS REALES.
+
+Tu única misión es diseñar el estándar oficial para construir módulos de negocio dentro de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+ESI-002
+
+ESI-003
+
+ESI-004
+
+Toda la arquitectura está congelada.
+
+Toda la plataforma backend está congelada.
+
+El Reference Module ya fue definido.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar el estándar oficial que deberán seguir todos los módulos de negocio de DeltaOps.
+
+Este documento NO implementa módulos.
+
+Define cómo deberán implementarse.
+
+======================================================================
+
+DISEÑAR
+
+1. Concepto de Business Module
+
+2. Anatomía oficial
+
+3. Ciclo de vida del módulo
+
+4. Registro del módulo
+
+5. Registro de capacidades
+
+6. Commands
+
+7. Queries
+
+8. Eventos
+
+9. Policies
+
+10. Domain Services
+
+11. Aggregates
+
+12. Read Models
+
+13. Indicadores
+
+14. Configuración
+
+15. Seguridad
+
+16. Permisos
+
+17. MultiTenant
+
+18. Offline
+
+19. Integraciones
+
+20. IA
+
+21. Documentación
+
+22. Testing
+
+23. Business Module Maturity Model
+
+24. Module Scorecard
+
+25. Checklist de implementación
+
+26. Checklist de revisión
+
+27. Relación con DGP
+
+28. Evolución de módulos
+
+======================================================================
+
+GENERAR
+
+01_BUSINESS_MODULE.md
+
+02_MODULE_ANATOMY.md
+
+03_MODULE_LIFECYCLE.md
+
+04_MODULE_REGISTRATION.md
+
+05_CAPABILITY_MODEL.md
+
+06_COMMAND_MODEL.md
+
+07_QUERY_MODEL.md
+
+08_EVENT_MODEL.md
+
+09_POLICY_MODEL.md
+
+10_DOMAIN_SERVICE_MODEL.md
+
+11_AGGREGATE_MODEL.md
+
+12_READMODEL_MODEL.md
+
+13_KPI_MODEL.md
+
+14_CONFIGURATION_MODEL.md
+
+15_SECURITY_MODEL.md
+
+16_PERMISSION_MODEL.md
+
+17_MULTITENANT_MODEL.md
+
+18_OFFLINE_MODEL.md
+
+19_INTEGRATION_MODEL.md
+
+20_AI_MODEL.md
+
+21_DOCUMENTATION_MODEL.md
+
+22_TESTING_MODEL.md
+
+23_MODULE_MATURITY.md
+
+24_MODULE_SCORECARD.md
+
+25_IMPLEMENTATION_CHECKLIST.md
+
+26_REVIEW_CHECKLIST.md
+
+27_DGP_MAPPING.md
+
+28_MODULE_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No implementar módulos reales.
+
+No generar ejemplos en Python.
+
+No modificar ETS.
+
+No modificar ESI.
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+6. Reusable Pattern
+
+7. Anti-Patterns
+
+8. Knowledge Graph
+
+(Indicar explícitamente:
+- Qué ETS consume.
+- Qué ESI consume.
+- Qué DGP originará.
+- Qué ADR relacionados existen.
+- Qué módulos reutilizarán este patrón.)
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
