@@ -1,0 +1,213 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-002
+
+DEVELOPMENT ENVIRONMENT & ENGINEERING PLATFORM
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO CONFIGURES HERRAMIENTAS.
+
+NO GENERES DOCKERFILES.
+
+NO GENERES YAML.
+
+NO GENERES GITHUB ACTIONS.
+
+NO CREES ESTRUCTURAS FÍSICAS.
+
+Tu única misión es diseñar la Plataforma Oficial de Ingeniería de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+La arquitectura del producto está congelada.
+
+El stack tecnológico ya fue oficialmente seleccionado.
+
+No debe modificarse.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar el entorno de desarrollo oficial que utilizarán todos los desarrolladores humanos e IA para construir DeltaOps.
+
+El resultado deberá permitir que cualquier implementación futura siga exactamente las mismas reglas.
+
+======================================================================
+
+DISEÑAR
+
+1. Arquitectura del Monorepo
+
+2. Organización física del repositorio
+
+3. Convenciones de carpetas
+
+4. Organización de aplicaciones
+
+5. Organización de paquetes compartidos
+
+6. Convenciones Git
+
+7. Estrategia de ramas
+
+8. Estrategia de versionado
+
+9. Bootstrap del proyecto
+
+10. Onboarding de desarrolladores
+
+11. Variables de entorno
+
+12. Gestión de secretos
+
+13. Entornos oficiales (DEV, QA, UAT, PROD)
+
+14. Estrategia Docker
+
+15. Servicios del entorno local
+
+16. Scripts oficiales
+
+17. Datos de desarrollo
+
+18. Seed y Fixtures
+
+19. Gestión de dependencias
+
+20. Calidad del código antes del commit
+
+21. Configuración del IDE
+
+22. Herramientas obligatorias
+
+23. Ingeniería asistida por IA
+
+24. Catálogo de plantillas de ingeniería
+
+25. Estrategia de generadores
+
+26. Preparación para los futuros DGP
+
+27. Checklist de preparación para Sprint 1
+
+28. Guía oficial del entorno de ingeniería
+
+======================================================================
+
+GENERAR
+
+01_ENGINEERING_PLATFORM.md
+
+02_MONOREPO_ARCHITECTURE.md
+
+03_REPOSITORY_STRUCTURE.md
+
+04_GIT_STRATEGY.md
+
+05_PROJECT_BOOTSTRAP.md
+
+06_DEVELOPER_ONBOARDING.md
+
+07_ENVIRONMENT_CONFIGURATION.md
+
+08_SECRET_MANAGEMENT.md
+
+09_ENVIRONMENTS.md
+
+10_DOCKER_STRATEGY.md
+
+11_LOCAL_DEVELOPMENT.md
+
+12_DATA_MANAGEMENT.md
+
+13_DEPENDENCY_MANAGEMENT.md
+
+14_CODE_QUALITY.md
+
+15_IDE_GUIDELINES.md
+
+16_ENGINEERING_TOOLS.md
+
+17_AI_DEVELOPMENT.md
+
+18_ENGINEERING_TEMPLATES.md
+
+19_GENERATOR_STRATEGY.md
+
+20_DGP_PREPARATION.md
+
+21_VERSIONING_GUIDELINES.md
+
+22_RELEASE_PREPARATION.md
+
+23_DOCUMENTATION_STANDARDS.md
+
+24_ENGINEERING_CONVENTIONS.md
+
+25_DEVELOPMENT_CHECKLIST.md
+
+26_SPRINT_READINESS.md
+
+27_ENGINEERING_GOVERNANCE.md
+
+28_PLATFORM_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No generar configuraciones.
+
+No crear archivos YAML.
+
+No crear Dockerfiles.
+
+No crear scripts.
+
+No modificar ningún ETS.
+
+No modificar ningún ESI.
+
+Todo debe estar orientado a estandarizar el trabajo de ingeniería.
+
+Cada documento debe finalizar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
