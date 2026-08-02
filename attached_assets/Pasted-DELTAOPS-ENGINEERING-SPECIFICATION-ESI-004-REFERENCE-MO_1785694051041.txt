@@ -1,0 +1,251 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-004
+
+REFERENCE MODULE ENGINEERING
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO GENERES ARCHIVOS PYTHON.
+
+NO CREES FASTAPI.
+
+NO GENERES SQL.
+
+NO IMPLEMENTES EL MÓDULO.
+
+Tu única misión es diseñar el Módulo de Referencia Oficial de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+ESI-002
+
+ESI-003
+
+Toda la arquitectura está congelada.
+
+Toda la plataforma backend está congelada.
+
+No puede modificarse.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar un módulo completamente neutro cuyo único propósito sea demostrar la implementación correcta de toda la arquitectura.
+
+Este módulo NO pertenece al negocio.
+
+Será utilizado como patrón oficial para todos los módulos futuros.
+
+======================================================================
+
+REGLAS
+
+NO utilizar:
+
+Activos
+
+Inventario
+
+Combustible
+
+Compras
+
+OT
+
+SST
+
+Ningún dominio del negocio.
+
+Crear un dominio completamente neutro.
+
+Ejemplo:
+
+Reference Capability
+
+Sample Capability
+
+Canonical Capability
+
+======================================================================
+
+DISEÑAR
+
+1. Objetivo del Reference Module
+
+2. Anatomía completa
+
+3. Registro del módulo
+
+4. Registro de capacidades
+
+5. Command de referencia
+
+6. Query de referencia
+
+7. Pipeline completo
+
+8. Validaciones
+
+9. Policies
+
+10. Application Service
+
+11. Domain Service
+
+12. Repository
+
+13. Unit of Work
+
+14. Evento publicado
+
+15. Read Model
+
+16. Logging
+
+17. Auditoría
+
+18. Observabilidad
+
+19. Testing
+
+20. Documentación
+
+21. Checklist del módulo
+
+22. Golden Path
+
+23. Anti-Patterns
+
+24. Relación con los futuros DGP
+
+25. Criterios de aceptación
+
+26. Checklist de revisión
+
+27. Checklist de calidad
+
+28. Evolución del Reference Module
+
+======================================================================
+
+GENERAR
+
+01_REFERENCE_MODULE.md
+
+02_REFERENCE_STRUCTURE.md
+
+03_MODULE_REGISTRATION.md
+
+04_CAPABILITY_REGISTRATION.md
+
+05_REFERENCE_COMMAND.md
+
+06_REFERENCE_QUERY.md
+
+07_REFERENCE_PIPELINE.md
+
+08_REFERENCE_VALIDATION.md
+
+09_REFERENCE_POLICIES.md
+
+10_REFERENCE_APPLICATION_SERVICE.md
+
+11_REFERENCE_DOMAIN_SERVICE.md
+
+12_REFERENCE_REPOSITORY.md
+
+13_REFERENCE_UNIT_OF_WORK.md
+
+14_REFERENCE_EVENT.md
+
+15_REFERENCE_READ_MODEL.md
+
+16_REFERENCE_LOGGING.md
+
+17_REFERENCE_AUDIT.md
+
+18_REFERENCE_OBSERVABILITY.md
+
+19_REFERENCE_TESTING.md
+
+20_REFERENCE_DOCUMENTATION.md
+
+21_REFERENCE_CHECKLIST.md
+
+22_GOLDEN_PATH.md
+
+23_ANTI_PATTERNS.md
+
+24_DGP_RELATIONSHIP.md
+
+25_ACCEPTANCE_CRITERIA.md
+
+26_REVIEW_CHECKLIST.md
+
+27_QUALITY_CHECKLIST.md
+
+28_REFERENCE_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No implementar.
+
+No generar ejemplos de Python.
+
+No crear módulos reales.
+
+No modificar ETS.
+
+No modificar ESI.
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+6. Reusable Pattern
+
+(Indicar explícitamente qué partes serán reutilizadas por los futuros DGP)
+
+7. Anti-Patterns
+
+(Indicar explícitamente qué prácticas quedan prohibidas)
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
