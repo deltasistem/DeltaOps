@@ -1,0 +1,403 @@
+DELTAOPS
+ENGINEERING CHARTER
+VERSIÓN 1.0
+
+======================================================================
+IMPORTANTE
+======================================================================
+
+NO ESCRIBAS CÓDIGO.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO GENERES IMPLEMENTACIONES.
+
+NO CREES CLASES.
+
+NO CREES APIS.
+
+NO ESCOJAS TECNOLOGÍAS TODAVÍA.
+
+Tu única misión es generar el documento oficial que gobernará toda la fase de ingeniería de DeltaOps.
+
+Este documento será la Constitución de Ingeniería de la plataforma.
+
+======================================================================
+CONTEXTO
+======================================================================
+
+La fase Enterprise Technical Specification (ETS) ha sido completada.
+
+Todos los documentos ETS-001 hasta ETS-012 han sido aprobados.
+
+El producto DeltaOps se considera completamente definido desde el punto de vista funcional, arquitectónico y empresarial.
+
+A partir de este momento comienza una nueva fase denominada:
+
+ENGINEERING SPECIFICATION (ESI)
+
+Los documentos ESI NO diseñan el producto.
+
+Los documentos ESI implementan técnicamente el producto ya definido.
+
+======================================================================
+OBJETIVO
+======================================================================
+
+Generar el documento rector que establecerá las reglas obligatorias para toda la ingeniería de DeltaOps.
+
+Este documento deberá ser utilizado como referencia por:
+
+• Desarrolladores
+• Arquitectos
+• Revisores
+• QA
+• DevOps
+• IA (ChatGPT, Replit AI, Cursor, Copilot, Claude, etc.)
+
+Toda implementación futura deberá obedecer este documento.
+
+======================================================================
+DEFINIR
+======================================================================
+
+1.
+Propósito de la fase Engineering Specification (ESI)
+
+Explicar claramente la diferencia entre:
+
+Arquitectura del Producto (ETS)
+
+e
+
+Ingeniería del Producto (ESI)
+
+======================================================================
+
+2.
+Jerarquía documental oficial
+
+Definir la jerarquía:
+
+Visión del Producto
+
+↓
+
+ETS
+
+↓
+
+ESI
+
+↓
+
+Código Fuente
+
+↓
+
+Pruebas
+
+↓
+
+Despliegue
+
+↓
+
+Operación
+
+Ningún nivel podrá contradecir al nivel superior.
+
+======================================================================
+
+3.
+Principios oficiales de Ingeniería
+
+Definir como mínimo:
+
+Architecture First
+
+Implementation by Specification
+
+Contract First
+
+Configuration First
+
+Test First
+
+Security by Design
+
+Performance by Design
+
+Observability by Design
+
+Automation First
+
+Documentation as Code
+
+Quality First
+
+AI Assisted Development
+
+======================================================================
+
+4.
+Autoridad de decisión
+
+Definir claramente:
+
+Qué decisiones puede tomar un ETS.
+
+Qué decisiones puede tomar un ESI.
+
+Qué decisiones puede tomar un desarrollador.
+
+Qué decisiones puede tomar una IA.
+
+Qué decisiones requieren aprobación arquitectónica.
+
+======================================================================
+
+5.
+Congelamiento arquitectónico
+
+Definir oficialmente que:
+
+La arquitectura del producto se considera congelada.
+
+Todo cambio arquitectónico deberá:
+
+Justificarse.
+
+Documentarse.
+
+Referenciar el ETS correspondiente.
+
+Ser aprobado explícitamente.
+
+======================================================================
+
+6.
+Rol oficial de la IA
+
+Definir el papel de la Inteligencia Artificial durante el desarrollo.
+
+La IA:
+
+No diseña el negocio.
+
+No modifica el dominio.
+
+No redefine eventos.
+
+No cambia contratos.
+
+La IA:
+
+Implementa.
+
+Documenta.
+
+Optimiza.
+
+Propone mejoras técnicas.
+
+Detecta riesgos.
+
+Genera pruebas.
+
+Genera documentación técnica.
+
+======================================================================
+
+7.
+Reglas de implementación
+
+Definir que toda implementación deberá respetar:
+
+DDD
+
+Clean Architecture
+
+Hexagonal
+
+CQRS
+
+SOLID
+
+YAGNI
+
+KISS
+
+DRY
+
+Dependency Rule
+
+API First
+
+Configuration First
+
+Offline First
+
+Append Only
+
+Event Driven
+
+======================================================================
+
+8.
+Proceso oficial de desarrollo
+
+Definir el ciclo completo:
+
+Análisis
+
+↓
+
+ESI
+
+↓
+
+Implementación
+
+↓
+
+Pruebas
+
+↓
+
+Revisión
+
+↓
+
+Merge
+
+↓
+
+Release
+
+↓
+
+Producción
+
+======================================================================
+
+9.
+Gestión de cambios
+
+Definir:
+
+Cambios funcionales
+
+Cambios técnicos
+
+Cambios de arquitectura
+
+Cambios de seguridad
+
+Cambios urgentes
+
+Proceso de aprobación.
+
+======================================================================
+
+10.
+Definición oficial de Done
+
+Crear una Definition of Done para DeltaOps.
+
+Debe incluir:
+
+Código
+
+Pruebas
+
+Cobertura
+
+Documentación
+
+Seguridad
+
+Observabilidad
+
+Performance
+
+Revisión
+
+Aprobación
+
+======================================================================
+
+11.
+Normas para IA
+
+Definir reglas obligatorias para cualquier IA.
+
+Por ejemplo:
+
+Nunca romper contratos.
+
+Nunca crear dependencias prohibidas.
+
+Nunca ignorar el lenguaje ubicuo.
+
+Nunca duplicar lógica.
+
+Nunca escribir código fuera de la arquitectura.
+
+======================================================================
+
+12.
+Normas para desarrolladores
+
+Definir responsabilidades.
+
+Buenas prácticas.
+
+Obligaciones.
+
+Criterios de calidad.
+
+======================================================================
+
+13.
+Objetivos de la fase ESI
+
+Definir claramente que la finalidad de los documentos ESI será:
+
+Seleccionar tecnologías.
+
+Definir patrones de implementación.
+
+Definir estándares de ingeniería.
+
+Preparar el desarrollo.
+
+Nunca rediseñar DeltaOps.
+
+======================================================================
+
+ENTREGABLE
+
+Generar únicamente:
+
+ENGINEERING_CHARTER.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No generar tecnologías.
+
+No elegir frameworks.
+
+No modificar ningún ETS.
+
+No reinterpretar la arquitectura.
+
+Todo el documento deberá escribirse en español.
+
+El documento deberá servir como la Constitución Oficial de Ingeniería de DeltaOps.
+
+Al finalizar detenerse y esperar nuevas instrucciones.
