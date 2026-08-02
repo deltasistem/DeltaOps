@@ -1,0 +1,228 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-007
+
+ENTERPRISE SECURITY & GOVERNANCE ENGINEERING
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO GENERES PYTHON.
+
+NO GENERES SQL.
+
+NO IMPLEMENTES SEGURIDAD.
+
+Tu única misión es diseñar el modelo oficial de Seguridad y Gobierno Empresarial de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+ESI-002
+
+ESI-003
+
+ESI-004
+
+ESI-005
+
+ESI-006
+
+Toda la arquitectura está congelada.
+
+Toda la plataforma está congelada.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar el estándar oficial de Seguridad, Identidad, Gobierno y Cumplimiento de DeltaOps.
+
+Este documento NO implementa seguridad.
+
+Define cómo deberá implementarse.
+
+======================================================================
+
+DISEÑAR
+
+1. Concepto de Enterprise Security
+
+2. Identity Service
+
+3. Authentication Model
+
+4. Authorization Model
+
+5. Session Management
+
+6. Delegation Model
+
+7. RBAC Model
+
+8. ABAC Readiness
+
+9. API Security
+
+10. Service Accounts
+
+11. Secret Management
+
+12. Credential Lifecycle
+
+13. Audit Security
+
+14. Compliance Model
+
+15. Privacy Model
+
+16. Data Classification
+
+17. Zero Trust Model
+
+18. Governance Registry
+
+19. Risk Classification
+
+20. Security Score
+
+21. Security Maturity
+
+22. Security Checklist
+
+23. Security Review
+
+24. Security Knowledge Graph
+
+25. Relación con DGP
+
+26. ADR relacionados
+
+27. Enterprise Readiness
+
+28. Evolución del Modelo de Seguridad
+
+======================================================================
+
+GENERAR
+
+01_ENTERPRISE_SECURITY.md
+
+02_IDENTITY_SERVICE.md
+
+03_AUTHENTICATION_MODEL.md
+
+04_AUTHORIZATION_MODEL.md
+
+05_SESSION_MANAGEMENT.md
+
+06_DELEGATION_MODEL.md
+
+07_RBAC_MODEL.md
+
+08_ABAC_READINESS.md
+
+09_API_SECURITY.md
+
+10_SERVICE_ACCOUNTS.md
+
+11_SECRET_MANAGEMENT.md
+
+12_CREDENTIAL_LIFECYCLE.md
+
+13_SECURITY_AUDIT.md
+
+14_COMPLIANCE_MODEL.md
+
+15_PRIVACY_MODEL.md
+
+16_DATA_CLASSIFICATION.md
+
+17_ZERO_TRUST_MODEL.md
+
+18_GOVERNANCE_REGISTRY.md
+
+19_RISK_CLASSIFICATION.md
+
+20_SECURITY_SCORE.md
+
+21_SECURITY_MATURITY.md
+
+22_SECURITY_CHECKLIST.md
+
+23_SECURITY_REVIEW.md
+
+24_SECURITY_KNOWLEDGE_GRAPH.md
+
+25_DGP_MAPPING.md
+
+26_SECURITY_ADR.md
+
+27_ENTERPRISE_READINESS.md
+
+28_SECURITY_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No implementar seguridad.
+
+No generar ejemplos.
+
+No modificar ETS.
+
+No modificar ESI.
+
+Todo componente deberá declarar:
+
+- Nivel de clasificación
+- Riesgo
+- Permisos
+- Auditoría
+- Retención
+- Evidencias
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+6. Reusable Pattern
+
+7. Anti-Patterns
+
+8. Knowledge Graph
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
