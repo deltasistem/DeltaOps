@@ -1,0 +1,229 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-006
+
+SHARED PLATFORM SERVICES ENGINEERING
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO GENERES PYTHON.
+
+NO GENERES SQL.
+
+NO IMPLEMENTES SERVICIOS.
+
+Tu única misión es diseñar el catálogo oficial de Servicios Compartidos de Plataforma de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+ESI-002
+
+ESI-003
+
+ESI-004
+
+ESI-005
+
+Toda la arquitectura está congelada.
+
+Los módulos de negocio ya tienen su estándar.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar los servicios compartidos que utilizarán todos los módulos de DeltaOps.
+
+Estos servicios NO pertenecen a ningún módulo.
+
+Pertenecen a la plataforma.
+
+======================================================================
+
+DISEÑAR
+
+1. Concepto de Shared Platform Service
+
+2. Catálogo oficial de servicios
+
+3. Notification Service
+
+4. Attachment Service
+
+5. Comment Service
+
+6. Timeline Service
+
+7. Task Service
+
+8. Search Service
+
+9. Export Service
+
+10. Import Service
+
+11. Report Service
+
+12. QR / Barcode / NFC Service
+
+13. AI Platform Service
+
+14. Integration Service
+
+15. Dashboard Service
+
+16. KPI Service
+
+17. Shared Capability Model
+
+18. Shared Event Model
+
+19. Shared Permission Model
+
+20. Shared Configuration Model
+
+21. Shared Service Registry
+
+22. Cross Module Matrix
+
+23. Shared Service Maturity
+
+24. Checklist de implementación
+
+25. Checklist de revisión
+
+26. Relación con DGP
+
+27. Knowledge Graph
+
+28. Evolución de Shared Services
+
+======================================================================
+
+GENERAR
+
+01_SHARED_PLATFORM.md
+
+02_SHARED_SERVICE_CATALOG.md
+
+03_NOTIFICATION_SERVICE.md
+
+04_ATTACHMENT_SERVICE.md
+
+05_COMMENT_SERVICE.md
+
+06_TIMELINE_SERVICE.md
+
+07_TASK_SERVICE.md
+
+08_SEARCH_SERVICE.md
+
+09_EXPORT_SERVICE.md
+
+10_IMPORT_SERVICE.md
+
+11_REPORT_SERVICE.md
+
+12_OPERATIONAL_SERVICES.md
+
+13_AI_PLATFORM_SERVICE.md
+
+14_INTEGRATION_SERVICE.md
+
+15_DASHBOARD_SERVICE.md
+
+16_KPI_SERVICE.md
+
+17_SHARED_CAPABILITY_MODEL.md
+
+18_SHARED_EVENT_MODEL.md
+
+19_SHARED_PERMISSION_MODEL.md
+
+20_SHARED_CONFIGURATION_MODEL.md
+
+21_SHARED_SERVICE_REGISTRY.md
+
+22_CROSS_MODULE_MATRIX.md
+
+23_SHARED_SERVICE_MATURITY.md
+
+24_IMPLEMENTATION_CHECKLIST.md
+
+25_REVIEW_CHECKLIST.md
+
+26_DGP_MAPPING.md
+
+27_KNOWLEDGE_GRAPH.md
+
+28_SHARED_PLATFORM_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No implementar servicios.
+
+No crear ejemplos en Python.
+
+No modificar ETS.
+
+No modificar ESI.
+
+Todo servicio debe ser reutilizable por múltiples módulos.
+
+Todo servicio debe publicar:
+
+- Capacidades
+- Eventos
+- Contratos
+- Configuración
+- KPIs
+- Permisos
+- Consumidores
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+6. Reusable Pattern
+
+7. Anti-Patterns
+
+8. Knowledge Graph
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
