@@ -1,0 +1,302 @@
+DELTAOPS
+ENGINEERING SPECIFICATION
+
+ESI-001
+
+TECHNOLOGY STRATEGY & ENGINEERING PLATFORM
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO CREES CLASES.
+
+NO CONFIGURES FRAMEWORKS.
+
+NO GENERES ARCHIVOS DE IMPLEMENTACIÓN.
+
+Tu única misión es seleccionar oficialmente el stack tecnológico de DeltaOps y justificar cada decisión.
+
+======================================================================
+
+CONTEXTO
+
+La fase ETS ha finalizado.
+
+Existe un ENGINEERING CHARTER aprobado.
+
+Toda decisión deberá respetar:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+La arquitectura del producto está congelada.
+
+No puede modificarse.
+
+======================================================================
+
+OBJETIVO
+
+Definir oficialmente la plataforma tecnológica que implementará DeltaOps.
+
+Cada decisión deberá estar técnicamente justificada.
+
+También deberán documentarse las alternativas descartadas y el motivo de su descarte.
+
+======================================================================
+
+GENERAR
+
+01_TECHNOLOGY_STRATEGY.md
+
+Visión general.
+
+Principios.
+
+Criterios de selección.
+
+Compatibilidad futura.
+
+Costo.
+
+Madurez.
+
+Comunidad.
+
+LTS.
+
+Escalabilidad.
+
+======================================================================
+
+02_BACKEND_STACK.md
+
+Lenguaje.
+
+Framework.
+
+ORM.
+
+Migraciones.
+
+Validación.
+
+Autenticación.
+
+Serialización.
+
+Asincronía.
+
+Dependencias.
+
+Justificación.
+
+Alternativas descartadas.
+
+======================================================================
+
+03_FRONTEND_STACK.md
+
+React.
+
+TypeScript.
+
+Vite.
+
+TanStack.
+
+Tailwind.
+
+shadcn/ui.
+
+React Hook Form.
+
+Zod.
+
+Internacionalización.
+
+PWA.
+
+Alternativas descartadas.
+
+======================================================================
+
+04_DATABASE_STACK.md
+
+PostgreSQL.
+
+Redis.
+
+Object Storage.
+
+Justificación.
+
+Escalabilidad.
+
+Backup.
+
+Alternativas.
+
+======================================================================
+
+05_INFRASTRUCTURE_STACK.md
+
+Docker.
+
+Docker Compose.
+
+Nginx/Caddy.
+
+CDN.
+
+Object Storage.
+
+Observabilidad.
+
+======================================================================
+
+06_DEVELOPMENT_TOOLS.md
+
+IDE.
+
+Git.
+
+Formato.
+
+Lint.
+
+Debug.
+
+Productividad.
+
+======================================================================
+
+07_TESTING_STACK.md
+
+Unit.
+
+Integration.
+
+Contract.
+
+E2E.
+
+Performance.
+
+Security.
+
+======================================================================
+
+08_SECURITY_STACK.md
+
+Dependencias.
+
+Escaneo.
+
+Secretos.
+
+SAST.
+
+DAST.
+
+SBOM.
+
+======================================================================
+
+09_OBSERVABILITY_STACK.md
+
+Logs.
+
+Tracing.
+
+Metrics.
+
+Health Checks.
+
+Alertas.
+
+======================================================================
+
+10_CI_CD_STACK.md
+
+GitHub Actions.
+
+Pipeline.
+
+Calidad.
+
+Releases.
+
+Versionado.
+
+======================================================================
+
+11_DECISION_RECORDS.md
+
+Registrar cada decisión tecnológica como ADR.
+
+Contexto.
+
+Decisión.
+
+Consecuencias.
+
+Alternativas.
+
+======================================================================
+
+12_TECHNOLOGY_ROADMAP.md
+
+Tecnologías del MVP.
+
+Tecnologías preparadas.
+
+Tecnologías futuras.
+
+Tecnologías descartadas.
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No configurar herramientas.
+
+No implementar.
+
+Toda decisión debe estar justificada.
+
+Toda alternativa descartada debe tener una razón objetiva.
+
+No contradecir ningún ETS.
+
+No contradecir el ENGINEERING_CHARTER.
+
+======================================================================
+
+Cada documento finalizará con:
+
+Impacto sobre la implementación
+
+Dependencias
+
+Riesgos
+
+Decisiones habilitadas
+
+Decisiones bloqueadas
+
+======================================================================
+
+Esperar nuevas instrucciones.
