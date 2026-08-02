@@ -1,0 +1,245 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-008
+
+EXPERIENCE PLATFORM ENGINEERING
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO GENERES REACT.
+
+NO GENERES TYPESCRIPT.
+
+NO GENERES HTML.
+
+NO GENERES CSS.
+
+Tu única misión es diseñar la Plataforma Oficial de Experiencia de Usuario de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+ESI-002
+
+ESI-003
+
+ESI-004
+
+ESI-005
+
+ESI-006
+
+ESI-007
+
+Toda la arquitectura está congelada.
+
+Toda la plataforma está congelada.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar el estándar oficial para construir cualquier experiencia de usuario dentro de DeltaOps.
+
+No diseñar pantallas específicas.
+
+No diseñar componentes React.
+
+Diseñar la plataforma de experiencia.
+
+======================================================================
+
+DISEÑAR
+
+1. Experience Platform
+
+2. Application Shell
+
+3. Navigation Framework
+
+4. Workspace Model
+
+5. Screen Contract
+
+6. Context Switching
+
+7. Layout Framework
+
+8. Design Token Strategy
+
+9. Responsive Strategy
+
+10. Accessibility
+
+11. Offline UX
+
+12. Loading Strategy
+
+13. Error Experience
+
+14. Empty States
+
+15. Notification UX
+
+16. Dialog Framework
+
+17. Wizard Framework
+
+18. Dashboard Framework
+
+19. Form Framework
+
+20. Table Framework
+
+21. Search Experience
+
+22. AI Experience
+
+23. Mobile First
+
+24. UX Score
+
+25. Experience Checklist
+
+26. Experience Knowledge Graph
+
+27. DGP Mapping
+
+28. Experience Evolution
+
+======================================================================
+
+GENERAR
+
+01_EXPERIENCE_PLATFORM.md
+
+02_APPLICATION_SHELL.md
+
+03_NAVIGATION_FRAMEWORK.md
+
+04_WORKSPACE_MODEL.md
+
+05_SCREEN_CONTRACT.md
+
+06_CONTEXT_SWITCHING.md
+
+07_LAYOUT_FRAMEWORK.md
+
+08_DESIGN_TOKENS.md
+
+09_RESPONSIVE_STRATEGY.md
+
+10_ACCESSIBILITY.md
+
+11_OFFLINE_UX.md
+
+12_LOADING_STRATEGY.md
+
+13_ERROR_EXPERIENCE.md
+
+14_EMPTY_STATES.md
+
+15_NOTIFICATION_UX.md
+
+16_DIALOG_FRAMEWORK.md
+
+17_WIZARD_FRAMEWORK.md
+
+18_DASHBOARD_FRAMEWORK.md
+
+19_FORM_FRAMEWORK.md
+
+20_TABLE_FRAMEWORK.md
+
+21_SEARCH_EXPERIENCE.md
+
+22_AI_EXPERIENCE.md
+
+23_MOBILE_FIRST.md
+
+24_UX_SCORE.md
+
+25_EXPERIENCE_CHECKLIST.md
+
+26_EXPERIENCE_KNOWLEDGE_GRAPH.md
+
+27_DGP_MAPPING.md
+
+28_EXPERIENCE_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No diseñar pantallas específicas.
+
+No generar React.
+
+No generar HTML.
+
+No modificar ETS.
+
+No modificar ESI.
+
+Toda pantalla deberá declarar:
+
+- Commands
+
+- Queries
+
+- Capacidades
+
+- Servicios
+
+- Permisos
+
+- Offline
+
+- KPIs
+
+- IA
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+6. Reusable Pattern
+
+7. Anti-Patterns
+
+8. Knowledge Graph
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
