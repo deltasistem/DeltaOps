@@ -1,0 +1,239 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-009
+
+DELIVERY & QUALITY ENGINEERING
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO GENERES YAML.
+
+NO GENERES GITHUB ACTIONS.
+
+NO GENERES DOCKERFILES.
+
+NO MODIFIQUES EL PROYECTO.
+
+Tu única misión es diseñar el modelo oficial de Entrega, Calidad y Gobierno del Desarrollo de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+ESI-002
+
+ESI-003
+
+ESI-004
+
+ESI-005
+
+ESI-006
+
+ESI-007
+
+ESI-008
+
+Toda la arquitectura está congelada.
+
+Toda la plataforma está congelada.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar el estándar oficial para construir, revisar, probar, liberar y operar cambios en DeltaOps.
+
+No seleccionar herramientas.
+
+No implementar pipelines.
+
+Diseñar el modelo de ingeniería de entrega.
+
+======================================================================
+
+DISEÑAR
+
+1. Delivery Philosophy
+
+2. Git Workflow
+
+3. Branch Strategy
+
+4. Commit Strategy
+
+5. Pull Request Standard
+
+6. Code Review Standard
+
+7. Static Quality Gates
+
+8. Testing Governance
+
+9. CI Pipeline Model
+
+10. Release Pipeline
+
+11. Version Strategy
+
+12. Feature Toggle Governance
+
+13. Deployment Strategy
+
+14. Rollback Strategy
+
+15. Incident Response
+
+16. Hotfix Model
+
+17. Technical Debt Governance
+
+18. Engineering Metrics
+
+19. Engineering Score
+
+20. Sprint Governance
+
+21. Definition of Ready
+
+22. Definition of Done
+
+23. Acceptance Criteria
+
+24. Quality Checklist
+
+25. Release Checklist
+
+26. Engineering Knowledge Graph
+
+27. DGP Mapping
+
+28. Delivery Evolution
+
+======================================================================
+
+GENERAR
+
+01_DELIVERY_PHILOSOPHY.md
+
+02_GIT_WORKFLOW.md
+
+03_BRANCH_STRATEGY.md
+
+04_COMMIT_STRATEGY.md
+
+05_PULL_REQUEST_STANDARD.md
+
+06_CODE_REVIEW_STANDARD.md
+
+07_STATIC_QUALITY_GATES.md
+
+08_TESTING_GOVERNANCE.md
+
+09_CI_PIPELINE_MODEL.md
+
+10_RELEASE_PIPELINE.md
+
+11_VERSION_STRATEGY.md
+
+12_FEATURE_TOGGLE_GOVERNANCE.md
+
+13_DEPLOYMENT_STRATEGY.md
+
+14_ROLLBACK_STRATEGY.md
+
+15_INCIDENT_RESPONSE.md
+
+16_HOTFIX_MODEL.md
+
+17_TECHNICAL_DEBT_GOVERNANCE.md
+
+18_ENGINEERING_METRICS.md
+
+19_ENGINEERING_SCORE.md
+
+20_SPRINT_GOVERNANCE.md
+
+21_DEFINITION_OF_READY.md
+
+22_DEFINITION_OF_DONE.md
+
+23_ACCEPTANCE_CRITERIA.md
+
+24_QUALITY_CHECKLIST.md
+
+25_RELEASE_CHECKLIST.md
+
+26_ENGINEERING_KNOWLEDGE_GRAPH.md
+
+27_DGP_MAPPING.md
+
+28_DELIVERY_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No elegir herramientas específicas.
+
+No generar YAML.
+
+No generar scripts.
+
+No modificar ETS.
+
+No modificar ESI.
+
+Toda entrega deberá declarar:
+
+- Objetivo
+- ETS relacionados
+- ESI relacionados
+- DGP relacionados
+- Riesgos
+- Evidencias
+- Pruebas
+- Rollback
+- Observabilidad
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+6. Reusable Pattern
+
+7. Anti-Patterns
+
+8. Knowledge Graph
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
