@@ -1,0 +1,223 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-003
+
+BACKEND FOUNDATION ENGINEERING
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES EL PROYECTO.
+
+NO GENERES CLASES.
+
+NO GENERES ARCHIVOS PYTHON.
+
+NO GENERES FASTAPI.
+
+NO CREES SQLALCHEMY.
+
+NO CREES ALEMBIC.
+
+NO GENERES CONFIGURACIONES.
+
+Tu única misión es diseñar la Plataforma Backend Oficial de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001
+
+ESI-002
+
+La arquitectura del producto está congelada.
+
+La plataforma de ingeniería está congelada.
+
+El stack tecnológico está oficialmente aprobado.
+
+No debe modificarse.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar la arquitectura técnica del Backend Foundation sobre el stack oficialmente aprobado.
+
+No implementar módulos de negocio.
+
+No diseñar Activos.
+
+No diseñar Inventario.
+
+No diseñar Compras.
+
+Diseñar únicamente la plataforma backend reutilizable.
+
+======================================================================
+
+DISEÑAR
+
+1. Arquitectura Backend Foundation
+
+2. Bootstrap del Backend
+
+3. Ciclo de vida de la aplicación
+
+4. Inicialización del Kernel
+
+5. Dependency Injection
+
+6. Registro de módulos
+
+7. Registro de capacidades
+
+8. Configuración centralizada
+
+9. Gestión de contexto
+
+10. Middleware Strategy
+
+11. Autenticación
+
+12. Autorización
+
+13. Gestión de permisos
+
+14. Gestión de sesiones
+
+15. Gestión de errores
+
+16. Logging estructurado
+
+17. Observabilidad
+
+18. Health Checks
+
+19. Event Dispatcher Runtime
+
+20. Unit of Work Runtime
+
+21. Repository Runtime
+
+22. Background Processing
+
+23. Gestión de archivos
+
+24. Integraciones externas
+
+25. Organización física del Backend
+
+26. Convenciones Backend
+
+27. Backend Readiness
+
+28. Evolución del Backend Foundation
+
+======================================================================
+
+GENERAR
+
+01_BACKEND_FOUNDATION.md
+
+02_BACKEND_BOOTSTRAP.md
+
+03_APPLICATION_LIFECYCLE.md
+
+04_KERNEL_RUNTIME.md
+
+05_DEPENDENCY_INJECTION.md
+
+06_MODULE_REGISTRATION.md
+
+07_CAPABILITY_REGISTRATION.md
+
+08_CONFIGURATION_RUNTIME.md
+
+09_EXECUTION_CONTEXT.md
+
+10_MIDDLEWARE_STRATEGY.md
+
+11_AUTHENTICATION_RUNTIME.md
+
+12_AUTHORIZATION_RUNTIME.md
+
+13_PERMISSION_RUNTIME.md
+
+14_SESSION_MANAGEMENT.md
+
+15_ERROR_RUNTIME.md
+
+16_LOGGING_RUNTIME.md
+
+17_OBSERVABILITY_RUNTIME.md
+
+18_HEALTHCHECK_RUNTIME.md
+
+19_EVENT_DISPATCHER_RUNTIME.md
+
+20_UNIT_OF_WORK_RUNTIME.md
+
+21_REPOSITORY_RUNTIME.md
+
+22_BACKGROUND_RUNTIME.md
+
+23_FILE_RUNTIME.md
+
+24_INTEGRATION_RUNTIME.md
+
+25_BACKEND_STRUCTURE.md
+
+26_BACKEND_CONVENTIONS.md
+
+27_BACKEND_READINESS.md
+
+28_BACKEND_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No crear clases.
+
+No generar ejemplos en Python.
+
+No crear archivos FastAPI.
+
+No generar configuraciones.
+
+Todo debe ser diseño técnico.
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
