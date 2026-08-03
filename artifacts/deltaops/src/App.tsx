@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import Login from '@/pages/login';
 import Console from '@/pages/console';
+import Plataforma from '@/pages/plataforma';
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Console} />
+      <Route path="/plataforma" component={Plataforma} />
       <Route path="/login" component={Login} />
       <Route component={NotFound} />
     </Switch>

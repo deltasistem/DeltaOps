@@ -3,3 +3,4 @@
 - [drizzle-zod identity omit](drizzle-zod-identity-omit.md) — insert schemas already exclude GENERATED ALWAYS identity PKs; omitting `id` throws in zod v4.
 - [Kernel UoW/outbox contracts](kernel-uow-outbox.md) — modules must write via pgSessionOf(uow); handlers must be idempotent (at-least-once outbox).
 - [Orval query-key invalidation](orval-query-invalidation.md) — call `getListXQueryKey()` with no args to invalidate all filter variants (prefix match).
+- [DeltaOps plataforma DGP-003](deltaops-platform-dgp003.md) — record store genérico, RLS exige set_config por transacción, sellos por Symbol no exportables, API en raíz del proxy.

@@ -1,0 +1,579 @@
+DELTAOPS
+
+DEVELOPMENT GENERATION PACKAGE
+
+DGP-003
+
+SHARED PLATFORM SERVICES IMPLEMENTATION
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+Has iniciado oficialmente el DGP-003.
+
+Toda la arquitectura está completamente congelada.
+
+Este DGP implementa exclusivamente lo definido en:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER
+
+ESI-001 ... ESI-010
+
+DGP-000
+
+DGP-001
+
+DGP-002
+
+No está permitido modificar ninguna decisión arquitectónica.
+
+Si detectas contradicciones, vacíos o necesidades de arquitectura, debes detener esa parte de la implementación y documentarla mediante un ADR.
+
+Nunca resolver mediante código una decisión arquitectónica.
+
+======================================================================
+
+OBJETIVO
+
+Materializar completamente la Plataforma Oficial de Servicios Compartidos de DeltaOps definida en ESI-006.
+
+El resultado deberá ser una plataforma completamente reutilizable por cualquier módulo futuro.
+
+Este DGP NO implementa módulos de negocio.
+
+======================================================================
+
+NO IMPLEMENTAR
+
+No crear:
+
+• Activos
+• Inventario
+• Compras
+• Combustible
+• Órdenes de Trabajo
+• Checklists
+• Costos
+• SST
+• Dashboard funcional
+• Reportes funcionales
+• IA de negocio
+
+Todo deberá permanecer completamente desacoplado del dominio.
+
+======================================================================
+
+IMPLEMENTAR
+
+Implementar completamente los siguientes Shared Platform Services:
+
+1. Notification Service
+
+2. Attachment Service
+
+3. Comment Service
+
+4. Timeline Service
+
+5. Task Service
+
+6. Search Service
+
+7. Export Service
+
+8. Import Service
+
+9. Report Service
+
+10. QR / Barcode / NFC Service
+
+11. Dashboard Service
+
+12. KPI Service
+
+13. Integration Service
+
+14. AI Platform Service
+(Solo infraestructura.
+NO integrar OpenAI todavía.)
+
+======================================================================
+
+CADA SERVICIO DEBERÁ IMPLEMENTAR
+
+• Interfaces oficiales del Kernel
+
+• Registro automático
+
+• Configuración por Tenant
+
+• Capacidades
+
+• Permisos
+
+• Eventos
+
+• Auditoría
+
+• Observabilidad
+
+• Telemetría
+
+• Health Checks
+
+• Adaptador Fake
+
+• Adaptador PostgreSQL
+
+• Tests Unitarios
+
+• Tests Integración
+
+• Integración completa con createKernelRuntime()
+
+======================================================================
+
+REGISTRO AUTOMÁTICO
+
+Todos los servicios deberán registrarse automáticamente en:
+
+• Shared Service Registry
+
+• Capability Registry
+
+• Dependency Registry
+
+• Knowledge Graph
+
+• Observability Registry
+
+No está permitido registrar servicios manualmente.
+
+Todo deberá descubrirse automáticamente mediante la infraestructura creada.
+
+======================================================================
+
+NOTIFICATION SERVICE
+
+Implementar:
+
+• canales
+
+• prioridades
+
+• destinatarios
+
+• preferencias
+
+• plantillas
+
+• agrupación
+
+• colas
+
+• reintentos
+
+• dead letter
+
+• auditoría
+
+No enviar correos reales.
+
+Construir únicamente la infraestructura.
+
+======================================================================
+
+ATTACHMENT SERVICE
+
+Implementar:
+
+• metadatos
+
+• versiones
+
+• hashes
+
+• estados
+
+• permisos
+
+• URLs firmadas
+
+• retención
+
+No almacenar binarios fuera del servicio.
+
+======================================================================
+
+COMMENT SERVICE
+
+Implementar:
+
+• comentarios
+
+• respuestas
+
+• menciones
+
+• edición
+
+• eliminación lógica
+
+• auditoría
+
+• timeline
+
+======================================================================
+
+TIMELINE SERVICE
+
+Construir la línea temporal completamente reconstruible mediante eventos.
+
+Nunca escribir directamente.
+
+======================================================================
+
+TASK SERVICE
+
+Implementar:
+
+• tareas
+
+• asignaciones
+
+• prioridades
+
+• vencimientos
+
+• recordatorios
+
+• historial
+
+Todo generado mediante eventos.
+
+======================================================================
+
+SEARCH SERVICE
+
+Implementar:
+
+• índice
+
+• documentos
+
+• reconstrucción
+
+• reindexación
+
+• búsqueda global
+
+• búsqueda contextual
+
+Nunca consultar directamente módulos de negocio.
+
+======================================================================
+
+EXPORT SERVICE
+
+Implementar:
+
+• trabajos
+
+• estados
+
+• progreso
+
+• cancelación
+
+• auditoría
+
+======================================================================
+
+IMPORT SERVICE
+
+Implementar:
+
+• sesiones
+
+• validaciones
+
+• vista previa
+
+• errores
+
+• importación mediante comandos
+
+Nunca escribir directamente sobre la base de datos.
+
+======================================================================
+
+REPORT SERVICE
+
+Implementar:
+
+• plantillas
+
+• trabajos
+
+• versiones
+
+• histórico
+
+======================================================================
+
+QR / BARCODE / NFC SERVICE
+
+Implementar:
+
+• resolución
+
+• etiquetas
+
+• validaciones
+
+• acciones
+
+• tipos
+
+======================================================================
+
+AI PLATFORM SERVICE
+
+Implementar únicamente la infraestructura.
+
+Construir:
+
+• Conversation Registry
+
+• Prompt Registry
+
+• Model Registry
+
+• Provider Registry
+
+• Cost Registry
+
+• Evaluation Registry
+
+• Inference Registry
+
+• Fake Provider
+
+• Provider Interface
+
+NO integrar OpenAI.
+
+======================================================================
+
+INTEGRATION SERVICE
+
+Implementar:
+
+• conectores
+
+• webhooks
+
+• credenciales
+
+• reintentos
+
+• estados
+
+• dead letter
+
+======================================================================
+
+DASHBOARD SERVICE
+
+Implementar:
+
+• widgets
+
+• layouts
+
+• preferencias
+
+• dashboards
+
+• configuración por tenant
+
+======================================================================
+
+KPI SERVICE
+
+Implementar:
+
+• catálogo
+
+• definiciones
+
+• snapshots
+
+• resultados
+
+• versiones
+
+No calcular KPIs de negocio.
+
+Solo infraestructura.
+
+======================================================================
+
+BASE DE DATOS
+
+Crear todas las tablas necesarias.
+
+Crear migraciones oficiales.
+
+Mantener:
+
+• RLS
+
+• Auditoría
+
+• Versionado
+
+• Outbox
+
+Mantener compatibilidad completa con DGP-002.
+
+======================================================================
+
+FRONTEND
+
+Construir únicamente una Consola Técnica de Plataforma.
+
+Debe visualizar:
+
+• servicios
+
+• métricas
+
+• jobs
+
+• logs
+
+• health
+
+• colas
+
+• registros
+
+• configuraciones
+
+No construir pantallas funcionales.
+
+======================================================================
+
+DOCUMENTACIÓN
+
+Generar obligatoriamente:
+
+• SHARED_PLATFORM.md
+
+• SERVICES.md
+
+• ARCHITECTURE.md
+
+• OPERATIONS.md
+
+• RUNBOOK.md
+
+• CHECKLIST.md
+
+======================================================================
+
+PRUEBAS
+
+Cada servicio deberá incluir:
+
+• pruebas unitarias
+
+• pruebas integración
+
+• pruebas PostgreSQL
+
+• pruebas concurrencia
+
+• pruebas multitenant
+
+• pruebas offline
+
+• pruebas permisos
+
+• pruebas auditoría
+
+======================================================================
+
+REVISIÓN ARQUITECTÓNICA
+
+Antes de cerrar el DGP ejecutar una revisión completa de arquitectura.
+
+Corregir automáticamente cualquier incumplimiento detectado.
+
+Documentar las correcciones realizadas.
+
+======================================================================
+
+ENTREGABLES
+
+Al finalizar entregar exactamente:
+
+1. Resumen Ejecutivo.
+
+2. Árbol actualizado del proyecto.
+
+3. Componentes implementados.
+
+4. Migraciones creadas.
+
+5. Servicios registrados.
+
+6. Pruebas ejecutadas.
+
+7. Cobertura obtenida.
+
+8. Riesgos encontrados.
+
+9. Correcciones realizadas durante la revisión arquitectónica.
+
+10. Bloqueadores existentes.
+
+11. Confirmación explícita de cumplimiento respecto a ETS, ESI y DGP anteriores.
+
+12. Confirmación explícita de que NO fue implementado ningún módulo de negocio.
+
+======================================================================
+
+CRITERIO DE ACEPTACIÓN
+
+Este DGP solo podrá darse por terminado si cualquier módulo futuro puede consumir inmediatamente cualquiera de los Shared Platform Services sin necesidad de modificar ninguno de ellos.
+
+======================================================================
+
+INSTRUCCIÓN FINAL DEL DIRECTOR DE ARQUITECTURA
+
+La Plataforma de Servicios Compartidos será utilizada por absolutamente todos los módulos de DeltaOps.
+
+La prioridad absoluta es:
+
+• reutilización
+
+• desacoplamiento
+
+• mantenibilidad
+
+• estabilidad
+
+• escalabilidad
+
+No optimices para velocidad de desarrollo.
+
+Optimiza para una plataforma Enterprise preparada para soportar decenas de módulos sin requerir rediseños posteriores.
+
+Al finalizar, espera nuevas instrucciones para DGP-004.

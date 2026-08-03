@@ -28,3 +28,5 @@ jobs:
         run: pnpm --filter @workspace/api-server run test
       - name: Pruebas del Kernel
         run: pnpm --filter @workspace/kernel run test
+      - name: Pruebas de la Plataforma
+        run: pnpm --filter @workspace/platform run test

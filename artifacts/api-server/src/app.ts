@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import deltaopsRouter from "./routes/deltaops";
+import platformConsoleRouter from "./routes/deltaops/platform-console";
 import { logger } from "./lib/logger";
 import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
@@ -43,6 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/deltaops", deltaopsMetricsMiddleware);
 app.use("/api/deltaops", createDeltaopsSession(deltaopsConfig));
 app.use("/api", deltaopsRouter);
+app.use("/api", platformConsoleRouter);
 app.use("/api", router);
 app.use("/api/deltaops", deltaopsErrorHandler);
 

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useDeltaopsMe,
@@ -138,6 +138,11 @@ export default function Console() {
           </div>
 
           <div className="flex items-center gap-6">
+            <Link href="/plataforma" data-testid="link-plataforma">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Plataforma
+              </Button>
+            </Link>
             <div className="text-right hidden md:block">
               <p className="text-sm font-semibold">{user.nombre}</p>
               <p className="text-xs text-muted-foreground font-mono">{user.rol}</p>
