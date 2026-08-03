@@ -8,15 +8,20 @@
     "seed-sgma": "tsx ./src/seed-sgma.ts",
     "seed:deltaops": "tsx ./src/seed-deltaops.ts",
     "generate:module": "tsx ./src/generate-deltaops-module.ts",
+    "kernel:demo": "tsx ./src/kernel-demo.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
-    "bcryptjs": "^2.4.3"
+    "@workspace/kernel": "workspace:*",
+    "bcryptjs": "^2.4.3",
+    "pg": "^8.20.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "catalog:",
+    "@types/pg": "^8.20.0",
     "tsx": "catalog:"
   }
 }

@@ -1,4 +1,5 @@
 - [Drizzle push needs TTY](drizzle-push-tty.md) — `drizzle-kit push`/`push-force` prompt for a TTY on constraint changes; apply such DDL via SQL instead.
 - [Recharts pie in narrow cell](recharts-pie-render.md) — donut renders tiny if screenshot catches the entrance animation; set `isAnimationActive={false}`.
 - [drizzle-zod identity omit](drizzle-zod-identity-omit.md) — insert schemas already exclude GENERATED ALWAYS identity PKs; omitting `id` throws in zod v4.
+- [Kernel UoW/outbox contracts](kernel-uow-outbox.md) — modules must write via pgSessionOf(uow); handlers must be idempotent (at-least-once outbox).
 - [Orval query-key invalidation](orval-query-invalidation.md) — call `getListXQueryKey()` with no args to invalidate all filter variants (prefix match).

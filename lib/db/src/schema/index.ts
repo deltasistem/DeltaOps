@@ -8,3 +8,4 @@ export * from "./work-orders";
 export * from "./maintenance-plans";
 export * from "./stock-movements";
 export * from "./deltaops";
+export * from "./deltaops-kernel";

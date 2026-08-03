@@ -1,0 +1,116 @@
+DELTAOPS
+
+DEVELOPMENT GENERATION PACKAGE
+
+DGP-002
+
+KERNEL IMPLEMENTATION
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+Este DGP implementa el Kernel oficial de DeltaOps.
+
+No modifica ETS.
+
+No modifica ESI.
+
+No modifica DGP-000 ni DGP-001.
+
+Todo debe construirse respetando estrictamente el corpus arquitectónico aprobado.
+
+======================================================================
+
+OBJETIVO
+
+Materializar el Kernel Ejecutable de DeltaOps.
+
+El resultado deberá ser una infraestructura completamente reutilizable para todos los módulos futuros.
+
+Todavía no se implementará ningún dominio de negocio.
+
+======================================================================
+
+IMPLEMENTAR
+
+1. Kernel Runtime.
+2. Execution Context.
+3. Result Pattern.
+4. Error Pattern.
+5. Command Pipeline.
+6. Query Pipeline.
+7. Dependency Injection.
+8. Repository Base.
+9. Unit Of Work.
+10. Event Dispatcher.
+11. Outbox.
+12. Replay.
+13. Dead Letter.
+14. Base Ports.
+15. Base Adapters.
+16. Authorization Runtime.
+17. Capability Resolver.
+18. Permission Resolver.
+19. Configuration Resolver.
+20. Policy Engine.
+21. Transaction Runtime.
+22. Telemetry.
+23. Logging.
+24. Tracing.
+25. Testing completo del Kernel.
+26. Documentación técnica.
+27. Diagramas actualizados.
+28. Checklist de aceptación.
+
+======================================================================
+
+NO IMPLEMENTAR
+
+Ningún módulo de negocio.
+
+No crear Activos.
+
+No crear Inventario.
+
+No crear Compras.
+
+No crear Combustible.
+
+No crear OT.
+
+No crear IA.
+
+No crear Dashboards.
+
+No crear Reportes.
+
+======================================================================
+
+CRITERIOS DE ACEPTACIÓN
+
+Debe demostrarse mediante ejecución real:
+
+- Command Pipeline operativo.
+- Query Pipeline operativo.
+- Unit Of Work funcionando.
+- Event Dispatcher operativo.
+- Outbox operativo.
+- Replay operativo.
+- Dead Letter operativo.
+- Authorization Runtime operativo.
+- Result Pattern operativo.
+- Tests del Kernel en verde.
+- Kernel completamente desacoplado del dominio.
+
+======================================================================
+
+Al finalizar:
+
+1. Mostrar el árbol actualizado del proyecto.
+2. Mostrar las pruebas ejecutadas.
+3. Confirmar que el Kernel está listo para soportar cualquier módulo.
+4. Identificar bloqueadores.
+5. Esperar instrucciones para DGP-003.

@@ -4,6 +4,7 @@
 
 ```
 lib/
+  kernel/                        # Kernel Ejecutable (DGP-002) — ver KERNEL.md
   api-spec/openapi.yaml          # Contrato OpenAPI (fuente de verdad, contract-first)
   api-zod/src/generated/         # Validadores Zod generados (backend)
   api-client-react/src/generated # Hooks TanStack Query generados (frontend)
