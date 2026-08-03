@@ -85,7 +85,7 @@ export default function Plataforma() {
           <Card data-testid="card-salud">
             <CardHeader className="pb-2"><CardDescription className="font-mono text-xs uppercase">Salud</CardDescription>
               <CardTitle className="text-2xl flex items-center gap-2">
-                {health?.healthy ? <CheckCircle2 className="h-6 w-6 text-emerald-500" /> : <XCircle className="h-6 w-6 text-destructive" />}
+                {health?.healthy ? <CheckCircle2 className="h-6 w-6 text-exito" /> : <XCircle className="h-6 w-6 text-destructive" />}
                 <span className="font-mono">{healthyCount}/{health?.services.length ?? "—"}</span>
               </CardTitle></CardHeader>
             <CardContent><p className="text-xs text-muted-foreground">health checks OK</p></CardContent>
@@ -158,7 +158,7 @@ export default function Plataforma() {
                       <TableRow key={s.service}>
                         <TableCell className="font-mono text-sm">{s.service}</TableCell>
                         <TableCell>{s.healthy
-                          ? <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 gap-1 font-mono"><CheckCircle2 className="h-3 w-3" />OK</Badge>
+                          ? <Badge variant="outline" className="bg-exito/10 text-exito border-exito/20 gap-1 font-mono"><CheckCircle2 className="h-3 w-3" />OK</Badge>
                           : <Badge variant="destructive" className="gap-1 font-mono"><XCircle className="h-3 w-3" />FALLO</Badge>}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{s.detail}</TableCell>
                       </TableRow>

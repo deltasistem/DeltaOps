@@ -1,0 +1,281 @@
+Iniciamos oficialmente el DGP-005 — EXPERIENCE FOUNDATION IMPLEMENTATION.
+
+IMPORTANTE:
+
+A partir de este momento el Brandbook y el Logo que adjunto forman parte del corpus oficial de DeltaOps y tienen exactamente el mismo nivel de autoridad que los documentos ETS y ESI para todo lo relacionado con identidad visual.
+
+NUNCA inventes colores.
+NUNCA inventes tipografías.
+NUNCA inventes iconografía.
+NUNCA inventes estilos propios.
+
+Toda decisión visual debe provenir exclusivamente del Brandbook.
+
+Si algún aspecto no está definido en el Brandbook, documenta la decisión técnica adoptada siguiendo el mismo lenguaje visual y dejando explícita su justificación.
+
+Este DGP NO construye módulos de negocio.
+
+NO construye Activos.
+
+NO construye Inventario.
+
+NO construye OT.
+
+NO construye Compras.
+
+NO construye Combustible.
+
+NO construye SST.
+
+NO modifica ningún ETS.
+
+NO modifica ningún ESI.
+
+NO modifica DGP anteriores.
+
+Su único objetivo es construir la Fundación de Experiencia (Experience Foundation) que utilizarán absolutamente todos los módulos futuros de DeltaOps.
+
+Debe implementar completamente lo definido en:
+
+• ETS-004
+• ETS-005
+• ETS-007
+• ETS-008
+• ETS-011
+• ETS-012
+
+• ESI-001
+• ESI-002
+• ESI-003
+• ESI-004
+• ESI-005
+• ESI-006
+• ESI-007
+• ESI-008
+• ESI-009
+• ESI-010
+
+• DGP-001
+• DGP-002
+• DGP-003
+• DGP-004
+
+Debe respetar estrictamente:
+
+Clean Architecture
+
+DDD
+
+Hexagonal
+
+CQRS
+
+Dependency Rule
+
+Contract First
+
+Configuration First
+
+Offline First
+
+Event Driven
+
+Append Only
+
+Multitenancy
+
+API First
+
+Kernel First
+
+Shared Platform
+
+Security First
+
+Accessibility
+
+Mobile First
+
+Debe construir la plataforma visual oficial de DeltaOps incluyendo como mínimo:
+
+• Design System completo
+
+• Design Tokens
+
+• Sistema de colores derivado únicamente del Brandbook
+
+• Tipografía oficial
+
+• Escalas tipográficas
+
+• Espaciados
+
+• Elevaciones
+
+• Sombras
+
+• Bordes
+
+• Radios
+
+• Motion Tokens
+
+• Sistema de iconografía
+
+• Layout Framework
+
+• Application Shell
+
+• Responsive Framework
+
+• Mobile First Framework
+
+• Dark Theme preparado
+
+• Light Theme
+
+• Sistema de navegación
+
+• Sidebar
+
+• Topbar
+
+• Breadcrumb
+
+• Workspace
+
+• Dashboard Layout
+
+• Formularios
+
+• Tablas
+
+• Cards
+
+• Dialogs
+
+• Alerts
+
+• Toast
+
+• Badges
+
+• Chips
+
+• Empty States
+
+• Error States
+
+• Loading States
+
+• Skeletons
+
+• Wizards
+
+• Stepper
+
+• Timeline
+
+• Search Components
+
+• KPI Widgets
+
+• Charts Wrapper
+
+• Theme Engine
+
+• Branding Engine
+
+• Accesibilidad AA
+
+• Navegación por teclado
+
+• ARIA
+
+• Internacionalización preparada
+
+• Sistema de animaciones
+
+• Biblioteca de componentes reutilizables
+
+Toda la UI debe quedar desacoplada de cualquier módulo de negocio.
+
+Ningún componente podrá llamarse:
+
+BotonActivo
+
+BotonInventario
+
+BotonOT
+
+BotonCompra
+
+etc.
+
+Todos los componentes deberán ser completamente reutilizables.
+
+Debe implementarse sobre React + TypeScript respetando completamente la arquitectura existente.
+
+Todo componente debe documentarse.
+
+Todo componente debe tener pruebas.
+
+Todo componente debe ser reutilizable.
+
+Todo componente debe cumplir accesibilidad.
+
+Todo componente debe soportar tema claro y oscuro.
+
+Todo componente debe respetar los Design Tokens.
+
+Debe generarse documentación completa en español.
+
+Debe ejecutarse una revisión arquitectónica obligatoria al finalizar.
+
+Debe corregirse cualquier desviación encontrada.
+
+Debe ejecutarse nuevamente toda la batería de pruebas.
+
+Al finalizar entrega únicamente el informe oficial de cierre DGP-005 con el mismo formato utilizado en DGP-001, DGP-002, DGP-003 y DGP-004:
+
+1. Resumen ejecutivo
+
+2. Árbol completo
+
+3. Componentes implementados
+
+4. Archivos creados
+
+5. Migraciones (si aplica)
+
+6. API (si aplica)
+
+7. Frontend
+
+8. Servicios utilizados
+
+9. Eventos (si aplica)
+
+10. Configuración
+
+11. Permisos
+
+12. Pruebas ejecutadas
+
+13. Cobertura
+
+14. Hallazgos encontrados
+
+15. Correcciones realizadas
+
+16. Riesgos
+
+17. Bloqueadores
+
+18. Confirmación de cumplimiento ETS / ESI / DGP
+
+No generar ningún DGP adicional.
+
+No comenzar ningún módulo de negocio.
+
+Esperar instrucciones para DGP-006.

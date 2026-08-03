@@ -1,0 +1,15 @@
+from PIL import Image
+import fitz, numpy as np
+doc = fitz.open("attached_assets/Delta_Brandbook_(1)_1785786071087.pdf")
+pix = doc[9].get_pixmap(matrix=fitz.Matrix(3,3), clip=fitz.Rect(500,350,940,510))
+img = Image.frombytes("RGB",(pix.width,pix.height),pix.samples).convert("RGBA")
+arr = np.array(img).astype(int)
+red = np.array([0xD2,0x00,0x2B])
+dist = np.sqrt(((arr[:,:,:3]-red)**2).sum(axis=2))
+alpha = np.clip((dist-20)/60.0,0,1)
+arr[:,:,3] = (alpha*255).astype(int)
+out = Image.fromarray(arr.astype("uint8"))
+bbox = out.getchannel("A").getbbox()
+out = out.crop(bbox)
+print("logo blanco:", out.size)
+out.save("brand/logo/logo-blanco.png")

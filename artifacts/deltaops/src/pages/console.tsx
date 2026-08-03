@@ -16,6 +16,7 @@ import {
 } from "@workspace/api-client-react";
 
 import { Activity, Server, Clock, ActivitySquare, AlertTriangle, ShieldCheck, Power, Shield, Activity as ActivityIcon, CheckCircle2, XCircle } from "lucide-react";
+import { Logo } from "@workspace/design-system";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -117,14 +118,12 @@ export default function Console() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-4">
-            <div className="bg-primary/10 p-2 rounded-md text-primary">
-              <ActivityIcon className="h-5 w-5" />
-            </div>
+            <Logo variant="isotipo" width={28} alt="DELTA" />
             <div>
               <h1 className="text-lg font-bold tracking-tight leading-none">DeltaOps Console</h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground uppercase">
-                  <span className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-500' : 'bg-destructive'} ${isHealthy ? 'animate-pulse' : ''}`} />
+                  <span className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-exito' : 'bg-destructive'} ${isHealthy ? 'animate-pulse' : ''}`} />
                   {isHealthy ? "Plataforma en línea" : "Degradado"}
                 </span>
                 {info && (
@@ -177,7 +176,7 @@ export default function Console() {
               <CardDescription className="uppercase tracking-wider font-mono text-xs">Estado Global</CardDescription>
               <CardTitle className="text-2xl flex items-center gap-2 mt-1">
                 {isHealthy && isReady ? (
-                  <><ShieldCheck className="h-6 w-6 text-emerald-500" /> Operativo</>
+                  <><ShieldCheck className="h-6 w-6 text-exito" /> Operativo</>
                 ) : (
                   <><AlertTriangle className="h-6 w-6 text-accent" /> Degradado</>
                 )}
@@ -267,7 +266,7 @@ export default function Console() {
                         <TableCell className="font-medium">{check.name}</TableCell>
                         <TableCell>
                           {check.status === "ok" ? (
-                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20 gap-1.5 font-mono">
+                            <Badge variant="outline" className="bg-exito/10 text-exito hover:bg-exito/20 border-exito/20 gap-1.5 font-mono">
                               <CheckCircle2 className="h-3 w-3" /> OK
                             </Badge>
                           ) : (

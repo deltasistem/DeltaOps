@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity } from "lucide-react";
+import { Logo } from "@workspace/design-system";
 
 import { useDeltaopsLogin, getDeltaopsMeQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -49,9 +49,8 @@ export default function Login() {
         <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle at 2px 2px, white 1px, transparent 0)", backgroundSize: "32px 32px" }}></div>
         
         <div className="relative z-10">
-          <div className="flex items-center gap-3 text-sidebar-primary">
-            <Activity className="h-8 w-8" />
-            <span className="text-2xl font-bold tracking-tight text-white">DeltaOps</span>
+          <div className="flex items-center gap-3">
+            <Logo variant="imagotipo-oscuro" width={160} alt="DELTA" />
           </div>
           <p className="mt-4 text-sidebar-foreground/70 font-mono text-sm uppercase tracking-wider max-w-sm">
             Control de Mantenimiento de Precisión // Plataforma EAM Grado Industrial
@@ -60,8 +59,8 @@ export default function Login() {
 
         <div className="relative z-10 border border-sidebar-accent p-6 rounded-sm bg-sidebar/50 backdrop-blur-sm max-w-md">
           <div className="flex items-center gap-2 mb-4">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-emerald-500 text-xs font-mono uppercase tracking-widest">Sistemas Operativos</span>
+            <div className="h-2 w-2 rounded-full bg-exito animate-pulse" />
+            <span className="text-exito text-xs font-mono uppercase tracking-widest">Sistemas Operativos</span>
           </div>
           <p className="text-sidebar-foreground/80 text-sm leading-relaxed">
             Gestión centralizada de activos, seguimiento de costos y orquestación de operaciones para flotas de alta disponibilidad.

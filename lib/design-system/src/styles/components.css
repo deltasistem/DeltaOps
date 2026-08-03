@@ -1,0 +1,33 @@
+/*
+ * DGP-005 · Estilos base de componentes oficiales (prefijo .do-).
+ * Todos los valores provienen de tokens (--do-*). Prohibido hardcodear.
+ * Las familias de componentes viven en hojas separadas:
+ */
+@import './components-core.css';
+@import './components-forms.css';
+@import './components-overlays.css';
+@import './components-data.css';
+
+/* ---- Reset mínimo del DS ---- */
+.do-root {
+  font-family: var(--do-font-secundaria);
+  font-size: var(--do-text-base);
+  line-height: var(--do-leading-normal);
+  color: var(--do-texto);
+  background: var(--do-bg);
+}
+
+.do-root h1,
+.do-root h2,
+.do-root h3,
+.do-root h4 {
+  font-family: var(--do-font-principal);
+}
+
+/* Focus visible global del DS (anillo Rojo oficial) */
+.do-root :focus-visible,
+[class^='do-']:focus-visible,
+[class*=' do-']:focus-visible {
+  outline: var(--do-focus-anillo);
+  outline-offset: var(--do-focus-offset);
+}

@@ -1,0 +1,509 @@
+Pasted-DIRECTIVA-OFICIAL-DEL-DIRECTOR-DEL-PROYECTO-Iniciamos-o_1785785641730.txt
+DIRECTIVA OFICIAL DEL DIRECTOR DEL PROYECTO
+
+Iniciamos oficialmente el DGP-005.
+
+================================================================================
+DGP-005
+DELTAOPS DESIGN SYSTEM IMPLEMENTATION
+================================================================================
+
+IMPORTANTE
+
+Este DGP NO implementa ningún módulo de negocio.
+
+NO modifica ETS.
+
+NO modifica ESI.
+
+NO modifica DGP anteriores.
+
+NO modifica el Kernel.
+
+NO modifica Platform Services.
+
+NO modifica el Módulo de Referencia.
+
+Únicamente implementa el Design System corporativo que utilizará TODO DeltaOps.
+
+La fuente de autoridad para este DGP es:
+
+• ENGINEERING_CHARTER
+• ETS-004
+• ESI-008 Experience Platform
+• DGP-004
+• Brandbook oficial DELTA (ya cargado al proyecto)
+
+================================================================================
+OBJETIVO
+================================================================================
+
+Construir el Design System completo y reutilizable de DeltaOps.
+
+Todo componente visual futuro deberá construirse usando este sistema.
+
+Queda prohibido crear componentes visuales fuera del Design System.
+
+================================================================================
+REGLAS OBLIGATORIAS
+================================================================================
+
+NO crear pantallas de negocio.
+
+NO crear módulos CMMS.
+
+NO crear tablas del dominio.
+
+NO crear APIs del dominio.
+
+NO crear lógica del dominio.
+
+NO crear inventario.
+
+NO crear activos.
+
+NO crear órdenes.
+
+NO crear compras.
+
+NO crear combustible.
+
+NO crear SST.
+
+================================================================================
+IDENTIDAD VISUAL
+================================================================================
+
+Implementar el Brandbook oficial.
+
+Respetar completamente:
+
+• Logo
+• Isotipo
+• Área de seguridad
+• Tipografía
+• Paleta
+• Espaciados
+• Estilo visual
+• Usos correctos
+• Usos incorrectos
+
+No reinterpretar el Brandbook.
+
+Implementarlo.
+
+================================================================================
+TIPOGRAFÍA
+================================================================================
+
+Principal:
+
+Montserrat
+
+Secundaria:
+
+Roboto
+
+No utilizar ninguna otra tipografía.
+
+================================================================================
+PALETA
+================================================================================
+
+Implementar los tokens oficiales derivados del Brandbook.
+
+No utilizar colores arbitrarios.
+
+Toda la UI deberá consumir únicamente Design Tokens.
+
+================================================================================
+TOKENS
+================================================================================
+
+Construir como mínimo:
+
+Color Tokens
+
+Typography Tokens
+
+Spacing Tokens
+
+Radius Tokens
+
+Shadow Tokens
+
+Opacity Tokens
+
+Border Tokens
+
+Animation Tokens
+
+Elevation Tokens
+
+Icon Tokens
+
+Layout Tokens
+
+Breakpoint Tokens
+
+Z-index Tokens
+
+Motion Tokens
+
+Transition Tokens
+
+Focus Tokens
+
+Disabled Tokens
+
+Semantic Tokens
+
+================================================================================
+TEMAS
+================================================================================
+
+Implementar
+
+Light Theme
+
+Dark Theme
+
+Auto Theme
+
+El cambio de tema debe ser inmediato.
+
+Sin duplicar componentes.
+
+================================================================================
+COMPONENTES
+================================================================================
+
+Construir los componentes reutilizables oficiales.
+
+Entre ellos:
+
+Button
+
+IconButton
+
+Input
+
+Password
+
+Search
+
+Textarea
+
+Checkbox
+
+Radio
+
+Switch
+
+Select
+
+Autocomplete
+
+Date Picker
+
+Time Picker
+
+DateTime Picker
+
+Tag
+
+Badge
+
+Chip
+
+Avatar
+
+Tooltip
+
+Popover
+
+Dropdown
+
+Menu
+
+Accordion
+
+Tabs
+
+Modal
+
+Drawer
+
+Toast
+
+Alert
+
+Notification
+
+Progress
+
+Spinner
+
+Skeleton
+
+Divider
+
+Breadcrumb
+
+Pagination
+
+Table
+
+DataGrid
+
+Card
+
+Panel
+
+StatCard
+
+Dashboard Widget
+
+Timeline
+
+Comment
+
+Attachment
+
+Empty State
+
+Error State
+
+Offline Indicator
+
+Sync Status
+
+Loading Overlay
+
+KPI Card
+
+Metric
+
+Chart Container
+
+Command Bar
+
+Top Bar
+
+Side Bar
+
+Workspace
+
+Navigation Tree
+
+Page Header
+
+Section Header
+
+Footer
+
+Form Layout
+
+Wizard Layout
+
+List Layout
+
+Detail Layout
+
+Split Layout
+
+Master Detail
+
+Search Layout
+
+Console Layout
+
+================================================================================
+ICONOGRAFÍA
+================================================================================
+
+Crear un sistema único de iconografía.
+
+No mezclar múltiples estilos.
+
+Todos los iconos deberán compartir:
+
+peso
+
+proporción
+
+alineación
+
+tamaño
+
+espaciado
+
+================================================================================
+ESTADOS
+================================================================================
+
+Todos los componentes deberán implementar:
+
+Default
+
+Hover
+
+Pressed
+
+Focused
+
+Disabled
+
+Loading
+
+Offline
+
+Error
+
+Success
+
+Warning
+
+Info
+
+Readonly
+
+================================================================================
+ACCESIBILIDAD
+================================================================================
+
+Cumplir AA.
+
+Focus visible.
+
+Navegación por teclado.
+
+Contrastes correctos.
+
+ARIA donde corresponda.
+
+================================================================================
+RESPONSIVE
+================================================================================
+
+Construir primero Mobile.
+
+Después Tablet.
+
+Después Desktop.
+
+Nunca al revés.
+
+================================================================================
+DOCUMENTACIÓN
+================================================================================
+
+Cada componente deberá documentarse.
+
+Incluir:
+
+Objetivo
+
+Uso
+
+Propiedades
+
+Variantes
+
+Estados
+
+Accesibilidad
+
+Ejemplos
+
+Buenas prácticas
+
+Malas prácticas
+
+================================================================================
+PRUEBAS
+================================================================================
+
+Todos los componentes deberán tener:
+
+Pruebas unitarias
+
+Pruebas visuales
+
+Pruebas de accesibilidad
+
+Pruebas responsive
+
+================================================================================
+ENTREGABLES
+================================================================================
+
+Generar únicamente la implementación del Design System.
+
+NO avanzar al Core Organizacional.
+
+NO implementar Empresas.
+
+NO implementar Usuarios.
+
+NO implementar Activos.
+
+================================================================================
+REVISIÓN OBLIGATORIA
+================================================================================
+
+Al finalizar ejecutar una revisión completa de arquitectura.
+
+Corregir TODOS los hallazgos.
+
+No cerrar el DGP hasta que:
+
+Typecheck limpio
+
+Pruebas verdes
+
+Build verde
+
+Revisión verde
+
+================================================================================
+SALIDA FINAL
+================================================================================
+
+Entregar el mismo informe ejecutivo de cierre utilizado en DGP-001 a DGP-004, incluyendo:
+
+1. Resumen ejecutivo
+
+2. Árbol completo
+
+3. Componentes creados
+
+4. Design Tokens implementados
+
+5. Componentes implementados
+
+6. Temas
+
+7. Iconografía
+
+8. Accesibilidad
+
+9. Responsive
+
+10. Pruebas
+
+11. Cobertura
+
+12. Hallazgos encontrados
+
+13. Correcciones realizadas
+
+14. Riesgos
+
+15. Bloqueadores
+
+16. Confirmación de cumplimiento con ETS, ESI y DGP.
+
+No construir ningún módulo de negocio.
+
+Esperar instrucciones para DGP-006.

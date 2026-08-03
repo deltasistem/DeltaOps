@@ -1,0 +1,137 @@
+Antes de comenzar la implementación de DGP-005 debes actualizar tu contexto de construcción.
+
+A partir de este momento, además de los documentos ETS-001…012, ENGINEERING_CHARTER, ESI-001…010 y DGP-000…004, existen dos nuevas fuentes oficiales de autoridad para toda la experiencia visual de DeltaOps:
+
+• Brandbook Oficial de la organización.
+• Logo Oficial de la organización.
+
+Ambos archivos serán cargados junto con este requerimiento y deberán ser considerados documentos normativos para cualquier decisión relacionada con identidad visual.
+
+Su autoridad es equivalente a la de un ETS para todo aquello relacionado con diseño, experiencia visual e identidad corporativa.
+
+No pueden reinterpretarse.
+
+No pueden simplificarse.
+
+No pueden modificarse.
+
+No pueden aproximarse.
+
+Todo color, tipografía, iconografía, espaciado, proporción, composición, tamaños mínimos, áreas de protección, usos permitidos, restricciones, variantes del logotipo y reglas de identidad deberán obtenerse exclusivamente del Brandbook.
+
+Si alguna decisión visual no está documentada en el Brandbook, deberá declararse explícitamente en la documentación del proyecto y utilizar la alternativa más conservadora posible, dejando trazabilidad de dicha decisión.
+
+Queda absolutamente prohibido:
+
+• inventar colores;
+• aproximar colores;
+• crear variantes del logotipo;
+• modificar el isotipo;
+• modificar la tipografía institucional;
+• recrear el logotipo;
+• descargar logotipos de Internet;
+• utilizar recursos diferentes a los archivos oficiales entregados.
+
+Durante DGP-005 deberás extraer automáticamente del Brandbook todos los Design Tokens oficiales de DeltaOps.
+
+Como mínimo deberán obtenerse y documentarse:
+
+• Color Primario
+• Colores Secundarios
+• Colores de apoyo
+• Escala de grises
+• Colores de éxito
+• Colores de advertencia
+• Colores de error
+• Colores informativos
+• Fondos
+• Superficies
+• Bordes
+• Elevaciones
+• Sombras
+• Radios
+• Espaciados
+• Sistema de grillas
+• Tipografía institucional
+• Escalas tipográficas
+• Pesos tipográficos
+• Espaciados entre caracteres
+• Iconografía
+• Animaciones
+• Timing de animaciones
+• Breakpoints oficiales
+• Estados de componentes
+• Tokens para modo claro
+• Tokens para modo oscuro (si el Brandbook los define)
+
+Estos Design Tokens deberán convertirse en la única fuente oficial utilizada por toda la aplicación.
+
+Queda prohibido utilizar valores escritos manualmente dentro de los componentes.
+
+Todo deberá consumir los tokens oficiales.
+
+Asimismo deberás construir la estructura oficial de identidad visual de DeltaOps para que toda la plataforma utilice un único origen de verdad.
+
+La estructura deberá contemplar, como mínimo:
+
+brand/
+    logo/
+    favicon/
+    app-icons/
+    splash/
+    illustrations/
+    fonts/
+    tokens/
+    themes/
+    documentation/
+
+A partir de estos activos oficiales deberán derivarse todos los recursos visuales de la plataforma:
+
+• Login
+• Shell principal
+• Sidebar
+• Navbar
+• Dashboard
+• Botones
+• Formularios
+• Tablas
+• Tarjetas
+• KPIs
+• Widgets
+• Reportes
+• Exportaciones PDF
+• Correos electrónicos
+• Manifest PWA
+• Favicons
+• Splash Screen
+• Iconos de aplicación
+• Loading Screen
+
+Toda pantalla futura deberá consumir únicamente estos recursos oficiales.
+
+Si el Brandbook define restricciones de uso del logotipo, estas deberán implementarse también en la aplicación.
+
+Antes de escribir cualquier componente visual deberás analizar completamente el Brandbook y documentar:
+
+• qué elementos pudieron extraerse automáticamente;
+• qué elementos requieren interpretación humana;
+• qué información no existe dentro del Brandbook;
+• qué decisiones conservadoras fueron necesarias.
+
+No avances a implementar componentes visuales hasta terminar completamente ese análisis.
+
+Una vez incorporada oficialmente la identidad corporativa, procede con la ejecución íntegra de DGP-005 según el alcance definido en DGP-000.
+
+Realiza obligatoriamente una revisión completa de arquitectura antes de dar por cerrado el DGP.
+
+No continúes con ningún DGP posterior sin cerrar completamente DGP-005.
+
+Recuerda que la arquitectura continúa completamente congelada.
+
+No está permitido modificar ETS, ENGINEERING_CHARTER, ESI ni DGP anteriores.
+
+Toda desviación arquitectónica deberá seguir el proceso oficial:
+
+DGP → ADR → Revisión Arquitectónica → Aprobación → Continuación.
+
+Al finalizar entrega únicamente el Informe Oficial de Cierre DGP-005 siguiendo el mismo formato utilizado en DGP-001, DGP-002, DGP-003 y DGP-004.

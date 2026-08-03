@@ -6,6 +6,7 @@ import Console from '@/pages/console';
 import Plataforma from '@/pages/plataforma';
 import Referencia from '@/pages/referencia';
 import ReferenciaDetalle from '@/pages/referencia-detalle';
+import DesignSystem from '@/pages/design-system';
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/referencia" component={Referencia} />
       <Route path="/referencia/:id" component={ReferenciaDetalle} />
       <Route path="/login" component={Login} />
+      <Route path="/design-system" component={DesignSystem} />
       <Route component={NotFound} />
     </Switch>
   );

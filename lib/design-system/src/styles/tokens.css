@@ -1,0 +1,212 @@
+/*
+ * DGP-005 · Variables CSS oficiales de DeltaOps (--do-*).
+ * Única fuente de verdad visual. Generadas desde brand/tokens/tokens.json.
+ * Colores de marca: Brandbook oficial DELTA (valores exactos).
+ * Temas: light (Positivo) / dark (Negativo · Oceano) / auto (media query).
+ */
+
+:root {
+  /* ---- Marca (Brandbook pág. 5–6) ---- */
+  --do-blanco: #ffffff;
+  --do-rojo: #d2002b;
+  --do-rojo-oscuro: #ba0c2f;
+  --do-oceano: #080a16;
+  --do-negro: #000000;
+  --do-rojo-50: rgba(210, 0, 43, 0.5);
+  --do-rojo-20: rgba(210, 0, 43, 0.2);
+
+  /* ---- Escala de grises (derivada Blanco↔Oceano) ---- */
+  --do-gris-50: #f4f4f6;
+  --do-gris-100: #e8e9ec;
+  --do-gris-200: #d2d3d8;
+  --do-gris-300: #b0b2ba;
+  --do-gris-400: #83858f;
+  --do-gris-500: #5c5e6a;
+  --do-gris-600: #41434f;
+  --do-gris-700: #2b2d39;
+  --do-gris-800: #191b26;
+  --do-gris-900: #0e101b;
+
+  /* ---- Semánticos (solo feedback de estado; AA como texto sobre claro) ---- */
+  --do-exito: #15803d;
+  --do-advertencia: #a16207;
+  --do-error: var(--do-rojo);
+  --do-info: #1d4ed8;
+  /* Texto de error: derivado del Rojo oficial (mezcla con Blanco en oscuro) */
+  --do-error-texto: var(--do-rojo);
+
+  /* ---- Tipografía (Brandbook pág. 4) ---- */
+  --do-font-principal: 'Montserrat', sans-serif;
+  --do-font-secundaria: 'Roboto', sans-serif;
+  --do-font-mono: 'Roboto Mono', monospace;
+  --do-text-xs: 0.75rem;
+  --do-text-sm: 0.875rem;
+  --do-text-base: 1rem;
+  --do-text-lg: 1.125rem;
+  --do-text-xl: 1.25rem;
+  --do-text-2xl: 1.5rem;
+  --do-text-3xl: 1.875rem;
+  --do-text-4xl: 2.25rem;
+  --do-peso-regular: 400;
+  --do-peso-medio: 500;
+  --do-peso-semibold: 600;
+  --do-peso-bold: 700;
+  --do-tracking-normal: 0;
+  --do-tracking-etiquetas: 0.05em;
+  --do-leading-compacto: 1.25;
+  --do-leading-normal: 1.5;
+  --do-leading-amplio: 1.75;
+
+  /* ---- Espaciado (base 4px) ---- */
+  --do-sp-1: 4px;
+  --do-sp-2: 8px;
+  --do-sp-3: 12px;
+  --do-sp-4: 16px;
+  --do-sp-5: 20px;
+  --do-sp-6: 24px;
+  --do-sp-8: 32px;
+  --do-sp-10: 40px;
+  --do-sp-12: 48px;
+  --do-sp-16: 64px;
+
+  /* ---- Radios / bordes ---- */
+  --do-radius-sm: 4px;
+  --do-radius-md: 8px;
+  --do-radius-lg: 12px;
+  --do-radius-xl: 16px;
+  --do-radius-full: 9999px;
+  --do-border-fino: 1px;
+  --do-border-medio: 2px;
+  --do-border-grueso: 4px;
+
+  /* ---- Sombras / elevaciones (alfa sobre Oceano) ---- */
+  --do-shadow-sm: 0 1px 2px rgba(8, 10, 22, 0.08);
+  --do-shadow-md: 0 2px 8px rgba(8, 10, 22, 0.12);
+  --do-shadow-lg: 0 8px 24px rgba(8, 10, 22, 0.16);
+  --do-shadow-xl: 0 16px 48px rgba(8, 10, 22, 0.24);
+  --do-elev-0: none;
+  --do-elev-1: var(--do-shadow-sm);
+  --do-elev-2: var(--do-shadow-md);
+  --do-elev-3: var(--do-shadow-lg);
+  --do-elev-4: var(--do-shadow-xl);
+
+  /* ---- Opacidades ---- */
+  --do-op-disabled: 0.5;
+  --do-op-hover: 0.9;
+  --do-op-overlay: 0.6;
+  --do-op-sutil: 0.08;
+
+  /* ---- Z-index ---- */
+  --do-z-dropdown: 1000;
+  --do-z-sticky: 1100;
+  --do-z-drawer: 1200;
+  --do-z-modal: 1300;
+  --do-z-toast: 1400;
+  --do-z-tooltip: 1500;
+
+  /* ---- Grilla / layout ---- */
+  --do-grid-columnas: 12;
+  --do-grid-gutter: 24px;
+  --do-grid-margen: 16px;
+  --do-max-ancho: 1280px;
+
+  /* ---- Motion ---- */
+  --do-dur-rapida: 150ms;
+  --do-dur-normal: 200ms;
+  --do-dur-lenta: 300ms;
+  --do-ease-estandar: cubic-bezier(0.2, 0, 0, 1);
+  --do-ease-salida: ease-out;
+  --do-ease-entrada: ease-in;
+
+  /* ---- Focus (Rojo oficial) ---- */
+  --do-focus-anillo: 2px solid var(--do-rojo);
+  --do-focus-offset: 2px;
+
+  /* Alturas de control (conservador) */
+  --do-control-sm: 32px;
+  --do-control-md: 40px;
+  --do-control-lg: 48px;
+}
+
+/* ============ Tema claro (Positivo: Blanco + acentos rojos) ============ */
+:root,
+[data-do-theme='light'] {
+  --do-bg: var(--do-blanco);
+  --do-bg-sutil: var(--do-gris-50);
+  --do-surface: var(--do-blanco);
+  --do-surface-2: var(--do-gris-50);
+  --do-surface-3: var(--do-gris-100);
+  --do-texto: var(--do-oceano);
+  --do-texto-suave: var(--do-gris-500);
+  --do-texto-invertido: var(--do-blanco);
+  --do-borde: var(--do-gris-200);
+  --do-borde-fuerte: var(--do-gris-300);
+  --do-primario: var(--do-rojo);
+  --do-primario-hover: var(--do-rojo-oscuro);
+  --do-primario-texto: var(--do-blanco);
+  --do-acento-sutil: var(--do-rojo-20);
+  --do-shell: var(--do-oceano);
+  --do-shell-texto: var(--do-blanco);
+  --do-shell-borde: var(--do-gris-800);
+  color-scheme: light;
+}
+
+/* ============ Tema oscuro (Negativo: Oceano + acentos rojos) ============ */
+[data-do-theme='dark'],
+.dark {
+  /* Semánticos aclarados para AA sobre Oceano (derivación por mezcla con Blanco) */
+  --do-exito: color-mix(in srgb, #15803d 45%, var(--do-blanco));
+  --do-advertencia: color-mix(in srgb, #a16207 45%, var(--do-blanco));
+  --do-info: color-mix(in srgb, #1d4ed8 40%, var(--do-blanco));
+  --do-error-texto: color-mix(in srgb, var(--do-rojo) 55%, var(--do-blanco));
+}
+[data-do-theme='dark'],
+.dark {
+  --do-bg: var(--do-oceano);
+  --do-bg-sutil: var(--do-gris-900);
+  --do-surface: var(--do-gris-900);
+  --do-surface-2: var(--do-gris-800);
+  --do-surface-3: var(--do-gris-700);
+  --do-texto: var(--do-blanco);
+  --do-texto-suave: var(--do-gris-300);
+  --do-texto-invertido: var(--do-oceano);
+  --do-borde: var(--do-gris-700);
+  --do-borde-fuerte: var(--do-gris-600);
+  --do-primario: var(--do-rojo);
+  --do-primario-hover: var(--do-rojo-oscuro);
+  --do-primario-texto: var(--do-blanco);
+  --do-acento-sutil: var(--do-rojo-20);
+  --do-shell: var(--do-gris-900);
+  --do-shell-texto: var(--do-blanco);
+  --do-shell-borde: var(--do-gris-700);
+  color-scheme: dark;
+}
+
+/* ============ Tema auto (preferencia del sistema) ============ */
+@media (prefers-color-scheme: dark) {
+  [data-do-theme='auto'] {
+    --do-bg: var(--do-oceano);
+    --do-bg-sutil: var(--do-gris-900);
+    --do-surface: var(--do-gris-900);
+    --do-surface-2: var(--do-gris-800);
+    --do-surface-3: var(--do-gris-700);
+    --do-texto: var(--do-blanco);
+    --do-texto-suave: var(--do-gris-300);
+    --do-texto-invertido: var(--do-oceano);
+    --do-borde: var(--do-gris-700);
+    --do-borde-fuerte: var(--do-gris-600);
+    --do-shell: var(--do-gris-900);
+    --do-shell-texto: var(--do-blanco);
+    --do-shell-borde: var(--do-gris-700);
+    color-scheme: dark;
+  }
+}
+
+/* ============ Accesibilidad: motion reducido ============ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --do-dur-rapida: 0ms;
+    --do-dur-normal: 0ms;
+    --do-dur-lenta: 0ms;
+  }
+}
