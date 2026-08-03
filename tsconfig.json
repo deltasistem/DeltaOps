@@ -19,6 +19,12 @@
       "path": "./lib/business-foundation"
     },
     {
+      "path": "./lib/workflow-engine"
+    },
+    {
+      "path": "./lib/dynamic-forms"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

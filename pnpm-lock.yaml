@@ -371,6 +371,12 @@ importers:
       '@workspace/design-system':
         specifier: workspace:*
         version: link:../../lib/design-system
+      '@workspace/dynamic-forms':
+        specifier: workspace:*
+        version: link:../../lib/dynamic-forms
+      '@workspace/workflow-engine':
+        specifier: workspace:*
+        version: link:../../lib/workflow-engine
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -933,6 +939,37 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
 
+  lib/dynamic-forms:
+    dependencies:
+      '@workspace/business-foundation':
+        specifier: workspace:*
+        version: link:../business-foundation
+      '@workspace/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@workspace/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@workspace/workflow-engine':
+        specifier: workspace:*
+        version: link:../workflow-engine
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.20.0
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+
   lib/kernel:
     dependencies:
       pg:
@@ -982,6 +1019,34 @@ importers:
       '@workspace/kernel':
         specifier: workspace:*
         version: link:../kernel
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.20.0
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+
+  lib/workflow-engine:
+    dependencies:
+      '@workspace/business-foundation':
+        specifier: workspace:*
+        version: link:../business-foundation
+      '@workspace/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@workspace/platform':
+        specifier: workspace:*
+        version: link:../platform
       pg:
         specifier: ^8.20.0
         version: 8.20.0
@@ -5297,7 +5362,7 @@ snapshots:
 
   '@types/pg@8.20.0':
     dependencies:
-      '@types/node': 22.20.1
+      '@types/node': 25.6.2
       pg-protocol: 1.13.0
       pg-types: 2.2.0
 

@@ -36,3 +36,7 @@ jobs:
         run: pnpm --filter @workspace/design-system run test
       - name: Pruebas del Business Foundation Framework
         run: pnpm --filter @workspace/business-foundation run test
+      - name: Pruebas del Workflow Engine
+        run: pnpm --filter @workspace/workflow-engine run test
+      - name: Pruebas del Dynamic Forms Engine
+        run: pnpm --filter @workspace/dynamic-forms run test

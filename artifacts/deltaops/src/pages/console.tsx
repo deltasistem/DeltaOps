@@ -147,6 +147,11 @@ export default function Console() {
                 Plataforma
               </Button>
             </Link>
+            <Link href="/motores" data-testid="link-motores">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Motores
+              </Button>
+            </Link>
             <div className="text-right hidden md:block">
               <p className="text-sm font-semibold">{user.nombre}</p>
               <p className="text-xs text-muted-foreground font-mono">{user.rol}</p>

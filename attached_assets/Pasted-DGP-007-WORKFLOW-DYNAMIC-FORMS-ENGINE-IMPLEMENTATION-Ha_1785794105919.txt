@@ -1,0 +1,518 @@
+DGP-007 — WORKFLOW & DYNAMIC FORMS ENGINE IMPLEMENTATION
+
+Has iniciado oficialmente el DGP-007 del programa DeltaOps.
+
+Toda la arquitectura (ETS-001…012), el Engineering Charter, ESI-001…010 y DGP-000…006 están completamente congelados.
+
+Este DGP implementa exclusivamente el Workflow Engine y el Dynamic Forms Engine reutilizables para todos los módulos futuros.
+
+No está permitido implementar módulos de negocio.
+
+No está permitido modificar ninguna decisión de arquitectura.
+
+No está permitido introducir nuevos patrones arquitectónicos.
+
+Toda implementación deberá reutilizar estrictamente:
+
+DGP-002 (Kernel)
+DGP-003 (Shared Platform)
+DGP-004 (Reference Module)
+DGP-005 (Design System)
+DGP-006 (Business Foundation)
+OBJETIVO
+
+Construir el motor oficial de flujos de trabajo y formularios dinámicos que utilizarán todos los módulos del sistema:
+
+Activos
+Órdenes de Trabajo
+Inventario
+Compras
+Combustible
+SST
+Auditorías
+PESV
+Gestión Documental
+Calidad
+Talento Humano
+cualquier módulo futuro.
+
+Debe ser completamente desacoplado del dominio.
+
+Nunca contendrá palabras como:
+
+Activo
+
+Inventario
+
+Orden
+
+Compra
+
+Combustible
+
+Empleado
+
+Proveedor
+
+Equipo
+
+OT
+
+Debe implementarse
+1.
+
+Workflow Runtime
+
+con soporte para
+
+Estados
+
+Transiciones
+
+Eventos
+
+Acciones
+
+Condiciones
+
+Permisos
+
+Capacidades
+
+Policies
+
+Aprobaciones
+
+Rechazos
+
+Escalamiento
+
+Cancelación
+
+Reapertura
+
+Suspensión
+
+Reanudación
+
+2.
+
+State Machine Runtime
+
+Totalmente declarativa.
+
+Debe permitir declarar un workflow únicamente mediante definición.
+
+Nunca mediante programación específica.
+
+3.
+
+Transition Engine
+
+Debe validar:
+
+Estado origen
+
+Estado destino
+
+Permisos
+
+Policies
+
+Capacidades
+
+Precondiciones
+
+Postcondiciones
+
+Eventos
+
+Auditoría
+
+Outbox
+
+4.
+
+Workflow Designer Runtime
+
+No visual.
+
+Debe existir únicamente el runtime.
+
+El diseñador gráfico llegará en otro DGP.
+
+Debe soportar:
+
+Definición
+
+Versionado
+
+Activación
+
+Desactivación
+
+Migración
+
+Compatibilidad N/N-1
+
+5.
+
+Dynamic Forms Runtime
+
+Debe permitir definir formularios completos mediante configuración.
+
+Tipos soportados:
+
+Texto
+
+Número
+
+Decimal
+
+Fecha
+
+Hora
+
+FechaHora
+
+Booleano
+
+Select
+
+MultiSelect
+
+Autocomplete
+
+Tabla
+
+Adjuntos
+
+Firma
+
+Ubicación
+
+Código QR
+
+Código de barras
+
+NFC
+
+Imagen
+
+Checklist
+
+Grupo
+
+Sección
+
+Pestañas
+
+Wizard
+
+6.
+
+Conditional Engine
+
+Debe soportar
+
+Visible cuando
+
+Obligatorio cuando
+
+Solo lectura cuando
+
+Oculto cuando
+
+Calculado cuando
+
+Validación cuando
+
+Todo mediante expresiones declarativas.
+
+Nunca código específico.
+
+7.
+
+Validation Runtime
+
+Debe soportar
+
+Longitud
+
+Expresiones
+
+Rangos
+
+Formato
+
+Regex
+
+Dependencias
+
+Validaciones cruzadas
+
+Validaciones asincrónicas
+
+Warnings
+
+Errores
+
+Bloqueos
+
+8.
+
+Dynamic Layout Runtime
+
+Layouts declarativos
+
+Responsive
+
+Desktop
+
+Tablet
+
+Mobile
+
+Offline
+
+9.
+
+Approval Runtime
+
+Aprobaciones
+
+Individuales
+
+Paralelas
+
+Secuenciales
+
+Por mayoría
+
+Por unanimidad
+
+Delegadas
+
+Escaladas
+
+Con vencimiento
+
+10.
+
+Evidence Runtime
+
+Adjuntos
+
+Comentarios
+
+Firmas
+
+Fotografías
+
+Geolocalización
+
+Timestamp
+
+Usuario
+
+Dispositivo
+
+Offline
+
+11.
+
+Checklist Runtime
+
+Checklist reutilizable
+
+Versionado
+
+Obligatorio
+
+Opcional
+
+Con evidencias
+
+Con firmas
+
+Con fotografías
+
+Con puntajes
+
+12.
+
+Template Runtime
+
+Plantillas reutilizables
+
+Versionadas
+
+Exportables
+
+Importables
+
+13.
+
+Offline Runtime
+
+Todos los formularios
+
+Todos los workflows
+
+Toda transición
+
+Toda aprobación
+
+Toda evidencia
+
+deben funcionar offline.
+
+14.
+
+Synchronization Runtime
+
+Conflictos
+
+Receipts
+
+Replay
+
+Idempotencia
+
+Reintentos
+
+Versiones
+
+15.
+
+UI Runtime
+
+Construido únicamente con el Design System DGP-005.
+
+No crear componentes visuales nuevos.
+
+Todo debe reutilizar:
+
+AppShell
+
+Wizard
+
+Stepper
+
+Table
+
+Form
+
+Card
+
+Tabs
+
+Timeline
+
+Drawer
+
+Modal
+
+Theme
+
+Tokens
+
+Logo
+
+Brandbook
+
+IMPORTANTE
+
+Toda la interfaz debe respetar exclusivamente:
+
+Brandbook oficial
+
+Logo oficial
+
+Design System DGP-005
+
+No introducir colores.
+
+No introducir tipografías.
+
+No introducir iconografía diferente.
+
+Debe entregarse
+
+Un nuevo paquete
+
+lib/workflow-engine
+
+y
+
+lib/dynamic-forms
+
+totalmente desacoplados.
+
+Debe incluir:
+
+Runtime Fake
+
+Runtime PostgreSQL
+
+Pruebas completas
+
+Documentación completa
+
+Galería técnica
+
+Playground técnico
+
+Ejemplos completamente neutros
+
+Sin vocabulario de negocio.
+
+Revisión Arquitectónica Obligatoria
+
+Al finalizar
+
+debe ejecutarse una revisión arquitectónica independiente.
+
+Debe buscar inconsistencias respecto a:
+
+ETS
+
+ESI
+
+DGP anteriores
+
+Dependency Rule
+
+CQRS
+
+DDD
+
+Hexagonal
+
+Configuration First
+
+Offline First
+
+Clean Architecture
+
+Event Driven
+
+Design System
+
+Brandbook
+
+Kernel
+
+Shared Platform
+
+Business Foundation
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+Informe Final Obligatorio
+
+Al finalizar entregar exclusivamente el informe oficial de cierre con el mismo formato utilizado en DGP-001…006.
+
+No proponer el siguiente DGP.
+
+Esperar instrucciones de la Dirección del Programa.

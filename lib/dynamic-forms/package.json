@@ -1,0 +1,30 @@
+{
+  "name": "@workspace/dynamic-forms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./definicion": "./src/definicion.ts",
+    "./condiciones": "./src/condiciones.ts",
+    "./validacion": "./src/validacion.ts",
+    "./layout": "./src/layout.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@workspace/business-foundation": "workspace:*",
+    "@workspace/kernel": "workspace:*",
+    "@workspace/platform": "workspace:*",
+    "@workspace/workflow-engine": "workspace:*",
+    "pg": "^8.20.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.11.0",
+    "vitest": "^4.1.10"
+  }
+}
