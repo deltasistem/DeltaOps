@@ -1,0 +1,213 @@
+DELTAOPS
+
+TRANSICIÓN OFICIAL DE FASE
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+A partir de este momento cambia oficialmente el modo de trabajo del proyecto.
+
+NO debes generar código.
+
+NO debes modificar el proyecto.
+
+NO debes implementar funcionalidades.
+
+NO debes crear tablas.
+
+NO debes crear APIs.
+
+NO debes generar componentes.
+
+Tu única misión es reconocer el cierre oficial de la fase de Ingeniería y preparar el proyecto para iniciar la fase de Construcción.
+
+======================================================================
+
+ESTADO OFICIAL DEL PROYECTO
+
+Las siguientes fases se consideran COMPLETADAS y CONGELADAS.
+
+✓ ETS-001 ... ETS-012
+
+✓ ENGINEERING_CHARTER
+
+✓ ESI-001 ... ESI-010
+
+Toda la arquitectura empresarial está congelada.
+
+Toda la arquitectura técnica está congelada.
+
+Toda la plataforma de ingeniería está congelada.
+
+Toda la experiencia de usuario está congelada.
+
+Toda la seguridad está congelada.
+
+Todo el sistema operativo de ingeniería está congelado.
+
+Ningún DGP podrá modificar ninguna decisión tomada en los ETS o ESI.
+
+======================================================================
+
+NUEVA FASE
+
+FASE 3
+
+CONSTRUCCIÓN
+
+Los DGP serán considerados proyectos ejecutables.
+
+Cada DGP tendrá como objetivo construir una capacidad funcional completa del sistema.
+
+Los DGP NO rediseñan.
+
+Los DGP IMPLEMENTAN.
+
+======================================================================
+
+REGLAS OFICIALES
+
+A partir de este momento:
+
+• Los ETS son la autoridad de negocio.
+
+• Los ESI son la autoridad de ingeniería.
+
+• Los DGP serán la autoridad de construcción.
+
+Todo conflicto deberá escalar hacia el documento de mayor jerarquía.
+
+El código jamás podrá modificar la arquitectura.
+
+Si durante un DGP aparece una necesidad arquitectónica:
+
+DGP
+
+↓
+
+ADR
+
+↓
+
+Revisión Arquitectónica
+
+↓
+
+Actualización del documento correspondiente
+
+↓
+
+Continuación del DGP
+
+Nunca al revés.
+
+======================================================================
+
+OBJETIVO DE LOS DGP
+
+Cada DGP deberá producir un incremento funcional completamente implementable.
+
+Cada DGP deberá:
+
+• tener objetivo
+
+• alcance
+
+• dependencias
+
+• riesgos
+
+• criterios de aceptación
+
+• Definition of Done
+
+• evidencias
+
+• estrategia de pruebas
+
+• estrategia de rollback
+
+• estrategia de observabilidad
+
+• reutilización de patrones
+
+• referencias exactas a ETS y ESI
+
+======================================================================
+
+SECUENCIA OFICIAL
+
+El siguiente documento será:
+
+DGP-000
+
+MASTER CONSTRUCTION PROGRAM
+
+Este documento NO implementará código.
+
+Su función será:
+
+• dividir DeltaOps en olas oficiales
+
+• definir el orden de construcción
+
+• establecer dependencias
+
+• identificar componentes paralelizables
+
+• definir hitos
+
+• definir entregables
+
+• definir releases
+
+• definir la estrategia oficial de construcción
+
+Después de DGP-000 comenzará la implementación real.
+
+======================================================================
+
+IMPORTANTE
+
+A partir de este momento debes comportarte como un CONSTRUCTOR DE SOFTWARE.
+
+No como arquitecto.
+
+No como analista.
+
+No como diseñador.
+
+Todo deberá construirse exactamente conforme al corpus:
+
+ETS
+
+↓
+
+ENGINEERING CHARTER
+
+↓
+
+ESI
+
+↓
+
+DGP
+
+↓
+
+CÓDIGO
+
+======================================================================
+
+Al finalizar:
+
+1. Confirmar el cierre oficial de la fase ETS/ESI.
+
+2. Confirmar el inicio oficial de la fase DGP.
+
+3. Confirmar que ninguna arquitectura será modificada durante los DGP.
+
+4. Esperar instrucciones para generar DGP-000.
