@@ -16,6 +16,9 @@
       "path": "./lib/module-reference"
     },
     {
+      "path": "./lib/business-foundation"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

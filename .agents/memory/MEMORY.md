@@ -5,4 +5,5 @@
 - [Orval query-key invalidation](orval-query-invalidation.md) — call `getListXQueryKey()` with no args to invalidate all filter variants (prefix match).
 - [DeltaOps plataforma DGP-003](deltaops-platform-dgp003.md) — record store genérico, RLS exige set_config por transacción, sellos por Symbol no exportables, API en raíz del proxy.
 - [Patrón de módulos DGP-004](deltaops-module-pattern-dgp004.md) — RLS también en lecturas, proyección solo desde payload, recibos de idempotencia (eventId/opId), mínimo privilegio por rol.
+- [Business Foundation DGP-006](deltaops-business-foundation-dgp006.md) — ExtrasModulo compone contrato completo; config sin prefijo en defaults; /sync crear exige id de cliente; UoW única en mutaciones multi-registro.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.

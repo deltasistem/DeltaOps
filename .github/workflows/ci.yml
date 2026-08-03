@@ -34,3 +34,5 @@ jobs:
         run: pnpm --filter @workspace/module-reference run test
       - name: Pruebas del Design System
         run: pnpm --filter @workspace/design-system run test
+      - name: Pruebas del Business Foundation Framework
+        run: pnpm --filter @workspace/business-foundation run test

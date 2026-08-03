@@ -1,0 +1,138 @@
+Iniciamos oficialmente el DGP-006 — BUSINESS FOUNDATION FRAMEWORK IMPLEMENTATION.
+
+Este DGP NO implementa ningún módulo de negocio.
+
+NO implementa Activos.
+
+NO implementa Inventario.
+
+NO implementa Compras.
+
+NO implementa Órdenes de Trabajo.
+
+NO implementa Combustible.
+
+NO implementa SST.
+
+NO modifica ningún ETS.
+
+NO modifica ningún ESI.
+
+NO modifica ningún DGP anterior.
+
+Su único objetivo es construir la Business Foundation Framework oficial de DeltaOps.
+
+Debe implementar únicamente componentes genéricos reutilizables que servirán como base para todos los módulos futuros.
+
+Debe respetar estrictamente el corpus completo:
+
+• ETS-001…012
+• ENGINEERING_CHARTER
+• ESI-001…010
+• DGP-000…005
+
+Debe utilizar exclusivamente:
+
+• Kernel (DGP-002)
+
+• Shared Platform (DGP-003)
+
+• Design System (DGP-005)
+
+Debe construir como mínimo:
+
+• Generic Aggregate Runtime
+
+• Generic Entity Runtime
+
+• Generic CRUD Runtime
+
+• Generic Repository Runtime
+
+• Generic Command Runtime
+
+• Generic Query Runtime
+
+• Generic State Machine Runtime
+
+• Generic Search Runtime
+
+• Generic Filter Runtime
+
+• Generic Dashboard Runtime
+
+• Generic KPI Runtime
+
+• Generic Timeline Runtime
+
+• Generic Attachment Runtime
+
+• Generic Comment Runtime
+
+• Generic Audit Viewer Runtime
+
+• Generic History Runtime
+
+• Generic Form Runtime
+
+• Generic Table Runtime
+
+• Generic Bulk Operations Runtime
+
+• Generic Import Runtime
+
+• Generic Export Runtime
+
+• Generic Tree Runtime
+
+• Generic Assignment Runtime
+
+• Generic Approval Runtime
+
+• Generic Catalog Runtime
+
+• Generic Module Bootstrap Runtime
+
+• Generic Module Scaffolding Runtime
+
+Todo debe ser completamente desacoplado del dominio.
+
+Ninguna clase, componente, servicio o contrato podrá contener nombres de negocio.
+
+Todo debe ser reutilizable por cualquier módulo futuro.
+
+Toda la configuración debe provenir del Configuration Engine.
+
+Todo debe soportar multitenancy.
+
+Todo debe soportar Offline First.
+
+Todo debe soportar auditoría.
+
+Todo debe soportar CQRS.
+
+Todo debe soportar Event Driven.
+
+Todo debe soportar RLS.
+
+Todo debe soportar permisos.
+
+Todo debe soportar capacidades.
+
+Todo debe soportar Design System.
+
+Todo debe soportar i18n.
+
+Todo debe tener pruebas automatizadas.
+
+Todo debe documentarse en español.
+
+Debe ejecutarse una revisión arquitectónica obligatoria al finalizar.
+
+Toda desviación encontrada deberá corregirse antes del cierre.
+
+Al finalizar entregar únicamente el Informe Oficial de Cierre DGP-006 con el mismo formato utilizado en los DGP anteriores.
+
+No implementar todavía ningún módulo funcional.
+
+Esperar instrucciones para DGP-007.
