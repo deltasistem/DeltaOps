@@ -4,3 +4,4 @@
 - [Kernel UoW/outbox contracts](kernel-uow-outbox.md) — modules must write via pgSessionOf(uow); handlers must be idempotent (at-least-once outbox).
 - [Orval query-key invalidation](orval-query-invalidation.md) — call `getListXQueryKey()` with no args to invalidate all filter variants (prefix match).
 - [DeltaOps plataforma DGP-003](deltaops-platform-dgp003.md) — record store genérico, RLS exige set_config por transacción, sellos por Symbol no exportables, API en raíz del proxy.
+- [Patrón de módulos DGP-004](deltaops-module-pattern-dgp004.md) — RLS también en lecturas, proyección solo desde payload, recibos de idempotencia (eventId/opId), mínimo privilegio por rol.

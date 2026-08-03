@@ -138,6 +138,11 @@ export default function Console() {
           </div>
 
           <div className="flex items-center gap-6">
+            <Link href="/referencia" data-testid="link-referencia">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Referencia
+              </Button>
+            </Link>
             <Link href="/plataforma" data-testid="link-plataforma">
               <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
                 Plataforma

@@ -7,7 +7,8 @@
  */
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
-import { createPlatformRuntime, type PlatformRuntime } from "@workspace/platform";
+import type { PlatformRuntime } from "@workspace/platform";
+import { deltaopsRuntime } from "./reference-runtime";
 
 const router: IRouter = Router();
 
@@ -15,21 +16,26 @@ const router: IRouter = Router();
  * Control de acceso: la Consola Técnica expone metadatos operativos
  * (auditoría, colas, almacenamiento) y exige sesión autenticada de DeltaOps.
  */
-router.use("/deltaops/platform", (req, res, next): void => {
-  if (!req.session?.deltaopsUserId) {
+router.use("/deltaops/platform", async (req, res, next): Promise<void> => {
+  const userId = req.session?.deltaopsUserId;
+  if (!userId) {
     res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+  // Mínimo privilegio: la consola expone metadatos globales (colas, auditoría,
+  // almacenamiento), reservados a administradores de plataforma.
+  const rows = await pool.query(`SELECT rol FROM deltaops.users WHERE id = $1`, [userId]);
+  const rol = rows.rows[0]?.rol;
+  if (rol !== "platform_admin" && rol !== "admin") {
+    res.status(403).json({ error: "Requiere rol de administrador de plataforma" });
     return;
   }
   next();
 });
 
-/** Runtime singleton de la plataforma (adaptadores PostgreSQL reales). */
-let runtime: PlatformRuntime | null = null;
+/** Runtime compartido de DeltaOps (Kernel + Plataforma + Reference Module). */
 function platform(): PlatformRuntime {
-  if (!runtime) {
-    runtime = createPlatformRuntime({ pool });
-  }
-  return runtime;
+  return deltaopsRuntime().platform;
 }
 
 router.get("/deltaops/platform/services", (_req, res): void => {

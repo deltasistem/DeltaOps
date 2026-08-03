@@ -30,3 +30,5 @@ jobs:
         run: pnpm --filter @workspace/kernel run test
       - name: Pruebas de la Plataforma
         run: pnpm --filter @workspace/platform run test
+      - name: Pruebas del Módulo de Referencia
+        run: pnpm --filter @workspace/module-reference run test

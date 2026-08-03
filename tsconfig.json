@@ -13,6 +13,9 @@
       "path": "./lib/platform"
     },
     {
+      "path": "./lib/module-reference"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

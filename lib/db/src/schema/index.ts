@@ -10,3 +10,4 @@ export * from "./stock-movements";
 export * from "./deltaops";
 export * from "./deltaops-kernel";
 export * from "./deltaops-platform";
+export * from "./deltaops-reference";

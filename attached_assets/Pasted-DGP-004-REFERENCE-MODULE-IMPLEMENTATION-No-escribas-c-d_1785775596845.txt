@@ -1,0 +1,430 @@
+DGP-004 — REFERENCE MODULE IMPLEMENTATION
+
+No escribas código inmediatamente.
+
+Primero actúa como Chief Software Architect de DeltaOps y verifica el corpus completo antes de implementar.
+
+Autoridad documental (orden estricto)
+
+ETS-001 … ETS-012
+ENGINEERING_CHARTER
+ESI-001 … ESI-010
+DGP-000
+DGP-001
+DGP-002
+DGP-003
+
+No está permitido modificar ninguno.
+
+Todo lo que construyas debe implementarlos literalmente.
+
+Objetivo
+
+Construir el Reference Module ejecutable.
+
+Este NO es un módulo de negocio.
+
+NO representa Activos.
+
+NO representa Inventario.
+
+NO representa Compras.
+
+NO representa Combustible.
+
+NO representa SST.
+
+Debe ser un dominio completamente neutro denominado:
+
+Elemento de Referencia
+
+con el único propósito de convertirse en el patrón oficial que utilizarán todos los módulos futuros.
+
+Este módulo será la implementación viva de todo lo diseñado en:
+
+ETS
+ESI
+DGP-001
+DGP-002
+DGP-003
+Dominio permitido
+
+Únicamente:
+
+Elemento de Referencia
+
+Estados:
+
+BORRADOR
+
+ACTIVO
+
+ARCHIVADO
+
+Nada más.
+
+No inventes reglas adicionales.
+
+Debe implementar
+
+Toda la arquitectura diseñada.
+
+Como mínimo:
+
+Aggregate
+Repository
+Unit Of Work
+Application Service
+Domain Service
+Policy
+Commands
+Queries
+Events
+Event Handlers
+Read Models
+Projection
+Capability
+Permission
+Configuration
+Audit
+Shared Services
+Search
+Notification
+Timeline
+Attachments
+Dashboard
+KPI
+AI Hook
+Integration Hook
+
+Todo usando exclusivamente:
+
+Kernel DGP-002
+
+Shared Platform DGP-003
+
+El módulo debe registrar automáticamente
+
+Capacidad
+
+Permisos
+
+Eventos
+
+Policies
+
+Configuración
+
+Servicios
+
+Read Models
+
+Consultas
+
+Comandos
+
+KPIs
+
+Knowledge Graph
+
+Observabilidad
+
+sin registro manual.
+
+Debe demostrar
+
+Pipeline completo
+
+HTTP
+
+↓
+
+Command
+
+↓
+
+Validation
+
+↓
+
+Authorization
+
+↓
+
+Policy
+
+↓
+
+Application Service
+
+↓
+
+Repository
+
+↓
+
+Unit Of Work
+
+↓
+
+PostgreSQL
+
+↓
+
+Outbox
+
+↓
+
+Audit
+
+↓
+
+Projection
+
+↓
+
+Read Model
+
+↓
+
+Shared Services
+
+↓
+
+API
+
+↓
+
+Frontend
+
+Todo funcionando.
+
+Debe construir
+
+Frontend completo.
+
+Pantallas mínimas:
+
+Login (reutilizar)
+
+Listado
+
+Detalle
+
+Crear
+
+Editar
+
+Activar
+
+Archivar
+
+Timeline
+
+Adjuntos
+
+Comentarios
+
+Dashboard
+
+Configuración
+
+Consola técnica del módulo
+
+Todo reutilizando:
+
+Shell
+
+Layouts
+
+Tokens
+
+Framework UX
+
+ESI-008.
+
+No diseñar componentes nuevos.
+
+Offline
+
+Demostrar:
+
+crear offline
+
+editar offline
+
+sincronizar
+
+conflictos
+
+idempotencia
+
+replay
+
+Seguridad
+
+Demostrar:
+
+RLS
+
+Permisos
+
+Capabilities
+
+Policies
+
+Session
+
+Audit
+
+Delegación
+
+Configuración por tenant
+
+Todo funcionando.
+
+Pruebas
+
+Construir pruebas automáticas para:
+
+Dominio
+
+Application
+
+Repository
+
+Policies
+
+Commands
+
+Queries
+
+Read Models
+
+Projection
+
+Outbox
+
+Audit
+
+Offline
+
+Multitenancy
+
+RLS
+
+PostgreSQL
+
+Frontend
+
+E2E
+
+Concurrencia
+
+Rollback
+
+Replay
+
+Integración
+
+Todo debe quedar verde.
+
+Documentación
+
+Generar únicamente documentación nueva correspondiente al DGP-004.
+
+No modificar ETS.
+
+No modificar ESI.
+
+No modificar DGP anteriores.
+
+Revisión obligatoria
+
+Antes de cerrar el DGP realiza una revisión arquitectónica completa.
+
+Buscar:
+
+violaciones DDD
+
+violaciones SOLID
+
+violaciones Clean Architecture
+
+violaciones Hexagonal
+
+violaciones CQRS
+
+violaciones Dependency Rule
+
+violaciones Event Driven
+
+duplicación
+
+acoplamientos
+
+dependencias circulares
+
+violaciones multitenant
+
+violaciones RLS
+
+violaciones Offline
+
+violaciones Outbox
+
+violaciones Append Only
+
+Si existe una sola, corrígela antes del cierre.
+
+Entregables
+
+Debes entregar un informe exactamente con esta estructura:
+
+Resumen ejecutivo
+Árbol completo del módulo
+Componentes implementados
+Migraciones
+API generada
+Frontend generado
+Eventos implementados
+Read Models
+Policies
+Capacidades
+Permisos
+Configuración
+Shared Services utilizados
+Pruebas ejecutadas
+Cobertura
+Hallazgos de la revisión arquitectónica
+Correcciones realizadas
+Riesgos
+Bloqueadores
+Confirmación de cumplimiento con ETS / ESI / DGP
+Restricciones
+
+NO construir módulos de negocio.
+
+NO crear Activos.
+
+NO crear Inventario.
+
+NO crear Compras.
+
+NO crear OT.
+
+NO crear Combustible.
+
+NO crear SST.
+
+NO crear Checklists.
+
+NO crear Hoja de Vida.
+
+NO crear Equipos.
+
+NO crear nada específico del negocio.
+
+Este DGP únicamente debe construir el molde ejecutable definitivo que servirá como referencia para todos los módulos reales de DeltaOps.
+
+Al finalizar, espera nuevas instrucciones sin iniciar ningún otro DGP automáticamente.

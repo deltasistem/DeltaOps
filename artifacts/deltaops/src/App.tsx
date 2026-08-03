@@ -4,6 +4,8 @@ import { Route, Switch, Router as WouterRouter } from 'wouter';
 import Login from '@/pages/login';
 import Console from '@/pages/console';
 import Plataforma from '@/pages/plataforma';
+import Referencia from '@/pages/referencia';
+import ReferenciaDetalle from '@/pages/referencia-detalle';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Console} />
       <Route path="/plataforma" component={Plataforma} />
+      <Route path="/referencia" component={Referencia} />
+      <Route path="/referencia/:id" component={ReferenciaDetalle} />
       <Route path="/login" component={Login} />
       <Route component={NotFound} />
     </Switch>
