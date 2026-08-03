@@ -9,6 +9,83 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Liveness de la plataforma DeltaOps
+ */
+export const DeltaopsHealthResponse = zod.object({
+  "status": zod.string(),
+  "timestamp": zod.string()
+})
+
+
+/**
+ * @summary Readiness (incluye chequeo de base de datos)
+ */
+export const DeltaopsReadyResponse = zod.object({
+  "status": zod.string(),
+  "checks": zod.array(zod.object({
+  "name": zod.string(),
+  "status": zod.string(),
+  "latencyMs": zod.number().nullish(),
+  "detail": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Información de la plataforma
+ */
+export const DeltaopsInfoResponse = zod.object({
+  "name": zod.string(),
+  "version": zod.string(),
+  "environment": zod.string(),
+  "uptimeSeconds": zod.number(),
+  "nodeVersion": zod.string().nullish()
+})
+
+
+/**
+ * @summary Observabilidad mínima (contadores del proceso)
+ */
+export const DeltaopsMetricsResponse = zod.object({
+  "uptimeSeconds": zod.number(),
+  "requestCount": zod.number(),
+  "errorCount": zod.number(),
+  "avgResponseTimeMs": zod.number().nullish()
+})
+
+
+/**
+ * @summary Iniciar sesión
+ */
+
+
+
+
+export const DeltaopsLoginBody = zod.object({
+  "email": zod.string().min(1),
+  "password": zod.string().min(1)
+})
+
+export const DeltaopsLoginResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "nombre": zod.string(),
+  "rol": zod.string()
+})
+
+
+/**
+ * @summary Usuario de la sesión actual
+ */
+export const DeltaopsMeResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "nombre": zod.string(),
+  "rol": zod.string()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

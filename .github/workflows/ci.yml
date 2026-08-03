@@ -1,0 +1,28 @@
+# DeltaOps · DGP-001 — Pipeline básico (calidad automática)
+# Puertas mecánicas: instalación reproducible, typecheck completo del monorepo,
+# formato y pruebas base. Ningún cambio se integra con la puerta en rojo.
+name: deltaops-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Instalación reproducible
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck (libs + artefactos)
+        run: pnpm run typecheck
+      - name: Formato
+        run: pnpm exec prettier --check "artifacts/api-server/src/**/*.ts" "scripts/src/**/*.ts" "lib/db/src/**/*.ts"
+      - name: Pruebas base
+        run: pnpm --filter @workspace/api-server run test

@@ -5,6 +5,56 @@
  * API specification for SGMA (Sistema de Gestión de Mantenimiento y Activos)
  * OpenAPI spec version: 0.1.0
  */
+export interface DeltaopsHealth {
+  status: string;
+  timestamp: string;
+}
+
+export interface DeltaopsCheck {
+  name: string;
+  status: string;
+  /** @nullable */
+  latencyMs?: number | null;
+  /** @nullable */
+  detail?: string | null;
+}
+
+export interface DeltaopsReadiness {
+  status: string;
+  checks: DeltaopsCheck[];
+}
+
+export interface DeltaopsInfo {
+  name: string;
+  version: string;
+  environment: string;
+  uptimeSeconds: number;
+  /** @nullable */
+  nodeVersion?: string | null;
+}
+
+export interface DeltaopsMetrics {
+  uptimeSeconds: number;
+  requestCount: number;
+  errorCount: number;
+  /** @nullable */
+  avgResponseTimeMs?: number | null;
+}
+
+export interface DeltaopsCredentials {
+  /** @minLength 1 */
+  email: string;
+  /** @minLength 1 */
+  password: string;
+}
+
+export interface DeltaopsSessionUser {
+  id: number;
+  email: string;
+  nombre: string;
+  rol: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

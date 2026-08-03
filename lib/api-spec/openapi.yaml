@@ -28,7 +28,122 @@ tags:
     description: Personnel (técnicos)
   - name: suppliers
     description: Suppliers (proveedores)
+  - name: deltaops-platform
+    description: DeltaOps — plataforma (health, readiness, info, métricas)
+  - name: deltaops-auth
+    description: DeltaOps — autenticación base y sesión
 paths:
+  /deltaops/platform/health:
+    get:
+      operationId: deltaopsHealth
+      tags: [deltaops-platform]
+      summary: Liveness de la plataforma DeltaOps
+      responses:
+        "200":
+          description: Vivo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaopsHealth"
+
+  /deltaops/platform/ready:
+    get:
+      operationId: deltaopsReady
+      tags: [deltaops-platform]
+      summary: Readiness (incluye chequeo de base de datos)
+      responses:
+        "200":
+          description: Listo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaopsReadiness"
+        "503":
+          description: No listo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaopsReadiness"
+
+  /deltaops/platform/info:
+    get:
+      operationId: deltaopsInfo
+      tags: [deltaops-platform]
+      summary: Información de la plataforma
+      responses:
+        "200":
+          description: Info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaopsInfo"
+
+  /deltaops/platform/metrics:
+    get:
+      operationId: deltaopsMetrics
+      tags: [deltaops-platform]
+      summary: Observabilidad mínima (contadores del proceso)
+      responses:
+        "200":
+          description: Métricas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaopsMetrics"
+
+  /deltaops/auth/login:
+    post:
+      operationId: deltaopsLogin
+      tags: [deltaops-auth]
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeltaopsCredentials"
+      responses:
+        "200":
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaopsSessionUser"
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /deltaops/auth/logout:
+    post:
+      operationId: deltaopsLogout
+      tags: [deltaops-auth]
+      summary: Cerrar sesión
+      responses:
+        "204":
+          description: Sesión cerrada
+
+  /deltaops/auth/me:
+    get:
+      operationId: deltaopsMe
+      tags: [deltaops-auth]
+      summary: Usuario de la sesión actual
+      responses:
+        "200":
+          description: Usuario autenticado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaopsSessionUser"
+        "401":
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /healthz:
     get:
       operationId: healthCheck
@@ -828,6 +943,91 @@ paths:
 
 components:
   schemas:
+    DeltaopsHealth:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+        timestamp:
+          type: string
+
+    DeltaopsCheck:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+        latencyMs:
+          type: ["number", "null"]
+        detail:
+          type: ["string", "null"]
+
+    DeltaopsReadiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeltaopsCheck"
+
+    DeltaopsInfo:
+      type: object
+      required: [name, version, environment, uptimeSeconds]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        environment:
+          type: string
+        uptimeSeconds:
+          type: number
+        nodeVersion:
+          type: ["string", "null"]
+
+    DeltaopsMetrics:
+      type: object
+      required: [uptimeSeconds, requestCount, errorCount]
+      properties:
+        uptimeSeconds:
+          type: number
+        requestCount:
+          type: integer
+        errorCount:
+          type: integer
+        avgResponseTimeMs:
+          type: ["number", "null"]
+
+    DeltaopsCredentials:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+
+    DeltaopsSessionUser:
+      type: object
+      required: [id, email, nombre, rol]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        nombre:
+          type: string
+        rol:
+          type: string
+
     HealthStatus:
       type: object
       properties:

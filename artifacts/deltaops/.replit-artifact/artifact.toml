@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/deltaops/"
+title = "DeltaOps — Plataforma"
+description = "Frontend de la plataforma DeltaOps (EAM SaaS). En DGP-001 solo contiene la fábrica: autenticación base, sesión, y consola de estado de la plataforma (health checks, versión, entorno). Sin módulos de negocio."
+version = "1.0.0"
+id = "artifacts/deltaops"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/deltaops/" ]
+localPort = 18151
+
+[services.development]
+run = "pnpm --filter @workspace/deltaops run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/deltaops", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/deltaops/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18151"
+BASE_PATH = "/deltaops/"

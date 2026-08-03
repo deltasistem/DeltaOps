@@ -1,0 +1,60 @@
+# DeltaOps · DGP-001 — Docker Compose (configuración portable)
+# Nota operativa: el entorno Replit no ejecuta Docker; allí la plataforma corre
+# con los workflows nativos (pnpm dev + proxy compartido). Estos archivos son la
+# definición portable equivalente para cualquier host con Docker.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: deltaops
+      POSTGRES_PASSWORD: deltaops
+      POSTGRES_DB: deltaops
+    volumes:
+      - deltaops_pgdata:/var/lib/postgresql/data
+      - ./lib/db/migrations/deltaops:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deltaops"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DATABASE_URL: postgres://deltaops:deltaops@db:5432/deltaops
+      SESSION_SECRET: ${SESSION_SECRET:?Defina SESSION_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8080/api/deltaops/platform/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    environment:
+      PORT: 5173
+      BASE_PATH: /deltaops/
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+volumes:
+  deltaops_pgdata:

@@ -26,6 +26,12 @@ import type {
   AssetInput,
   AssetUpdate,
   DashboardSummary,
+  DeltaopsCredentials,
+  DeltaopsHealth,
+  DeltaopsInfo,
+  DeltaopsMetrics,
+  DeltaopsReadiness,
+  DeltaopsSessionUser,
   Error,
   HealthStatus,
   ListAssetsParams,
@@ -66,6 +72,532 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getDeltaopsHealthUrl = () => {
+
+
+
+
+  return `/api/deltaops/platform/health`
+}
+
+/**
+ * @summary Liveness de la plataforma DeltaOps
+ */
+export const deltaopsHealth = async ( options?: RequestInit): Promise<DeltaopsHealth> => {
+
+  return customFetch<DeltaopsHealth>(getDeltaopsHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeltaopsHealthQueryKey = () => {
+    return [
+    `/api/deltaops/platform/health`
+    ] as const;
+    }
+
+
+export const getDeltaopsHealthQueryOptions = <TData = Awaited<ReturnType<typeof deltaopsHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDeltaopsHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof deltaopsHealth>>> = ({ signal }) => deltaopsHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deltaopsHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DeltaopsHealthQueryResult = NonNullable<Awaited<ReturnType<typeof deltaopsHealth>>>
+export type DeltaopsHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liveness de la plataforma DeltaOps
+ */
+
+export function useDeltaopsHealth<TData = Awaited<ReturnType<typeof deltaopsHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDeltaopsHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeltaopsReadyUrl = () => {
+
+
+
+
+  return `/api/deltaops/platform/ready`
+}
+
+/**
+ * @summary Readiness (incluye chequeo de base de datos)
+ */
+export const deltaopsReady = async ( options?: RequestInit): Promise<DeltaopsReadiness> => {
+
+  return customFetch<DeltaopsReadiness>(getDeltaopsReadyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeltaopsReadyQueryKey = () => {
+    return [
+    `/api/deltaops/platform/ready`
+    ] as const;
+    }
+
+
+export const getDeltaopsReadyQueryOptions = <TData = Awaited<ReturnType<typeof deltaopsReady>>, TError = ErrorType<DeltaopsReadiness>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsReady>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDeltaopsReadyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof deltaopsReady>>> = ({ signal }) => deltaopsReady({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deltaopsReady>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DeltaopsReadyQueryResult = NonNullable<Awaited<ReturnType<typeof deltaopsReady>>>
+export type DeltaopsReadyQueryError = ErrorType<DeltaopsReadiness>
+
+
+/**
+ * @summary Readiness (incluye chequeo de base de datos)
+ */
+
+export function useDeltaopsReady<TData = Awaited<ReturnType<typeof deltaopsReady>>, TError = ErrorType<DeltaopsReadiness>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsReady>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDeltaopsReadyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeltaopsInfoUrl = () => {
+
+
+
+
+  return `/api/deltaops/platform/info`
+}
+
+/**
+ * @summary Información de la plataforma
+ */
+export const deltaopsInfo = async ( options?: RequestInit): Promise<DeltaopsInfo> => {
+
+  return customFetch<DeltaopsInfo>(getDeltaopsInfoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeltaopsInfoQueryKey = () => {
+    return [
+    `/api/deltaops/platform/info`
+    ] as const;
+    }
+
+
+export const getDeltaopsInfoQueryOptions = <TData = Awaited<ReturnType<typeof deltaopsInfo>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDeltaopsInfoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof deltaopsInfo>>> = ({ signal }) => deltaopsInfo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deltaopsInfo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DeltaopsInfoQueryResult = NonNullable<Awaited<ReturnType<typeof deltaopsInfo>>>
+export type DeltaopsInfoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Información de la plataforma
+ */
+
+export function useDeltaopsInfo<TData = Awaited<ReturnType<typeof deltaopsInfo>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDeltaopsInfoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeltaopsMetricsUrl = () => {
+
+
+
+
+  return `/api/deltaops/platform/metrics`
+}
+
+/**
+ * @summary Observabilidad mínima (contadores del proceso)
+ */
+export const deltaopsMetrics = async ( options?: RequestInit): Promise<DeltaopsMetrics> => {
+
+  return customFetch<DeltaopsMetrics>(getDeltaopsMetricsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeltaopsMetricsQueryKey = () => {
+    return [
+    `/api/deltaops/platform/metrics`
+    ] as const;
+    }
+
+
+export const getDeltaopsMetricsQueryOptions = <TData = Awaited<ReturnType<typeof deltaopsMetrics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDeltaopsMetricsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof deltaopsMetrics>>> = ({ signal }) => deltaopsMetrics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deltaopsMetrics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DeltaopsMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof deltaopsMetrics>>>
+export type DeltaopsMetricsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Observabilidad mínima (contadores del proceso)
+ */
+
+export function useDeltaopsMetrics<TData = Awaited<ReturnType<typeof deltaopsMetrics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDeltaopsMetricsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeltaopsLoginUrl = () => {
+
+
+
+
+  return `/api/deltaops/auth/login`
+}
+
+/**
+ * @summary Iniciar sesión
+ */
+export const deltaopsLogin = async (deltaopsCredentials: DeltaopsCredentials, options?: RequestInit): Promise<DeltaopsSessionUser> => {
+
+  return customFetch<DeltaopsSessionUser>(getDeltaopsLoginUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      deltaopsCredentials,)
+  }
+);}
+
+
+
+
+export const getDeltaopsLoginMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deltaopsLogin>>, TError,{data: BodyType<DeltaopsCredentials>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deltaopsLogin>>, TError,{data: BodyType<DeltaopsCredentials>}, TContext> => {
+
+const mutationKey = ['deltaopsLogin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deltaopsLogin>>, {data: BodyType<DeltaopsCredentials>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  deltaopsLogin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeltaopsLoginMutationResult = NonNullable<Awaited<ReturnType<typeof deltaopsLogin>>>
+    export type DeltaopsLoginMutationBody = BodyType<DeltaopsCredentials>
+    export type DeltaopsLoginMutationError = ErrorType<Error>
+
+    /**
+ * @summary Iniciar sesión
+ */
+export const useDeltaopsLogin = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deltaopsLogin>>, TError,{data: BodyType<DeltaopsCredentials>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deltaopsLogin>>,
+        TError,
+        {data: BodyType<DeltaopsCredentials>},
+        TContext
+      > => {
+      return useMutation(getDeltaopsLoginMutationOptions(options));
+    }
+
+export const getDeltaopsLogoutUrl = () => {
+
+
+
+
+  return `/api/deltaops/auth/logout`
+}
+
+/**
+ * @summary Cerrar sesión
+ */
+export const deltaopsLogout = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeltaopsLogoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDeltaopsLogoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deltaopsLogout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deltaopsLogout>>, TError,void, TContext> => {
+
+const mutationKey = ['deltaopsLogout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deltaopsLogout>>, void> = () => {
+
+
+          return  deltaopsLogout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeltaopsLogoutMutationResult = NonNullable<Awaited<ReturnType<typeof deltaopsLogout>>>
+
+    export type DeltaopsLogoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Cerrar sesión
+ */
+export const useDeltaopsLogout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deltaopsLogout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deltaopsLogout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeltaopsLogoutMutationOptions(options));
+    }
+
+export const getDeltaopsMeUrl = () => {
+
+
+
+
+  return `/api/deltaops/auth/me`
+}
+
+/**
+ * @summary Usuario de la sesión actual
+ */
+export const deltaopsMe = async ( options?: RequestInit): Promise<DeltaopsSessionUser> => {
+
+  return customFetch<DeltaopsSessionUser>(getDeltaopsMeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeltaopsMeQueryKey = () => {
+    return [
+    `/api/deltaops/auth/me`
+    ] as const;
+    }
+
+
+export const getDeltaopsMeQueryOptions = <TData = Awaited<ReturnType<typeof deltaopsMe>>, TError = ErrorType<Error>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDeltaopsMeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof deltaopsMe>>> = ({ signal }) => deltaopsMe({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deltaopsMe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DeltaopsMeQueryResult = NonNullable<Awaited<ReturnType<typeof deltaopsMe>>>
+export type DeltaopsMeQueryError = ErrorType<Error>
+
+
+/**
+ * @summary Usuario de la sesión actual
+ */
+
+export function useDeltaopsMe<TData = Awaited<ReturnType<typeof deltaopsMe>>, TError = ErrorType<Error>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof deltaopsMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDeltaopsMeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

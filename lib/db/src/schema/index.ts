@@ -7,3 +7,4 @@ export * from "./spare-parts";
 export * from "./work-orders";
 export * from "./maintenance-plans";
 export * from "./stock-movements";
+export * from "./deltaops";

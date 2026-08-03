@@ -6,12 +6,16 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "seed-sgma": "tsx ./src/seed-sgma.ts",
+    "seed:deltaops": "tsx ./src/seed-deltaops.ts",
+    "generate:module": "tsx ./src/generate-deltaops-module.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workspace/db": "workspace:*"
+    "@workspace/db": "workspace:*",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "catalog:",
     "tsx": "catalog:"
   }
