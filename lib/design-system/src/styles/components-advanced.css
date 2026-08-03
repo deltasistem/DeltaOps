@@ -1,0 +1,189 @@
+/*
+ * DGP-005 · Estilos de componentes avanzados del Design System DeltaOps.
+ * Stepper, Wizard, ChartWrapper.
+ * (ThemeProvider e I18nProvider no aportan estilos propios: gestionan tokens/contexto.)
+ * Todos los valores provienen de tokens (--do-*). Prohibido hardcodear.
+ */
+
+/* ===================================================================== */
+/* Stepper                                                               */
+/* ===================================================================== */
+.do-stepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--do-sp-2);
+}
+.do-stepper--horizontal {
+  flex-direction: row;
+  align-items: flex-start;
+}
+.do-stepper--vertical {
+  flex-direction: column;
+  gap: var(--do-sp-4);
+}
+
+.do-stepper__item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--do-sp-3);
+  flex: 1 1 0;
+  min-width: 0;
+}
+.do-stepper--vertical .do-stepper__item {
+  flex: 0 0 auto;
+}
+
+.do-stepper__marcador {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--do-control-sm);
+  height: var(--do-control-sm);
+  border-radius: var(--do-radius-full);
+  border: var(--do-border-medio) solid var(--do-borde-fuerte);
+  background: var(--do-surface);
+  color: var(--do-texto-suave);
+  font-family: var(--do-font-principal);
+  font-size: var(--do-text-sm);
+  font-weight: var(--do-peso-semibold);
+}
+.do-stepper__numero {
+  line-height: 1;
+}
+
+.do-stepper__texto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-1);
+  padding-top: var(--do-sp-1);
+  min-width: 0;
+}
+.do-stepper__etiqueta {
+  font-family: var(--do-font-principal);
+  font-size: var(--do-text-sm);
+  font-weight: var(--do-peso-semibold);
+  color: var(--do-texto);
+}
+.do-stepper__descripcion {
+  font-size: var(--do-text-xs);
+  color: var(--do-texto-suave);
+  line-height: var(--do-leading-normal);
+}
+
+/* Línea conectora entre pasos */
+.do-stepper__linea {
+  position: absolute;
+  background: var(--do-borde);
+}
+.do-stepper--horizontal .do-stepper__linea {
+  top: calc(var(--do-control-sm) / 2);
+  left: calc(var(--do-control-sm) + var(--do-sp-3));
+  right: calc(var(--do-sp-2) * -1);
+  height: var(--do-border-medio);
+}
+.do-stepper--vertical .do-stepper__linea {
+  top: var(--do-control-sm);
+  bottom: calc(var(--do-sp-4) * -1);
+  left: calc(var(--do-control-sm) / 2);
+  width: var(--do-border-medio);
+}
+
+/* Estado: completado */
+.do-stepper__item--completado .do-stepper__marcador {
+  background: var(--do-exito);
+  border-color: var(--do-exito);
+  color: var(--do-texto-invertido);
+}
+.do-stepper__item--completado .do-stepper__linea {
+  background: var(--do-exito);
+}
+
+/* Estado: actual (acento Rojo oficial) */
+.do-stepper__item--actual .do-stepper__marcador {
+  background: var(--do-primario);
+  border-color: var(--do-primario);
+  color: var(--do-primario-texto);
+}
+.do-stepper__item--actual .do-stepper__etiqueta {
+  color: var(--do-acento-texto);
+}
+
+/* Estado: pendiente (por defecto, sin overrides) */
+
+/* ===================================================================== */
+/* Wizard                                                                */
+/* ===================================================================== */
+.do-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-6);
+}
+.do-wizard__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-3);
+  padding: var(--do-sp-6);
+  background: var(--do-surface);
+  border: var(--do-border-fino) solid var(--do-borde);
+  border-radius: var(--do-radius-lg);
+}
+.do-wizard__paso-etiqueta {
+  font-family: var(--do-font-principal);
+  font-size: var(--do-text-lg);
+  font-weight: var(--do-peso-semibold);
+  color: var(--do-texto);
+}
+.do-wizard__contenido {
+  color: var(--do-texto);
+  font-size: var(--do-text-base);
+  line-height: var(--do-leading-normal);
+}
+
+/* ===================================================================== */
+/* ChartWrapper                                                          */
+/* ===================================================================== */
+.do-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-4);
+  margin: 0;
+  padding: var(--do-sp-4);
+  background: var(--do-surface);
+  border: var(--do-border-fino) solid var(--do-borde);
+  border-radius: var(--do-radius-lg);
+  box-shadow: var(--do-elev-1);
+}
+.do-chart__cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-1);
+}
+.do-chart__titulo {
+  font-family: var(--do-font-principal);
+  font-size: var(--do-text-lg);
+  font-weight: var(--do-peso-semibold);
+  color: var(--do-texto);
+}
+.do-chart__descripcion {
+  font-size: var(--do-text-sm);
+  color: var(--do-texto-suave);
+  line-height: var(--do-leading-normal);
+}
+.do-chart__area {
+  position: relative;
+  width: 100%;
+  display: flex;
+  min-height: var(--do-control-lg);
+}
+.do-chart__area > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.do-chart__cargando {
+  width: 100%;
+  height: 100%;
+}

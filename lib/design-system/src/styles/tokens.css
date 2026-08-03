@@ -34,6 +34,11 @@
   --do-info: #1d4ed8;
   /* Texto de error: derivado del Rojo oficial (mezcla con Blanco en oscuro) */
   --do-error-texto: var(--do-rojo);
+  /* Texto acentuado (rojo como color de texto; en oscuro se aclara para AA) */
+  --do-acento-texto: var(--do-rojo);
+  /* Layout de navegación/dashboard (conservador) */
+  --do-topbar-alto: 56px;
+  --do-dashboard-min: 260px;
 
   /* ---- Tipografía (Brandbook pág. 4) ---- */
   --do-font-principal: 'Montserrat', sans-serif;
@@ -126,6 +131,10 @@
   --do-control-sm: 32px;
   --do-control-md: 40px;
   --do-control-lg: 48px;
+
+  /* Navegación lateral (conservador) */
+  --do-sidebar-ancho: 260px;
+  --do-sidebar-ancho-colapsada: 64px;
 }
 
 /* ============ Tema claro (Positivo: Blanco + acentos rojos) ============ */
@@ -159,6 +168,7 @@
   --do-advertencia: color-mix(in srgb, #a16207 45%, var(--do-blanco));
   --do-info: color-mix(in srgb, #1d4ed8 40%, var(--do-blanco));
   --do-error-texto: color-mix(in srgb, var(--do-rojo) 55%, var(--do-blanco));
+  --do-acento-texto: color-mix(in srgb, var(--do-rojo) 55%, var(--do-blanco));
 }
 [data-do-theme='dark'],
 .dark {
@@ -185,6 +195,12 @@
 /* ============ Tema auto (preferencia del sistema) ============ */
 @media (prefers-color-scheme: dark) {
   [data-do-theme='auto'] {
+    /* Semánticos aclarados para AA sobre Oceano (idéntico al tema oscuro explícito) */
+    --do-exito: color-mix(in srgb, #15803d 45%, var(--do-blanco));
+    --do-advertencia: color-mix(in srgb, #a16207 45%, var(--do-blanco));
+    --do-info: color-mix(in srgb, #1d4ed8 40%, var(--do-blanco));
+    --do-error-texto: color-mix(in srgb, var(--do-rojo) 55%, var(--do-blanco));
+    --do-acento-texto: color-mix(in srgb, var(--do-rojo) 55%, var(--do-blanco));
     --do-bg: var(--do-oceano);
     --do-bg-sutil: var(--do-gris-900);
     --do-surface: var(--do-gris-900);
