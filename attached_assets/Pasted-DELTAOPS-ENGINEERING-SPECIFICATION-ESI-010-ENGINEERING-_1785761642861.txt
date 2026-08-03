@@ -1,0 +1,211 @@
+DELTAOPS
+
+ENGINEERING SPECIFICATION
+
+ESI-010
+
+ENGINEERING OPERATING SYSTEM
+
+VERSIÓN 1.0
+
+======================================================================
+
+IMPORTANTE
+
+NO ESCRIBAS CÓDIGO.
+
+NO IMPLEMENTES.
+
+NO MODIFIQUES ETS.
+
+NO MODIFIQUES ESI.
+
+NO GENERES DGP.
+
+NO GENERES YAML.
+
+Tu única misión es diseñar el Sistema Operativo Oficial de Ingeniería de DeltaOps.
+
+======================================================================
+
+CONTEXTO
+
+Tomar como referencia obligatoria:
+
+ETS-001 ... ETS-012
+
+ENGINEERING_CHARTER.md
+
+ESI-001 ... ESI-009
+
+Toda la ingeniería está congelada.
+
+Este documento NO crea arquitectura nueva.
+
+Integra toda la existente.
+
+======================================================================
+
+OBJETIVO
+
+Diseñar el Sistema Operativo Oficial de Ingeniería que gobernará el ciclo completo de vida de DeltaOps, desde una idea hasta la operación en producción.
+
+======================================================================
+
+DISEÑAR
+
+1. Engineering Operating System
+
+2. Engineering Flow
+
+3. Artifact Lifecycle
+
+4. Engineering Knowledge Index
+
+5. Dependency Map
+
+6. Pattern Registry
+
+7. Decision Registry
+
+8. Checklist Registry
+
+9. Score Registry
+
+10. Capability Registry
+
+11. Module Registry
+
+12. Service Registry
+
+13. Contract Registry
+
+14. Engineering Traceability
+
+15. Documentation Lifecycle
+
+16. AI Engineering Workflow
+
+17. Human Engineering Workflow
+
+18. Collaboration Model
+
+19. Engineering Governance
+
+20. Quality Governance
+
+21. Architecture Governance
+
+22. Knowledge Evolution
+
+23. Project Readiness
+
+24. Portfolio Readiness
+
+25. Engineering Dashboard Model
+
+26. Global Knowledge Graph
+
+27. Official Roadmap
+
+28. Engineering Evolution
+
+======================================================================
+
+GENERAR
+
+01_ENGINEERING_OPERATING_SYSTEM.md
+
+02_ENGINEERING_FLOW.md
+
+03_ARTIFACT_LIFECYCLE.md
+
+04_ENGINEERING_KNOWLEDGE_INDEX.md
+
+05_DEPENDENCY_MAP.md
+
+06_PATTERN_REGISTRY.md
+
+07_DECISION_REGISTRY.md
+
+08_CHECKLIST_REGISTRY.md
+
+09_SCORE_REGISTRY.md
+
+10_CAPABILITY_REGISTRY.md
+
+11_MODULE_REGISTRY.md
+
+12_SERVICE_REGISTRY.md
+
+13_CONTRACT_REGISTRY.md
+
+14_ENGINEERING_TRACEABILITY.md
+
+15_DOCUMENTATION_LIFECYCLE.md
+
+16_AI_ENGINEERING_WORKFLOW.md
+
+17_HUMAN_ENGINEERING_WORKFLOW.md
+
+18_COLLABORATION_MODEL.md
+
+19_ENGINEERING_GOVERNANCE.md
+
+20_QUALITY_GOVERNANCE.md
+
+21_ARCHITECTURE_GOVERNANCE.md
+
+22_KNOWLEDGE_EVOLUTION.md
+
+23_PROJECT_READINESS.md
+
+24_PORTFOLIO_READINESS.md
+
+25_ENGINEERING_DASHBOARD.md
+
+26_GLOBAL_KNOWLEDGE_GRAPH.md
+
+27_OFFICIAL_ROADMAP.md
+
+28_ENGINEERING_EVOLUTION.md
+
+======================================================================
+
+REGLAS
+
+No escribir código.
+
+No generar implementaciones.
+
+No redefinir arquitectura.
+
+No modificar ETS.
+
+No modificar ESI.
+
+No crear nuevos principios que contradigan los existentes.
+
+Todo deberá integrarse mediante referencias, no duplicación.
+
+Cada documento deberá terminar con:
+
+1. Impacto sobre la implementación
+
+2. Dependencias
+
+3. Riesgos
+
+4. Decisiones habilitadas
+
+5. Decisiones bloqueadas
+
+6. Reusable Pattern
+
+7. Anti-Patterns
+
+8. Knowledge Graph
+
+======================================================================
+
+Al finalizar detenerse y esperar nuevas instrucciones.
