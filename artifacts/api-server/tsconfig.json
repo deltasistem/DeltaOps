@@ -20,6 +20,9 @@
     },
     {
       "path": "../../lib/platform"
+    },
+    {
+      "path": "../../lib/module-activos"
     }
   ]
 }

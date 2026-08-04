@@ -1,0 +1,318 @@
+DGP-008.1 — ENTERPRISE ASSET DOMAIN IMPLEMENTATION
+
+Has iniciado oficialmente la subfase DGP-008.1 del programa DeltaOps.
+
+Todo el corpus arquitectónico permanece congelado.
+
+No está permitido modificar ETS.
+
+No está permitido modificar ESI.
+
+No está permitido modificar DGP anteriores.
+
+No está permitido construir infraestructura nueva.
+
+Todo debe reutilizar:
+
+DGP-002 Kernel
+DGP-003 Shared Platform
+DGP-004 Reference Module
+DGP-005 Experience Foundation
+DGP-006 Business Foundation
+DGP-007 Workflow & Dynamic Forms
+Objetivo
+
+Construir exclusivamente el dominio del módulo Activos Empresariales.
+
+No construir todavía:
+
+Dashboard
+Reportes
+KPIs
+Integraciones
+IA
+Importaciones
+Exportaciones
+El dominio debe soportar
+
+Maquinaria amarilla
+
+Vehículos
+
+Equipos móviles
+
+Equipos estáticos
+
+Bandas transportadoras
+
+Tolvas
+
+Empacadoras
+
+Cocedoras
+
+Herramientas
+
+Equipos eléctricos
+
+Equipos electrónicos
+
+Infraestructura
+
+Cualquier otro activo futuro.
+
+Nunca mediante código específico.
+
+Siempre mediante configuración.
+
+Deben implementarse
+Agregado Activo
+
+Debe soportar como mínimo:
+
+UUID
+Código empresarial
+Nombre
+Descripción
+Estado
+Tipo
+Categoría
+Familia
+Subfamilia
+Fabricante
+Modelo
+Serie
+Año
+Fecha de compra
+Fecha de puesta en servicio
+Vida útil
+Valor de adquisición
+Valor residual
+Moneda
+Centro de costo
+Empresa
+Proyecto
+Ubicación
+Responsable
+Supervisor
+Horómetro
+Odómetro
+Garantía
+Criticidad
+Prioridad
+Observaciones
+Objetos de Valor
+
+Implementar:
+
+Ubicación
+
+Coordenadas
+
+Medición
+
+Garantía
+
+Identificación Técnica
+
+Especificaciones
+
+Dimensiones
+
+Peso
+
+Capacidad
+
+Combustible
+
+Motor
+
+Transmisión
+
+Neumáticos
+
+Proveedor
+
+Todos como Value Objects.
+
+Catálogos
+
+Construir catálogos configurables para:
+
+Tipos
+
+Categorías
+
+Familias
+
+Subfamilias
+
+Estados
+
+Criticidades
+
+Prioridades
+
+Empresas
+
+Centros de costo
+
+Proyectos
+
+Ubicaciones
+
+Fabricantes
+
+Modelos
+
+Monedas
+
+Unidades
+
+Máquina de Estados
+
+BORRADOR
+
+REGISTRADO
+
+OPERATIVO
+
+MANTENIMIENTO
+
+FUERA_SERVICIO
+
+RETIRADO
+
+Con transiciones declarativas.
+
+Policies
+
+Implementar como mínimo:
+
+PuedeRegistrarActivo
+
+PuedeModificarActivo
+
+PuedeRetirarActivo
+
+PuedeCambiarUbicacion
+
+PuedeAsignarResponsable
+
+PuedeModificarHorometro
+
+PuedeModificarOdometro
+
+PuedeCerrarActivo
+
+Todas configurables.
+
+Eventos
+
+Emitir exclusivamente eventos autosuficientes.
+
+Como mínimo:
+
+ActivoRegistrado
+
+ActivoActualizado
+
+ActivoOperativo
+
+ActivoEnMantenimiento
+
+ActivoFueraServicio
+
+ActivoRetirado
+
+ActivoUbicacionActualizada
+
+ActivoResponsableActualizado
+
+ActivoHorometroActualizado
+
+ActivoOdometroActualizado
+
+Capacidades
+
+Gestionar Activos
+
+Consultar Activos
+
+Administrar Activos
+
+Permisos
+
+Solo usando el estándar existente.
+
+Configuración
+
+Toda configurable por tenant.
+
+Nada hardcodeado.
+
+Documentación
+
+Generar documentación completa en español.
+
+Pruebas
+
+Cobertura completa.
+
+Fake.
+
+PostgreSQL.
+
+Offline.
+
+RLS.
+
+CQRS.
+
+Policies.
+
+Eventos.
+
+Máquinas de estado.
+
+Revisión Arquitectónica
+
+Obligatoria al finalizar.
+
+Debe detectar:
+
+DDD
+
+CQRS
+
+Hexagonal
+
+Dependency Rule
+
+Configuration First
+
+Offline First
+
+Event Driven
+
+Kernel
+
+Business Foundation
+
+Workflow
+
+Dynamic Forms
+
+Design System
+
+Brandbook
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+Informe Final
+
+Al finalizar entregar únicamente el informe oficial de cierre con el mismo formato utilizado en DGP anteriores.
+
+No iniciar automáticamente DGP-008.2.
+
+Esperar instrucciones de la Dirección del Programa.

@@ -5,6 +5,7 @@ import router from "./routes";
 import deltaopsRouter from "./routes/deltaops";
 import platformConsoleRouter from "./routes/deltaops/platform-console";
 import referenceModuleRouter from "./routes/deltaops/reference-module";
+import activosModuleRouter from "./routes/deltaops/activos-module";
 import { logger } from "./lib/logger";
 import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
@@ -47,6 +48,7 @@ app.use("/api/deltaops", createDeltaopsSession(deltaopsConfig));
 app.use("/api", deltaopsRouter);
 app.use("/api", platformConsoleRouter);
 app.use("/api", referenceModuleRouter);
+app.use("/api", activosModuleRouter);
 app.use("/api", router);
 app.use("/api/deltaops", deltaopsErrorHandler);
 

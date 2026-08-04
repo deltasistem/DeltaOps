@@ -7,4 +7,5 @@
 - [Patrón de módulos DGP-004](deltaops-module-pattern-dgp004.md) — RLS también en lecturas, proyección solo desde payload, recibos de idempotencia (eventId/opId), mínimo privilegio por rol.
 - [Business Foundation DGP-006](deltaops-business-foundation-dgp006.md) — ExtrasModulo compone contrato completo; config sin prefijo en defaults; /sync crear exige id de cliente; UoW única en mutaciones multi-registro.
 - [Workflow & Forms DGP-007](deltaops-workflow-forms-dgp007.md) — aprobación como gate en misma UoW; sync por orquestación (no comandos anidados); plantillas inmutables N/N-1; respuestas ancladas a su versión.
+- [Módulo Activos DGP-008.1](deltaops-activos-dgp008-1.md) — sync exige claim durable del opId antes de ejecutar; policies enlazadas a cada comando; catálogo no vacío ⇒ presente y habilitado.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.

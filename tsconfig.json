@@ -16,6 +16,9 @@
       "path": "./lib/module-reference"
     },
     {
+      "path": "./lib/module-activos"
+    },
+    {
       "path": "./lib/business-foundation"
     },
     {
