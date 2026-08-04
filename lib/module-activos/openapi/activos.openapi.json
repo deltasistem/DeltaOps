@@ -16,6 +16,12 @@
       "name": "Activos"
     },
     {
+      "name": "Búsqueda"
+    },
+    {
+      "name": "Identificación"
+    },
+    {
       "name": "Transiciones"
     },
     {
@@ -50,7 +56,7 @@
           "Activos"
         ],
         "operationId": "activos.listar",
-        "summary": "Listar activos (read model)",
+        "summary": "Listar activos (read model) con filtros avanzados y paginación",
         "parameters": [
           {
             "name": "estado",
@@ -87,6 +93,63 @@
               "type": "string"
             },
             "description": "Filtro por tipo"
+          },
+          {
+            "name": "categoria",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por categoria"
+          },
+          {
+            "name": "familia",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por familia"
+          },
+          {
+            "name": "responsable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por responsable"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Texto libre sobre código empresarial / nombre"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Tamaño de página"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Desplazamiento de página"
           }
         ],
         "responses": {
@@ -294,6 +357,309 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/busqueda": {
+      "get": {
+        "tags": [
+          "Búsqueda"
+        ],
+        "operationId": "activos.busqueda",
+        "summary": "Búsqueda rápida/contextual de activos (delega en platform.search)",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Texto de búsqueda"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por estado"
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por tipo"
+          },
+          {
+            "name": "categoria",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por categoria"
+          },
+          {
+            "name": "familia",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por familia"
+          },
+          {
+            "name": "criticidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por criticidad"
+          },
+          {
+            "name": "ubicacionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por ubicacionId"
+          },
+          {
+            "name": "responsable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por responsable"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Máximo de resultados"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResultadoBusqueda"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/qr": {
+      "post": {
+        "tags": [
+          "Identificación"
+        ],
+        "operationId": "activos.qr-emitir",
+        "summary": "Emitir/reutilizar etiqueta (idempotente por activo+tipo)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmitirEtiqueta"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EtiquetaEmitida"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/qr/resolver": {
+      "get": {
+        "tags": [
+          "Identificación"
+        ],
+        "operationId": "activos.qr-resolver",
+        "summary": "Resolver etiqueta → activo (404 si revocada/inexistente)",
+        "parameters": [
+          {
+            "name": "codigo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Código de la etiqueta"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EtiquetaResuelta"
                 }
               }
             }
@@ -2217,6 +2583,77 @@
         }
       }
     },
+    "/api/deltaops/activos/{id}/documentacion/{attachmentId}/url": {
+      "get": {
+        "tags": [
+          "Colaboración"
+        ],
+        "operationId": "activos.documentacion-url",
+        "summary": "URL firmada (HMAC+TTL) del adjunto — referencia-only, sin binarios",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Id del adjunto"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UrlFirmada"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/deltaops/activos/catalogos/{catalogo}": {
       "get": {
         "tags": [
@@ -3146,6 +3583,200 @@
             "additionalProperties": false
           }
         },
+        "additionalProperties": false
+      },
+      "ResultadoBusqueda": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "codigoEmpresarial": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "REGISTRADO",
+              "OPERATIVO",
+              "MANTENIMIENTO",
+              "FUERA_SERVICIO",
+              "RETIRADO"
+            ]
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "categoria": {
+            "type": "string",
+            "nullable": true
+          },
+          "familia": {
+            "type": "string",
+            "nullable": true
+          },
+          "criticidad": {
+            "type": "string",
+            "nullable": true
+          },
+          "ubicacionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "responsable": {
+            "type": "string",
+            "nullable": true
+          },
+          "fabricante": {
+            "type": "string",
+            "nullable": true
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "serie": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "codigoEmpresarial",
+          "nombre",
+          "estado"
+        ],
+        "additionalProperties": false
+      },
+      "EmitirEtiqueta": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "qr",
+              "barcode",
+              "nfc"
+            ],
+            "default": "qr"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EtiquetaEmitida": {
+        "type": "object",
+        "properties": {
+          "activoId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "qr",
+              "barcode",
+              "nfc"
+            ]
+          },
+          "reutilizada": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "activoId",
+          "codigo",
+          "tipo",
+          "reutilizada"
+        ],
+        "additionalProperties": false
+      },
+      "EtiquetaResuelta": {
+        "type": "object",
+        "properties": {
+          "activoId": {
+            "type": "string"
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "qr",
+              "barcode",
+              "nfc"
+            ]
+          },
+          "acciones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "activoId",
+          "codigo",
+          "tipo"
+        ],
+        "additionalProperties": false
+      },
+      "UrlFirmada": {
+        "type": "object",
+        "properties": {
+          "activoId": {
+            "type": "string"
+          },
+          "attachmentId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "nombreArchivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "mimeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "tamanoBytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "hashSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "almacenamiento": {
+            "type": "string",
+            "enum": [
+              "referencia"
+            ]
+          }
+        },
+        "required": [
+          "activoId",
+          "attachmentId",
+          "url",
+          "expiresAt",
+          "almacenamiento"
+        ],
         "additionalProperties": false
       }
     }

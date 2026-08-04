@@ -10,6 +10,12 @@ import DesignSystem from '@/pages/design-system';
 import Motores from '@/pages/motores';
 import MotoresPlayground from '@/pages/motores-playground';
 import ConsolaActivos from '@/pages/consola-activos';
+import ActivosListado from '@/pages/activos-listado';
+import ActivosNuevo from '@/pages/activos-nuevo';
+import ActivosArboles from '@/pages/activos-arboles';
+import ActivosSincronizacion from '@/pages/activos-sincronizacion';
+import ActivosEscanear from '@/pages/activos-escanear';
+import ActivosFicha from '@/pages/activos-ficha';
 
 const queryClient = new QueryClient();
 
@@ -39,6 +45,12 @@ function Router() {
       <Route path="/motores/playground" component={MotoresPlayground} />
       <Route path="/motores" component={Motores} />
       <Route path="/consola-activos" component={ConsolaActivos} />
+      <Route path="/activos" component={ActivosListado} />
+      <Route path="/activos/nuevo" component={ActivosNuevo} />
+      <Route path="/activos/arboles" component={ActivosArboles} />
+      <Route path="/activos/sincronizacion" component={ActivosSincronizacion} />
+      <Route path="/activos/escanear" component={ActivosEscanear} />
+      <Route path="/activos/:id" component={ActivosFicha} />
       <Route component={NotFound} />
     </Switch>
   );

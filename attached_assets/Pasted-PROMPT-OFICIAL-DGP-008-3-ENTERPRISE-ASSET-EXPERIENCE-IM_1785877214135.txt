@@ -1,0 +1,242 @@
+PROMPT OFICIAL — DGP-008.3
+
+ENTERPRISE ASSET EXPERIENCE IMPLEMENTATION
+
+Has iniciado oficialmente la subfase DGP-008.3 del programa DeltaOps.
+
+Todo el corpus arquitectónico permanece completamente congelado.
+
+No está permitido modificar:
+
+ETS-001…012
+ENGINEERING_CHARTER
+ESI-001…010
+DGP-000…008.2
+
+No está permitido introducir nuevos patrones arquitectónicos.
+
+Todo deberá reutilizar estrictamente:
+
+Kernel (DGP-002)
+Shared Platform (DGP-003)
+Reference Module (DGP-004)
+Experience Foundation (DGP-005)
+Business Foundation (DGP-006)
+Workflow & Dynamic Forms (DGP-007)
+Enterprise Asset Domain (DGP-008.1)
+Enterprise Asset Persistence (DGP-008.2)
+Objetivo
+
+Construir la experiencia completa del módulo de Activos, dejando un producto completamente utilizable por usuarios finales, sin modificar el dominio ni la infraestructura.
+
+Deben implementarse
+1. Experiencia completa del módulo
+
+Construir utilizando exclusivamente el Design System oficial:
+
+listado
+tarjetas
+tabla
+ficha completa
+árbol jerárquico
+árbol por ubicación
+árbol por componentes
+2. Wizard de creación
+
+Implementar un asistente paso a paso utilizando el Wizard Framework.
+
+Debe incluir:
+
+identificación
+clasificación
+información técnica
+ubicación
+responsables
+garantía
+documentación
+revisión
+confirmación
+
+Debe soportar borradores.
+
+3. Formularios dinámicos
+
+Todos los formularios deberán utilizar el Dynamic Forms Engine.
+
+No se permitirá HTML manual.
+
+4. Timeline visual
+
+Visualización completa del historial.
+
+Filtros.
+
+Eventos.
+
+Comentarios.
+
+Adjuntos.
+
+Estados.
+
+Actor.
+
+Fechas.
+
+5. Documentación
+
+Visualizador integrado para:
+
+manuales
+certificados
+planos
+garantías
+procedimientos
+fotografías
+videos
+
+Siempre reutilizando Attachment Service.
+
+6. Relaciones
+
+Visualizador gráfico de relaciones entre activos.
+
+Jerarquías.
+
+Dependencias.
+
+Componentes.
+
+Reemplazos.
+
+7. Offline UX
+
+Experiencia completa:
+
+cola visible
+sincronización
+conflictos
+estado
+reintentos
+recuperación
+
+Todo reutilizando el Offline Framework.
+
+8. QR
+
+Implementar:
+
+impresión de etiquetas
+vista previa
+escaneo
+navegación directa
+
+Preparar:
+
+NFC
+código de barras
+9. Búsqueda
+
+Integración total con Search Service.
+
+Filtros avanzados.
+
+Búsqueda rápida.
+
+Búsqueda contextual.
+
+10. Accesibilidad
+
+Cumplimiento AA completo.
+
+Navegación mediante teclado.
+
+Lectores de pantalla.
+
+Foco visible.
+
+Contraste.
+
+11. Responsive
+
+Desktop.
+
+Tablet.
+
+Móvil.
+
+Sin versiones distintas.
+
+Una única experiencia adaptativa.
+
+12. API
+
+Completar todos los endpoints de experiencia necesarios.
+
+Mantener Contract First.
+
+13. Pruebas
+
+Unitarias.
+
+Integración.
+
+E2E.
+
+Accesibilidad.
+
+Responsive.
+
+Offline.
+
+Timeline.
+
+QR.
+
+Wizard.
+
+Formularios.
+
+14. Documentación
+
+Completa.
+
+En español.
+
+Diagramas.
+
+Capturas.
+
+Flujos.
+
+Guías de usuario técnico.
+
+Revisión Arquitectónica Obligatoria
+
+Al finalizar ejecutar una revisión arquitectónica completamente independiente.
+
+Revisar:
+
+Experience Foundation
+Design System
+Mobile First
+Offline First
+Dynamic Forms
+Workflow
+CQRS
+Timeline
+Search
+Accessibility
+Responsive
+Performance
+Reutilización de componentes
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+Informe Final Obligatorio
+
+Al finalizar entregar únicamente el informe oficial de cierre siguiendo exactamente el formato de los DGP anteriores.
+
+No iniciar automáticamente la siguiente subfase.
+
+Esperar instrucciones de la Dirección del Programa.

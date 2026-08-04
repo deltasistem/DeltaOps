@@ -53,6 +53,7 @@ export function principalActivos(userId: string, rol: string): Principal {
         "platform.comment.read", "platform.comment.write",
         "platform.attachment.read", "platform.attachment.write",
         "platform.timeline.read", "platform.search.read", "platform.config.read",
+        "platform.qr.read", "platform.qr.write",
       ],
       capacidades: ["gestionar-activos", "consultar-activos"],
     };
@@ -63,6 +64,7 @@ export function principalActivos(userId: string, rol: string): Principal {
     permisos: [
       "modulo.activos.read", "platform.search.read", "platform.timeline.read",
       "platform.comment.read", "platform.attachment.read", "platform.config.read",
+      "platform.qr.read",
     ],
     capacidades: ["consultar-activos"],
   };

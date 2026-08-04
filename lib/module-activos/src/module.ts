@@ -704,6 +704,71 @@ async function delegarPlataforma(
   return deps.runtime.commands.execute(sys, comando, input);
 }
 
+/* ------------------------------ Búsqueda -------------------------------- */
+
+/**
+ * Documento de búsqueda de un activo construido SOLO desde el payload del
+ * evento (nunca releyendo el aggregate): código empresarial, nombre, tipo,
+ * categoría, familia, estado, ubicación, responsable y fabricante/modelo/serie.
+ * Se delega en `platform.search.indexDocument` (idempotente por documentId).
+ */
+function documentoBusqueda(p: Record<string, unknown>): {
+  documentId: string;
+  entityType: string;
+  entityRef: string;
+  titulo: string;
+  contenido: string;
+} | null {
+  const id = String(p["id"] ?? "");
+  if (!id) return null;
+  const s = (k: string): string => {
+    const v = p[k];
+    return v == null ? "" : String(v);
+  };
+  const ubic = (p["ubicacion"] ?? null) as Record<string, unknown> | null;
+  const ubicacionTxt = ubic ? `${String(ubic["etiqueta"] ?? "")} ${String(ubic["ubicacionId"] ?? "")}` : "";
+  const codigo = s("codigoEmpresarial");
+  const nombre = s("nombre");
+  // `contenido` alimenta la tokenización del índice; concentra todos los campos
+  // buscables (payload-only) para que la búsqueda rápida/contextual los cubra.
+  const contenido = [
+    codigo, nombre, s("descripcion"), s("tipo"), s("categoria"), s("familia"),
+    s("subfamilia"), s("estado"), ubicacionTxt, s("responsable"), s("supervisor"),
+    s("fabricante"), s("modelo"), s("serie"),
+  ]
+    .filter((t) => t.length > 0)
+    .join(" ");
+  return {
+    documentId: `activo:${id}`,
+    entityType: "activo",
+    entityRef: `activo:${id}`,
+    titulo: `${codigo} · ${nombre}`.trim(),
+    contenido,
+  };
+}
+
+/**
+ * Indexa (o reindexa) un activo en `platform.search` desde el payload del
+ * evento, con principal de SISTEMA. Idempotente: `indexDocument` actualiza el
+ * documento existente. Se usa desde los eventHandlers y desde la reproyección.
+ */
+async function indexarActivo(
+  deps: ServiceDeps,
+  correlationId: string,
+  payload: Record<string, unknown>,
+): Promise<Result<void, KernelError>> {
+  const tenantId = String(payload["tenantId"] ?? "");
+  const doc = documentoBusqueda(payload);
+  if (!tenantId || !doc) return ok(undefined);
+  const sysCtx = createExecutionContext({
+    principal: SYSTEM_PRINCIPAL,
+    correlationId,
+    metadata: { tenantId },
+  });
+  const r = await deps.runtime.commands.execute(sysCtx, "platform.search.indexDocument", doc);
+  return r.ok ? ok(undefined) : r;
+}
+
 /* ------------------------- Consola: colaboración ------------------------- */
 
 /**
@@ -853,7 +918,7 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
       "modulo.activos.retirar",
       "modulo.activos.admin",
     ],
-    dependsOn: ["platform.search", "platform.timeline", "platform.attachment", "platform.comment", "platform.config"],
+    dependsOn: ["platform.search", "platform.timeline", "platform.attachment", "platform.comment", "platform.config", "platform.qr"],
     events: [...EVENTOS_MODULO, ...EVENTOS_RELACION],
     recordTypes: CATALOGOS.map((c) => `catalogo:${c}`),
     configDefaults: {
@@ -1343,6 +1408,45 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           },
         };
       },
+      // Emitir una etiqueta (QR/barcode/NFC) para el activo — DELEGA en
+      // platform.qr.issue. IDEMPOTENTE por activo+tipo: si ya existe una
+      // etiqueta ACTIVA de ese tipo para el activo, la reutiliza (no reemite).
+      // `tipo` por defecto "qr"; barcode/nfc quedan preparados (sin UI hardware).
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.qr-emitir`,
+          inputSchema: z.object({
+            id: z.string().min(1),
+            tipo: z.enum(["qr", "barcode", "nfc"]).default("qr"),
+          }),
+          authorization: { permissions: ["modulo.activos.write"] },
+          async handle(ctx, input) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const activo = await cargar(adapters, tenant.value, input.id);
+            if (!activo.ok) return activo;
+            const ref = refActivo(input.id);
+            // Idempotencia por activo+tipo: reutiliza etiqueta activa existente.
+            const existentes = await deps.runtime.queries.execute(ctx, "platform.qr.list", { tipo: input.tipo });
+            if (!existentes.ok) return existentes;
+            const previa = (existentes.value as Array<Record<string, unknown>>).find(
+              (t) => t["status"] === "active" && (t["data"] as Record<string, unknown> | undefined)?.["entityRef"] === ref,
+            );
+            if (previa) {
+              const data = previa["data"] as Record<string, unknown>;
+              return ok({ activoId: input.id, id: previa["id"], codigo: data["codigo"], tipo: input.tipo, reutilizada: true });
+            }
+            const r = await delegarPlataforma(deps, ctx, tenant.value, "platform.qr.issue", {
+              tipo: input.tipo,
+              entityRef: ref,
+              acciones: ["open"],
+            });
+            if (!r.ok) return r;
+            return ok({ activoId: input.id, tipo: input.tipo, reutilizada: false, ...(r.value as Record<string, unknown>) });
+          },
+        };
+      },
       // Reproyección (replay del EVENT STREAM): reconstruye TODOS los read
       // models releyendo los eventos del módulo YA PROCESADOS del outbox del
       // kernel (orden cronológico, tenant-scoped, sólo lectura) y reaplicando
@@ -1383,6 +1487,12 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
               eventos += 1;
               if (ev.tipo === RELACION_CREADA) relaciones += 1;
               if (ev.tipo === RELACION_ELIMINADA) relaciones -= 1;
+              // El índice de búsqueda (platform.search) NO se limpia aquí: se
+              // mantiene incrementalmente por los eventHandlers `indexar:*` sobre
+              // eventos vivos y es idempotente por documentId. Reindexar aquí
+              // exigiría anidar un comando dentro de esta UoW (anti-patrón), por
+              // lo que la rehidratación del índice se hace fuera del pipeline
+              // mediante el comando `platform.search.rebuild`.
             }
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "reproyectar", "-", {
               eventos,
@@ -1503,7 +1613,12 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
       // `sincronizar(ctx, operaciones)` y por el router como POST .../sync.
     ],
     queries: [
-      // Listado desde el READ MODEL (filtros por estado/criticidad/ubicación/tipo).
+      // Listado desde el READ MODEL con filtros avanzados para tabla/tarjetas.
+      // Filtros de columna indexada (estado/criticidad/tipo/ubicacionId) se
+      // resuelven en el store; los filtros por atributo del payload
+      // (categoria/familia/responsable) y el texto libre (`q` sobre
+      // código/nombre) se aplican SOBRE el resultado (payload-only, sin tocar el
+      // dominio). Paginación por `limit`/`offset`.
       () => ({
         name: `${MODULO}.listar`,
         inputSchema: z.object({
@@ -1511,23 +1626,48 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           criticidad: z.string().optional(),
           ubicacionId: z.string().optional(),
           tipo: z.string().optional(),
+          categoria: z.string().optional(),
+          familia: z.string().optional(),
+          responsable: z.string().optional(),
+          q: z.string().optional(),
           limit: z.number().int().positive().max(200).optional(),
+          offset: z.number().int().nonnegative().optional(),
         }),
         authorization: { permissions: ["modulo.activos.read"] },
         async handle(ctx, input) {
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
-          return adapters.readModel.list(tenant.value, {
+          const listado = await adapters.readModel.list(tenant.value, {
             estado: input.estado as EstadoActivo | undefined,
             criticidad: input.criticidad,
             ubicacionId: input.ubicacionId,
             tipo: input.tipo,
-            limit: input.limit,
+            // Traemos una ventana amplia del read model (los filtros por atributo
+            // del payload y la paginación se aplican en la aplicación).
+            limit: 500,
           });
+          if (!listado.ok) return listado;
+          const q = input.q?.trim().toLowerCase();
+          let filas = listado.value.filter((row) => {
+            const datos = row.datos as Record<string, unknown>;
+            if (input.categoria && String(datos["categoria"] ?? "") !== input.categoria) return false;
+            if (input.familia && String(datos["familia"] ?? "") !== input.familia) return false;
+            if (input.responsable && String(datos["responsable"] ?? "") !== input.responsable) return false;
+            if (q) {
+              const hay = `${row.codigoEmpresarial} ${row.nombre}`.toLowerCase();
+              if (!hay.includes(q)) return false;
+            }
+            return true;
+          });
+          if (input.offset) filas = filas.slice(input.offset);
+          if (input.limit) filas = filas.slice(0, input.limit);
+          return ok(filas);
         },
       }),
-      // Detalle: SOLO read model (CQRS estricto).
-      () => ({
+      // Detalle: read model (CQRS estricto) + etiqueta QR/barcode/NFC vigente
+      // si existe (consulta a platform.qr.list, payload-only). Se incluye el
+      // primer código ACTIVO cuyo entityRef apunta a este activo.
+      (deps) => ({
         name: `${MODULO}.detalle`,
         inputSchema: z.object({ id: z.string() }),
         authorization: { permissions: ["modulo.activos.read"] },
@@ -1537,7 +1677,164 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           const rm = await adapters.readModel.get(tenant.value, input.id);
           if (!rm.ok) return rm;
           if (!rm.value) return fail(KernelErrors.notFound("activo", input.id));
-          return ok(rm.value);
+          // Etiqueta de identificación (código) si existe — mejor esfuerzo:
+          // un fallo del servicio de QR no impide devolver el detalle.
+          let etiqueta: Record<string, unknown> | null = null;
+          const tags = await deps.runtime.queries.execute(ctx, "platform.qr.list", {});
+          if (tags.ok) {
+            const ref = refActivo(input.id);
+            const tag = (tags.value as Array<Record<string, unknown>>).find(
+              (t) => t["status"] === "active" && (t["data"] as Record<string, unknown> | undefined)?.["entityRef"] === ref,
+            );
+            if (tag) {
+              const data = tag["data"] as Record<string, unknown>;
+              etiqueta = { id: tag["id"], codigo: data["codigo"], tipo: data["tipo"] };
+            }
+          }
+          return ok({ ...rm.value, etiqueta });
+        },
+      }),
+      // Búsqueda de activos (rápida global y contextual) — DELEGA en
+      // platform.search. `entityType` fija el scope del módulo ("activo").
+      // Devuelve documentos del índice (payload-only). Filtros opcionales
+      // (estado/tipo/categoria/familia/criticidad/ubicacionId/responsable) se
+      // aplican SOBRE los resultados del índice, sin releer aggregates.
+      (deps) => ({
+        name: `${MODULO}.busqueda`,
+        inputSchema: z.object({
+          q: z.string().min(1),
+          limit: z.number().int().positive().max(200).optional(),
+          estado: z.enum(ESTADOS).optional(),
+          tipo: z.string().optional(),
+          categoria: z.string().optional(),
+          familia: z.string().optional(),
+          criticidad: z.string().optional(),
+          ubicacionId: z.string().optional(),
+          responsable: z.string().optional(),
+        }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          // Contextual al scope del módulo: platform.search.contextual filtra por
+          // entityType === "activo" antes de puntuar por tokens.
+          const r = await deps.runtime.queries.execute(ctx, "platform.search.contextual", {
+            q: input.q,
+            entityType: "activo",
+          });
+          if (!r.ok) return r;
+          // Cada resultado es {id, score, documentId, entityRef, titulo, contenido,...}.
+          // Enriquecemos con el read model del activo para poder filtrar por
+          // atributos estructurados y devolver campos de tabla/tarjeta.
+          const docs = r.value as Array<Record<string, unknown>>;
+          const salida: Array<Record<string, unknown>> = [];
+          for (const d of docs) {
+            const activoId = String(d["entityRef"] ?? "").replace(/^activo:/, "");
+            if (!activoId) continue;
+            const rm = await adapters.readModel.get(tenant.value, activoId);
+            if (!rm.ok) return rm;
+            const row = rm.value;
+            if (!row) continue; // documento del índice sin read model (p.ej. purgado)
+            const datos = row.datos as Record<string, unknown>;
+            const ubic = (datos["ubicacion"] ?? null) as Record<string, unknown> | null;
+            if (input.estado && row.estado !== input.estado) continue;
+            if (input.tipo && row.tipo !== input.tipo) continue;
+            if (input.criticidad && row.criticidad !== input.criticidad) continue;
+            if (input.ubicacionId && (ubic?.["ubicacionId"] ?? null) !== input.ubicacionId) continue;
+            if (input.categoria && String(datos["categoria"] ?? "") !== input.categoria) continue;
+            if (input.familia && String(datos["familia"] ?? "") !== input.familia) continue;
+            if (input.responsable && String(datos["responsable"] ?? "") !== input.responsable) continue;
+            salida.push({
+              id: activoId,
+              score: d["score"] ?? 0,
+              codigoEmpresarial: row.codigoEmpresarial,
+              nombre: row.nombre,
+              estado: row.estado,
+              tipo: row.tipo,
+              categoria: datos["categoria"] ?? null,
+              familia: datos["familia"] ?? null,
+              criticidad: row.criticidad,
+              ubicacionId: ubic?.["ubicacionId"] ?? null,
+              responsable: datos["responsable"] ?? null,
+              fabricante: datos["fabricante"] ?? null,
+              modelo: datos["modelo"] ?? null,
+              serie: datos["serie"] ?? null,
+            });
+            if (input.limit && salida.length >= input.limit) break;
+          }
+          return ok(salida);
+        },
+      }),
+      // Resolución de una etiqueta (QR/barcode/NFC) a su activo para navegación
+      // directa. Es una CONSULTA sin efectos: usa `platform.qr.list` y filtra por
+      // código ACTIVO (no `platform.qr.resolve`, que es un comando que registra
+      // el escaneo). Devuelve {activoId, tipo, codigo}; 404 si la etiqueta no
+      // existe o fue revocada, o si su entityRef no apunta a un activo.
+      (deps) => ({
+        name: `${MODULO}.qr-resolver`,
+        inputSchema: z.object({ codigo: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await deps.runtime.queries.execute(ctx, "platform.qr.list", {});
+          if (!r.ok) return r;
+          const tag = (r.value as Array<Record<string, unknown>>).find(
+            (t) => (t["data"] as Record<string, unknown> | undefined)?.["codigo"] === input.codigo,
+          );
+          // Inexistente o revocada (sólo se resuelven etiquetas activas) ⇒ 404.
+          if (!tag || tag["status"] !== "active") {
+            return fail(KernelErrors.notFound("etiqueta", input.codigo));
+          }
+          const data = tag["data"] as Record<string, unknown>;
+          const entityRef = String(data["entityRef"] ?? "");
+          if (!entityRef.startsWith("activo:")) {
+            return fail(KernelErrors.notFound("etiqueta-activo", input.codigo));
+          }
+          return ok({
+            activoId: entityRef.slice("activo:".length),
+            tipo: data["tipo"] ?? "qr",
+            codigo: input.codigo,
+            acciones: data["acciones"] ?? [],
+          });
+        },
+      }),
+      // URL firmada de un adjunto (documentación técnica) del activo — DELEGA en
+      // platform.attachment.signedUrl, validando que el adjunto pertenece al
+      // activo/tenant. La plataforma es referencia-only: devuelve URL firmada
+      // (HMAC + TTL) + metadatos; NUNCA binarios.
+      (deps) => ({
+        name: `${MODULO}.documentacion-url`,
+        inputSchema: z.object({ id: z.string().min(1), attachmentId: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const activo = await cargar(adapters, tenant.value, input.id);
+          if (!activo.ok) return activo;
+          // El adjunto debe pertenecer a ESTE activo (entityRef) del tenant.
+          const meta = await deps.runtime.queries.execute(ctx, "platform.attachment.get", { id: input.attachmentId });
+          if (!meta.ok) return meta;
+          const rec = meta.value as { tenantId?: string; data?: Record<string, unknown> } | null;
+          if (!rec || (rec.data?.["entityRef"] ?? null) !== refActivo(input.id)) {
+            return fail(KernelErrors.notFound("attachment", input.attachmentId));
+          }
+          const signed = await deps.runtime.queries.execute(ctx, "platform.attachment.signedUrl", { id: input.attachmentId });
+          if (!signed.ok) return signed;
+          const s = signed.value as { url: string; expiresAt: number };
+          return ok({
+            activoId: input.id,
+            attachmentId: input.attachmentId,
+            url: s.url,
+            expiresAt: s.expiresAt,
+            nombreArchivo: rec.data?.["nombreArchivo"] ?? null,
+            mimeType: rec.data?.["mimeType"] ?? null,
+            tamanoBytes: rec.data?.["tamanoBytes"] ?? null,
+            hashSha256: rec.data?.["hashSha256"] ?? null,
+            // referencia-only: la plataforma NO almacena binarios; el servido
+            // resuelve la referencia y devuelve metadatos + verificación HMAC/TTL.
+            almacenamiento: "referencia",
+          });
         },
       }),
       // Opciones de un catálogo (habilitadas).
@@ -1844,32 +2141,17 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
         handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
           proyeccionRelacion(adapters)(deps, { ...event, type: eventType }),
       })),
-      // Search: indexación desde el payload en registro/actualización.
-      ...[ACTIVO_REGISTRADO, ACTIVO_ACTUALIZADO].map((eventType) => ({
+      // Search: (re)indexación del activo desde el payload en CUALQUIER evento
+      // del módulo (registro/edición/transiciones/mover/reasignar/medidores).
+      // Todos los eventos son payload-autosuficientes, así que el documento del
+      // índice refleja siempre el último estado del activo. Idempotente.
+      ...EVENTOS_MODULO.map((eventType) => ({
         eventType,
         handlerName: `indexar:${eventType}`,
         handle: (deps: ServiceDeps) => async (event: {
           payload: Record<string, unknown>;
           correlationId: string;
-        }) => {
-          const p = event.payload;
-          const tenantId = String(p["tenantId"] ?? "");
-          const id = String(p["id"] ?? "");
-          if (!tenantId || !id) return ok(undefined);
-          const sysCtx = createExecutionContext({
-            principal: SYSTEM_PRINCIPAL,
-            correlationId: event.correlationId,
-            metadata: { tenantId },
-          });
-          const r = await deps.runtime.commands.execute(sysCtx, "platform.search.indexDocument", {
-            documentId: `activo:${id}`,
-            entityType: "activo",
-            entityRef: `activo:${id}`,
-            titulo: `${String(p["codigoEmpresarial"] ?? "")} · ${String(p["nombre"] ?? "")}`,
-            contenido: String(p["descripcion"] ?? ""),
-          });
-          return r.ok ? ok(undefined) : r;
-        },
+        }) => indexarActivo(deps, event.correlationId, event.payload),
       })),
     ],
     healthCheck: () => async () => {

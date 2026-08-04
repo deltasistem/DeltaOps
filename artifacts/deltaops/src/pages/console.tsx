@@ -152,6 +152,11 @@ export default function Console() {
                 Motores
               </Button>
             </Link>
+            <Link href="/activos" data-testid="link-activos">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Activos
+              </Button>
+            </Link>
             {(user.rol === "admin" || user.rol === "platform_admin") && (
               <Link href="/consola-activos" data-testid="link-consola-activos">
                 <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">

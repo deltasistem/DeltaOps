@@ -67,12 +67,46 @@ async function drain(): Promise<void> {
 
 /* ------------------------------ Consultas --------------------------------- */
 
+function numQuery(v: unknown): number | undefined {
+  return typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : undefined;
+}
+
 router.get(BASE, async (req, res) => {
+  const q = req.query;
   send(res, await query(ctxOf(res), `${MODULO}.listar`, {
-    estado: typeof req.query.estado === "string" ? req.query.estado : undefined,
-    criticidad: typeof req.query.criticidad === "string" ? req.query.criticidad : undefined,
-    ubicacionId: typeof req.query.ubicacionId === "string" ? req.query.ubicacionId : undefined,
-    tipo: typeof req.query.tipo === "string" ? req.query.tipo : undefined,
+    estado: typeof q.estado === "string" ? q.estado : undefined,
+    criticidad: typeof q.criticidad === "string" ? q.criticidad : undefined,
+    ubicacionId: typeof q.ubicacionId === "string" ? q.ubicacionId : undefined,
+    tipo: typeof q.tipo === "string" ? q.tipo : undefined,
+    categoria: typeof q.categoria === "string" ? q.categoria : undefined,
+    familia: typeof q.familia === "string" ? q.familia : undefined,
+    responsable: typeof q.responsable === "string" ? q.responsable : undefined,
+    q: typeof q.q === "string" ? q.q : undefined,
+    limit: numQuery(q.limit),
+    offset: numQuery(q.offset),
+  }));
+});
+
+// Búsqueda rápida/contextual de activos (delega en platform.search).
+router.get(`${BASE}/busqueda`, async (req, res) => {
+  const q = req.query;
+  send(res, await query(ctxOf(res), `${MODULO}.busqueda`, {
+    q: typeof q.q === "string" ? q.q : "",
+    estado: typeof q.estado === "string" ? q.estado : undefined,
+    tipo: typeof q.tipo === "string" ? q.tipo : undefined,
+    categoria: typeof q.categoria === "string" ? q.categoria : undefined,
+    familia: typeof q.familia === "string" ? q.familia : undefined,
+    criticidad: typeof q.criticidad === "string" ? q.criticidad : undefined,
+    ubicacionId: typeof q.ubicacionId === "string" ? q.ubicacionId : undefined,
+    responsable: typeof q.responsable === "string" ? q.responsable : undefined,
+    limit: numQuery(q.limit),
+  }));
+});
+
+// Resolución de etiqueta QR/barcode/NFC → {activoId} (navegación directa).
+router.get(`${BASE}/qr/resolver`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.qr-resolver`, {
+    codigo: typeof req.query.codigo === "string" ? req.query.codigo : "",
   }));
 });
 
@@ -132,6 +166,13 @@ router.get(`${BASE}/:id/comentarios`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.comentarios`, { id: req.params.id }));
 });
 
+router.get(`${BASE}/:id/documentacion/:attachmentId/url`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.documentacion-url`, {
+    id: req.params.id,
+    attachmentId: req.params.attachmentId,
+  }));
+});
+
 router.get(`${BASE}/:id/documentacion`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.documentacion`, { id: req.params.id }));
 });
@@ -182,6 +223,16 @@ router.post(`${BASE}/:id/horometro`, async (req, res) => {
 
 router.post(`${BASE}/:id/odometro`, async (req, res) => {
   const r = await exec(ctxOf(res), `${MODULO}.actualizar-odometro`, { id: req.params.id, ...req.body });
+  await drain();
+  send(res, r);
+});
+
+// Emitir/reutilizar etiqueta QR (o barcode/nfc) para el activo (idempotente).
+router.post(`${BASE}/:id/qr`, async (req, res) => {
+  const r = await exec(ctxOf(res), `${MODULO}.qr-emitir`, {
+    id: req.params.id,
+    tipo: typeof req.body?.tipo === "string" ? req.body.tipo : "qr",
+  });
   await drain();
   send(res, r);
 });

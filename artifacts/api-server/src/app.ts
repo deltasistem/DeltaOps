@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import deltaopsRouter from "./routes/deltaops";
 import platformConsoleRouter from "./routes/deltaops/platform-console";
+import attachmentServeRouter from "./routes/deltaops/attachment-serve";
 import referenceModuleRouter from "./routes/deltaops/reference-module";
 import activosModuleRouter from "./routes/deltaops/activos-module";
 import { logger } from "./lib/logger";
@@ -46,6 +47,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/deltaops", deltaopsMetricsMiddleware);
 app.use("/api/deltaops", createDeltaopsSession(deltaopsConfig));
 app.use("/api", deltaopsRouter);
+// El servido de URLs firmadas se monta ANTES de la consola de plataforma para
+// no quedar tras su middleware de admin (la firma HMAC es la autorización).
+app.use("/api", attachmentServeRouter);
 app.use("/api", platformConsoleRouter);
 app.use("/api", referenceModuleRouter);
 app.use("/api", activosModuleRouter);

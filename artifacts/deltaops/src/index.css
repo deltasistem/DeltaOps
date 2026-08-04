@@ -98,3 +98,12 @@
   /* Tipografía institucional: títulos en Montserrat (Brandbook pág. 4) */
   h1, h2, h3, h4 { font-family: var(--do-font-principal); }
 }
+
+/* DGP-008.3 · Utilidades responsive de la experiencia de Activos.
+   Una sola experiencia adaptativa: tabla en desktop, tarjetas en móvil. */
+.do-solo-movil { display: block; }
+.do-solo-desktop { display: none; }
+@media (min-width: 768px) {
+  .do-solo-movil { display: none; }
+  .do-solo-desktop { display: block; }
+}

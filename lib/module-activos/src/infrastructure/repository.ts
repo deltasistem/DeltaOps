@@ -295,7 +295,11 @@ export class FakeActivoReadModel implements ActivoReadModel {
           (!filter.tipo || r.tipo === filter.tipo) &&
           (!filter.ubicacionId || r.ubicacionId === filter.ubicacionId),
       )
-      .sort((a, b) => b.actualizadoAt.getTime() - a.actualizadoAt.getTime());
+      // Orden determinista: por fecha de actualización DESC y, ante empates de
+      // marca temporal (p.ej. varios creados en el mismo ms), desempate estable
+      // por `id`. Así el listado es idéntico antes/después de una reproyección
+      // aunque el replay reordene por (occurred_at, event_id).
+      .sort((a, b) => b.actualizadoAt.getTime() - a.actualizadoAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     return ok(all.slice(0, filter.limit ?? 100));
   }
 
@@ -571,7 +575,7 @@ export class PgActivoReadModel implements ActivoReadModel {
              AND ($3::text IS NULL OR criticidad=$3)
              AND ($4::text IS NULL OR tipo=$4)
              AND ($5::text IS NULL OR ubicacion_id=$5)
-           ORDER BY actualizado_at DESC LIMIT $6`,
+           ORDER BY actualizado_at DESC, id ASC LIMIT $6`,
           [
             tenantId, filter.estado ?? null, filter.criticidad ?? null, filter.tipo ?? null,
             filter.ubicacionId ?? null, filter.limit ?? 100,

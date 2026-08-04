@@ -710,4 +710,87 @@ suite("Módulo Activos · PostgreSQL", () => {
     expect(v.colaboracion.comentarios).toBe(1);
     expect(v.colaboracion.adjuntos).toBe(0);
   });
+
+  /* ------------------- DGP-008.3 · Enterprise Asset Experience ------------- */
+
+  const T3 = `pgact-83-${Date.now()}`;
+  const ID_83 = "83838383-8383-4383-8383-838383838383";
+  const HASH64 = "b".repeat(64);
+
+  it("DGP-008.3 · indexa en platform.search y la búsqueda contextual encuentra el activo", async () => {
+    await sembrar(ctx(T3));
+    const r = await exec(ctx(T3), `${MODULO}.crear`, {
+      ...NUEVO, id: ID_83, codigoEmpresarial: "PG83-EXC", nombre: "Excavadora indexada PG", descripcion: "grande",
+    });
+    expect(r.ok).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+    // El documento existe en el índice (platform_records service=platform.search).
+    const docs = await pool.query(
+      `SELECT id FROM deltaops.platform_records WHERE tenant_id=$1 AND service='platform.search'`, [T3],
+    );
+    expect(docs.rowCount).toBeGreaterThanOrEqual(1);
+    const busq = await query(ctx(T3), `${MODULO}.busqueda`, { q: "excavadora" });
+    expect(busq.ok).toBe(true);
+    if (!busq.ok) return;
+    expect((busq.value as Array<{ id: string }>).map((x) => x.id)).toContain(ID_83);
+  });
+
+  it("DGP-008.3 · emite etiqueta QR idempotente, la incluye en el detalle y resuelve el código", async () => {
+    const e1 = await exec(ctx(T3), `${MODULO}.qr-emitir`, { id: ID_83 });
+    expect(e1.ok).toBe(true);
+    if (!e1.ok) return;
+    const codigo = (e1.value as { codigo: string }).codigo;
+    await rt.platform.kernel.outboxProcessor.processPending();
+    const e2 = await exec(ctx(T3), `${MODULO}.qr-emitir`, { id: ID_83 });
+    expect(e2.ok && (e2.value as { reutilizada: boolean; codigo: string }).reutilizada).toBe(true);
+    expect(e2.ok && (e2.value as { codigo: string }).codigo).toBe(codigo);
+
+    const det = await query(ctx(T3), `${MODULO}.detalle`, { id: ID_83 });
+    expect(det.ok && (det.value as { etiqueta: { codigo: string } | null }).etiqueta?.codigo).toBe(codigo);
+
+    const res = await query(ctx(T3), `${MODULO}.qr-resolver`, { codigo });
+    expect(res.ok && (res.value as { activoId: string }).activoId).toBe(ID_83);
+  });
+
+  it("DGP-008.3 · URL firmada de documentación: válida, adjunto ajeno → 404, cruce de tenant → 404", async () => {
+    const adj = await exec(ctx(T3), `${MODULO}.adjuntar`, {
+      id: ID_83, categoria: "manual", nombreArchivo: "manual.pdf",
+      mimeType: "application/pdf", tamanoBytes: 12, hashSha256: HASH64,
+    });
+    expect(adj.ok).toBe(true);
+    if (!adj.ok) return;
+    await rt.platform.kernel.outboxProcessor.processPending();
+    const attachmentId = (adj.value as { id: string }).id;
+
+    // (a) URL firmada válida (HMAC + expiración) para el adjunto del activo.
+    const url = await query(ctx(T3), `${MODULO}.documentacion-url`, { id: ID_83, attachmentId });
+    expect(url.ok).toBe(true);
+    if (!url.ok) return;
+    const v = url.value as { url: string; expiresAt: number };
+    expect(v.url).toContain(`attachments/${attachmentId}`);
+    expect(v.url).toContain("signature=");
+    expect(v.expiresAt).toBeGreaterThan(Date.now());
+
+    // (b) adjunto que no pertenece al activo (usa el activo base T como ajeno):
+    // pedir el adjunto de T3 bajo el activo NUEVO de T3 no existe → creamos otro.
+    const otro = await exec(ctx(T3), `${MODULO}.crear`, {
+      ...NUEVO, id: "83000000-0000-4000-8000-000000000001", codigoEmpresarial: "PG83-OTRO", nombre: "Otro PG",
+    });
+    expect(otro.ok).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+    const ajeno = await query(ctx(T3), `${MODULO}.documentacion-url`, {
+      id: "83000000-0000-4000-8000-000000000001", attachmentId,
+    });
+    expect(ajeno.ok).toBe(false);
+    if (ajeno.ok) return;
+    expect(ajeno.error.code.startsWith("KRN-NF")).toBe(true);
+
+    // (c) cruce de tenant: otro tenant no ve el adjunto (RLS por tenant) → 404.
+    const T4 = `pgact-83b-${Date.now()}`;
+    await sembrar(ctx(T4));
+    await exec(ctx(T4), `${MODULO}.crear`, { ...NUEVO, id: ID_83, codigoEmpresarial: "PG83B", nombre: "Tenant B" });
+    await rt.platform.kernel.outboxProcessor.processPending();
+    const cruce = await query(ctx(T4), `${MODULO}.documentacion-url`, { id: ID_83, attachmentId });
+    expect(cruce.ok).toBe(false);
+  });
 });

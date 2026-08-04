@@ -22,7 +22,9 @@ runtime de máquinas de estados de `business-foundation`.
 | [timeline.md](./timeline.md) | **DGP-008.2** · Línea de tiempo del módulo (append-only) y decisión sobre `platform.timeline`. |
 | [colaboracion.md](./colaboracion.md) | **DGP-008.2** · Comentarios y adjuntos por referencia vía comandos de plataforma. |
 | [consola.md](./consola.md) | **DGP-008.2** · Consola técnica (solo admin) del estado operativo. |
-| [api.md](./api.md) | **DGP-008.2** · Contrato REST (Contract-First; Zod como fuente de verdad). |
+| [api.md](./api.md) | **DGP-008.2/008.3** · Contrato REST (Contract-First; Zod como fuente de verdad). |
+| [busqueda.md](./busqueda.md) | **DGP-008.3** · Búsqueda rápida/contextual e indexación automática vía `platform.search`. |
+| [qr.md](./qr.md) | **DGP-008.3** · Etiquetas QR/barcode/NFC (emitir idempotente, resolver) vía `platform.qr`. |
 
 ## Arranque rápido
 

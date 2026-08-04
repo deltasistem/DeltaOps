@@ -1,4 +1,4 @@
-# API REST del módulo Activos — Contract-First (DGP-008.2)
+# API REST del módulo Activos — Contract-First (DGP-008.2 / 008.3)
 
 ## Fuente de verdad del contrato
 
@@ -50,6 +50,7 @@ Errores mapeados: `KRN-AUTH-*`→403, `KRN-NF-*`→404, `KRN-CFL-*`→409,
 | `PUT /deltaops/activos/comentarios/:comentarioId` | `editar-comentario` | `{ expectedVersion, texto, opId? }` |
 | `DELETE /deltaops/activos/comentarios/:comentarioId` | `borrar-comentario` | `{ opId? }` |
 | `POST /deltaops/activos/:id/documentacion` | `adjuntar` | `AdjuntarInput` |
+| `POST /deltaops/activos/:id/qr` | `qr-emitir` | `{ tipo?: qr\|barcode\|nfc }` (idempotente por activo+tipo) |
 | `POST /deltaops/activos/reproyectar` | `reproyectar` | `{}` (admin) |
 | `POST /deltaops/activos/sync` | cola offline | `ColaSyncSchema` |
 
@@ -57,8 +58,11 @@ Errores mapeados: `KRN-AUTH-*`→403, `KRN-NF-*`→404, `KRN-CFL-*`→409,
 
 | Ruta | Query |
 |---|---|
-| `GET /deltaops/activos` | `listar` |
-| `GET /deltaops/activos/:id` | `detalle` |
+| `GET /deltaops/activos?estado=&criticidad=&tipo=&ubicacionId=&categoria=&familia=&responsable=&q=&limit=&offset=` | `listar` (filtros avanzados + paginación) |
+| `GET /deltaops/activos/busqueda?q=&estado=&tipo=&categoria=&familia=&criticidad=&ubicacionId=&responsable=&limit=` | `busqueda` (delega en `platform.search`) |
+| `GET /deltaops/activos/qr/resolver?codigo=` | `qr-resolver` (→ `{activoId,...}`; 404 si revocada/inexistente) |
+| `GET /deltaops/activos/:id` | `detalle` (incluye `etiqueta` si hay código vigente) |
+| `GET /deltaops/activos/:id/documentacion/:attachmentId/url` | `documentacion-url` (URL firmada HMAC+TTL, referencia-only) |
 | `GET /deltaops/activos/:id/relacionados?categoria=` | `relacionados` |
 | `GET /deltaops/activos/:id/arbol` | `arbol` |
 | `GET /deltaops/activos/:id/componentes` | `componentes` |
@@ -85,3 +89,34 @@ Errores mapeados: `KRN-AUTH-*`→403, `KRN-NF-*`→404, `KRN-CFL-*`→409,
   `timeline.md` y `maquina-estados.md`.
 - El contrato completo y verificable está en
   `lib/module-activos/openapi/activos.openapi.json`.
+
+## Enterprise Asset Experience (DGP-008.3)
+
+Rutas de experiencia añadidas de forma **aditiva** (corpus congelado), todas
+*payload-only* y delegando en servicios de plataforma existentes:
+
+- **Búsqueda** (`platform.search`): ver `busqueda.md`.
+- **Identificación QR/barcode/NFC** (`platform.qr`): ver `qr.md`.
+- **Documentación descargable** (`platform.attachment`): `documentacion-url`
+  devuelve una **URL firmada** (HMAC + TTL) que apunta a
+  `GET /api/deltaops/platform/attachments/:id?tenant=&expires=&signature=`. Ese
+  handler de servido **verifica firma y expiración** (la firma ES la
+  autorización, sin sesión) y, como la plataforma es **referencia-only** (no
+  almacena binarios), devuelve **metadatos + referencia (hash)** — nunca
+  contenido binario. El registro de adjuntos se hace por **referencia** con
+  `POST /deltaops/activos/:id/documentacion` (`adjuntar`).
+
+### Formas de request/response (para la UI)
+
+- `POST /deltaops/activos/:id/qr` → body `{ "tipo": "qr" }` (opcional; por
+  defecto `qr`). Respuesta `{ activoId, id?, codigo, tipo, reutilizada }`.
+- `GET /deltaops/activos/qr/resolver?codigo=DOP-XXXX` → `{ activoId, codigo,
+  tipo, acciones }`; `404` si revocada/inexistente.
+- `GET /deltaops/activos/busqueda?q=...` → `[{ id, score, codigoEmpresarial,
+  nombre, estado, tipo, categoria, familia, criticidad, ubicacionId,
+  responsable, fabricante, modelo, serie }]`.
+- `GET /deltaops/activos/:id/documentacion/:attachmentId/url` → `{ activoId,
+  attachmentId, url, expiresAt, nombreArchivo, mimeType, tamanoBytes,
+  hashSha256, almacenamiento: "referencia" }`.
+- `GET /deltaops/activos/:id` (detalle) ahora incluye `etiqueta: { id, codigo,
+  tipo } | null` con la etiqueta vigente del activo.

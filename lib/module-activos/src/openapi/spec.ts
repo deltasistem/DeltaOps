@@ -158,6 +158,27 @@ export function construirOpenApi(): Record<string, unknown> {
       readModels: obj({}, []), outbox: obj({}, []), sincronizacion: obj({}, []),
       colaboracion: obj({}, []), rls: obj({}, []),
     }),
+    ResultadoBusqueda: obj({
+      id: str(), score: num(), codigoEmpresarial: str(), nombre: str(),
+      estado: str({ enum: estados }), tipo: str(), categoria: str({ nullable: true }),
+      familia: str({ nullable: true }), criticidad: str({ nullable: true }),
+      ubicacionId: str({ nullable: true }), responsable: str({ nullable: true }),
+      fabricante: str({ nullable: true }), modelo: str({ nullable: true }), serie: str({ nullable: true }),
+    }, ["id", "codigoEmpresarial", "nombre", "estado"]),
+    EmitirEtiqueta: obj({ tipo: str({ enum: ["qr", "barcode", "nfc"], default: "qr" }) }),
+    EtiquetaEmitida: obj({
+      activoId: str(), id: str(), codigo: str(), tipo: str({ enum: ["qr", "barcode", "nfc"] }),
+      reutilizada: bool(),
+    }, ["activoId", "codigo", "tipo", "reutilizada"]),
+    EtiquetaResuelta: obj({
+      activoId: str(), codigo: str(), tipo: str({ enum: ["qr", "barcode", "nfc"] }), acciones: arr(str()),
+    }, ["activoId", "codigo", "tipo"]),
+    UrlFirmada: obj({
+      activoId: str(), attachmentId: str(), url: str(), expiresAt: int(),
+      nombreArchivo: str({ nullable: true }), mimeType: str({ nullable: true }),
+      tamanoBytes: int({ nullable: true }), hashSha256: str({ nullable: true }),
+      almacenamiento: str({ enum: ["referencia"] }),
+    }, ["activoId", "attachmentId", "url", "expiresAt", "almacenamiento"]),
   };
 
   const paths: Record<string, Record<string, unknown>> = {};
@@ -168,8 +189,16 @@ export function construirOpenApi(): Record<string, unknown> {
 
   // ---- CRUD + listado ----
   add(BASE, "get", {
-    tags: ["Activos"], operationId: "activos.listar", summary: "Listar activos (read model)",
-    parameters: ["estado", "criticidad", "ubicacionId", "tipo"].map((p) => queryParam(p, `Filtro por ${p}`)),
+    tags: ["Activos"], operationId: "activos.listar",
+    summary: "Listar activos (read model) con filtros avanzados y paginación",
+    parameters: [
+      ...["estado", "criticidad", "ubicacionId", "tipo", "categoria", "familia", "responsable"].map((p) =>
+        queryParam(p, `Filtro por ${p}`),
+      ),
+      queryParam("q", "Texto libre sobre código empresarial / nombre"),
+      { name: "limit", in: "query", required: false, schema: int({ minimum: 1, maximum: 200 }), description: "Tamaño de página" },
+      { name: "offset", in: "query", required: false, schema: int({ minimum: 0 }), description: "Desplazamiento de página" },
+    ],
     responses: { "200": jsonOk(arr(obj({}, []))), ...errores("401", "403") },
   });
   add(BASE, "post", {
@@ -185,6 +214,34 @@ export function construirOpenApi(): Record<string, unknown> {
     tags: ["Activos"], operationId: "activos.editar", summary: "Editar activo (concurrencia optimista)",
     parameters: [idParam], requestBody: jsonBody(ref("EditarActivo")),
     responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
+  });
+
+  // ---- Búsqueda (platform.search) ----
+  add(`${BASE}/busqueda`, "get", {
+    tags: ["Búsqueda"], operationId: "activos.busqueda",
+    summary: "Búsqueda rápida/contextual de activos (delega en platform.search)",
+    parameters: [
+      { name: "q", in: "query", required: true, schema: str(), description: "Texto de búsqueda" },
+      ...["estado", "tipo", "categoria", "familia", "criticidad", "ubicacionId", "responsable"].map((p) =>
+        queryParam(p, `Filtro por ${p}`),
+      ),
+      { name: "limit", in: "query", required: false, schema: int({ minimum: 1, maximum: 200 }), description: "Máximo de resultados" },
+    ],
+    responses: { "200": jsonOk(arr(ref("ResultadoBusqueda"))), ...errores("400", "401", "403") },
+  });
+
+  // ---- Identificación: QR / Barcode / NFC (platform.qr) ----
+  add(`${BASE}/{id}/qr`, "post", {
+    tags: ["Identificación"], operationId: "activos.qr-emitir",
+    summary: "Emitir/reutilizar etiqueta (idempotente por activo+tipo)",
+    parameters: [idParam], requestBody: jsonBody(ref("EmitirEtiqueta")),
+    responses: { "200": jsonOk(ref("EtiquetaEmitida")), ...errores("400", "401", "403", "404") },
+  });
+  add(`${BASE}/qr/resolver`, "get", {
+    tags: ["Identificación"], operationId: "activos.qr-resolver",
+    summary: "Resolver etiqueta → activo (404 si revocada/inexistente)",
+    parameters: [{ name: "codigo", in: "query", required: true, schema: str(), description: "Código de la etiqueta" }],
+    responses: { "200": jsonOk(ref("EtiquetaResuelta")), ...errores("400", "401", "403", "404", "409") },
   });
 
   // ---- Transiciones de estado ----
@@ -291,6 +348,12 @@ export function construirOpenApi(): Record<string, unknown> {
     tags: ["Colaboración"], operationId: "activos.documentacion", summary: "Listar documentación técnica",
     parameters: [idParam], responses: { "200": jsonOk(arr(obj({}, []))), ...errores("401", "403") },
   });
+  add(`${BASE}/{id}/documentacion/{attachmentId}/url`, "get", {
+    tags: ["Colaboración"], operationId: "activos.documentacion-url",
+    summary: "URL firmada (HMAC+TTL) del adjunto — referencia-only, sin binarios",
+    parameters: [idParam, pathParam("attachmentId", "Id del adjunto")],
+    responses: { "200": jsonOk(ref("UrlFirmada")), ...errores("401", "403", "404") },
+  });
   add(`${BASE}/{id}/documentacion`, "post", {
     tags: ["Colaboración"], operationId: "activos.adjuntar", summary: "Adjuntar documentación técnica por referencia",
     parameters: [idParam], requestBody: jsonBody(ref("Adjuntar")),
@@ -342,7 +405,8 @@ export function construirOpenApi(): Record<string, unknown> {
     },
     servers: [{ url: "/", description: "API DeltaOps" }],
     tags: [
-      { name: "Activos" }, { name: "Transiciones" }, { name: "Operación" },
+      { name: "Activos" }, { name: "Búsqueda" }, { name: "Identificación" },
+      { name: "Transiciones" }, { name: "Operación" },
       { name: "Relaciones" }, { name: "Históricos" }, { name: "Timeline" },
       { name: "Colaboración" }, { name: "Catálogos" }, { name: "Sincronización" },
       { name: "Administración" },
