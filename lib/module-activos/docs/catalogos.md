@@ -9,7 +9,12 @@ encapsula el acceso con `recordType = catalogo:<nombre>`.
 
 `tipos`, `categorias`, `familias`, `subfamilias`, `estados`, `criticidades`,
 `prioridades`, `empresas`, `centros-costo`, `proyectos`, `ubicaciones`,
-`fabricantes`, `modelos`, `monedas`, `unidades`, `proveedores`.
+`fabricantes`, `modelos`, `monedas`, `unidades`, `proveedores`,
+`tiposRelacion`.
+
+El catálogo `tiposRelacion` hace **configurable por tenant** el conjunto de
+tipos de relación inter-activo (vacío ⇒ los 8 canónicos; no vacío ⇒ sólo los
+habilitados con su inverso declarado). Ver `relaciones.md`.
 
 Jerárquicos (`CATALOGOS_JERARQUICOS`): `categorias → familias → subfamilias`.
 

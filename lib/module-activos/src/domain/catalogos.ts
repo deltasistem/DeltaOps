@@ -27,6 +27,7 @@ export const CATALOGOS = [
   "monedas",
   "unidades",
   "proveedores",
+  "tiposRelacion",
 ] as const;
 export type NombreCatalogo = (typeof CATALOGOS)[number];
 

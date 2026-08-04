@@ -152,6 +152,13 @@ export default function Console() {
                 Motores
               </Button>
             </Link>
+            {(user.rol === "admin" || user.rol === "platform_admin") && (
+              <Link href="/consola-activos" data-testid="link-consola-activos">
+                <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                  Consola Activos
+                </Button>
+              </Link>
+            )}
             <div className="text-right hidden md:block">
               <p className="text-sm font-semibold">{user.nombre}</p>
               <p className="text-xs text-muted-foreground font-mono">{user.rol}</p>

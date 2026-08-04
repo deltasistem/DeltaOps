@@ -84,6 +84,58 @@ router.get(`${BASE}/catalogos/:catalogo`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.catalogo.opciones`, { catalogo: req.params.catalogo }));
 });
 
+// Read models operacionales DGP-008.2 (rutas específicas antes de /:id).
+router.get(`${BASE}/:id/relacionados`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.relacionados`, {
+    id: req.params.id,
+    categoria: typeof req.query.categoria === "string" ? req.query.categoria : undefined,
+  }));
+});
+
+router.get(`${BASE}/:id/arbol`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.arbol`, { id: req.params.id }));
+});
+
+router.get(`${BASE}/:id/componentes`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.componentes`, { id: req.params.id }));
+});
+
+router.get(`${BASE}/:id/historial/ubicaciones`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.historial-ubicaciones`, { id: req.params.id }));
+});
+
+router.get(`${BASE}/:id/historial/responsables`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.historial-responsables`, { id: req.params.id }));
+});
+
+// Historial cronológico interno del activo (read model act_historial).
+router.get(`${BASE}/:id/historial`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.historial`, { id: req.params.id }));
+});
+
+// Línea de tiempo CANÓNICA (Shared Timeline de plataforma) con filtros:
+// actor, estado, entidadRelacionada, rango de fechas (desde/hasta).
+router.get(`${BASE}/:id/timeline`, async (req, res) => {
+  const q = req.query;
+  send(res, await query(ctxOf(res), `${MODULO}.timeline`, {
+    id: req.params.id,
+    actor: typeof q.actor === "string" ? q.actor : undefined,
+    estado: typeof q.estado === "string" ? q.estado : undefined,
+    entidadRelacionada: typeof q.entidadRelacionada === "string" ? q.entidadRelacionada : undefined,
+    desde: typeof q.desde === "string" ? q.desde : undefined,
+    hasta: typeof q.hasta === "string" ? q.hasta : undefined,
+  }));
+});
+
+// Colaboración: comentarios y documentación técnica del activo.
+router.get(`${BASE}/:id/comentarios`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.comentarios`, { id: req.params.id }));
+});
+
+router.get(`${BASE}/:id/documentacion`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.documentacion`, { id: req.params.id }));
+});
+
 router.get(`${BASE}/:id`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.detalle`, { id: req.params.id }));
 });
@@ -130,6 +182,44 @@ router.post(`${BASE}/:id/horometro`, async (req, res) => {
 
 router.post(`${BASE}/:id/odometro`, async (req, res) => {
   const r = await exec(ctxOf(res), `${MODULO}.actualizar-odometro`, { id: req.params.id, ...req.body });
+  await drain();
+  send(res, r);
+});
+
+router.post(`${BASE}/:id/relaciones`, async (req, res) => {
+  const r = await exec(ctxOf(res), `${MODULO}.crear-relacion`, { ...req.body, origenId: req.params.id });
+  await drain();
+  send(res, r);
+});
+
+router.delete(`${BASE}/relaciones/:relId`, async (req, res) => {
+  const r = await exec(ctxOf(res), `${MODULO}.eliminar-relacion`, { id: req.params.relId });
+  await drain();
+  send(res, r);
+});
+
+// Colaboración: comentarios (crear/responder, editar, borrar lógico) y
+// adjuntar documentación técnica por referencia — delegan en plataforma.
+router.post(`${BASE}/:id/comentarios`, async (req, res) => {
+  const r = await exec(ctxOf(res), `${MODULO}.comentar`, { ...req.body, id: req.params.id });
+  await drain();
+  send(res, r);
+});
+
+router.put(`${BASE}/comentarios/:comentarioId`, async (req, res) => {
+  const r = await exec(ctxOf(res), `${MODULO}.editar-comentario`, { ...req.body, comentarioId: req.params.comentarioId });
+  await drain();
+  send(res, r);
+});
+
+router.delete(`${BASE}/comentarios/:comentarioId`, async (req, res) => {
+  const r = await exec(ctxOf(res), `${MODULO}.borrar-comentario`, { comentarioId: req.params.comentarioId });
+  await drain();
+  send(res, r);
+});
+
+router.post(`${BASE}/:id/documentacion`, async (req, res) => {
+  const r = await exec(ctxOf(res), `${MODULO}.adjuntar`, { ...req.body, id: req.params.id });
   await drain();
   send(res, r);
 });

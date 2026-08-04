@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "generar-openapi": "node --experimental-strip-types scripts/generar-openapi.ts"
   },
   "dependencies": {
     "@workspace/kernel": "workspace:*",

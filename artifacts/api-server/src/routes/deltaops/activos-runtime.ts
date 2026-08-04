@@ -22,7 +22,16 @@ export function activosRuntime(): ActivosRuntime {
 
 const PLATFORM_PERMISSIONS = [...new Set(officialServices().flatMap((s) => [...s.permissions]))];
 const MODULE_PERMISSIONS = [
-  ...activosModule({ repository: null as never, readModel: null as never }).permissions,
+  ...activosModule({
+    repository: null as never,
+    readModel: null as never,
+    relaciones: null as never,
+    relacionesRead: null as never,
+    historial: null as never,
+    syncReceipts: null as never,
+    consola: null as never,
+    eventLog: null as never,
+  }).permissions,
 ];
 
 /** Mapa rol → permisos (admin: todo; operador: sin admin; lector: lectura). */

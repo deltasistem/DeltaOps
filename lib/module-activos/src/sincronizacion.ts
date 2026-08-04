@@ -107,12 +107,33 @@ const POLLING_ESPERA_MS = 25;
 /** Comandos que exigen `id` de cliente (creación offline). */
 const COMANDOS_CREACION = new Set(["crear"]);
 
+/**
+ * Lista blanca EXPLÍCITA de operaciones de colaboración admitidas en la cola
+ * offline. Cada sufijo mapea a un comando del módulo que DELEGA en un servicio
+ * de plataforma (comentar → platform.comment.create; adjuntar →
+ * platform.attachment.register; etc.). Se sincronizan con el mismo protocolo
+ * claim→ejecutar→finalizar y recibos/idempotencia. En la RECUPERACIÓN de un
+ * 'pendiente' viejo NO se re-ejecutan a ciegas (no son reconciliables por
+ * versión/id de agregado): se degradan a `reintentable` para que un claim
+ * limpio posterior las procese una única vez.
+ */
+const COMANDOS_COLABORACION = new Set([
+  "comentar",
+  "editar-comentario",
+  "borrar-comentario",
+  "adjuntar",
+]);
+
 function sufijo(comando: string): string {
   return comando.split(".").pop() ?? "";
 }
 
 function esComandoCreacion(comando: string): boolean {
   return COMANDOS_CREACION.has(sufijo(comando));
+}
+
+function esComandoColaboracion(comando: string): boolean {
+  return COMANDOS_COLABORACION.has(sufijo(comando));
 }
 
 /** Normaliza el nombre de comando al namespace del módulo. */
@@ -365,6 +386,17 @@ async function reconciliar(
   op: OperacionSync,
   comando: string,
 ): Promise<ResultadoSync> {
+  // Operaciones de colaboración: no son reconciliables por agregado; no se
+  // re-ejecutan a ciegas. Se degradan a `reintentable` para un claim limpio.
+  if (esComandoColaboracion(comando)) {
+    return {
+      opId: op.opId,
+      comando,
+      estado: "reintentable",
+      error: "Operación de colaboración pendiente; reintente para procesarla una única vez.",
+    };
+  }
+
   const id = clienteIdDe(op.input);
   if (!id) return { opId: op.opId, comando, estado: "rechazada", error: "Sin id para reconciliar." };
 

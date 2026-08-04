@@ -57,6 +57,8 @@ export interface ActivoReadModel {
   get(tenantId: string, id: string): Promise<Result<ActivoReadRow | null, KernelError>>;
   list(tenantId: string, filter: ActivoFilter): Promise<Result<ActivoReadRow[], KernelError>>;
   stats(tenantId: string): Promise<Result<Record<string, number>, KernelError>>;
+  /** Diagnóstico: último `last_event_id` proyectado del tenant (o `null`). */
+  lastEventId(tenantId: string): Promise<Result<string | null, KernelError>>;
   clear(uow: UnitOfWork, tenantId: string): Promise<Result<void, KernelError>>;
 }
 
@@ -108,6 +110,11 @@ export interface SyncReceiptStore {
    * del comando (KRN-INF-001), que no dejan efecto durable alguno.
    */
   release(tenantId: string, opId: string): Promise<Result<void, KernelError>>;
+  /**
+   * Diagnóstico (consola): lista todos los recibos del tenant (tenant-scoped,
+   * RLS). Sólo lectura; no participa del protocolo de reclamación.
+   */
+  listByTenant(tenantId: string): Promise<Result<SyncReceipt[], KernelError>>;
 }
 
 /* ----------------------------- Serialización ----------------------------- */
@@ -300,8 +307,24 @@ export class FakeActivoReadModel implements ActivoReadModel {
     return ok(s);
   }
 
+  async lastEventId(tenantId: string): Promise<Result<string | null, KernelError>> {
+    let latest: ActivoReadRow | null = null;
+    for (const r of this.rows.values()) {
+      if (r.tenantId === tenantId && (!latest || r.actualizadoAt.getTime() >= latest.actualizadoAt.getTime())) latest = r;
+    }
+    return ok(latest ? latest.lastEventId : null);
+  }
+
   async clear(_uow: UnitOfWork, tenantId: string): Promise<Result<void, KernelError>> {
-    for (const [k, r] of this.rows) if (r.tenantId === tenantId) this.rows.delete(k);
+    // Al vaciar el read model del tenant se DEBE reiniciar el guard de
+    // idempotencia por eventId para que la reproyección por replay (que reusa
+    // los MISMOS event ids) pueda repoblar las filas eliminadas.
+    for (const [k, r] of this.rows) {
+      if (r.tenantId === tenantId) {
+        this.applied.delete(r.lastEventId);
+        this.rows.delete(k);
+      }
+    }
     return ok(undefined);
   }
 }
@@ -346,6 +369,14 @@ export class FakeSyncReceiptStore implements SyncReceiptStore {
   async release(tenantId: string, opId: string): Promise<Result<void, KernelError>> {
     this.rows.delete(this.key(tenantId, opId));
     return ok(undefined);
+  }
+
+  async listByTenant(tenantId: string): Promise<Result<SyncReceipt[], KernelError>> {
+    const prefix = `${tenantId}::`;
+    const out: SyncReceipt[] = [];
+    for (const [k, r] of this.rows) if (k.startsWith(prefix)) out.push(r);
+    out.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    return ok(out);
   }
 
   /** Reloj inyectable para pruebas de recuperación de 'pendiente' viejos. */
@@ -570,6 +601,21 @@ export class PgActivoReadModel implements ActivoReadModel {
     }
   }
 
+  async lastEventId(tenantId: string): Promise<Result<string | null, KernelError>> {
+    try {
+      const res = await withTenantRead(this.pool, tenantId, (c) =>
+        c.query(
+          `SELECT last_event_id FROM deltaops.act_activos_read
+           WHERE tenant_id=$1 ORDER BY actualizado_at DESC LIMIT 1`,
+          [tenantId],
+        ),
+      );
+      return ok(res.rows[0] ? String(res.rows[0]["last_event_id"]) : null);
+    } catch (err) {
+      return fail(KernelErrors.infrastructure("ReadModel lastEventId falló", err));
+    }
+  }
+
   async clear(uow: UnitOfWork, tenantId: string): Promise<Result<void, KernelError>> {
     try {
       await setTenant(uow, tenantId);
@@ -721,6 +767,20 @@ export class PgSyncReceiptStore implements SyncReceiptStore {
       return fail(KernelErrors.infrastructure("SyncReceipt release falló", err));
     } finally {
       client.release();
+    }
+  }
+
+  async listByTenant(tenantId: string): Promise<Result<SyncReceipt[], KernelError>> {
+    try {
+      const res = await withTenantRead(this.pool, tenantId, (c) =>
+        c.query(
+          `SELECT * FROM deltaops.act_sync_receipts WHERE tenant_id=$1 ORDER BY created_at DESC`,
+          [tenantId],
+        ),
+      );
+      return ok(res.rows.map((r) => filaARecibo(r)));
+    } catch (err) {
+      return fail(KernelErrors.infrastructure("SyncReceipt listByTenant falló", err));
     }
   }
 }

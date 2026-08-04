@@ -95,12 +95,59 @@ export function timelineService(): PlatformServiceDefinition {
         description: "Consultar la línea temporal",
       },
     ],
-    permissions: ["platform.timeline.read", "platform.timeline.rebuild"],
+    permissions: ["platform.timeline.read", "platform.timeline.rebuild", "platform.timeline.record"],
     dependsOn: ["platform.comment", "platform.attachment", "platform.task"],
     events: [],
     recordTypes: ["entry"],
     configDefaults: { "max-entradas-consulta": "200" },
     commands: [
+      // Registro de dominio: permite a un módulo proyectar SUS eventos al
+      // Shared Timeline sin tocar tablas de plataforma (nunca escritura
+      // directa). Idempotente por `entryId` (el id del evento del módulo):
+      // una reentrega tardía del outbox no duplica la entrada.
+      (deps) => ({
+        name: `${SERVICE}.record`,
+        inputSchema: z.object({
+          entryId: z.string().min(1),
+          entityRef: z.string().min(1),
+          eventType: z.string().min(1),
+          actorId: z.string().min(1),
+          occurredAt: z.string().min(1),
+          resumen: z.string().default(""),
+          estado: z.string().nullable().optional(),
+          entidadRelacionada: z.string().nullable().optional(),
+          payload: z.record(z.unknown()).default({}),
+        }),
+        authorization: { permissions: ["platform.timeline.record"] },
+        async handle(ctx, input, uow) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const id = `tl:${input.entryId}`;
+          const existing = await deps.store.findById(tenant.value, id);
+          if (!existing.ok) return existing;
+          if (existing.value) return ok({ id, idempotente: true });
+          const inserted = await deps.store.insert(uow, {
+            id,
+            tenantId: tenant.value,
+            service: SERVICE,
+            recordType: "entry",
+            status: "active",
+            data: {
+              eventType: input.eventType,
+              entityRef: input.entityRef,
+              actorId: input.actorId,
+              resumen: input.resumen,
+              estado: input.estado ?? null,
+              entidadRelacionada: input.entidadRelacionada ?? null,
+              payload: input.payload,
+              occurredAt: input.occurredAt,
+            },
+            createdBy: ctx.principal.id,
+          });
+          if (!inserted.ok) return inserted;
+          return ok({ id, idempotente: false });
+        },
+      }),
       // Reconstrucción: borra proyección y re-proyecta desde auditoría
       (deps) => ({
         name: `${SERVICE}.rebuild`,
@@ -175,6 +222,48 @@ export function timelineService(): PlatformServiceDefinition {
             recordType: "entry",
             limit: input.limit ?? 50,
           });
+        },
+      }),
+      // Consulta cronológica con filtros obligatorios: actor, rango de fechas,
+      // estado, entidad relacionada y entityRef. Devuelve entradas ordenadas.
+      (deps) => ({
+        name: `${SERVICE}.query`,
+        inputSchema: z.object({
+          entityRef: z.string().optional(),
+          actorId: z.string().optional(),
+          eventType: z.string().optional(),
+          estado: z.string().optional(),
+          entidadRelacionada: z.string().optional(),
+          desde: z.string().optional(),
+          hasta: z.string().optional(),
+          limit: z.number().int().positive().max(500).optional(),
+        }),
+        authorization: { permissions: ["platform.timeline.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const rows = await deps.store.list(tenant.value, { service: SERVICE, recordType: "entry", limit: 500 });
+          if (!rows.ok) return rows;
+          const desde = input.desde ? new Date(input.desde).getTime() : null;
+          const hasta = input.hasta ? new Date(input.hasta).getTime() : null;
+          const filtered = rows.value.filter((r) => {
+            const d = r.data;
+            if (input.entityRef && d["entityRef"] !== input.entityRef) return false;
+            if (input.actorId && d["actorId"] !== input.actorId) return false;
+            if (input.eventType && d["eventType"] !== input.eventType) return false;
+            if (input.estado && d["estado"] !== input.estado) return false;
+            if (input.entidadRelacionada && d["entidadRelacionada"] !== input.entidadRelacionada) return false;
+            const ts = d["occurredAt"] ? new Date(String(d["occurredAt"])).getTime() : null;
+            if (desde != null && (ts == null || ts < desde)) return false;
+            if (hasta != null && (ts == null || ts > hasta)) return false;
+            return true;
+          });
+          filtered.sort((a, b) => {
+            const ta = new Date(String(a.data["occurredAt"] ?? 0)).getTime();
+            const tb = new Date(String(b.data["occurredAt"] ?? 0)).getTime();
+            return tb - ta;
+          });
+          return ok(filtered.slice(0, input.limit ?? 200));
         },
       }),
     ],

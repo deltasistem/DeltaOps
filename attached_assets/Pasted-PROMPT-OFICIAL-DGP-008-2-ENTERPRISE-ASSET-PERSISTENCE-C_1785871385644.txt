@@ -1,0 +1,441 @@
+PROMPT OFICIAL — DGP-008.2
+ENTERPRISE ASSET PERSISTENCE, CQRS & OFFLINE IMPLEMENTATION
+
+Has iniciado oficialmente la subfase DGP-008.2 del programa DeltaOps.
+
+Todo el corpus arquitectónico permanece completamente congelado.
+
+No está permitido modificar:
+
+ETS-001…012
+ENGINEERING_CHARTER
+ESI-001…010
+DGP-000…007
+DGP-008.1
+
+No está permitido introducir nuevos patrones arquitectónicos.
+
+Todo debe reutilizar estrictamente:
+
+Kernel (DGP-002)
+Shared Platform (DGP-003)
+Reference Module (DGP-004)
+Experience Foundation (DGP-005)
+Business Foundation (DGP-006)
+Workflow & Dynamic Forms (DGP-007)
+Dominio de Activos (DGP-008.1)
+Objetivo
+
+Construir toda la infraestructura operacional del módulo de Activos.
+
+En esta subfase todavía NO se desarrollan:
+
+Dashboard ejecutivo
+KPIs avanzados
+IA
+Importaciones
+Exportaciones
+Reportes
+Analítica
+Deben implementarse
+1. Persistencia definitiva
+
+Implementar toda la persistencia PostgreSQL definitiva del módulo.
+
+Debe incluir:
+
+tablas del agregado
+tablas de lectura
+tablas de sincronización
+tablas auxiliares estrictamente necesarias
+
+Siempre con:
+
+RLS
+multitenancy
+auditoría
+versionado
+migraciones oficiales
+espejo Drizzle
+
+Nunca romper compatibilidad.
+
+2. Read Models especializados
+
+Construir read models optimizados para:
+
+Listado
+
+Detalle
+
+Árbol jerárquico
+
+Historial
+
+Ubicaciones
+
+Responsables
+
+Equipos relacionados
+
+Documentación
+
+Componentes
+
+Todos completamente desacoplados del agregado.
+
+Nunca leer el agregado para consultas.
+
+3. CQRS completo
+
+Todas las consultas deberán utilizar exclusivamente Read Models.
+
+Todos los comandos deberán utilizar exclusivamente el agregado.
+
+Verificar:
+
+versionado optimista
+concurrencia
+replay
+reconstrucción completa
+4. Timeline
+
+Integración completa con Shared Timeline.
+
+Cada evento deberá proyectarse automáticamente.
+
+Debe permitir:
+
+Historial cronológico
+
+Filtros
+
+Actor
+
+Fecha
+
+Estado
+
+Entidad relacionada
+
+Nunca escribir directamente en Timeline.
+
+5. Comentarios
+
+Integración completa con Comment Service.
+
+Cada activo podrá tener comentarios.
+
+Soportar:
+
+respuestas
+
+ediciones
+
+eliminación lógica
+
+auditoría
+
+offline
+
+6. Adjuntos
+
+Integración completa con Attachment Service.
+
+Permitir:
+
+fotografías
+
+manuales
+
+planos
+
+PDF
+
+videos
+
+certificados
+
+documentos técnicos
+
+Todo mediante referencias.
+
+Nunca almacenar binarios en PostgreSQL.
+
+7. Relaciones entre activos
+
+Construir relaciones reutilizables:
+
+Padre
+
+Hijo
+
+Depende de
+
+Relacionado con
+
+Reemplaza
+
+Reemplazado por
+
+Componente de
+
+Compuesto por
+
+Todo configurable.
+
+8. Ubicaciones
+
+Persistencia completa.
+
+Histórico.
+
+Cambios.
+
+Timeline.
+
+Auditoría.
+
+Eventos.
+
+9. Responsables
+
+Persistencia.
+
+Histórico.
+
+Eventos.
+
+Auditoría.
+
+10. Documentación técnica
+
+Cada activo podrá tener:
+
+manuales
+
+certificados
+
+garantías
+
+diagramas
+
+planos
+
+procedimientos
+
+Todo reutilizando Attachment Service.
+
+11. Sincronización Offline
+
+Implementar sincronización completa para:
+
+crear
+
+editar
+
+reasignar
+
+mover
+
+adjuntar
+
+comentar
+
+cambiar estado
+
+actualizar horómetro
+
+actualizar odómetro
+
+Debe soportar:
+
+cola
+
+conflictos
+
+replay
+
+idempotencia
+
+receipts
+
+versiones
+
+reintentos
+
+recuperación
+
+12. Consola Técnica del módulo
+
+Construir una consola técnica exclusiva para Activos.
+
+Debe mostrar:
+
+estado del módulo
+
+eventos
+
+outbox
+
+proyecciones
+
+read models
+
+RLS
+
+sincronización
+
+conflictos
+
+timeline
+
+comentarios
+
+adjuntos
+
+No debe ser visible para usuarios normales.
+
+Solo administradores.
+
+13. API
+
+Completar toda la API REST del módulo.
+
+Mantener:
+
+Contract First
+
+OpenAPI
+
+Zod
+
+Errores Kernel
+
+HTTP Mapping
+
+Offline endpoints
+
+14. Pruebas
+
+Cobertura completa.
+
+Fake.
+
+PostgreSQL.
+
+RLS.
+
+CQRS.
+
+Offline.
+
+Sincronización.
+
+Replay.
+
+Timeline.
+
+Adjuntos.
+
+Comentarios.
+
+Concurrencia.
+
+Recuperación.
+
+15. Documentación
+
+Completa.
+
+En español.
+
+Diagramas.
+
+Flujos.
+
+Protocolos Offline.
+
+Reconstrucción CQRS.
+
+Read Models.
+
+Timeline.
+
+Revisión Arquitectónica Obligatoria
+
+Al finalizar ejecutar una revisión arquitectónica completamente independiente.
+
+Debe revisar:
+
+DDD
+
+CQRS
+
+Hexagonal
+
+Dependency Rule
+
+Kernel
+
+Shared Platform
+
+Business Foundation
+
+Workflow
+
+Dynamic Forms
+
+Experience Foundation
+
+Offline First
+
+Configuration First
+
+Event Driven
+
+RLS
+
+Outbox
+
+Read Models
+
+Timeline
+
+Attachment Service
+
+Comment Service
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+Nuevo requisito obligatorio
+
+A partir de este DGP todos los informes deberán incluir una nueva sección:
+
+19. Oportunidades de mejora detectadas
+
+Esta sección deberá documentar exclusivamente oportunidades identificadas durante la implementación, sin aplicarlas automáticamente.
+
+Como mínimo deberá incluir, cuando existan:
+
+oportunidades de optimización de rendimiento;
+oportunidades de reutilización;
+simplificaciones arquitectónicas futuras;
+mejoras de observabilidad;
+mejoras para desarrolladores (DX);
+mejoras para despliegue;
+automatizaciones posibles;
+deuda técnica heredada;
+riesgos potenciales a largo plazo.
+
+Ninguna de estas mejoras podrá implementarse sin autorización expresa de la Dirección del Programa.
+
+Solo deberán quedar registradas y justificadas.
+
+Informe Final Obligatorio
+
+Al finalizar entregar únicamente el informe oficial de cierre siguiendo exactamente el formato de DGP anteriores.
+
+No iniciar automáticamente DGP-008.3.
+
+Esperar instrucciones de la Dirección del Programa.

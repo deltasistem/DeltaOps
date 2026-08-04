@@ -104,3 +104,34 @@ Tabla PROPIA del módulo (`deltaops.act_sync_receipts`, RLS por tenant,
   actual del activo adjunto (`resultado.actual`).
 - **Sin anidamiento**: una unidad de trabajo por operación real; la
   orquestación sólo coordina, no abre transacciones que contengan otras.
+
+## Cobertura de TODAS las operaciones (DGP-008.2)
+
+`procesarCola` es **agnóstico al comando**: despacha genéricamente cualquier
+`op.comando` del módulo vía `commands.execute`, por lo que la cola offline cubre
+**todo** el catálogo sin cambiar el protocolo: `crear`, `editar`,
+`cambiar-ubicacion`, `asignar-responsable`, `actualizar-horometro`,
+`actualizar-odometro`, las transiciones de estado, `catalogo.upsert` /
+`catalogo.habilitar`, las **relaciones** (`crear-relacion` /
+`eliminar-relacion`) y las operaciones de **colaboración**.
+
+- Las relaciones tienen su **propia idempotencia offline** adicional: `crear-
+  relacion` acepta un `id` de cliente y detecta el reenvío como duplicado
+  idempotente antes de tocar el grafo.
+- La prueba `sincroniza crear/…/relación` (Fake) y la suite PG ejercitan una
+  cola mixta de 8 operaciones heterogéneas, verificando `aplicadas` en la primera
+  pasada y `replay:true` en la reenvío completo (idempotencia durable).
+
+### Colaboración por la cola offline
+
+`sincronizacion.ts` declara la whitelist `COMANDOS_COLABORACION`
+(`comentar`, `editar-comentario`, `borrar-comentario`, `adjuntar`), que se
+mapean a los comandos del módulo que **delegan** en `platform.comment` /
+`platform.attachment`. Siguen el mismo protocolo claim→ejecutar→finalizar: un
+reenvío devuelve el recibo original con `replay:true` **sin re-ejecutar** (no se
+duplican comentarios ni adjuntos), verificado con pruebas Fake y PG.
+
+Estas operaciones **no** son reconciliables por versión/id de agregado; por eso,
+en la ruta de RECUPERACIÓN de un recibo `pendiente` **viejo**, `reconciliar` las
+degrada a **`reintentable`** (nunca re-ejecución a ciegas): una reclamación
+limpia posterior las procesa exactamente una vez.

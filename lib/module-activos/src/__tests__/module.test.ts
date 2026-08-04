@@ -35,7 +35,16 @@ import {
 const ALL_PERMISSIONS = [
   ...new Set([
     ...officialServices().flatMap((s) => [...s.permissions]),
-    ...activosModule({ repository: null as never, readModel: null as never }).permissions,
+    ...activosModule({
+      repository: null as never,
+      readModel: null as never,
+      relaciones: null as never,
+      relacionesRead: null as never,
+      historial: null as never,
+      syncReceipts: null as never,
+      consola: null as never,
+      eventLog: null as never,
+    }).permissions,
   ]),
 ];
 const ADMIN: Principal = { id: "admin-1", rol: "admin", permisos: ALL_PERMISSIONS, capacidades: [] };
@@ -351,7 +360,7 @@ describe("Offline: idempotencia, conflicto, replay y recibos", () => {
     await exec(rt, ctx, `${MODULO}.crear`, { ...NUEVO, codigoEmpresarial: "EXC-002", nombre: "Otra" });
     await drain(rt);
     const re = await exec(rt, ctx, `${MODULO}.reproyectar`, {});
-    expect(re.ok && (re.value as { proyectados: number }).proyectados).toBe(2);
+    expect(re.ok && (re.value as { eventos: number }).eventos).toBe(2);
   });
 
   it("sincronizar: replay de CREACIÓN devuelve el recibo original sin re-ejecutar", async () => {
@@ -463,6 +472,7 @@ describe("Offline: idempotencia, conflicto, replay y recibos", () => {
       claim: (t, o, c, cmd) => base.claim(t, o, c, cmd),
       find: (t, o) => base.find(t, o),
       release: (t, o) => base.release(t, o),
+      listByTenant: (t) => base.listByTenant(t),
       finalize: async () => ({ ok: false, error: { code: "KRN-INF-001", message: "finalize boom" } }) as never,
     };
     const id = crypto.randomUUID();

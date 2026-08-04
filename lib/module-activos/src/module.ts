@@ -44,7 +44,6 @@ import {
   crearActivo,
   editarActivo,
   EVENTOS_MODULO,
-  eventoActivo,
   fueraServicioActivo,
   mantenerActivo,
   operarActivo,
@@ -80,13 +79,46 @@ import {
   type ActivoReadModel,
   type ActivoReadRow,
   type ActivoRepository,
+  type SyncReceipt,
+  type SyncReceiptStore,
 } from "./infrastructure/repository";
+import {
+  crearRelacion,
+  eliminarRelacion,
+  EVENTOS_RELACION,
+  NOMBRES_TIPO_RELACION,
+  RELACION_CREADA,
+  RELACION_ELIMINADA,
+  resolverTiposRelacion,
+  TIPOS_RELACION,
+  type CategoriaRelacion,
+} from "./domain/relaciones";
+import type {
+  ConsolaStore,
+  EventLogStore,
+  HistorialStore,
+  RelacionReadModel,
+  RelacionReadRow,
+  RelacionRepository,
+} from "./infrastructure/relaciones-store";
 
 export { MODULO };
 
 export interface ModuleAdapters {
   readonly repository: ActivoRepository;
   readonly readModel: ActivoReadModel;
+  readonly relaciones: RelacionRepository;
+  readonly relacionesRead: RelacionReadModel;
+  readonly historial: HistorialStore;
+  /** Recibos durables de sincronización (diagnóstico de consola). */
+  readonly syncReceipts: SyncReceiptStore;
+  /** Diagnóstico del outbox del módulo (consola técnica). */
+  readonly consola: ConsolaStore;
+  /**
+   * Bitácora de eventos durable del módulo (`act_eventos`), fuente de verdad del
+   * replay de reproyección. Independiente del outbox y su retención.
+   */
+  readonly eventLog: EventLogStore;
 }
 
 /* ------------------------------- Config ---------------------------------- */
@@ -193,6 +225,33 @@ async function validarUnidades(
 
 /* ---------------------- Application Service ------------------------------ */
 
+/**
+ * Emite un evento de dominio del módulo escribiéndolo ATÓMICAMENTE en la MISMA
+ * UoW en la bitácora durable (`act_eventos`, fuente de verdad del replay) y en
+ * el outbox del Kernel (`registerEvent`). Usa el MISMO `event.id` en ambos, de
+ * modo que la reproyección desde la bitácora produzca read models idénticos
+ * (mismo `lastEventId`/`eventId` que la proyección en vivo).
+ */
+async function emitirEvento(
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
+  tenantId: string,
+  evento: { tipo: string; payload: Record<string, unknown> },
+): Promise<Result<void, KernelError>> {
+  const dominio = createDomainEvent(evento.tipo, evento.payload, ctx.correlationId);
+  const logged = await adapters.eventLog.append(uow, {
+    tenantId,
+    eventId: dominio.id,
+    tipo: dominio.type,
+    payload: dominio.payload,
+    occurredAt: dominio.occurredAt,
+  });
+  if (!logged.ok) return logged;
+  uow.registerEvent(dominio);
+  return ok(undefined);
+}
+
 async function persistirCambio(
   deps: ServiceDeps,
   adapters: ModuleAdapters,
@@ -215,7 +274,8 @@ async function persistirCambio(
   });
   if (!audited.ok) return audited;
 
-  uow.registerEvent(createDomainEvent(cambio.evento.tipo, cambio.evento.payload, ctx.correlationId));
+  const emitido = await emitirEvento(adapters, ctx, uow, a.tenantId, cambio.evento);
+  if (!emitido.ok) return emitido;
   return ok(a);
 }
 
@@ -255,6 +315,290 @@ function proyeccion(adapters: ModuleAdapters) {
     );
     return applied.ok ? ok(undefined) : applied;
   };
+}
+
+/* --------------- Proyecciones DGP-008.2 (payload-only, idempotentes) ------ */
+
+/** Resumen legible para la línea de tiempo del módulo, derivado del evento. */
+function resumenDeEvento(tipo: string, p: Record<string, unknown>): string {
+  const codigo = String(p["codigoEmpresarial"] ?? p["id"] ?? "");
+  switch (tipo) {
+    case ACTIVO_REGISTRADO: return `Activo registrado (${codigo})`;
+    case ACTIVO_ACTUALIZADO: return `Datos actualizados (${codigo})`;
+    case ACTIVO_OPERATIVO: return `Activo puesto OPERATIVO (${codigo})`;
+    case ACTIVO_EN_MANTENIMIENTO: return `Activo en MANTENIMIENTO (${codigo})`;
+    case ACTIVO_FUERA_SERVICIO: return `Activo FUERA DE SERVICIO (${codigo})`;
+    case ACTIVO_RETIRADO: return `Activo RETIRADO (${codigo})`;
+    case ACTIVO_UBICACION_ACTUALIZADA: return `Ubicación actualizada (${codigo})`;
+    case ACTIVO_RESPONSABLE_ACTUALIZADO: return `Responsable actualizado (${codigo})`;
+    case ACTIVO_HOROMETRO_ACTUALIZADO: return `Horómetro actualizado (${codigo})`;
+    case ACTIVO_ODOMETRO_ACTUALIZADO: return `Odómetro actualizado (${codigo})`;
+    case RELACION_CREADA: return `Relación "${String(p["tipo"] ?? "")}" creada`;
+    case RELACION_ELIMINADA: return `Relación "${String(p["tipo"] ?? "")}" eliminada`;
+    default: return `${tipo} (${codigo})`;
+  }
+}
+
+/**
+ * Aplica UNA fila de línea de tiempo al READ MODEL INTERNO del módulo
+ * (`act_historial`), idempotente por event_id. Reutilizable por el handler de
+ * proyección y por la reproyección por replay. NO es el Shared Timeline: es el
+ * historial cronológico propio del activo. El Shared Timeline canónico es
+ * platform.timeline (ver `registrarEnTimelineCompartido`).
+ */
+async function aplicarHistorial(
+  adapters: ModuleAdapters,
+  uow: UnitOfWork,
+  event: { id: string; type: string; payload: Record<string, unknown> },
+): Promise<Result<boolean, KernelError>> {
+  const p = event.payload;
+  // En eventos de relación el activo del historial es el ORIGEN; el `id` del
+  // payload es el id de la relación, no del activo.
+  const esRelacion = event.type === RELACION_CREADA || event.type === RELACION_ELIMINADA;
+  const origen = p["origen"] as { id?: string } | undefined;
+  const id = esRelacion ? String(origen?.id ?? p["id"] ?? "") : String(p["id"] ?? "");
+  return adapters.historial.registrarEvento(uow, {
+    tenantId: String(p["tenantId"] ?? ""),
+    eventId: event.id,
+    activoId: id,
+    entityRef: String(p["entityRef"] ?? `activo:${id}`),
+    tipoEvento: event.type,
+    estado: p["estado"] == null ? null : String(p["estado"]),
+    version: Number(p["version"] ?? 1),
+    actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+    resumen: resumenDeEvento(event.type, p),
+    registradoAt: p["actualizadoAt"] ? new Date(String(p["actualizadoAt"])) : new Date(),
+  });
+}
+
+/**
+ * Proyección al READ MODEL INTERNO de historial del activo (`act_historial`),
+ * idempotente por event_id. Es un read model — NO "el timeline".
+ */
+function proyeccionHistorial(adapters: ModuleAdapters) {
+  return async (deps: ServiceDeps, event: { id: string; type: string; payload: Record<string, unknown> }) => {
+    const p = event.payload;
+    const tenantId = String(p["tenantId"] ?? "");
+    const id = String(p["id"] ?? "");
+    if (!tenantId || !id) return ok(undefined);
+    const uowPort = deps.runtime.container.resolve(KernelTokens.unitOfWork);
+    const ctx = createExecutionContext({ principal: SYSTEM_PRINCIPAL, metadata: { tenantId } });
+    const applied = await uowPort.execute(ctx, (uow) => aplicarHistorial(adapters, uow, event));
+    return applied.ok ? ok(undefined) : applied;
+  };
+}
+
+/**
+ * Proyecta un evento del módulo al SHARED TIMELINE canónico de la plataforma
+ * mediante el COMANDO `platform.timeline.record` (nunca escritura directa a las
+ * tablas de plataforma). Idempotente por el id del evento del módulo: una
+ * reentrega tardía del outbox no duplica la entrada. Se ejecuta con principal
+ * de sistema para no depender de los permisos de plataforma del actor.
+ */
+function registrarEnTimelineCompartido() {
+  return async (
+    deps: ServiceDeps,
+    event: { id: string; type: string; payload: Record<string, unknown>; correlationId: string },
+  ): Promise<Result<void, KernelError>> => {
+    const p = event.payload;
+    const tenantId = String(p["tenantId"] ?? "");
+    const id = String(p["id"] ?? "");
+    if (!tenantId || !id) return ok(undefined);
+    // La entidad relacionada aplica a los eventos de relación (origen→destino).
+    const origen = p["origen"] as { id?: string } | undefined;
+    const destino = p["destino"] as { id?: string } | undefined;
+    const esRelacion = event.type === RELACION_CREADA || event.type === RELACION_ELIMINADA;
+    const entityRef = esRelacion
+      ? `activo:${String(origen?.id ?? id)}`
+      : String(p["entityRef"] ?? `activo:${id}`);
+    const entidadRelacionada = esRelacion && destino?.id ? `activo:${destino.id}` : null;
+    const sys = createExecutionContext({
+      principal: SYSTEM_PRINCIPAL,
+      correlationId: event.correlationId,
+      metadata: { tenantId },
+    });
+    const r = await deps.runtime.commands.execute(sys, "platform.timeline.record", {
+      entryId: event.id,
+      entityRef,
+      eventType: event.type,
+      actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+      occurredAt: p["actualizadoAt"] ? String(p["actualizadoAt"]) : new Date().toISOString(),
+      resumen: resumenDeEvento(event.type, p),
+      estado: p["estado"] == null ? null : String(p["estado"]),
+      entidadRelacionada,
+      payload: { id, tipo: p["tipo"] ?? null },
+    });
+    return r.ok ? ok(undefined) : r;
+  };
+}
+
+/** Proyección al historial de ubicaciones desde el payload del evento. */
+function proyeccionUbicacion(adapters: ModuleAdapters) {
+  return async (deps: ServiceDeps, event: { id: string; payload: Record<string, unknown> }) => {
+    const p = event.payload;
+    const tenantId = String(p["tenantId"] ?? "");
+    const id = String(p["id"] ?? "");
+    const ubic = p["ubicacion"] as
+      | { ubicacionId?: string; etiqueta?: string; detalle?: string; coordenadas?: Record<string, unknown> }
+      | null
+      | undefined;
+    if (!tenantId || !id || !ubic) return ok(undefined);
+    const uowPort = deps.runtime.container.resolve(KernelTokens.unitOfWork);
+    const ctx = createExecutionContext({ principal: SYSTEM_PRINCIPAL, metadata: { tenantId } });
+    const applied = await uowPort.execute(ctx, (uow) =>
+      adapters.historial.registrarUbicacion(uow, {
+        tenantId,
+        eventId: event.id,
+        activoId: id,
+        ubicacionId: ubic.ubicacionId ?? null,
+        etiqueta: ubic.etiqueta ?? null,
+        detalle: ubic.detalle ?? null,
+        coordenadas: ubic.coordenadas ?? null,
+        version: Number(p["version"] ?? 1),
+        actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+        registradoAt: p["actualizadoAt"] ? new Date(String(p["actualizadoAt"])) : new Date(),
+      }),
+    );
+    return applied.ok ? ok(undefined) : applied;
+  };
+}
+
+/** Proyección al historial de responsables desde el payload del evento. */
+function proyeccionResponsable(adapters: ModuleAdapters) {
+  return async (deps: ServiceDeps, event: { id: string; payload: Record<string, unknown> }) => {
+    const p = event.payload;
+    const tenantId = String(p["tenantId"] ?? "");
+    const id = String(p["id"] ?? "");
+    if (!tenantId || !id || p["responsable"] == null) return ok(undefined);
+    const uowPort = deps.runtime.container.resolve(KernelTokens.unitOfWork);
+    const ctx = createExecutionContext({ principal: SYSTEM_PRINCIPAL, metadata: { tenantId } });
+    const applied = await uowPort.execute(ctx, (uow) =>
+      adapters.historial.registrarResponsable(uow, {
+        tenantId,
+        eventId: event.id,
+        activoId: id,
+        responsable: p["responsable"] == null ? null : String(p["responsable"]),
+        supervisor: p["supervisor"] == null ? null : String(p["supervisor"]),
+        version: Number(p["version"] ?? 1),
+        actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+        registradoAt: p["actualizadoAt"] ? new Date(String(p["actualizadoAt"])) : new Date(),
+      }),
+    );
+    return applied.ok ? ok(undefined) : applied;
+  };
+}
+
+/** Proyección del read model de relaciones desde el payload del evento. */
+function relacionReadRowDe(p: Record<string, unknown>, eventId: string): RelacionReadRow {
+  const origen = (p["origen"] ?? {}) as { id?: string; codigo?: string | null; nombre?: string | null };
+  const destino = (p["destino"] ?? {}) as { id?: string; codigo?: string | null; nombre?: string | null };
+  return {
+    tenantId: String(p["tenantId"] ?? ""),
+    id: String(p["id"] ?? ""),
+    tipo: String(p["tipo"] ?? ""),
+    categoria: String(p["categoria"] ?? "asociacion") as CategoriaRelacion,
+    origenId: String(origen.id ?? ""),
+    origenCodigo: origen.codigo ?? null,
+    origenNombre: origen.nombre ?? null,
+    destinoId: String(destino.id ?? ""),
+    destinoCodigo: destino.codigo ?? null,
+    destinoNombre: destino.nombre ?? null,
+    lastEventId: eventId,
+    actualizadoAt: p["actualizadoAt"] ? new Date(String(p["actualizadoAt"])) : new Date(),
+  };
+}
+
+function proyeccionRelacion(adapters: ModuleAdapters) {
+  return async (deps: ServiceDeps, event: { id: string; type: string; payload: Record<string, unknown> }) => {
+    const p = event.payload;
+    const tenantId = String(p["tenantId"] ?? "");
+    const id = String(p["id"] ?? "");
+    if (!tenantId || !id) return ok(undefined);
+    const uowPort = deps.runtime.container.resolve(KernelTokens.unitOfWork);
+    const ctx = createExecutionContext({ principal: SYSTEM_PRINCIPAL, metadata: { tenantId } });
+    const applied = await uowPort.execute(ctx, async (uow) => {
+      if (event.type === RELACION_ELIMINADA) {
+        const r = await adapters.relacionesRead.remove(uow, tenantId, id);
+        return r.ok ? ok(true) : r;
+      }
+      return adapters.relacionesRead.apply(uow, relacionReadRowDe(p, event.id));
+    });
+    return applied.ok ? ok(undefined) : applied;
+  };
+}
+
+/* --------------------------- Replay (reproyección) ----------------------- */
+
+/**
+ * Reaplica LAS MISMAS funciones de proyección payload-only de UN evento del
+ * módulo sobre los read models (activos_read, relaciones_read, historial,
+ * ubicaciones/responsables histórico) dentro del UoW dado. Es idéntico a lo que
+ * hacen los eventHandlers en línea, garantizando equivalencia bit a bit entre
+ * la proyección en vivo y la reproyección por replay del event stream.
+ */
+async function reproyectarEvento(
+  adapters: ModuleAdapters,
+  uow: UnitOfWork,
+  ev: { id: string; eventType: string; payload: Record<string, unknown> },
+): Promise<Result<void, KernelError>> {
+  const p = ev.payload;
+  const tipo = ev.eventType;
+  const esRelacion = tipo === RELACION_CREADA || tipo === RELACION_ELIMINADA;
+
+  if (esRelacion) {
+    if (tipo === RELACION_ELIMINADA) {
+      const r = await adapters.relacionesRead.remove(uow, String(p["tenantId"] ?? ""), String(p["id"] ?? ""));
+      if (!r.ok) return r;
+    } else {
+      const r = await adapters.relacionesRead.apply(uow, relacionReadRowDe(p, ev.id));
+      if (!r.ok) return r;
+    }
+    // Historial también para eventos de relación (mismo comportamiento en vivo).
+    const th = await aplicarHistorial(adapters, uow, { id: ev.id, type: tipo, payload: p });
+    return th.ok ? ok(undefined) : th;
+  }
+
+  // Read model del activo.
+  const rm = await adapters.readModel.apply(uow, readRowDeEvento(p, ev.id));
+  if (!rm.ok) return rm;
+
+  // Historial cronológico del activo.
+  const th = await aplicarHistorial(adapters, uow, { id: ev.id, type: tipo, payload: p });
+  if (!th.ok) return th;
+
+  // Histórico de ubicaciones (registro + cambio de ubicación).
+  if ((tipo === ACTIVO_REGISTRADO || tipo === ACTIVO_UBICACION_ACTUALIZADA) && p["ubicacion"] != null) {
+    const ubic = p["ubicacion"] as { ubicacionId?: string; etiqueta?: string; detalle?: string; coordenadas?: Record<string, unknown> };
+    const u = await adapters.historial.registrarUbicacion(uow, {
+      tenantId: String(p["tenantId"] ?? ""),
+      eventId: ev.id,
+      activoId: String(p["id"] ?? ""),
+      ubicacionId: ubic.ubicacionId ?? null,
+      etiqueta: ubic.etiqueta ?? null,
+      detalle: ubic.detalle ?? null,
+      coordenadas: ubic.coordenadas ?? null,
+      version: Number(p["version"] ?? 1),
+      actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+      registradoAt: p["actualizadoAt"] ? new Date(String(p["actualizadoAt"])) : new Date(),
+    });
+    if (!u.ok) return u;
+  }
+
+  // Histórico de responsables (registro + reasignación).
+  if ((tipo === ACTIVO_REGISTRADO || tipo === ACTIVO_RESPONSABLE_ACTUALIZADO) && p["responsable"] != null) {
+    const r = await adapters.historial.registrarResponsable(uow, {
+      tenantId: String(p["tenantId"] ?? ""),
+      eventId: ev.id,
+      activoId: String(p["id"] ?? ""),
+      responsable: p["responsable"] == null ? null : String(p["responsable"]),
+      supervisor: p["supervisor"] == null ? null : String(p["supervisor"]),
+      version: Number(p["version"] ?? 1),
+      actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+      registradoAt: p["actualizadoAt"] ? new Date(String(p["actualizadoAt"])) : new Date(),
+    });
+    if (!r.ok) return r;
+  }
+  return ok(undefined);
 }
 
 /* ------------------------------- Schemas VO ------------------------------ */
@@ -321,6 +665,103 @@ async function cargar(
 }
 
 const ID_VERSION = z.object({ id: z.string(), expectedVersion: z.number().int().positive() });
+
+/* --------------------------- Colaboración -------------------------------- */
+
+/** Categorías de documentación técnica admitidas como metadato de adjunto. */
+export const CATEGORIAS_DOCUMENTACION = [
+  "manual",
+  "certificado",
+  "garantia",
+  "diagrama",
+  "plano",
+  "procedimiento",
+] as const;
+export type CategoriaDocumentacion = (typeof CATEGORIAS_DOCUMENTACION)[number];
+
+/** entityRef canónico de un activo para los servicios de plataforma. */
+function refActivo(id: string): string {
+  return `activo:${id}`;
+}
+
+/**
+ * Ejecuta un comando de plataforma con principal de SISTEMA (delegación de
+ * colaboración): valida antes que el activo exista con la autorización del
+ * módulo (el comando del módulo YA exigió el permiso correspondiente).
+ */
+async function delegarPlataforma(
+  deps: ServiceDeps,
+  ctx: ExecutionContext,
+  tenant: string,
+  comando: string,
+  input: Record<string, unknown>,
+): Promise<Result<unknown, KernelError>> {
+  const sys = createExecutionContext({
+    principal: SYSTEM_PRINCIPAL,
+    correlationId: ctx.correlationId,
+    metadata: { tenantId: tenant },
+  });
+  return deps.runtime.commands.execute(sys, comando, input);
+}
+
+/* ------------------------- Consola: colaboración ------------------------- */
+
+/**
+ * Actividad de colaboración del tenant para la consola técnica.
+ *  - `timelineModulo`: entradas de la línea de tiempo propia del módulo.
+ *  - `comentarios`/`adjuntos`: conteos vía QUERIES de plataforma
+ *    (`platform.comment.byEntity` / `platform.attachment.byEntity`), NUNCA SQL
+ *    directo a las tablas de plataforma.
+ *
+ * LIMITACIÓN documentada: la plataforma no expone una query de CONTEO agregada
+ * por tenant, sólo `byEntity`. Por ello se agregan los conteos recorriendo los
+ * activos del read model (acotado a `MAX_ACTIVOS_COLAB`), lo que da un conteo
+ * EXACTO cuando el tenant tiene ≤ ese número de activos y un conteo PARCIAL
+ * (con `truncado: true`) por encima. Se ejecuta con principal de sistema para
+ * no depender de que el admin tenga permisos de lectura de plataforma.
+ */
+async function actividadColaboracion(
+  deps: ServiceDeps,
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  tenant: string,
+): Promise<{
+  timelineModulo: number;
+  comentarios: number;
+  adjuntos: number;
+  activosInspeccionados: number;
+  truncado: boolean;
+  nota: string;
+}> {
+  const MAX_ACTIVOS_COLAB = 200;
+  const histCount = await adapters.historial.contarEventos(tenant);
+  const lista = await adapters.readModel.list(tenant, { limit: MAX_ACTIVOS_COLAB });
+  const activos = lista.ok ? lista.value : [];
+  const sys = createExecutionContext({
+    principal: SYSTEM_PRINCIPAL,
+    correlationId: ctx.correlationId,
+    metadata: { tenantId: tenant },
+  });
+  let comentarios = 0;
+  let adjuntos = 0;
+  for (const a of activos) {
+    const ref = `activo:${a.id}`;
+    const c = await deps.runtime.queries.execute(sys, "platform.comment.byEntity", { entityRef: ref });
+    if (c.ok && Array.isArray(c.value)) comentarios += c.value.length;
+    const at = await deps.runtime.queries.execute(sys, "platform.attachment.byEntity", { entityRef: ref });
+    if (at.ok && Array.isArray(at.value)) adjuntos += at.value.length;
+  }
+  return {
+    timelineModulo: histCount.ok ? histCount.value : 0,
+    comentarios,
+    adjuntos,
+    activosInspeccionados: activos.length,
+    truncado: activos.length >= MAX_ACTIVOS_COLAB,
+    nota:
+      "Comentarios/adjuntos agregados vía platform.*.byEntity (la plataforma no expone conteo agregado por tenant); conteo exacto hasta " +
+      `${MAX_ACTIVOS_COLAB} activos.`,
+  };
+}
 
 /* ------------------------------ Descriptor ------------------------------- */
 
@@ -413,7 +854,7 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
       "modulo.activos.admin",
     ],
     dependsOn: ["platform.search", "platform.timeline", "platform.attachment", "platform.comment", "platform.config"],
-    events: [...EVENTOS_MODULO],
+    events: [...EVENTOS_MODULO, ...EVENTOS_RELACION],
     recordTypes: CATALOGOS.map((c) => `catalogo:${c}`),
     configDefaults: {
       "max-longitud-nombre": "160",
@@ -790,7 +1231,123 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           },
         };
       },
-      // Reproyección (replay) del read model desde los aggregates.
+      // ------------------------ Colaboración -----------------------------
+      // Comentar un activo — DELEGA en platform.comment.create. Valida que el
+      // activo exista y aplica la autorización del módulo (write). Soporta
+      // respuesta (parentId) para hilos.
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.comentar`,
+          inputSchema: z.object({
+            id: z.string().min(1),
+            texto: z.string().min(1),
+            parentId: z.string().optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: ["modulo.activos.write"] },
+          async handle(ctx, input) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const activo = await cargar(adapters, tenant.value, input.id);
+            if (!activo.ok) return activo;
+            const r = await delegarPlataforma(deps, ctx, tenant.value, "platform.comment.create", {
+              entityRef: refActivo(input.id),
+              texto: input.texto,
+              parentId: input.parentId,
+            });
+            if (!r.ok) return r;
+            return ok({ activoId: input.id, ...(r.value as Record<string, unknown>) });
+          },
+        };
+      },
+      // Editar un comentario propio — DELEGA en platform.comment.edit.
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.editar-comentario`,
+          inputSchema: z.object({
+            comentarioId: z.string().min(1),
+            expectedVersion: z.number().int().positive(),
+            texto: z.string().min(1),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: ["modulo.activos.write"] },
+          async handle(ctx, input) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const r = await delegarPlataforma(deps, ctx, tenant.value, "platform.comment.edit", {
+              id: input.comentarioId,
+              expectedVersion: input.expectedVersion,
+              texto: input.texto,
+            });
+            if (!r.ok) return r;
+            return ok({ comentarioId: input.comentarioId });
+          },
+        };
+      },
+      // Borrado lógico de un comentario — DELEGA en platform.comment.delete.
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.borrar-comentario`,
+          inputSchema: z.object({ comentarioId: z.string().min(1), opId: z.string().optional() }),
+          authorization: { permissions: ["modulo.activos.write"] },
+          async handle(ctx, input) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const r = await delegarPlataforma(deps, ctx, tenant.value, "platform.comment.delete", {
+              id: input.comentarioId,
+            });
+            if (!r.ok) return r;
+            return ok({ comentarioId: input.comentarioId });
+          },
+        };
+      },
+      // Adjuntar documentación técnica POR REFERENCIA — DELEGA en
+      // platform.attachment.register. La categoría de documentación técnica
+      // (manual/certificado/garantía/diagrama/plano/procedimiento) viaja como
+      // metadato en el nombre lógico; los binarios NUNCA salen de plataforma.
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.adjuntar`,
+          inputSchema: z.object({
+            id: z.string().min(1),
+            categoria: z.enum(CATEGORIAS_DOCUMENTACION),
+            nombreArchivo: z.string().min(1),
+            mimeType: z.string().min(1),
+            tamanoBytes: z.number().int().nonnegative(),
+            hashSha256: z.string().length(64),
+            attachmentId: z.string().optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: ["modulo.activos.write"] },
+          async handle(ctx, input) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const activo = await cargar(adapters, tenant.value, input.id);
+            if (!activo.ok) return activo;
+            const r = await delegarPlataforma(deps, ctx, tenant.value, "platform.attachment.register", {
+              entityRef: refActivo(input.id),
+              // La categoría documental se codifica como prefijo del nombre
+              // lógico (metadato), sin tocar el binario.
+              nombreArchivo: `[${input.categoria}] ${input.nombreArchivo}`,
+              mimeType: input.mimeType,
+              tamanoBytes: input.tamanoBytes,
+              hashSha256: input.hashSha256,
+              attachmentId: input.attachmentId,
+            });
+            if (!r.ok) return r;
+            return ok({ activoId: input.id, categoria: input.categoria, ...(r.value as Record<string, unknown>) });
+          },
+        };
+      },
+      // Reproyección (replay del EVENT STREAM): reconstruye TODOS los read
+      // models releyendo los eventos del módulo YA PROCESADOS del outbox del
+      // kernel (orden cronológico, tenant-scoped, sólo lectura) y reaplicando
+      // las MISMAS funciones de proyección payload-only sobre read models
+      // vaciados. Preserva la historia (no snapshots ni ids sintéticos).
       (deps) => {
         conPolicies(deps);
         return {
@@ -800,21 +1357,143 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, _input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
+            // Limpia TODOS los read models del módulo antes de reconstruir.
             const cleared = await adapters.readModel.clear(uow, tenant.value);
             if (!cleared.ok) return cleared;
-            const all = await adapters.repository.list(tenant.value, { limit: 1000 });
-            if (!all.ok) return all;
-            let proyectados = 0;
-            for (const a of all.value) {
-              const evento = eventoActivo(a, ACTIVO_ACTUALIZADO, ctx.principal.id);
-              const row = readRowDeEvento(evento.payload, `replay:${crypto.randomUUID()}`);
-              const applied = await adapters.readModel.apply(uow, row);
-              if (!applied.ok) return applied;
-              proyectados += 1;
+            const clearedRel = await adapters.relacionesRead.clear(uow, tenant.value);
+            if (!clearedRel.ok) return clearedRel;
+            const clearedHist = await adapters.historial.clear(uow, tenant.value);
+            if (!clearedHist.ok) return clearedHist;
+
+            // Fuente del replay: la BITÁCORA DURABLE del módulo (`act_eventos`),
+            // NO el outbox. Es íntegra e independiente de processed_at y de la
+            // retención del outbox, de modo que la reconstrucción es completa
+            // aunque haya eventos pendientes o el outbox haya sido purgado.
+            const stream = await adapters.eventLog.stream(tenant.value);
+            if (!stream.ok) return stream;
+            let eventos = 0;
+            let relaciones = 0;
+            for (const ev of stream.value) {
+              const r = await reproyectarEvento(adapters, uow, {
+                id: ev.eventId,
+                eventType: ev.tipo,
+                payload: ev.payload,
+              });
+              if (!r.ok) return r;
+              eventos += 1;
+              if (ev.tipo === RELACION_CREADA) relaciones += 1;
+              if (ev.tipo === RELACION_ELIMINADA) relaciones -= 1;
             }
-            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "reproyectar", "-", { proyectados });
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "reproyectar", "-", {
+              eventos,
+              relaciones,
+            });
             if (!audited.ok) return audited;
-            return ok({ proyectados });
+            return ok({ eventos, relaciones });
+          },
+        };
+      },
+      // Crear relación inter-activo (existencia + anticiclo jerárquico).
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.crear-relacion`,
+          inputSchema: z.object({
+            id: z.string().optional(),
+            opId: z.string().optional(),
+            tipo: z.enum(NOMBRES_TIPO_RELACION as [string, ...string[]]),
+            origenId: z.string().min(1),
+            destinoId: z.string().min(1),
+          }),
+          authorization: { permissions: ["modulo.activos.write"] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const id = input.id ?? crypto.randomUUID();
+
+            // Idempotencia offline por id de cliente.
+            if (input.id) {
+              const previo = await adapters.relaciones.find(tenant.value, id);
+              if (!previo.ok) return previo;
+              if (previo.value) return ok({ id, idempotente: true });
+            }
+
+            // Tipos de relación configurables por tenant (catálogo
+            // `tiposRelacion`): vacío ⇒ los 8 canónicos; no vacío ⇒ sólo los
+            // habilitados con su inverso declarado.
+            const opciones = await catalogoDe(deps).opciones(tenant.value, "tiposRelacion");
+            if (!opciones.ok) return opciones;
+            const resueltos = resolverTiposRelacion(opciones.value.map((o) => o.value));
+            if (!resueltos.ok) return resueltos;
+            if (!resueltos.value.some((t) => t.tipo === input.tipo)) {
+              return fail(
+                KernelErrors.validation(`Tipo de relación "${input.tipo}" no habilitado para este tenant`),
+              );
+            }
+
+            // Ambos extremos deben existir (fuente de verdad = aggregate).
+            const origen = await cargar(adapters, tenant.value, input.origenId);
+            if (!origen.ok) return origen;
+            const destino = await cargar(adapters, tenant.value, input.destinoId);
+            if (!destino.ok) return destino;
+
+            const cambio = await crearRelacion({
+              tenantId: tenant.value,
+              id,
+              tipo: input.tipo,
+              origen: { id: origen.value.id, codigo: origen.value.codigoEmpresarial, nombre: origen.value.nombre },
+              destino: { id: destino.value.id, codigo: destino.value.codigoEmpresarial, nombre: destino.value.nombre },
+              actorId: ctx.principal.id,
+              ahora: new Date(),
+              existeArista: (o, d, t) => adapters.relaciones.existeArista(tenant.value, o, d, t),
+              alcanza: (desde, hasta, t) => adapters.relaciones.alcanza(tenant.value, desde, hasta, t),
+            });
+            if (!cambio.ok) return cambio;
+
+            const persisted = await adapters.relaciones.insert(
+              uow,
+              tenant.value,
+              { id, tipo: input.tipo, origenId: input.origenId, destinoId: input.destinoId },
+              ctx.principal.id,
+            );
+            if (!persisted.ok) return persisted;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "crear-relacion", id, {
+              tipo: input.tipo,
+            });
+            if (!audited.ok) return audited;
+            const emitido = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+            if (!emitido.ok) return emitido;
+            return ok({ id, tipo: input.tipo, idempotente: false });
+          },
+        };
+      },
+      // Eliminar relación inter-activo.
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.eliminar-relacion`,
+          inputSchema: z.object({ id: z.string().min(1), opId: z.string().optional() }),
+          authorization: { permissions: ["modulo.activos.write"] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const removed = await adapters.relaciones.delete(uow, tenant.value, input.id);
+            if (!removed.ok) return removed;
+            if (!removed.value) return fail(KernelErrors.notFound("relacion", input.id));
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "eliminar-relacion", input.id, {});
+            if (!audited.ok) return audited;
+            const evento = eliminarRelacion({
+              tenantId: tenant.value,
+              id: input.id,
+              tipo: removed.value.tipo,
+              origenId: removed.value.origenId,
+              destinoId: removed.value.destinoId,
+              actorId: ctx.principal.id,
+              ahora: new Date(),
+            });
+            const emitido = await emitirEvento(adapters, ctx, uow, tenant.value, evento);
+            if (!emitido.ok) return emitido;
+            return ok({ id: input.id });
           },
         };
       },
@@ -872,28 +1551,246 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           return new CatalogoService(deps.store).opciones(tenant.value, input.catalogo as NombreCatalogo);
         },
       }),
-      // Consola técnica: contrato + configuración efectiva.
+      // Relacionados de un activo (por categoría opcional), desde el read model.
+      () => ({
+        name: `${MODULO}.relacionados`,
+        inputSchema: z.object({
+          id: z.string().min(1),
+          categoria: z.enum(["jerarquia", "dependencia", "componente", "asociacion", "sustitucion"]).optional(),
+        }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const cat = input.categoria as CategoriaRelacion | undefined;
+          const salientes = await adapters.relacionesRead.porOrigen(tenant.value, input.id, cat);
+          if (!salientes.ok) return salientes;
+          const entrantes = await adapters.relacionesRead.porDestino(tenant.value, input.id, cat);
+          if (!entrantes.ok) return entrantes;
+          return ok({ id: input.id, salientes: salientes.value, entrantes: entrantes.value });
+        },
+      }),
+      // Árbol jerárquico: hijos (salientes padre-de) y padres (entrantes padre-de).
+      () => ({
+        name: `${MODULO}.arbol`,
+        inputSchema: z.object({ id: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const jer = await adapters.relacionesRead.porOrigen(tenant.value, input.id, "jerarquia");
+          if (!jer.ok) return jer;
+          const jerEntr = await adapters.relacionesRead.porDestino(tenant.value, input.id, "jerarquia");
+          if (!jerEntr.ok) return jerEntr;
+          return ok({
+            id: input.id,
+            hijos: jer.value.filter((r) => r.tipo === "padre-de"),
+            padres: jerEntr.value.filter((r) => r.tipo === "padre-de"),
+          });
+        },
+      }),
+      // Componentes: compuesto-por (salientes) y componente-de (entrantes).
+      () => ({
+        name: `${MODULO}.componentes`,
+        inputSchema: z.object({ id: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const comp = await adapters.relacionesRead.porOrigen(tenant.value, input.id, "componente");
+          if (!comp.ok) return comp;
+          const parte = await adapters.relacionesRead.porDestino(tenant.value, input.id, "componente");
+          if (!parte.ok) return parte;
+          return ok({
+            id: input.id,
+            componentes: comp.value.filter((r) => r.tipo === "compuesto-por"),
+            perteneceA: parte.value.filter((r) => r.tipo === "compuesto-por"),
+          });
+        },
+      }),
+      // Historial de ubicaciones (append-only) desde el read model histórico.
+      () => ({
+        name: `${MODULO}.historial-ubicaciones`,
+        inputSchema: z.object({ id: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          return adapters.historial.historialUbicaciones(tenant.value, input.id);
+        },
+      }),
+      // Historial de responsables (append-only).
+      () => ({
+        name: `${MODULO}.historial-responsables`,
+        inputSchema: z.object({ id: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          return adapters.historial.historialResponsables(tenant.value, input.id);
+        },
+      }),
+      // Historial cronológico del activo desde el READ MODEL INTERNO
+      // (act_historial). Es la vista interna del módulo (no el Shared Timeline).
+      () => ({
+        name: `${MODULO}.historial`,
+        inputSchema: z.object({ id: z.string().min(1), limit: z.number().int().positive().max(200).optional() }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          return adapters.historial.timeline(tenant.value, input.id, input.limit);
+        },
+      }),
+      // Colaboración: comentarios de un activo — DELEGA en platform.comment.byEntity.
+      (deps) => ({
+        name: `${MODULO}.comentarios`,
+        inputSchema: z.object({ id: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const sys = createExecutionContext({
+            principal: SYSTEM_PRINCIPAL,
+            correlationId: ctx.correlationId,
+            metadata: { tenantId: tenant.value },
+          });
+          return deps.runtime.queries.execute(sys, "platform.comment.byEntity", { entityRef: refActivo(input.id) });
+        },
+      }),
+      // Colaboración: documentación técnica adjunta — DELEGA en
+      // platform.attachment.byEntity (sólo metadatos; nunca binarios).
+      (deps) => ({
+        name: `${MODULO}.documentacion`,
+        inputSchema: z.object({ id: z.string().min(1) }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const sys = createExecutionContext({
+            principal: SYSTEM_PRINCIPAL,
+            correlationId: ctx.correlationId,
+            metadata: { tenantId: tenant.value },
+          });
+          return deps.runtime.queries.execute(sys, "platform.attachment.byEntity", { entityRef: refActivo(input.id) });
+        },
+      }),
+      // Línea de tiempo CANÓNICA (Shared Timeline de plataforma) con los filtros
+      // obligatorios: actor, rango de fechas, estado y entidad relacionada. Se
+      // apoya en la query platform.timeline.query (integración canónica),
+      // ejecutada con principal de sistema y acotada al tenant.
+      (deps) => ({
+        name: `${MODULO}.timeline`,
+        inputSchema: z.object({
+          id: z.string().min(1).optional(),
+          actor: z.string().optional(),
+          estado: z.string().optional(),
+          entidadRelacionada: z.string().optional(),
+          desde: z.string().optional(),
+          hasta: z.string().optional(),
+          limit: z.number().int().positive().max(200).optional(),
+        }),
+        authorization: { permissions: ["modulo.activos.read"] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const sys = createExecutionContext({
+            principal: SYSTEM_PRINCIPAL,
+            correlationId: ctx.correlationId,
+            metadata: { tenantId: tenant.value },
+          });
+          return deps.runtime.queries.execute(sys, "platform.timeline.query", {
+            entityRef: input.id ? `activo:${input.id}` : undefined,
+            actorId: input.actor,
+            estado: input.estado,
+            entidadRelacionada: input.entidadRelacionada,
+            desde: input.desde,
+            hasta: input.hasta,
+            limit: input.limit,
+          });
+        },
+      }),
+      // Consola técnica: contrato + configuración efectiva + estado operativo.
+      // Restringida a administradores (admin / platform_admin): 403 al resto.
       (deps) => ({
         name: `${MODULO}.consola`,
         inputSchema: z.object({}),
-        authorization: { permissions: ["modulo.activos.read"] },
+        authorization: { permissions: ["modulo.activos.admin"] },
         async handle(ctx) {
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
+          const t = tenant.value;
           const claves = [
             "max-longitud-nombre", "max-longitud-codigo", "moneda-defecto",
             "permite-retroceso-horometro", "permite-retroceso-odometro", "requiere-aprobacion-retiro",
           ];
           const config: Record<string, string> = {};
-          for (const k of claves) config[k] = await cfg(deps, tenant.value, k, "");
+          for (const k of claves) config[k] = await cfg(deps, t, k, "");
+
+          const LIMITE = 10;
+
+          // (proyecciones) conteos + lastEventId de cada read model.
+          const stats = await adapters.readModel.stats(t);
+          const relCount = await adapters.relacionesRead.contar(t);
+          const histCount = await adapters.historial.contarEventos(t);
+          const totalRm = stats.ok ? Object.values(stats.value).reduce((a, b) => a + b, 0) : 0;
+          const [leiActivos, leiRel, leiHist] = await Promise.all([
+            adapters.readModel.lastEventId(t),
+            adapters.relacionesRead.lastEventId(t),
+            adapters.historial.lastEventId(t),
+          ]);
+
+          // (outbox) conteos pendientes/procesados + últimos N eventos del módulo.
+          const outbox = await adapters.consola.outboxDelModulo(t, LIMITE);
+
+          // (sincronización) recibos por estado + últimos N + conflictos con detalle.
+          const recibos = await adapters.syncReceipts.listByTenant(t);
+          const listaRecibos: readonly SyncReceipt[] = recibos.ok ? recibos.value : [];
+          const porEstado: Record<string, number> = {};
+          for (const r of listaRecibos) porEstado[r.estado] = (porEstado[r.estado] ?? 0) + 1;
+          const resumenRecibo = (r: SyncReceipt) => ({
+            opId: r.opId, comando: r.comando, estado: r.estado,
+            clienteId: r.clienteId, createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+          });
+          const conflictos = listaRecibos
+            .filter((r) => r.estado === "conflicto")
+            .map((r) => ({ ...resumenRecibo(r), resultado: r.resultado }));
+
+          // (colaboración) actividad del módulo + comentarios/adjuntos de plataforma.
+          const colaboracion = await actividadColaboracion(deps, adapters, ctx, t);
+
           return ok({
             modulo: MODULO,
             version: "1.0.0",
             estados: [...ESTADOS],
-            eventos: [...EVENTOS_MODULO],
+            eventos: [...EVENTOS_MODULO, ...EVENTOS_RELACION],
             policies: [...POLICIES],
             catalogos: [...CATALOGOS],
+            tiposRelacion: TIPOS_RELACION.map((t) => ({ tipo: t.tipo, categoria: t.categoria, inverso: t.inverso })),
             configuracion: config,
+            readModels: {
+              activos: { total: totalRm, porEstado: stats.ok ? stats.value : {}, lastEventId: leiActivos.ok ? leiActivos.value : null },
+              relaciones: { total: relCount.ok ? relCount.value : 0, lastEventId: leiRel.ok ? leiRel.value : null },
+              historial: { total: histCount.ok ? histCount.value : 0, lastEventId: leiHist.ok ? leiHist.value : null },
+            },
+            outbox: outbox.ok
+              ? outbox.value
+              : { pendientes: 0, procesados: 0, ultimos: [], error: outbox.error.message },
+            sincronizacion: {
+              total: listaRecibos.length,
+              porEstado,
+              ultimos: listaRecibos.slice(0, LIMITE).map(resumenRecibo),
+              conflictos,
+            },
+            colaboracion,
+            rls: {
+              tablas: [
+                "act_activos", "act_activos_read", "act_sync_receipts",
+                "act_relaciones", "act_relaciones_read",
+                "act_ubicaciones_hist", "act_responsables_hist", "act_historial",
+              ],
+              aislamiento: "app.tenant_id (RLS por tenant)",
+            },
           });
         },
       }),
@@ -905,6 +1802,47 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
         handlerName: `proyectar:${eventType}`,
         handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
           proyeccion(adapters)(deps, event),
+      })),
+      // Read model INTERNO de historial del activo: cada evento de dominio
+      // (activos Y relaciones) se proyecta al feed cronológico append-only del
+      // módulo (act_historial). Es un read model, NO el Shared Timeline.
+      ...[...EVENTOS_MODULO, ...EVENTOS_RELACION].map((eventType) => ({
+        eventType,
+        handlerName: `historial:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          proyeccionHistorial(adapters)(deps, { ...event, type: eventType }),
+      })),
+      // Shared Timeline CANÓNICO: cada evento del módulo (activos Y relaciones)
+      // se proyecta al platform.timeline vía COMANDO (nunca escritura directa).
+      ...[...EVENTOS_MODULO, ...EVENTOS_RELACION].map((eventType) => ({
+        eventType,
+        handlerName: `timeline-compartido:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: {
+          id: string;
+          payload: Record<string, unknown>;
+          correlationId: string;
+        }) => registrarEnTimelineCompartido()(deps, { ...event, type: eventType }),
+      })),
+      // Historial de ubicaciones (creación + cambio de ubicación).
+      ...[ACTIVO_REGISTRADO, ACTIVO_UBICACION_ACTUALIZADA].map((eventType) => ({
+        eventType,
+        handlerName: `ubicacion-hist:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          proyeccionUbicacion(adapters)(deps, event),
+      })),
+      // Historial de responsables (creación + reasignación).
+      ...[ACTIVO_REGISTRADO, ACTIVO_RESPONSABLE_ACTUALIZADO].map((eventType) => ({
+        eventType,
+        handlerName: `responsable-hist:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          proyeccionResponsable(adapters)(deps, event),
+      })),
+      // Read model de relaciones (árbol/relacionados/componentes).
+      ...EVENTOS_RELACION.map((eventType) => ({
+        eventType,
+        handlerName: `proyectar:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          proyeccionRelacion(adapters)(deps, { ...event, type: eventType }),
       })),
       // Search: indexación desde el payload en registro/actualización.
       ...[ACTIVO_REGISTRADO, ACTIVO_ACTUALIZADO].map((eventType) => ({

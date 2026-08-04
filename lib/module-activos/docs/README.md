@@ -14,8 +14,15 @@ runtime de máquinas de estados de `business-foundation`.
 | [catalogos.md](./catalogos.md) | Catálogos configurables por tenant vía Record Store. |
 | [policies.md](./policies.md) | Las 8 políticas configurables en el PolicyEngine. |
 | [eventos.md](./eventos.md) | Eventos de dominio autosuficientes y CQRS. |
-| [sync.md](./sync.md) | Sincronización offline por orquestación (`sincronizar`) con RECLAMACIÓN durable por `opId` (claim→ejecutar→finalizar) y recuperación por reconciliación. |
+| [sync.md](./sync.md) | Sincronización offline por orquestación (`sincronizar`) con RECLAMACIÓN durable por `opId` (claim→ejecutar→finalizar), recuperación por reconciliación y **cobertura de TODAS las operaciones** (DGP-008.2). |
 | [configuracion.md](./configuracion.md) | `configDefaults` + `tenantConfig`. |
+| [read-models.md](./read-models.md) | **DGP-008.2** · Read models especializados (payload-only, idempotentes) y consultas. |
+| [reconstruccion-cqrs.md](./reconstruccion-cqrs.md) | **DGP-008.2** · `reproyectar`: reconstrucción de todos los read models. |
+| [relaciones.md](./relaciones.md) | **DGP-008.2** · Grafo dirigido tipado, inversos, anticiclo, proyecciones. |
+| [timeline.md](./timeline.md) | **DGP-008.2** · Línea de tiempo del módulo (append-only) y decisión sobre `platform.timeline`. |
+| [colaboracion.md](./colaboracion.md) | **DGP-008.2** · Comentarios y adjuntos por referencia vía comandos de plataforma. |
+| [consola.md](./consola.md) | **DGP-008.2** · Consola técnica (solo admin) del estado operativo. |
+| [api.md](./api.md) | **DGP-008.2** · Contrato REST (Contract-First; Zod como fuente de verdad). |
 
 ## Arranque rápido
 
@@ -65,4 +72,7 @@ src/
   HTTP → Command/Query del Kernel. Sin lógica de dominio.
 - Migración oficial: `lib/db/migrations/deltaops/0007_activos_module.sql`
   (fuente de verdad; el espejo Drizzle en `lib/db/src/schema/deltaops-activos.ts`
-  sólo tipa el esquema).
+  sólo tipa el esquema). **DGP-008.2** añade `0008_activos_operacional.sql`
+  (idempotente, aditiva): `act_relaciones`, `act_relaciones_read`,
+  `act_ubicaciones_hist`, `act_responsables_hist`, `act_historial` (todas con RLS
+  por `app.tenant_id`).

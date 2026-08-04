@@ -1,0 +1,3153 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DeltaOps · Módulo Activos Empresariales (DGP-008)",
+    "version": "1.0.0",
+    "description": "Contrato OpenAPI generado (contract-first) desde los esquemas del módulo. Errores kernel→HTTP: AUTH→403, NF→404, CFL→409, VAL→400, INF→500."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "API DeltaOps"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Activos"
+    },
+    {
+      "name": "Transiciones"
+    },
+    {
+      "name": "Operación"
+    },
+    {
+      "name": "Relaciones"
+    },
+    {
+      "name": "Históricos"
+    },
+    {
+      "name": "Timeline"
+    },
+    {
+      "name": "Colaboración"
+    },
+    {
+      "name": "Catálogos"
+    },
+    {
+      "name": "Sincronización"
+    },
+    {
+      "name": "Administración"
+    }
+  ],
+  "paths": {
+    "/api/deltaops/activos": {
+      "get": {
+        "tags": [
+          "Activos"
+        ],
+        "operationId": "activos.listar",
+        "summary": "Listar activos (read model)",
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por estado"
+          },
+          {
+            "name": "criticidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por criticidad"
+          },
+          {
+            "name": "ubicacionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por ubicacionId"
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por tipo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Activos"
+        ],
+        "operationId": "activos.crear",
+        "summary": "Crear activo (idempotente por id de cliente)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearActivo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Creado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}": {
+      "get": {
+        "tags": [
+          "Activos"
+        ],
+        "operationId": "activos.detalle",
+        "summary": "Detalle del activo (read model)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Activos"
+        ],
+        "operationId": "activos.editar",
+        "summary": "Editar activo (concurrencia optimista)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditarActivo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/registrar": {
+      "post": {
+        "tags": [
+          "Transiciones"
+        ],
+        "operationId": "activos.registrar",
+        "summary": "Transición: registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionEstado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/operar": {
+      "post": {
+        "tags": [
+          "Transiciones"
+        ],
+        "operationId": "activos.operar",
+        "summary": "Transición: operar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionEstado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/mantener": {
+      "post": {
+        "tags": [
+          "Transiciones"
+        ],
+        "operationId": "activos.mantener",
+        "summary": "Transición: mantener",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionEstado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/fuera-servicio": {
+      "post": {
+        "tags": [
+          "Transiciones"
+        ],
+        "operationId": "activos.fuera-servicio",
+        "summary": "Transición: fuera-servicio",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionEstado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/retirar": {
+      "post": {
+        "tags": [
+          "Transiciones"
+        ],
+        "operationId": "activos.retirar",
+        "summary": "Transición: retirar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionEstado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/ubicacion": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "operationId": "activos.cambiar-ubicacion",
+        "summary": "Cambiar ubicación",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarUbicacion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/responsable": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "operationId": "activos.asignar-responsable",
+        "summary": "Asignar responsable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsignarResponsable"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/horometro": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "operationId": "activos.actualizar-horometro",
+        "summary": "Actualizar horometro",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarMedidor"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/odometro": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "operationId": "activos.actualizar-odometro",
+        "summary": "Actualizar odometro",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarMedidor"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/relaciones": {
+      "post": {
+        "tags": [
+          "Relaciones"
+        ],
+        "operationId": "activos.crear-relacion",
+        "summary": "Crear relación (origen = {id})",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearRelacion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/relaciones/{relId}": {
+      "delete": {
+        "tags": [
+          "Relaciones"
+        ],
+        "operationId": "activos.eliminar-relacion",
+        "summary": "Eliminar relación",
+        "parameters": [
+          {
+            "name": "relId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Id de la relación"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/relacionados": {
+      "get": {
+        "tags": [
+          "Relaciones"
+        ],
+        "operationId": "activos.relacionados",
+        "summary": "Activos relacionados",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          },
+          {
+            "name": "categoria",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Categoría de relación"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/arbol": {
+      "get": {
+        "tags": [
+          "Relaciones"
+        ],
+        "operationId": "activos.arbol",
+        "summary": "Árbol jerárquico",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/componentes": {
+      "get": {
+        "tags": [
+          "Relaciones"
+        ],
+        "operationId": "activos.componentes",
+        "summary": "Componentes (compuesto-por)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/historial/ubicaciones": {
+      "get": {
+        "tags": [
+          "Históricos"
+        ],
+        "operationId": "activos.historial-ubicaciones",
+        "summary": "Histórico de ubicaciones",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/historial/responsables": {
+      "get": {
+        "tags": [
+          "Históricos"
+        ],
+        "operationId": "activos.historial-responsables",
+        "summary": "Histórico de responsables",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/historial": {
+      "get": {
+        "tags": [
+          "Históricos"
+        ],
+        "operationId": "activos.historial",
+        "summary": "Historial cronológico (read model interno)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EntradaHistorial"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/timeline": {
+      "get": {
+        "tags": [
+          "Timeline"
+        ],
+        "operationId": "activos.timeline",
+        "summary": "Shared Timeline (plataforma) con filtros: actor, estado, entidadRelacionada, rango de fechas",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por actor"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por estado"
+          },
+          {
+            "name": "entidadRelacionada",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por entidad relacionada"
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Rango: fecha/hora inicial (ISO-8601)"
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Rango: fecha/hora final (ISO-8601)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EntradaTimeline"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/comentarios": {
+      "get": {
+        "tags": [
+          "Colaboración"
+        ],
+        "operationId": "activos.comentarios",
+        "summary": "Listar comentarios del activo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Colaboración"
+        ],
+        "operationId": "activos.comentar",
+        "summary": "Comentar / responder (hilos)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Comentario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/comentarios/{comentarioId}": {
+      "put": {
+        "tags": [
+          "Colaboración"
+        ],
+        "operationId": "activos.editar-comentario",
+        "summary": "Editar comentario propio",
+        "parameters": [
+          {
+            "name": "comentarioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Id del comentario"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditarComentario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Colaboración"
+        ],
+        "operationId": "activos.borrar-comentario",
+        "summary": "Borrado lógico de comentario",
+        "parameters": [
+          {
+            "name": "comentarioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Id del comentario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/{id}/documentacion": {
+      "get": {
+        "tags": [
+          "Colaboración"
+        ],
+        "operationId": "activos.documentacion",
+        "summary": "Listar documentación técnica",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Colaboración"
+        ],
+        "operationId": "activos.adjuntar",
+        "summary": "Adjuntar documentación técnica por referencia",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Adjuntar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/catalogos/{catalogo}": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "operationId": "activos.catalogo.opciones",
+        "summary": "Opciones habilitadas de un catálogo",
+        "parameters": [
+          {
+            "name": "catalogo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nombre del catálogo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/catalogos": {
+      "post": {
+        "tags": [
+          "Catálogos"
+        ],
+        "operationId": "activos.catalogo.upsert",
+        "summary": "Alta/edición de entrada de catálogo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogoUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/catalogos/habilitar": {
+      "post": {
+        "tags": [
+          "Catálogos"
+        ],
+        "operationId": "activos.catalogo.habilitar",
+        "summary": "Habilitar/deshabilitar entrada",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogoHabilitar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/reproyectar": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "activos.reproyectar",
+        "summary": "Reproyección por replay del event stream (admin)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eventos": {
+                      "type": "integer"
+                    },
+                    "relaciones": {
+                      "type": "integer"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/sync": {
+      "post": {
+        "tags": [
+          "Sincronización"
+        ],
+        "operationId": "activos.sync",
+        "summary": "Sincronización offline (claim→ejecutar→finalizar, idempotente)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ColaSync"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenSync"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/activos/consola": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "activos.consola",
+        "summary": "Consola técnica (admin)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Consola"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "KRN-VAL-001"
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "Medicion": {
+        "type": "object",
+        "properties": {
+          "valor": {
+            "type": "number"
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "medidoAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "valor",
+          "unidad"
+        ],
+        "additionalProperties": false
+      },
+      "Ubicacion": {
+        "type": "object",
+        "properties": {
+          "ubicacionId": {
+            "type": "string"
+          },
+          "etiqueta": {
+            "type": "string"
+          },
+          "detalle": {
+            "type": "string"
+          },
+          "coordenadas": {
+            "type": "object",
+            "properties": {
+              "latitud": {
+                "type": "number"
+              },
+              "longitud": {
+                "type": "number"
+              },
+              "altitud": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "latitud",
+              "longitud"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ubicacionId",
+          "etiqueta"
+        ],
+        "additionalProperties": false
+      },
+      "CrearActivo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "codigoEmpresarial": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "categoria": {
+            "type": "string"
+          },
+          "familia": {
+            "type": "string"
+          },
+          "criticidad": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigoEmpresarial",
+          "nombre",
+          "tipo",
+          "categoria",
+          "familia",
+          "criticidad"
+        ],
+        "additionalProperties": false
+      },
+      "EditarActivo": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "TransicionEstado": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "aprobado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "CambiarUbicacion": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "ubicacion": {
+            "$ref": "#/components/schemas/Ubicacion"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "ubicacion"
+        ],
+        "additionalProperties": false
+      },
+      "AsignarResponsable": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "responsable": {
+            "type": "string"
+          },
+          "supervisor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ActualizarMedidor": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "medicion": {
+            "$ref": "#/components/schemas/Medicion"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "medicion"
+        ],
+        "additionalProperties": false
+      },
+      "CrearRelacion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "destinoId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "destinoId"
+        ],
+        "additionalProperties": false
+      },
+      "Comentario": {
+        "type": "object",
+        "properties": {
+          "texto": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "texto"
+        ],
+        "additionalProperties": false
+      },
+      "EditarComentario": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "texto": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "texto"
+        ],
+        "additionalProperties": false
+      },
+      "Adjuntar": {
+        "type": "object",
+        "properties": {
+          "categoria": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "certificado",
+              "garantia",
+              "diagrama",
+              "plano",
+              "procedimiento"
+            ]
+          },
+          "nombreArchivo": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "tamanoBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hashSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "attachmentId": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "categoria",
+          "nombreArchivo",
+          "mimeType",
+          "tamanoBytes",
+          "hashSha256"
+        ],
+        "additionalProperties": false
+      },
+      "CatalogoUpsert": {
+        "type": "object",
+        "properties": {
+          "catalogo": {
+            "type": "string"
+          },
+          "clave": {
+            "type": "string"
+          },
+          "etiqueta": {
+            "type": "string"
+          },
+          "posicion": {
+            "type": "integer"
+          },
+          "padre": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "catalogo",
+          "clave",
+          "etiqueta"
+        ],
+        "additionalProperties": false
+      },
+      "CatalogoHabilitar": {
+        "type": "object",
+        "properties": {
+          "catalogo": {
+            "type": "string"
+          },
+          "clave": {
+            "type": "string"
+          },
+          "habilitado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "catalogo",
+          "clave",
+          "habilitado"
+        ],
+        "additionalProperties": false
+      },
+      "OperacionSync": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string"
+          },
+          "comando": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "opId",
+          "comando",
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "ColaSync": {
+        "type": "object",
+        "properties": {
+          "operaciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperacionSync"
+            }
+          }
+        },
+        "required": [
+          "operaciones"
+        ],
+        "additionalProperties": false
+      },
+      "ResumenSync": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "aplicadas": {
+            "type": "integer"
+          },
+          "idempotentes": {
+            "type": "integer"
+          },
+          "conflictos": {
+            "type": "integer"
+          },
+          "reintentables": {
+            "type": "integer"
+          },
+          "rechazadas": {
+            "type": "integer"
+          },
+          "resultados": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResultadoComando": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "REGISTRADO",
+              "OPERATIVO",
+              "MANTENIMIENTO",
+              "FUERA_SERVICIO",
+              "RETIRADO"
+            ]
+          },
+          "idempotente": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EntradaTimeline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "recordType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "eventType": {
+                "type": "string"
+              },
+              "entityRef": {
+                "type": "string"
+              },
+              "actorId": {
+                "type": "string"
+              },
+              "resumen": {
+                "type": "string"
+              },
+              "estado": {
+                "type": "string",
+                "nullable": true
+              },
+              "entidadRelacionada": {
+                "type": "string",
+                "nullable": true
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "EntradaHistorial": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "activoId": {
+            "type": "string"
+          },
+          "tipoEvento": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "resumen": {
+            "type": "string"
+          },
+          "registradoAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Consola": {
+        "type": "object",
+        "properties": {
+          "modulo": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "estados": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "eventos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "readModels": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "outbox": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "sincronizacion": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "colaboracion": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "rls": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

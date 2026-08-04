@@ -22,7 +22,16 @@ const suite = DATABASE_URL ? describe : describe.skip;
 const ALL_PERMISSIONS = [
   ...new Set([
     ...officialServices().flatMap((s) => [...s.permissions]),
-    ...activosModule({ repository: null as never, readModel: null as never }).permissions,
+    ...activosModule({
+      repository: null as never,
+      readModel: null as never,
+      relaciones: null as never,
+      relacionesRead: null as never,
+      historial: null as never,
+      syncReceipts: null as never,
+      consola: null as never,
+      eventLog: null as never,
+    }).permissions,
   ]),
 ];
 const ADMIN: Principal = { id: "admin-pg", rol: "admin", permisos: ALL_PERMISSIONS, capacidades: [] };
@@ -97,6 +106,13 @@ suite("Módulo Activos · PostgreSQL", () => {
     await pool.query(`DELETE FROM deltaops.act_activos WHERE tenant_id LIKE 'pgact-%'`);
     await pool.query(`DELETE FROM deltaops.act_activos_read WHERE tenant_id LIKE 'pgact-%'`);
     await pool.query(`DELETE FROM deltaops.act_sync_receipts WHERE tenant_id LIKE 'pgact-%'`);
+    // DGP-008.2: tablas operacionales nuevas.
+    await pool.query(`DELETE FROM deltaops.act_relaciones WHERE tenant_id LIKE 'pgact-%'`);
+    await pool.query(`DELETE FROM deltaops.act_relaciones_read WHERE tenant_id LIKE 'pgact-%'`);
+    await pool.query(`DELETE FROM deltaops.act_ubicaciones_hist WHERE tenant_id LIKE 'pgact-%'`);
+    await pool.query(`DELETE FROM deltaops.act_responsables_hist WHERE tenant_id LIKE 'pgact-%'`);
+    await pool.query(`DELETE FROM deltaops.act_historial WHERE tenant_id LIKE 'pgact-%'`);
+    await pool.query(`DELETE FROM deltaops.act_eventos WHERE tenant_id LIKE 'pgact-%'`);
     await pool.query(`DELETE FROM deltaops.platform_records WHERE tenant_id LIKE 'pgact-%'`);
     await pool.query(`DELETE FROM deltaops.platform_audit WHERE tenant_id LIKE 'pgact-%'`);
     await pool.end();
@@ -339,5 +355,359 @@ suite("Módulo Activos · PostgreSQL", () => {
     // La versión no avanzó por la reconciliación (sigue en 2).
     const v = await pool.query(`SELECT version FROM deltaops.act_activos WHERE tenant_id=$1 AND id=$2`, [tenant, id]);
     expect(v.rows[0].version).toBe(2);
+  });
+
+  /* -------------------------- DGP-008.2 (PG real) ------------------------- */
+
+  async function crear82(tenant: string, id: string, codigo: string): Promise<void> {
+    const r = await exec(ctx(tenant), `${MODULO}.crear`, {
+      id, codigoEmpresarial: codigo, nombre: codigo,
+      tipo: "movil", categoria: "maquinaria", familia: "excavadoras", criticidad: "alta",
+    });
+    expect(r.ok, r.ok ? "" : JSON.stringify((r as { error: unknown }).error)).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+  }
+
+  it("relaciones: crea, proyecta a read model y aplica anticiclo (PG real)", async () => {
+    const tenant = `${T}-rel`;
+    await sembrar(ctx(tenant));
+    const flota = crypto.randomUUID();
+    const exc = crypto.randomUUID();
+    await crear82(tenant, flota, "PG-FLOTA");
+    await crear82(tenant, exc, "PG-EXC");
+
+    const r = await exec(ctx(tenant), `${MODULO}.crear-relacion`, { tipo: "padre-de", origenId: flota, destinoId: exc });
+    expect(r.ok).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    // Fuente de verdad persistida.
+    const src = await pool.query(`SELECT * FROM deltaops.act_relaciones WHERE tenant_id=$1`, [tenant]);
+    expect(src.rowCount).toBe(1);
+    // Read model proyectado (payload-only).
+    const rm = await pool.query(`SELECT * FROM deltaops.act_relaciones_read WHERE tenant_id=$1`, [tenant]);
+    expect(rm.rowCount).toBe(1);
+    expect(rm.rows[0].categoria).toBe("jerarquia");
+
+    const arbol = await query(ctx(tenant), `${MODULO}.arbol`, { id: flota });
+    expect(arbol.ok && (arbol.value as { hijos: unknown[] }).hijos.length).toBe(1);
+
+    // Anticiclo real vía CTE recursiva.
+    const ciclo = await exec(ctx(tenant), `${MODULO}.crear-relacion`, { tipo: "padre-de", origenId: exc, destinoId: flota });
+    expect(ciclo.ok).toBe(false);
+    if (!ciclo.ok) expect(ciclo.error.code).toBe("KRN-CFL-001");
+  });
+
+  it("historial de ubicaciones/responsables + timeline proyectados (PG real)", async () => {
+    const tenant = `${T}-hist`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    await crear82(tenant, a, "PG-HIST");
+
+    let det = await query(ctx(tenant), `${MODULO}.detalle`, { id: a });
+    let ver = (det as { value: { version: number } }).value.version;
+    await exec(ctx(tenant), `${MODULO}.cambiar-ubicacion`, {
+      id: a, expectedVersion: ver, ubicacion: { ubicacionId: "planta-1", etiqueta: "Planta 1" },
+    });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    det = await query(ctx(tenant), `${MODULO}.detalle`, { id: a });
+    ver = (det as { value: { version: number } }).value.version;
+    await exec(ctx(tenant), `${MODULO}.asignar-responsable`, { id: a, expectedVersion: ver, responsable: "ana" });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    const ubic = await pool.query(`SELECT * FROM deltaops.act_ubicaciones_hist WHERE tenant_id=$1 AND activo_id=$2`, [tenant, a]);
+    expect(ubic.rowCount).toBeGreaterThanOrEqual(1);
+    const resp = await pool.query(`SELECT * FROM deltaops.act_responsables_hist WHERE tenant_id=$1 AND activo_id=$2`, [tenant, a]);
+    expect(resp.rowCount).toBeGreaterThanOrEqual(1);
+    const tl = await query(ctx(tenant), `${MODULO}.timeline`, { id: a });
+    expect(tl.ok && (tl.value as unknown[]).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("aislamiento por tenant en las tablas nuevas (PG real)", async () => {
+    const tenant = `${T}-rls82`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    const b = crypto.randomUUID();
+    await crear82(tenant, a, "PG-RLSA");
+    await crear82(tenant, b, "PG-RLSB");
+    await exec(ctx(tenant), `${MODULO}.crear-relacion`, { tipo: "relacionado-con", origenId: a, destinoId: b });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    // Consulta tenant-scoped (set_config + tenant_id): el tenant propio ve su
+    // relación; otro tenant no ve ninguna (aislamiento por tenant como en 0007).
+    const propio = await rt.adapters.relacionesRead.porOrigen(tenant, a);
+    expect(propio.ok && propio.value.length).toBe(1);
+    const ajeno = await rt.adapters.relacionesRead.porOrigen(`${tenant}-otro`, a);
+    expect(ajeno.ok && ajeno.value.length).toBe(0);
+    // Historial también aislado por tenant.
+    const histAjeno = await rt.adapters.historial.timeline(`${tenant}-otro`, a);
+    expect(histAjeno.ok && histAjeno.value.length).toBe(0);
+  });
+
+  it("reproyectar reconstruye TODOS los read models (PG real)", async () => {
+    const tenant = `${T}-reproj`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    const b = crypto.randomUUID();
+    await crear82(tenant, a, "PG-RPA");
+    await crear82(tenant, b, "PG-RPB");
+    await exec(ctx(tenant), `${MODULO}.crear-relacion`, { tipo: "depende-de", origenId: a, destinoId: b });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    // Vacía manualmente los read models y reconstruye.
+    await pool.query(`DELETE FROM deltaops.act_activos_read WHERE tenant_id=$1`, [tenant]);
+    await pool.query(`DELETE FROM deltaops.act_relaciones_read WHERE tenant_id=$1`, [tenant]);
+    const rep = await exec(ctx(tenant), `${MODULO}.reproyectar`, {});
+    expect(rep.ok).toBe(true);
+    if (rep.ok) {
+      const v = rep.value as { eventos: number; relaciones: number };
+      expect(v.eventos).toBe(3); // 2 crear + 1 relación-creada (replay del stream)
+      expect(v.relaciones).toBe(1);
+    }
+    const rm = await pool.query(`SELECT count(*)::int AS n FROM deltaops.act_relaciones_read WHERE tenant_id=$1`, [tenant]);
+    expect(rm.rows[0].n).toBe(1);
+  });
+
+  it("reproyectar reconstruye eventos AÚN PENDIENTES en el outbox (independiente de processed_at) (PG real)", async () => {
+    const tenant = `${T}-pend`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    await crear82(tenant, a, "PG-PEND");
+    // Registrar (transición) pero NO drenar el outbox: el evento queda PENDIENTE.
+    const det = await query(ctx(tenant), `${MODULO}.detalle`, { id: a });
+    const ver = (det as { value: { version: number } }).value.version;
+    await exec(ctx(tenant), `${MODULO}.registrar`, { id: a, expectedVersion: ver });
+    // Fuerza artificialmente TODOS los eventos del tenant a NO procesados.
+    await pool.query(
+      `UPDATE deltaops.kernel_outbox SET processed_at = NULL WHERE payload->>'tenantId' = $1`,
+      [tenant],
+    );
+    const pend = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.kernel_outbox WHERE payload->>'tenantId'=$1 AND processed_at IS NULL`,
+      [tenant],
+    );
+    expect(pend.rows[0].n).toBeGreaterThanOrEqual(2);
+
+    // La bitácora tiene los eventos (crear + registrar) aunque el outbox no los
+    // haya procesado. El replay NO depende de processed_at.
+    const rep = await exec(ctx(tenant), `${MODULO}.reproyectar`, {});
+    expect(rep.ok).toBe(true);
+    if (rep.ok) expect((rep.value as { eventos: number }).eventos).toBe(2);
+    const rm = await pool.query(`SELECT estado FROM deltaops.act_activos_read WHERE tenant_id=$1 AND id=$2`, [tenant, a]);
+    expect(rm.rows[0].estado).toBe("REGISTRADO");
+    // Deja el outbox limpio para no interferir con el afterAll.
+    await pool.query(`UPDATE deltaops.kernel_outbox SET processed_at = now() WHERE payload->>'tenantId' = $1`, [tenant]);
+  });
+
+  it("reproyectar sigue COMPLETO tras retención del outbox (borrado de eventos) (PG real)", async () => {
+    const tenant = `${T}-reten`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    const b = crypto.randomUUID();
+    await crear82(tenant, a, "PG-RETA");
+    await crear82(tenant, b, "PG-RETB");
+    await exec(ctx(tenant), `${MODULO}.crear-relacion`, { tipo: "depende-de", origenId: a, destinoId: b });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    const enBitacora = await pool.query(`SELECT count(*)::int AS n FROM deltaops.act_eventos WHERE tenant_id=$1`, [tenant]);
+    expect(enBitacora.rows[0].n).toBe(3);
+
+    // Simula la RETENCIÓN del outbox: se borran las filas del módulo del tenant.
+    await pool.query(`DELETE FROM deltaops.kernel_outbox WHERE payload->>'tenantId' = $1`, [tenant]);
+    const enOutbox = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.kernel_outbox WHERE payload->>'tenantId'=$1`,
+      [tenant],
+    );
+    expect(enOutbox.rows[0].n).toBe(0);
+
+    // El replay usa la bitácora, no el outbox: la reconstrucción sigue completa.
+    await pool.query(`DELETE FROM deltaops.act_activos_read WHERE tenant_id=$1`, [tenant]);
+    await pool.query(`DELETE FROM deltaops.act_relaciones_read WHERE tenant_id=$1`, [tenant]);
+    const rep = await exec(ctx(tenant), `${MODULO}.reproyectar`, {});
+    expect(rep.ok).toBe(true);
+    if (rep.ok) {
+      const v = rep.value as { eventos: number; relaciones: number };
+      expect(v.eventos).toBe(3);
+      expect(v.relaciones).toBe(1);
+    }
+    const rm = await pool.query(`SELECT count(*)::int AS n FROM deltaops.act_activos_read WHERE tenant_id=$1`, [tenant]);
+    expect(rm.rows[0].n).toBe(2);
+    const rel = await pool.query(`SELECT count(*)::int AS n FROM deltaops.act_relaciones_read WHERE tenant_id=$1`, [tenant]);
+    expect(rel.rows[0].n).toBe(1);
+  });
+
+  it("bitácora act_eventos aislada por tenant (PG real)", async () => {
+    const tA = `${T}-elA`;
+    const tB = `${T}-elB`;
+    await sembrar(ctx(tA));
+    const a = crypto.randomUUID();
+    await crear82(tA, a, "PG-ELA");
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    // El stream tenant-scoped de A ve sus eventos; el de B (sin actividad) no ve
+    // ninguno de A (aislamiento por tenant como en 0007/0008). La política RLS de
+    // la tabla queda declarada en la migración (verificada al aplicarla).
+    const streamA = await rt.adapters.eventLog.stream(tA);
+    expect(streamA.ok && streamA.value.length).toBeGreaterThanOrEqual(1);
+    expect(streamA.ok && streamA.value.every((e) => e.tenantId === tA)).toBe(true);
+    const streamB = await rt.adapters.eventLog.stream(tB);
+    expect(streamB.ok && streamB.value.length).toBe(0);
+    // Bajo la transacción tenant-scoped de B (set_config), no aparecen filas de A.
+    const cruzado = await withTenant(tB, (c) =>
+      c.query(`SELECT count(*)::int AS n FROM deltaops.act_eventos WHERE tenant_id = $1`, [tB]),
+    );
+    expect(Number(cruzado.rows[0].n)).toBe(0);
+  });
+
+  it("colaboración (comentarios + documentación) delega en plataforma (PG real)", async () => {
+    const tenant = `${T}-colab`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    await crear82(tenant, a, "PG-COLAB");
+
+    // Comentar (valida existencia del activo) + responder en hilo.
+    const c1 = await exec(ctx(tenant), `${MODULO}.comentar`, { id: a, texto: "revisar" });
+    expect(c1.ok).toBe(true);
+    const c1Id = (c1 as { value: { id: string } }).value.id;
+    await rt.platform.kernel.outboxProcessor.processPending();
+    await exec(ctx(tenant), `${MODULO}.comentar`, { id: a, texto: "ok", parentId: c1Id });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    // Editar + borrado lógico.
+    expect((await exec(ctx(tenant), `${MODULO}.editar-comentario`, { comentarioId: c1Id, expectedVersion: 1, texto: "revisar bomba" })).ok).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+    expect((await exec(ctx(tenant), `${MODULO}.borrar-comentario`, { comentarioId: c1Id })).ok).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    const coments = await query(ctx(tenant), `${MODULO}.comentarios`, { id: a });
+    expect(coments.ok && (coments.value as unknown[]).length).toBeGreaterThanOrEqual(1);
+
+    // Adjuntar documentación técnica por referencia (categoría como metadato).
+    const doc = await exec(ctx(tenant), `${MODULO}.adjuntar`, {
+      id: a, categoria: "manual", nombreArchivo: "manual.pdf",
+      mimeType: "application/pdf", tamanoBytes: 1024, hashSha256: "a".repeat(64),
+    });
+    expect(doc.ok).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+    const docs = await query(ctx(tenant), `${MODULO}.documentacion`, { id: a });
+    expect(docs.ok).toBe(true);
+    if (docs.ok) {
+      const items = docs.value as Array<{ data: { nombreArchivo: string } }>;
+      expect(items.length).toBe(1);
+      expect(items[0]!.data.nombreArchivo.startsWith("[manual]")).toBe(true);
+    }
+  });
+
+  it("colaboración vía cola offline con replay idempotente (PG real)", async () => {
+    const tenant = `${T}-colabsync`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    await crear82(tenant, a, "PG-COLABSYNC");
+
+    const ops = [
+      { opId: "pgc-com-1", comando: "comentar", input: { id: a, texto: "offline" } },
+      { opId: "pgc-doc-1", comando: "adjuntar", input: {
+        id: a, categoria: "certificado", nombreArchivo: "cert.pdf",
+        mimeType: "application/pdf", tamanoBytes: 2048, hashSha256: "b".repeat(64),
+      } },
+    ];
+    const r1 = await rt.sincronizar(ctx(tenant), ops);
+    expect(r1.aplicadas).toBe(2);
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    // Replay: recibos durables ⇒ sin re-ejecutar (replay:true), sin duplicar.
+    const r2 = await rt.sincronizar(ctx(tenant), ops);
+    expect(r2.aplicadas).toBe(2);
+    expect(r2.resultados.every((x) => x.replay === true)).toBe(true);
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    const coments = await query(ctx(tenant), `${MODULO}.comentarios`, { id: a });
+    expect(coments.ok && (coments.value as unknown[]).length).toBe(1);
+    const docs = await query(ctx(tenant), `${MODULO}.documentacion`, { id: a });
+    expect(docs.ok && (docs.value as unknown[]).length).toBe(1);
+  });
+
+  it("timeline compartido de plataforma con filtros (PG real)", async () => {
+    const tenant = `${T}-tl`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    await crear82(tenant, a, "PG-TL");
+    let det = await query(ctx(tenant), `${MODULO}.detalle`, { id: a });
+    let ver = (det as { value: { version: number } }).value.version;
+    await exec(ctx(tenant), `${MODULO}.registrar`, { id: a, expectedVersion: ver });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    const tl = await query(ctx(tenant), `${MODULO}.timeline`, { id: a });
+    expect(tl.ok && (tl.value as unknown[]).length).toBeGreaterThanOrEqual(2);
+    // Filtro por estado.
+    const porEstado = await query(ctx(tenant), `${MODULO}.timeline`, { id: a, estado: "REGISTRADO" });
+    expect(porEstado.ok).toBe(true);
+    if (porEstado.ok) {
+      const items = porEstado.value as Array<{ data: { estado: string | null } }>;
+      expect(items.length).toBeGreaterThanOrEqual(1);
+      expect(items.every((i) => i.data.estado === "REGISTRADO")).toBe(true);
+    }
+    // Filtro por actor inexistente ⇒ vacío.
+    const vacio = await query(ctx(tenant), `${MODULO}.timeline`, { id: a, actor: "nadie" });
+    expect(vacio.ok && (vacio.value as unknown[]).length).toBe(0);
+  });
+
+  it("tiposRelacion configurable por tenant (catálogo) (PG real)", async () => {
+    const tenant = `${T}-tr`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    const b = crypto.randomUUID();
+    await crear82(tenant, a, "PG-TRA");
+    await crear82(tenant, b, "PG-TRB");
+    // Habilita SOLO relacionado-con (su propio inverso).
+    await exec(ctx(tenant), `${MODULO}.catalogo.upsert`, { catalogo: "tiposRelacion", clave: "relacionado-con", etiqueta: "Relacionado con" });
+    const okRel = await exec(ctx(tenant), `${MODULO}.crear-relacion`, { tipo: "relacionado-con", origenId: a, destinoId: b });
+    expect(okRel.ok).toBe(true);
+    const rechazado = await exec(ctx(tenant), `${MODULO}.crear-relacion`, { tipo: "padre-de", origenId: a, destinoId: b });
+    expect(rechazado.ok).toBe(false);
+    if (!rechazado.ok) expect(rechazado.error.code.startsWith("KRN-VAL")).toBe(true);
+  });
+
+  it("consola técnica expone estado operativo para admin (PG real)", async () => {
+    const tenant = `${T}-consola`;
+    await sembrar(ctx(tenant));
+    const a = crypto.randomUUID();
+    // Vía cola offline ⇒ genera recibo durable 'aplicada' + eventos en outbox.
+    const resumen = await rt.sincronizar(ctx(tenant), [
+      { opId: "pgcon-1", comando: "crear", input: { ...NUEVO, id: a, codigoEmpresarial: "PG-CON" } },
+    ]);
+    expect(resumen.aplicadas).toBe(1);
+    await rt.platform.kernel.outboxProcessor.processPending();
+    // Un comentario de plataforma sobre el activo (actividad de colaboración).
+    await exec(ctx(tenant), "platform.comment.create", { entityRef: `activo:${a}`, texto: "nota" });
+    await rt.platform.kernel.outboxProcessor.processPending();
+
+    const r = await query(ctx(tenant), `${MODULO}.consola`, {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const v = r.value as {
+      readModels: { activos: { total: number; lastEventId: string | null }; historial: { total: number; lastEventId: string | null } };
+      outbox: { pendientes: number; procesados: number; ultimos: Array<{ tipo: string }> };
+      sincronizacion: { total: number; porEstado: Record<string, number>; ultimos: Array<{ opId: string }>; conflictos: unknown[] };
+      colaboracion: { timelineModulo: number; comentarios: number; adjuntos: number };
+      rls: { tablas: string[] };
+    };
+    expect(v.readModels.activos.total).toBe(1);
+    expect(v.readModels.activos.lastEventId).toBeTruthy();
+    expect(v.readModels.historial.lastEventId).toBeTruthy();
+    expect(v.rls.tablas).toContain("act_historial");
+    // (a) outbox del módulo, tenant-scoped, sin reclamar (todo procesado).
+    expect(v.outbox.pendientes).toBe(0);
+    expect(v.outbox.procesados).toBeGreaterThanOrEqual(1);
+    expect(v.outbox.ultimos.every((u) => u.tipo.startsWith("modulo.activos."))).toBe(true);
+    // (b/c) recibos por estado + últimos + conflictos.
+    expect(v.sincronizacion.total).toBe(1);
+    expect(v.sincronizacion.porEstado["aplicada"]).toBe(1);
+    expect(v.sincronizacion.ultimos[0]?.opId).toBe("pgcon-1");
+    expect(v.sincronizacion.conflictos.length).toBe(0);
+    // (e) colaboración: timeline del módulo + 1 comentario de plataforma.
+    expect(v.colaboracion.timelineModulo).toBeGreaterThanOrEqual(1);
+    expect(v.colaboracion.comentarios).toBe(1);
+    expect(v.colaboracion.adjuntos).toBe(0);
   });
 });

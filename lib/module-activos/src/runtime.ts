@@ -5,7 +5,12 @@
  * createReferenceRuntime (DGP-004) y createWorkflowRuntime (DGP-007).
  */
 import type { Pool } from "pg";
-import type { ExecutionContext } from "@workspace/kernel";
+import {
+  InMemoryOutboxStore,
+  KernelTokens,
+  type ExecutionContext,
+  type OutboxRecord,
+} from "@workspace/kernel";
 import {
   createPlatformRuntime,
   type PlatformRuntime,
@@ -22,6 +27,23 @@ import {
   type ActivoRepository,
   type SyncReceiptStore,
 } from "./infrastructure/repository";
+import {
+  FakeConsolaStore,
+  FakeEventLogStore,
+  FakeHistorialStore,
+  FakeRelacionReadModel,
+  FakeRelacionRepository,
+  PgConsolaStore,
+  PgEventLogStore,
+  PgHistorialStore,
+  PgRelacionReadModel,
+  PgRelacionRepository,
+  type ConsolaStore,
+  type EventLogStore,
+  type HistorialStore,
+  type RelacionReadModel,
+  type RelacionRepository,
+} from "./infrastructure/relaciones-store";
 import { activosModule, type ModuleAdapters } from "./module";
 import { procesarCola, type OperacionSync, type ResumenSync } from "./sincronizacion";
 
@@ -48,12 +70,41 @@ export function crearActivosRuntime(
   const syncReceipts: SyncReceiptStore = options.pool
     ? new PgSyncReceiptStore(options.pool)
     : new FakeSyncReceiptStore();
-  const adapters: ModuleAdapters = { repository, readModel };
+  const relaciones: RelacionRepository = options.pool
+    ? new PgRelacionRepository(options.pool)
+    : new FakeRelacionRepository();
+  const relacionesRead: RelacionReadModel = options.pool
+    ? new PgRelacionReadModel(options.pool)
+    : new FakeRelacionReadModel();
+  const historial: HistorialStore = options.pool
+    ? new PgHistorialStore(options.pool)
+    : new FakeHistorialStore();
+  // Bitácora de eventos durable del módulo (fuente de verdad del replay).
+  const eventLog: EventLogStore = options.pool
+    ? new PgEventLogStore(options.pool)
+    : new FakeEventLogStore();
+
+  // Consola técnica: en PG lee el outbox del Kernel por SQL; en memoria lee los
+  // registros del outbox in-memory del Kernel mediante un accesor perezoso
+  // (el store se resuelve del contenedor DESPUÉS de montar la plataforma).
+  let outboxRecords: () => readonly OutboxRecord[] = () => [];
+  const consola: ConsolaStore = options.pool
+    ? new PgConsolaStore(options.pool)
+    : new FakeConsolaStore(() => outboxRecords());
+
+  const adapters: ModuleAdapters = {
+    repository, readModel, relaciones, relacionesRead, historial, syncReceipts, consola, eventLog,
+  };
 
   const platform = createPlatformRuntime({
     ...options,
     extraServices: [activosModule(adapters)],
   });
+
+  if (!options.pool) {
+    const store = platform.kernel.container.resolve(KernelTokens.outbox);
+    if (store instanceof InMemoryOutboxStore) outboxRecords = () => store.records;
+  }
 
   return {
     platform,

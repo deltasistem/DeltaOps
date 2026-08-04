@@ -9,6 +9,7 @@ import ReferenciaDetalle from '@/pages/referencia-detalle';
 import DesignSystem from '@/pages/design-system';
 import Motores from '@/pages/motores';
 import MotoresPlayground from '@/pages/motores-playground';
+import ConsolaActivos from '@/pages/consola-activos';
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/design-system" component={DesignSystem} />
       <Route path="/motores/playground" component={MotoresPlayground} />
       <Route path="/motores" component={Motores} />
+      <Route path="/consola-activos" component={ConsolaActivos} />
       <Route component={NotFound} />
     </Switch>
   );

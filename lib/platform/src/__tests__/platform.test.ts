@@ -212,6 +212,39 @@ describe("Servicios (adaptadores Fake = modo offline)", () => {
     expect(recent.ok && (recent.value as unknown[]).length).toBeGreaterThan(0);
   });
 
+  it("timeline.record: módulos proyectan sus eventos (idempotente) y query filtra", async () => {
+    const rt = runtime();
+    const ctx = ctxOf("t-rec");
+    const base = {
+      entityRef: "activo:A1",
+      eventType: "modulo.demo.creado",
+      actorId: "u-7",
+      occurredAt: "2024-01-10T10:00:00.000Z",
+      resumen: "creado",
+      estado: "OPERATIVO",
+    };
+    const r1 = await rt.kernel.commands.execute(ctx, "platform.timeline.record", { entryId: "ev-1", ...base });
+    expect(r1.ok && (r1.value as { idempotente: boolean }).idempotente).toBe(false);
+    // Reentrega del mismo evento ⇒ idempotente, no duplica.
+    const r2 = await rt.kernel.commands.execute(ctx, "platform.timeline.record", { entryId: "ev-1", ...base });
+    expect(r2.ok && (r2.value as { idempotente: boolean }).idempotente).toBe(true);
+    await rt.kernel.commands.execute(ctx, "platform.timeline.record", {
+      entryId: "ev-2", ...base, eventType: "modulo.demo.retirado", estado: "RETIRADO",
+      occurredAt: "2024-02-01T10:00:00.000Z", entidadRelacionada: "activo:B2",
+    });
+    // Filtro por estado.
+    const soloRetiro = await rt.kernel.queries.execute(ctx, "platform.timeline.query", { estado: "RETIRADO" });
+    expect(soloRetiro.ok && (soloRetiro.value as unknown[]).length).toBe(1);
+    // Filtro por actor + rango de fechas.
+    const enEnero = await rt.kernel.queries.execute(ctx, "platform.timeline.query", {
+      actorId: "u-7", desde: "2024-01-01T00:00:00.000Z", hasta: "2024-01-31T23:59:59.000Z",
+    });
+    expect(enEnero.ok && (enEnero.value as unknown[]).length).toBe(1);
+    // Filtro por entidad relacionada.
+    const rel = await rt.kernel.queries.execute(ctx, "platform.timeline.query", { entidadRelacionada: "activo:B2" });
+    expect(rel.ok && (rel.value as unknown[]).length).toBe(1);
+  });
+
   it("task: asignación, transición inválida y recordatorios", async () => {
     const rt = runtime();
     const ctx = ctxOf("t1");
