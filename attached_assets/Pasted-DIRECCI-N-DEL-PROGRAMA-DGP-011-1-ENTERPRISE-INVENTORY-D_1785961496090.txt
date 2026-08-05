@@ -1,0 +1,554 @@
+DIRECCIÓN DEL PROGRAMA — DGP-011.1
+ENTERPRISE INVENTORY DOMAIN
+
+A partir de este momento inicia oficialmente la subfase DGP-011.1 del Programa Maestro DeltaOps.
+
+====================================================================
+REGLAS ABSOLUTAS
+====================================================================
+
+Todo el trabajo deberá respetar íntegramente:
+
+ETS-001…ETS-012
+Engineering Charter
+ESI-001…ESI-010
+DGP-000…DGP-010
+
+Queda absolutamente prohibido:
+
+• modificar arquitectura
+• modificar patrones
+• modificar Kernel
+• modificar Shared Platform
+• modificar Business Foundation
+• modificar Workflow Engine
+• modificar Dynamic Forms
+• modificar Design System
+• modificar módulos anteriores
+
+Todo deberá construirse únicamente reutilizando el corpus congelado.
+
+No crear infraestructura.
+
+No crear UI.
+
+No crear dashboards.
+
+No crear reportes.
+
+No crear IA.
+
+No crear analítica.
+
+No crear APIs adicionales.
+
+Esta subfase construye EXCLUSIVAMENTE EL DOMINIO.
+
+====================================================================
+OBJETIVO
+====================================================================
+
+Construir el dominio Enterprise Inventory de DeltaOps.
+
+Este NO será un inventario simple.
+
+Será un dominio capaz de administrar completamente:
+
+• Repuestos
+• Consumibles
+• Materiales
+• Herramientas
+• Equipos auxiliares
+• Kits
+• Material eléctrico
+• Material mecánico
+• Lubricantes
+• Grasas
+• Fluidos
+• Elementos de protección
+• Componentes
+• Lotes
+• Series
+• Ubicaciones
+• Bodegas
+• Subbodegas
+• Tránsitos
+• Reservas
+• Existencias
+• Movimientos
+
+Todo configurable.
+
+Nada hardcodeado.
+
+====================================================================
+AGREGADOS
+====================================================================
+
+Construir como mínimo:
+
+Inventario
+
+ItemInventario
+
+MovimientoInventario
+
+Bodega
+
+Ubicacion
+
+Lote
+
+Serie
+
+Reserva
+
+Transferencia
+
+Ajuste
+
+ConteoFisico
+
+Todos con agregados correctamente delimitados.
+
+====================================================================
+VALUE OBJECTS
+====================================================================
+
+Construir todos los Value Objects necesarios.
+
+Como mínimo:
+
+SKU
+
+CodigoInventario
+
+Cantidad
+
+UnidadMedida
+
+CostoPromedio
+
+CostoUltimaCompra
+
+CostoEstandar
+
+UbicacionFisica
+
+Lote
+
+Serie
+
+FechaVencimiento
+
+Stock
+
+Minimo
+
+Maximo
+
+PuntoReorden
+
+LeadTime
+
+ProveedorPreferido
+
+====================================================================
+CATÁLOGOS
+====================================================================
+
+Todo configurable por tenant.
+
+Nunca enums.
+
+Como mínimo:
+
+Tipos Item
+
+Categorías
+
+Familias
+
+Subfamilias
+
+Marcas
+
+Fabricantes
+
+Modelos
+
+Unidades
+
+Tipos Movimiento
+
+Motivos Movimiento
+
+Tipos Ajuste
+
+Tipos Conteo
+
+Estados
+
+Tipos Bodega
+
+Ubicaciones
+
+Empresas
+
+CentrosCosto
+
+Proyectos
+
+====================================================================
+MOVIMIENTOS
+====================================================================
+
+Modelar completamente:
+
+Entrada
+
+Salida
+
+Transferencia
+
+Reserva
+
+Liberación
+
+Consumo
+
+Devolución
+
+Ajuste positivo
+
+Ajuste negativo
+
+Conteo
+
+Inicialización
+
+Corrección
+
+Todos mediante eventos.
+
+Nunca modificar existencias directamente.
+
+====================================================================
+STOCK
+====================================================================
+
+Modelar:
+
+Stock Disponible
+
+Reservado
+
+Comprometido
+
+En tránsito
+
+En inspección
+
+Bloqueado
+
+Vencido
+
+Todo consistente.
+
+====================================================================
+LOTES Y SERIES
+====================================================================
+
+El sistema deberá soportar simultáneamente:
+
+sin lote
+
+con lote
+
+con serie
+
+lote + serie
+
+vencimientos
+
+trazabilidad completa
+
+historial
+
+Todo configurable.
+
+====================================================================
+BODEGAS
+====================================================================
+
+Modelar:
+
+Bodegas
+
+Subbodegas
+
+Ubicaciones
+
+Pasillos
+
+Estanterías
+
+Niveles
+
+Posiciones
+
+Sin asumir ninguna estructura fija.
+
+Todo configurable.
+
+====================================================================
+RESERVAS
+====================================================================
+
+Reservas para:
+
+OT
+
+Preventivos
+
+Correctivos
+
+Proyectos
+
+Solicitudes
+
+Transferencias
+
+Las reservas nunca podrán romper consistencia de inventario.
+
+====================================================================
+TRANSFERENCIAS
+====================================================================
+
+Transferencias:
+
+entre ubicaciones
+
+entre bodegas
+
+entre empresas
+
+entre proyectos
+
+entre centros de costo
+
+Siempre mediante Workflow.
+
+====================================================================
+CONTEOS
+====================================================================
+
+Modelar:
+
+Conteo parcial
+
+Conteo cíclico
+
+Conteo general
+
+Reconteo
+
+Diferencias
+
+Ajustes posteriores
+
+====================================================================
+POLICIES
+====================================================================
+
+Registrar todas las Policies necesarias.
+
+Como mínimo:
+
+PuedeCrearItem
+
+PuedeModificarItem
+
+PuedeMoverInventario
+
+PuedeReservar
+
+PuedeLiberarReserva
+
+PuedeTransferir
+
+PuedeAjustar
+
+PuedeContar
+
+PuedeCerrarConteo
+
+PuedeEliminarItem
+
+====================================================================
+EVENTOS
+====================================================================
+
+Todos autosuficientes.
+
+Como mínimo:
+
+ItemCreado
+
+MovimientoRegistrado
+
+StockActualizado
+
+ReservaCreada
+
+ReservaLiberada
+
+TransferenciaCreada
+
+TransferenciaCompletada
+
+ConteoIniciado
+
+ConteoFinalizado
+
+AjusteAplicado
+
+LoteCreado
+
+SerieRegistrada
+
+====================================================================
+PERMISOS
+====================================================================
+
+Construir permisos granulares.
+
+Ejemplo:
+
+modulo.inventario.read
+
+write
+
+move
+
+reserve
+
+transfer
+
+count
+
+adjust
+
+admin
+
+====================================================================
+CAPACIDADES
+====================================================================
+
+Registrar capacidades del producto.
+
+Nunca hardcodeadas.
+
+====================================================================
+WORKFLOW
+====================================================================
+
+Transferencias
+
+Conteos
+
+Ajustes
+
+deberán quedar preparados para Workflow Engine.
+
+No implementar infraestructura.
+
+Solo contratos.
+
+====================================================================
+OFFLINE
+====================================================================
+
+Preparar completamente:
+
+opId
+
+idempotencia
+
+UUID cliente
+
+sincronización
+
+recibos
+
+replay
+
+Todo igual que Activos y OT.
+
+====================================================================
+CONFIGURATION FIRST
+====================================================================
+
+Todo configurable.
+
+Nada hardcodeado.
+
+====================================================================
+DISCIPLINA DE ALCANCE
+====================================================================
+
+NO construir:
+
+persistencia
+
+adaptadores PG
+
+read models
+
+API
+
+OpenAPI
+
+UI
+
+Dashboards
+
+Reportes
+
+Importación
+
+Exportación
+
+BI
+
+IA
+
+Analytics
+
+Eso pertenece a DGP-011.2 y DGP-011.3.
+
+====================================================================
+REVISIÓN ARQUITECTÓNICA
+====================================================================
+
+Antes de cerrar la subfase ejecutar obligatoriamente revisión independiente completa.
+
+Corregir todos los hallazgos.
+
+No cerrar con observaciones críticas o mayores.
+
+====================================================================
+ENTREGABLE
+====================================================================
+
+Al finalizar entregar exclusivamente el
+
+INFORME OFICIAL DE CIERRE
+
+siguiendo exactamente el estándar utilizado en todos los DGP anteriores.
+
+No iniciar DGP-011.2.
+
+No proponer siguientes fases.
+
+Esperar instrucciones de la Dirección del Programa.

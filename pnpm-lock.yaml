@@ -1038,6 +1038,25 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
 
+  lib/module-inventario:
+    dependencies:
+      '@workspace/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@workspace/platform':
+        specifier: workspace:*
+        version: link:../platform
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+
   lib/module-ordenes:
     dependencies:
       '@workspace/business-foundation':
