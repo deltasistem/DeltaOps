@@ -42,3 +42,5 @@ jobs:
         run: pnpm --filter @workspace/workflow-engine run test
       - name: Pruebas del Dynamic Forms Engine
         run: pnpm --filter @workspace/dynamic-forms run test
+      - name: Pruebas del Módulo Órdenes de Trabajo
+        run: pnpm --filter @workspace/module-ordenes run test

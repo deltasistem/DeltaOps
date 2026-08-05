@@ -1,0 +1,25 @@
+{
+  "name": "@workspace/module-ordenes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@workspace/kernel": "workspace:*",
+    "@workspace/platform": "workspace:*",
+    "@workspace/business-foundation": "workspace:*",
+    "@workspace/workflow-engine": "workspace:*",
+    "@workspace/dynamic-forms": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vitest": "^4.1.10"
+  }
+}

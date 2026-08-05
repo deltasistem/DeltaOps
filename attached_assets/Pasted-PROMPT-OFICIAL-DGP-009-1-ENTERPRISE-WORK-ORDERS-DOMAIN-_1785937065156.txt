@@ -1,0 +1,213 @@
+PROMPT OFICIAL — DGP-009.1
+ENTERPRISE WORK ORDERS DOMAIN
+
+Has iniciado oficialmente la subfase DGP-009.1 del programa DeltaOps.
+
+Todo el corpus permanece completamente congelado.
+
+No está permitido modificar:
+
+ETS-001…012
+ENGINEERING_CHARTER
+ESI-001…010
+DGP-000…008.3
+
+Toda implementación deberá reutilizar exclusivamente:
+
+Kernel
+Shared Platform
+Reference Module
+Experience Foundation
+Business Foundation
+Workflow Engine
+Dynamic Forms
+Enterprise Asset Module
+
+No podrán construirse patrones nuevos.
+
+Objetivo
+
+Construir exclusivamente el dominio del módulo Órdenes de Trabajo Empresariales (Enterprise Work Orders).
+
+No construir infraestructura.
+
+No construir UI.
+
+No construir dashboards.
+
+No construir IA.
+
+No construir reportes.
+
+No construir analítica.
+
+Deben modelarse únicamente
+Agregado principal
+
+Orden de Trabajo.
+
+Debe soportar como mínimo:
+
+Correctivas
+Preventivas
+Predictivas
+Inspecciones
+Instalaciones
+Desmontajes
+Calibraciones
+Lubricaciones
+Limpiezas
+Emergencias
+Campañas
+Otros tipos configurables
+
+Todo por configuración.
+
+Nunca por código.
+
+Debe incluir
+Código consecutivo empresarial configurable.
+Estado.
+Prioridad.
+Severidad.
+SLA.
+Activo principal.
+Activos relacionados.
+Responsable.
+Supervisor.
+Solicitante.
+Empresa.
+Proyecto.
+Centro de costo.
+Ubicación.
+Tipo.
+Categoría.
+Fecha solicitada.
+Fecha programada.
+Fecha inicio.
+Fecha finalización.
+Fecha cierre.
+Tiempo estimado.
+Tiempo real.
+Costos estimados.
+Costos reales.
+Observaciones.
+Motivo.
+Causa.
+Diagnóstico.
+Solución.
+Riesgo.
+Impacto.
+Checklist asociado.
+Formulario asociado.
+Workflow asociado.
+
+Todo configurable.
+
+Objetos de valor
+
+Diseñar todos los Value Objects necesarios.
+
+Catálogos
+
+Todos configurables por tenant.
+
+Máquina de estados
+
+Completamente declarativa.
+
+Debe soportar como mínimo:
+
+BORRADOR
+ABIERTA
+PLANIFICADA
+ASIGNADA
+EN_EJECUCION
+PAUSADA
+EN_VALIDACION
+CERRADA
+CANCELADA
+
+Más estados definidos por tenant.
+
+Workflow
+
+Toda transición deberá ejecutarse mediante el Workflow Engine.
+
+Nunca mediante lógica propia.
+
+Formularios
+
+Toda OT podrá asociar formularios dinámicos.
+
+Checklists
+
+Toda OT podrá asociar checklists versionados.
+
+Evidencias
+
+Toda OT deberá soportar evidencias mediante la plataforma compartida.
+
+Policies
+
+Modelar todas las Policies necesarias.
+
+Eventos
+
+Modelar todos los eventos autosuficientes.
+
+Permisos
+
+Modelar permisos granulares.
+
+Capacidades
+
+Modelar capacidades del producto.
+
+Configuración
+
+Todo parametrizable por tenant.
+
+Nada hardcodeado.
+
+Offline
+
+Preparar el dominio para operación Offline First.
+
+Pruebas
+
+Cobertura completa.
+
+Documentación
+
+Completa.
+
+En español.
+
+Revisión Arquitectónica Obligatoria
+
+Al finalizar ejecutar una revisión completamente independiente.
+
+Validar:
+
+DDD
+Clean Architecture
+CQRS
+Event Driven
+Workflow
+Dynamic Forms
+Shared Platform
+Offline
+Configuración
+Reutilización
+Multitenancy
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+Informe Final
+
+Entregar únicamente el informe oficial de cierre siguiendo exactamente el formato de las subfases anteriores.
+
+No iniciar automáticamente DGP-009.2.
+
+Esperar instrucciones de la Dirección del Programa.

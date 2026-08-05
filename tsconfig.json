@@ -28,6 +28,9 @@
       "path": "./lib/dynamic-forms"
     },
     {
+      "path": "./lib/module-ordenes"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {
