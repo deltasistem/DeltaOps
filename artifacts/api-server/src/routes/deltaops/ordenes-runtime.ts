@@ -39,11 +39,20 @@ const MODULE_PERMISSIONS = [
 
 /** Mapa rol → permisos (admin: todo; operador: sin admin; lector: lectura). */
 export function principalOrdenes(userId: string, rol: string): Principal {
+  // Permisos de Dynamic Forms necesarios para la ejecución de la OT:
+  //  - plantilla.read: RENDERIZAR la plantilla asociada (clave+versión exacta).
+  //  - respuesta.write/enviar: CAPTURAR y enviar la respuesta del checklist/
+  //    formulario asociado, obteniendo un respuestaId que ancla la asociación.
+  //  - respuesta.read: consultar el anclaje.
+  const FORMS_READ = "modulo.formularios.plantilla.read";
+  const RESP_READ = "modulo.formularios.respuesta.read";
+  const RESP_WRITE = "modulo.formularios.respuesta.write";
+  const RESP_SEND = "modulo.formularios.respuesta.enviar";
   if (rol === "admin" || rol === "platform_admin") {
     return {
       id: userId,
       rol,
-      permisos: [...PLATFORM_PERMISSIONS, ...MODULE_PERMISSIONS],
+      permisos: [...PLATFORM_PERMISSIONS, ...MODULE_PERMISSIONS, FORMS_READ, RESP_READ, RESP_WRITE, RESP_SEND],
       capacidades: ["gestionar-ordenes", "ejecutar-ordenes", "validar-ordenes", "administrar-ordenes"],
     };
   }
@@ -55,6 +64,7 @@ export function principalOrdenes(userId: string, rol: string): Principal {
         ...MODULE_PERMISSIONS.filter((p) => p !== "modulo.ordenes.admin"),
         "platform.attachment.read", "platform.attachment.write",
         "platform.timeline.read", "platform.config.read",
+        FORMS_READ, RESP_READ, RESP_WRITE, RESP_SEND,
       ],
       capacidades: ["gestionar-ordenes", "ejecutar-ordenes"],
     };
@@ -65,6 +75,7 @@ export function principalOrdenes(userId: string, rol: string): Principal {
     permisos: [
       "modulo.ordenes.read", "platform.timeline.read",
       "platform.attachment.read", "platform.config.read",
+      FORMS_READ, RESP_READ,
     ],
     capacidades: [],
   };

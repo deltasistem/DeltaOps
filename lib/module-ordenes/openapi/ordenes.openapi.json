@@ -926,6 +926,108 @@
         }
       }
     },
+    "/api/deltaops/ordenes/{id}/{clase}/respuesta": {
+      "post": {
+        "tags": [
+          "Documentación"
+        ],
+        "operationId": "ordenes.capturarRespuesta",
+        "summary": "Capturar respuesta de un formulario/checklist asociado (comando orquestador, idempotente y offline)",
+        "description": "Comando único `modulo.ordenes.capturarRespuesta`: compone en el servidor respuesta.guardarBorrador (anclada a clave+versión exacta) → respuesta.enviar (validación completa) → asociación a la OT re-leyendo su versión ACTUAL. Idempotente por opId y RECUPERABLE (los reintentos —incl. replay por /sync desde la cola offline— convergen al mismo resultado, sin duplicar ni dejar respuestas huérfanas). La respuesta queda ANCLADA a la asociación/plantilla/versión concreta.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          },
+          {
+            "name": "clase",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clase de plantilla: formulario | checklist"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapturaRespuesta"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/deltaops/ordenes/{id}/evidencias": {
       "post": {
         "tags": [
@@ -1069,6 +1171,251 @@
           },
           "403": {
             "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Documentación"
+        ],
+        "operationId": "ordenes.registrarDocumentacion",
+        "summary": "Registrar evidencia por referencia (platform.attachment.register + agregarEvidencia)",
+        "description": "Registra el adjunto en el Attachment Service de plataforma (referencia-only: metadatos + hash, NUNCA el binario) obteniendo un attachmentId, y luego agrega la evidencia a la OT anclada a su versión (control de concurrencia).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarDocumentacion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/{id}/documentacion/{attachmentId}/url": {
+      "get": {
+        "tags": [
+          "Documentación"
+        ],
+        "operationId": "ordenes.documentacionUrl",
+        "summary": "URL firmada + metadatos de una evidencia (verificación de referencia)",
+        "description": "Devuelve la URL firmada (HMAC + caducidad) y los metadatos verificables del adjunto. El binario NUNCA se expone por esta vía; sirve para verificar la referencia.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del adjunto en plataforma"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentacionUrl"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/plantillas/{clave}/{version}": {
+      "get": {
+        "tags": [
+          "Documentación"
+        ],
+        "operationId": "ordenes.plantillaDefinicion",
+        "summary": "Definición de una plantilla de Dynamic Forms (clave + versión exacta)",
+        "description": "Proxy de sólo lectura a modulo.formularios.plantilla.obtener. Devuelve la definición renderizable y metadatos de la plantilla asociada, para capturar su resultado durante la ejecución (respuesta anclada a clave+versión).",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clave de la plantilla"
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Versión exacta de la plantilla"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaDefinicion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2980,10 +3327,10 @@
         ],
         "additionalProperties": false
       },
-      "AsociarPlantilla": {
+      "PlantillaRef": {
         "type": "object",
         "properties": {
-          "id": {
+          "servicio": {
             "type": "string"
           },
           "clave": {
@@ -2992,6 +3339,29 @@
           "version": {
             "type": "integer",
             "minimum": 1
+          },
+          "etiqueta": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "AsociarPlantilla": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "plantilla": {
+            "$ref": "#/components/schemas/PlantillaRef"
           },
           "respuestaId": {
             "type": "string",
@@ -3003,8 +3373,45 @@
         },
         "required": [
           "id",
-          "clave",
-          "version"
+          "expectedVersion",
+          "plantilla"
+        ],
+        "additionalProperties": false
+      },
+      "Evidencia": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string"
+          },
+          "nombreArchivo": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "tamanoBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hashSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "etapa": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attachmentId",
+          "nombreArchivo",
+          "mimeType",
+          "tamanoBytes",
+          "hashSha256"
         ],
         "additionalProperties": false
       },
@@ -3014,11 +3421,12 @@
           "id": {
             "type": "string"
           },
-          "attachmentId": {
-            "type": "string"
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
           },
-          "titulo": {
-            "type": "string"
+          "evidencia": {
+            "$ref": "#/components/schemas/Evidencia"
           },
           "opId": {
             "type": "string"
@@ -3026,7 +3434,138 @@
         },
         "required": [
           "id",
-          "attachmentId"
+          "expectedVersion",
+          "evidencia"
+        ],
+        "additionalProperties": false
+      },
+      "RegistrarDocumentacion": {
+        "type": "object",
+        "properties": {
+          "categoria": {
+            "type": "string"
+          },
+          "nombreArchivo": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "tamanoBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hashSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "categoria",
+          "nombreArchivo",
+          "mimeType",
+          "tamanoBytes",
+          "hashSha256",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "DocumentacionUrl": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "nombreArchivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "mimeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "tamanoBytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "hashSha256": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "attachmentId",
+          "url",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlantillaDefinicion": {
+        "type": "object",
+        "properties": {
+          "clave": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "definicion": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "clave",
+          "version",
+          "titulo"
+        ],
+        "additionalProperties": false
+      },
+      "CapturaRespuesta": {
+        "type": "object",
+        "properties": {
+          "clave": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "etiqueta": {
+            "type": "string"
+          },
+          "datos": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "version",
+          "datos",
+          "opId"
         ],
         "additionalProperties": false
       },

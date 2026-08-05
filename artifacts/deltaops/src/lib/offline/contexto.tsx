@@ -12,7 +12,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
-import { ColaSync } from "./cola";
+import { ColaSync, crearEnviadorHttp } from "./cola";
 import type { OperacionCola, ResumenSync } from "./tipos";
 
 interface OfflineCtx {
@@ -31,12 +31,23 @@ export interface OfflineProviderProps {
   children: React.ReactNode;
   /** Inyección de cola para pruebas. */
   cola?: ColaSync;
+  /** Espacio de nombres del módulo (aísla la cola). Por defecto "activos". */
+  modulo?: string;
+  /** URL del endpoint /sync del módulo. Por defecto el de activos. */
+  syncUrl?: string;
 }
 
-export function OfflineProvider({ tenant, children, cola: colaInyectada }: OfflineProviderProps) {
+export function OfflineProvider({ tenant, children, cola: colaInyectada, modulo = "activos", syncUrl }: OfflineProviderProps) {
   const colaRef = useRef<ColaSync | null>(null);
   if (!colaRef.current) {
-    colaRef.current = colaInyectada ?? new ColaSync(tenant);
+    colaRef.current =
+      colaInyectada ??
+      new ColaSync(
+        tenant,
+        syncUrl ? crearEnviadorHttp(syncUrl) : undefined,
+        undefined,
+        modulo,
+      );
   }
   const cola = colaRef.current;
 

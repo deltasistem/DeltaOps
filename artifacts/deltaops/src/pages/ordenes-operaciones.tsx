@@ -1,0 +1,167 @@
+/**
+ * DGP-009.3 · Centro de Operaciones.
+ * Bandejas del ciclo de vida (Mis órdenes, Pendientes, Nuevas, En ejecución, En
+ * espera, En validación, Próximas a vencer, Críticas, Canceladas, Cerradas) con
+ * búsqueda, filtros (Dynamic Forms), estados visuales y acciones inmediatas.
+ */
+import React, { useMemo, useState } from "react";
+import {
+  PageHeader,
+  Section,
+  Card,
+  CardContent,
+  Button,
+  Spinner,
+  EmptyState,
+  ErrorState,
+  SearchInput,
+  Tabs,
+  useToast,
+} from "@workspace/design-system";
+import { ShellOrdenes } from "../lib/ordenes/Shell";
+import { useListado } from "../lib/ordenes/hooks";
+import { useOffline } from "../lib/offline/contexto";
+import { transicionar } from "../lib/ordenes/mutaciones";
+import { BANDEJAS, TRANSICIONES, type BandejaDef } from "../lib/ordenes/constantes";
+import { TarjetaOrden, esCritica, proximaAVencer } from "../lib/ordenes/componentes";
+import type { OrdenRow } from "../lib/ordenes/tipos";
+
+export default function OrdenesOperacionesPage() {
+  return (
+    <ShellOrdenes activo="/ordenes">
+      <Contenido />
+    </ShellOrdenes>
+  );
+}
+
+function Contenido() {
+  // Una sola carga del read model; las bandejas derivan en cliente. Evita 10
+  // peticiones simultáneas (los paneles del DS Tabs se montan todos).
+  const { datos, cargando, error, recargar } = useListado({ limit: 300 });
+  return (
+    <>
+      <PageHeader
+        titulo="Centro de Operaciones"
+        descripcion="Órdenes de trabajo organizadas por bandeja del ciclo de vida."
+      />
+      <Tabs
+        etiquetaLista="Bandejas de órdenes"
+        porDefecto="mis"
+        items={BANDEJAS.map((b) => ({
+          id: b.id,
+          etiqueta: b.etiqueta,
+          contenido: <Bandeja bandeja={b} todas={datos ?? []} cargando={cargando} error={error} recargar={recargar} />,
+        }))}
+      />
+    </>
+  );
+}
+
+function Bandeja({
+  bandeja, todas, cargando, error, recargar,
+}: {
+  bandeja: BandejaDef;
+  todas: OrdenRow[];
+  cargando: boolean;
+  error: Error | null;
+  recargar: () => void;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const ahoraMs = useMemo(() => Date.parse(new Date().toISOString()), []);
+
+  const filtradas = useMemo(() => {
+    let lista = todas;
+    if (bandeja.estado) lista = lista.filter((o) => o.estado === bandeja.estado);
+    if (bandeja.id === "criticas") lista = lista.filter((o) => esCritica(o) && o.estado !== "CERRADA" && o.estado !== "CANCELADA");
+    if (bandeja.id === "vencer") lista = lista.filter((o) => proximaAVencer(o, ahoraMs));
+    if (bandeja.id === "mis") lista = lista.filter((o) => o.responsable != null);
+    const q = busqueda.trim().toLowerCase();
+    if (q) {
+      lista = lista.filter(
+        (o) =>
+          o.titulo.toLowerCase().includes(q) ||
+          o.codigo.toLowerCase().includes(q) ||
+          (o.responsable ?? "").toLowerCase().includes(q),
+      );
+    }
+    return lista;
+  }, [todas, bandeja.id, bandeja.estado, busqueda, ahoraMs]);
+
+  return (
+    <Section
+      titulo={`${bandeja.etiqueta} — ${bandeja.descripcion}`}
+      acciones={
+        <div style={{ minWidth: 220 }}>
+          <SearchInput
+            aria-label="Buscar órdenes"
+            placeholder="Buscar por código, título o responsable"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            onClear={() => setBusqueda("")}
+          />
+        </div>
+      }
+    >
+      {cargando ? (
+        <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div>
+      ) : error ? (
+        <ErrorState titulo="No se pudo cargar" descripcion={error.message} onReintentar={recargar} />
+      ) : filtradas.length === 0 ? (
+        <Card><CardContent><EmptyState titulo="Sin órdenes" descripcion="No hay órdenes en esta bandeja." /></CardContent></Card>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
+          <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>{filtradas.length} orden(es)</span>
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+            {filtradas.map((o) => (
+              <FilaOrden key={o.id} orden={o} onCambio={recargar} />
+            ))}
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** Tarjeta con acciones inmediatas de transición (según estado). */
+function FilaOrden({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+  const { cola } = useOffline();
+  const toast = useToast();
+  const [ocupado, setOcupado] = useState(false);
+  const acciones = (TRANSICIONES[orden.estado] ?? []).filter((a) => !a.requiereValidacion);
+
+  async function ejecutar(comando: string, etiqueta: string) {
+    setOcupado(true);
+    try {
+      const r = await transicionar(cola, orden.id, comando);
+      if (r.error) toast.mostrar({ variant: "error", titulo: "Error", mensaje: r.error.message });
+      else if (r.encolada) toast.mostrar({ variant: "info", titulo: "Sin conexión", mensaje: `«${etiqueta}» quedó en cola.` });
+      else {
+        toast.mostrar({ variant: "exito", titulo: "Listo", mensaje: `${etiqueta} aplicado.` });
+        onCambio();
+      }
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <TarjetaOrden orden={orden} />
+      {acciones.length > 0 && (
+        <div style={{ display: "flex", gap: "var(--do-sp-1)", flexWrap: "wrap", marginTop: "calc(-1 * var(--do-sp-2))", padding: "0 var(--do-sp-3) var(--do-sp-3)" }}>
+          {acciones.map((a) => (
+            <Button
+              key={a.comando}
+              variant={a.comando === "cancelar" ? "peligro" : "primario"}
+              size="sm"
+              disabled={ocupado}
+              onClick={() => void ejecutar(a.comando, a.etiqueta)}
+            >
+              {a.etiqueta}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

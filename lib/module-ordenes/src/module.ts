@@ -519,6 +519,11 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
       `${MODULO_WORKFLOW}.read`,
       `${MODULO_WORKFLOW}.operar`,
       `${MODULO_WORKFLOW}.disenar`,
+      // Permisos del servicio de formularios que este módulo orquesta al
+      // capturar respuestas de checklist/formulario (guardarBorrador → enviar):
+      "modulo.formularios.respuesta.write",
+      "modulo.formularios.respuesta.enviar",
+      "modulo.formularios.respuesta.read",
     ],
     dependsOn: [
       MODULO_WORKFLOW,
@@ -946,6 +951,110 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           authorization: { permissions: [`${MODULO}.write`] },
           async handle(ctx, input, uow) {
             return asociarPlantilla(deps, adapters, ctx, uow, input, "checklist");
+          },
+        };
+      },
+      /* --------- capturar respuesta de plantilla asociada (ORQUESTADOR) ---- */
+      // Operación ÚNICA, idempotente por opId y RECUPERABLE: compone el flujo
+      // real de Dynamic Forms (guardarBorrador → enviar) y ANCLA la respuesta a
+      // la OT re-leyendo su versión ACTUAL (no exige expectedVersion del cliente,
+      // por eso un reintento tras un conflicto converge sin dejar respuestas
+      // huérfanas). El id de la respuesta es DETERMINISTA a partir del opId, y
+      // los subpasos usan sub-opIds derivados: reejecutar (desde /sync o la cola
+      // offline) NO duplica respuestas ni efectos. Es una sola operación de
+      // aplicación ⇒ encolable offline y replayable por /sync.
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.capturarRespuesta`,
+          inputSchema: z.object({
+            id: z.string(),
+            opId: z.string().min(1),
+            clase: z.enum(["formulario", "checklist"]),
+            plantilla: z.object({
+              clave: z.string().min(1),
+              version: z.number().int().positive(),
+              etiqueta: z.string().optional(),
+            }),
+            datos: z.record(z.string(), z.unknown()),
+          }),
+          authorization: { permissions: [`${MODULO}.operar`] },
+          async handle(ctx, input) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const comando = `${MODULO}.capturarRespuesta`;
+
+            // Idempotencia terminal por opId: si ya se selló, devolver el mismo
+            // resultado (un solo efecto entre reintentos y workers de /sync).
+            const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+
+            // La OT debe existir; se re-lee su versión ACTUAL para el anclaje.
+            const actual = await adapters.repository.findById(tenant.value, input.id);
+            if (!actual.ok) return actual;
+            if (!actual.value) return fail(KernelErrors.notFound("orden-trabajo", input.id));
+
+            // Id de respuesta DETERMINISTA por opId ⇒ reintentos convergen a la
+            // MISMA respuesta (sin duplicar). Sub-opIds derivados garantizan la
+            // idempotencia de cada subpaso en el servicio de formularios.
+            const respuestaId = `ord-resp:${input.id}:${input.clase}:${input.plantilla.clave}:${input.plantilla.version}:${input.opId}`;
+
+            // (1) Guardar borrador ANCLADO a la clave+versión EXACTA (UoW propia
+            //     del servicio de formularios). Idempotente por sub-opId.
+            const borrador = await deps.runtime.commands.execute(childContext(ctx), "modulo.formularios.respuesta.guardarBorrador", {
+              id: respuestaId,
+              opId: `${input.opId}:borrador`,
+              plantillaClave: input.plantilla.clave,
+              plantillaVersion: input.plantilla.version,
+              datos: input.datos,
+            });
+            if (!borrador.ok) return borrador;
+            const versionBorrador = (borrador.value as { version: number }).version;
+
+            // (2) Enviar (validación completa server-side). Idempotente por
+            //     sub-opId; si ya estaba ENVIADA por un intento previo, el propio
+            //     comando devuelve `idempotente` sin re-aplicar.
+            const enviado = await deps.runtime.commands.execute(childContext(ctx), "modulo.formularios.respuesta.enviar", {
+              id: respuestaId,
+              opId: `${input.opId}:enviar`,
+              version: versionBorrador,
+            });
+            if (!enviado.ok) return enviado;
+
+            // (3) ANCLAR a la OT re-leyendo su versión ACTUAL (recuperable: si un
+            //     intento anterior falló DESPUÉS de enviar, este paso completa el
+            //     anclaje sin re-crear la respuesta). UoW SEPARADA por asociación.
+            const uowPort = deps.runtime.container.resolve(KernelTokens.unitOfWork);
+            const asociado = await uowPort.execute(ctx, (uow) =>
+              asociarPlantilla(
+                deps,
+                adapters,
+                ctx,
+                uow,
+                {
+                  id: input.id,
+                  expectedVersion: actual.value!.version,
+                  opId: `${input.opId}:asociar`,
+                  plantilla: { clave: input.plantilla.clave, version: input.plantilla.version, etiqueta: input.plantilla.etiqueta },
+                  respuestaId,
+                },
+                input.clase,
+              ),
+            );
+            if (!asociado.ok) return asociado;
+
+            const resultado = {
+              id: input.id,
+              clase: input.clase,
+              respuestaId,
+              plantilla: { clave: input.plantilla.clave, version: input.plantilla.version },
+              version: (asociado.value as { version: number }).version,
+            };
+            const rec = await uowPort.execute(ctx, (uow) =>
+              adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando, resultado }, ctx.principal.id),
+            );
+            if (!rec.ok) return rec;
+            return ok({ ...resultado, idempotente: false });
           },
         };
       },

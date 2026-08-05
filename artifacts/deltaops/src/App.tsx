@@ -16,6 +16,13 @@ import ActivosArboles from '@/pages/activos-arboles';
 import ActivosSincronizacion from '@/pages/activos-sincronizacion';
 import ActivosEscanear from '@/pages/activos-escanear';
 import ActivosFicha from '@/pages/activos-ficha';
+import OrdenesOperaciones from '@/pages/ordenes-operaciones';
+import OrdenesNueva from '@/pages/ordenes-nueva';
+import OrdenesSupervisor from '@/pages/ordenes-supervisor';
+import OrdenesPlanificacion from '@/pages/ordenes-planificacion';
+import OrdenesEscanear from '@/pages/ordenes-escanear';
+import OrdenesSincronizacion from '@/pages/ordenes-sincronizacion';
+import OrdenesFicha from '@/pages/ordenes-ficha';
 
 const queryClient = new QueryClient();
 
@@ -51,6 +58,13 @@ function Router() {
       <Route path="/activos/sincronizacion" component={ActivosSincronizacion} />
       <Route path="/activos/escanear" component={ActivosEscanear} />
       <Route path="/activos/:id" component={ActivosFicha} />
+      <Route path="/ordenes" component={OrdenesOperaciones} />
+      <Route path="/ordenes/nueva" component={OrdenesNueva} />
+      <Route path="/ordenes/supervisor" component={OrdenesSupervisor} />
+      <Route path="/ordenes/planificacion" component={OrdenesPlanificacion} />
+      <Route path="/ordenes/escanear" component={OrdenesEscanear} />
+      <Route path="/ordenes/sincronizacion" component={OrdenesSincronizacion} />
+      <Route path="/ordenes/:id" component={OrdenesFicha} />
       <Route component={NotFound} />
     </Switch>
   );

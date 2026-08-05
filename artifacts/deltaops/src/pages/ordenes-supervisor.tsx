@@ -1,0 +1,203 @@
+/**
+ * DGP-009.3 · Centro del Supervisor.
+ *
+ * Gestión de asignaciones/reasignaciones, validación de cierre (aprobar/devolver),
+ * carga de trabajo por técnico, vencidas y SLA. Todas las escrituras degradan a
+ * la cola offline.
+ */
+import React, { useMemo, useState } from "react";
+import {
+  PageHeader,
+  Section,
+  Card,
+  CardContent,
+  CardHeader,
+  Button,
+  Badge,
+  KpiCard,
+  Spinner,
+  ErrorState,
+  EmptyState,
+  Table as DoTable,
+  Modal,
+  Alert,
+  useToast,
+} from "@workspace/design-system";
+import { ShellOrdenes } from "../lib/ordenes/Shell";
+import { useListado } from "../lib/ordenes/hooks";
+import { useOffline } from "../lib/offline/contexto";
+import { asignar, aprobarCierre } from "../lib/ordenes/mutaciones";
+import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/FormularioDinamico";
+import { plantillaAsignacion } from "../lib/forms/plantillas-ordenes";
+import { BadgeEstado, esCritica, proximaAVencer } from "../lib/ordenes/componentes";
+import type { OrdenRow } from "../lib/ordenes/tipos";
+
+export default function OrdenesSupervisorPage() {
+  return (
+    <ShellOrdenes activo="/ordenes/supervisor">
+      <Supervisor />
+    </ShellOrdenes>
+  );
+}
+
+function Supervisor() {
+  const { datos, cargando, error, recargar } = useListado({ limit: 300 });
+  const ahoraMs = useMemo(() => Date.parse(new Date().toISOString()), []);
+
+  if (cargando) return <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-8)" }}><Spinner /></div>;
+  if (error) return <ErrorState titulo="No se pudo cargar" descripcion={error.message} onReintentar={recargar} />;
+
+  const ordenes = datos ?? [];
+  const activas = ordenes.filter((o) => o.estado !== "CERRADA" && o.estado !== "CANCELADA");
+  const enValidacion = ordenes.filter((o) => o.estado === "EN_VALIDACION");
+  const sinAsignar = ordenes.filter((o) => !o.responsable && o.estado !== "CERRADA" && o.estado !== "CANCELADA");
+  const criticas = activas.filter(esCritica);
+  const vencer = activas.filter((o) => proximaAVencer(o, ahoraMs));
+
+  // Carga por técnico.
+  const carga = new Map<string, number>();
+  for (const o of activas) {
+    if (o.responsable) carga.set(o.responsable, (carga.get(o.responsable) ?? 0) + 1);
+  }
+
+  return (
+    <>
+      <PageHeader titulo="Centro del Supervisor" descripcion="Asignación, validación, carga de trabajo y SLA." />
+
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+        <KpiCard titulo="Activas" valor={String(activas.length)} />
+        <KpiCard titulo="En validación" valor={String(enValidacion.length)} />
+        <KpiCard titulo="Sin asignar" valor={String(sinAsignar.length)} />
+        <KpiCard titulo="Críticas" valor={String(criticas.length)} />
+        <KpiCard titulo="Por vencer" valor={String(vencer.length)} />
+      </div>
+
+      <Section titulo="Pendientes de validación">
+        {enValidacion.length === 0 ? (
+          <Card><CardContent><EmptyState titulo="Nada por validar" /></CardContent></Card>
+        ) : (
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+            {enValidacion.map((o) => <TarjetaValidacion key={o.id} orden={o} onCambio={recargar} />)}
+          </div>
+        )}
+      </Section>
+
+      <Section titulo="Asignación de trabajo">
+        {sinAsignar.length === 0 ? (
+          <Card><CardContent><EmptyState titulo="Todo asignado" descripcion="No hay órdenes activas sin responsable." /></CardContent></Card>
+        ) : (
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+            {sinAsignar.map((o) => <TarjetaAsignacion key={o.id} orden={o} onCambio={recargar} />)}
+          </div>
+        )}
+      </Section>
+
+      <Section titulo="Carga por técnico">
+        {carga.size === 0 ? (
+          <Card><CardContent><EmptyState titulo="Sin carga registrada" /></CardContent></Card>
+        ) : (
+          <Card>
+            <CardContent>
+              <DoTable caption="Carga de trabajo por técnico">
+                <thead><tr><th>Técnico</th><th>Órdenes activas</th></tr></thead>
+                <tbody>
+                  {[...carga.entries()].sort((a, b) => b[1] - a[1]).map(([tec, n]) => (
+                    <tr key={tec}><td>{tec}</td><td><Badge variant={n > 5 ? "advertencia" : "neutro"}>{n}</Badge></td></tr>
+                  ))}
+                </tbody>
+              </DoTable>
+            </CardContent>
+          </Card>
+        )}
+      </Section>
+    </>
+  );
+}
+
+function TarjetaValidacion({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+  const { cola } = useOffline();
+  const toast = useToast();
+  const [ocupado, setOcupado] = useState(false);
+
+  async function resolver(aprobado: boolean) {
+    setOcupado(true);
+    const r = await aprobarCierre(cola, orden.id, aprobado);
+    setOcupado(false);
+    if (r.error) toast.mostrar({ variant: "error", titulo: "Error", mensaje: r.error.message });
+    else { toast.mostrar({ variant: r.encolada ? "info" : "exito", titulo: aprobado ? "Cierre aprobado" : "Orden devuelta" }); onCambio(); }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--do-sp-2)", alignItems: "center" }}>
+          <span><code style={{ fontSize: "var(--do-text-xs)" }}>{orden.codigo}</code> {orden.titulo}</span>
+          <BadgeEstado estado={orden.estado} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>Responsable: {orden.responsable ?? "—"}</p>
+        <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
+          <Button variant="primario" size="sm" disabled={ocupado} onClick={() => void resolver(true)}>Aprobar cierre</Button>
+          <Button variant="peligro" size="sm" disabled={ocupado} onClick={() => void resolver(false)}>Devolver</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TarjetaAsignacion({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <Card>
+      <CardHeader>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--do-sp-2)", alignItems: "center" }}>
+          <span><code style={{ fontSize: "var(--do-text-xs)" }}>{orden.codigo}</code> {orden.titulo}</span>
+          <BadgeEstado estado={orden.estado} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>Sin responsable asignado.</p>
+        <Button variant="primario" size="sm" onClick={() => setAbierto(true)}>Asignar</Button>
+      </CardContent>
+      {abierto && <ModalAsignacion orden={orden} onCerrar={() => setAbierto(false)} onGuardado={() => { setAbierto(false); onCambio(); }} />}
+    </Card>
+  );
+}
+
+function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenRow; onCerrar: () => void; onGuardado: () => void }) {
+  const { cola } = useOffline();
+  const def = useMemo(() => plantillaAsignacion([], []), []);
+  const form = useFormularioDinamico(def, {}, { responsable: orden.responsable ?? "", supervisor: orden.supervisor ?? "" });
+  const [guardando, setGuardando] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function guardar() {
+    setGuardando(true);
+    setErr(null);
+    const r = await asignar(cola, orden.id, orden.version, {
+      responsable: form.valores.responsable ? String(form.valores.responsable) : null,
+      supervisor: form.valores.supervisor ? String(form.valores.supervisor) : null,
+    });
+    setGuardando(false);
+    if (r.error) setErr(r.error.message);
+    else onGuardado();
+  }
+
+  return (
+    <Modal
+      abierto
+      onClose={onCerrar}
+      titulo={`Asignar ${orden.codigo}`}
+      pie={
+        <>
+          <Button variant="fantasma" onClick={onCerrar}>Cancelar</Button>
+          <Button variant="primario" loading={guardando} onClick={() => void guardar()}>Asignar</Button>
+        </>
+      }
+    >
+      {err && <Alert variant="error" titulo={err} />}
+      <FormularioDinamico definicion={def} valores={form.valores} onCambio={form.setValores} hallazgos={form.hallazgos} />
+    </Modal>
+  );
+}

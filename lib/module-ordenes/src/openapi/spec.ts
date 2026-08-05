@@ -77,8 +77,73 @@ export function construirOpenApi(): Record<string, unknown> {
     Transicionar: obj({ id: str(), comando: str(), aprobado: bool(), opId: str() }, ["id", "comando"]),
     Asignar: obj({ id: str(), expectedVersion: int({ minimum: 1 }), responsable: str({ nullable: true }), supervisor: str({ nullable: true }), opId: str() }, ["id", "expectedVersion"]),
     RegistrarEjecucion: obj({ id: str(), expectedVersion: int({ minimum: 1 }), diagnostico: obj({}, []), opId: str() }, ["id", "expectedVersion"]),
-    AsociarPlantilla: obj({ id: str(), clave: str(), version: int({ minimum: 1 }), respuestaId: str({ nullable: true }), opId: str() }, ["id", "clave", "version"]),
-    AgregarEvidencia: obj({ id: str(), attachmentId: str(), titulo: str(), opId: str() }, ["id", "attachmentId"]),
+    PlantillaRef: obj(
+      { servicio: str(), clave: str(), version: int({ minimum: 1 }), etiqueta: str() },
+      ["clave", "version"],
+    ),
+    AsociarPlantilla: obj(
+      { id: str(), expectedVersion: int({ minimum: 1 }), plantilla: ref("PlantillaRef"), respuestaId: str({ nullable: true }), opId: str() },
+      ["id", "expectedVersion", "plantilla"],
+    ),
+    Evidencia: obj(
+      {
+        attachmentId: str(),
+        nombreArchivo: str(),
+        mimeType: str(),
+        tamanoBytes: int({ minimum: 0 }),
+        hashSha256: str({ minLength: 64, maxLength: 64 }),
+        etapa: str(),
+        descripcion: str(),
+      },
+      ["attachmentId", "nombreArchivo", "mimeType", "tamanoBytes", "hashSha256"],
+    ),
+    AgregarEvidencia: obj(
+      { id: str(), expectedVersion: int({ minimum: 1 }), evidencia: ref("Evidencia"), opId: str() },
+      ["id", "expectedVersion", "evidencia"],
+    ),
+    RegistrarDocumentacion: obj(
+      {
+        categoria: str(),
+        nombreArchivo: str(),
+        mimeType: str(),
+        tamanoBytes: int({ minimum: 0 }),
+        hashSha256: str({ minLength: 64, maxLength: 64 }),
+        expectedVersion: int({ minimum: 1 }),
+        opId: str(),
+      },
+      ["categoria", "nombreArchivo", "mimeType", "tamanoBytes", "hashSha256", "expectedVersion"],
+    ),
+    DocumentacionUrl: obj(
+      {
+        attachmentId: str(),
+        url: str(),
+        expiresAt: int(),
+        nombreArchivo: str({ nullable: true }),
+        mimeType: str({ nullable: true }),
+        tamanoBytes: int({ nullable: true }),
+        hashSha256: str({ nullable: true }),
+      },
+      ["attachmentId", "url", "expiresAt"],
+    ),
+    PlantillaDefinicion: obj(
+      {
+        clave: str(),
+        version: int({ minimum: 1 }),
+        titulo: str(),
+        definicion: { type: "object", additionalProperties: true, nullable: true } as Schema,
+      },
+      ["clave", "version", "titulo"],
+    ),
+    CapturaRespuesta: obj(
+      {
+        clave: str(),
+        version: int({ minimum: 1 }),
+        etiqueta: str(),
+        datos: { type: "object", additionalProperties: true } as Schema,
+        opId: str(),
+      },
+      ["clave", "version", "datos", "opId"],
+    ),
     Planificar: obj(
       {
         ordenId: str(),
@@ -189,6 +254,16 @@ export function construirOpenApi(): Record<string, unknown> {
     parameters: [idParam], requestBody: jsonBody(ref("AsociarPlantilla")),
     responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
   });
+  add(`${BASE}/{id}/{clase}/respuesta`, "post", {
+    tags: ["Documentación"],
+    operationId: "ordenes.capturarRespuesta",
+    summary: "Capturar respuesta de un formulario/checklist asociado (comando orquestador, idempotente y offline)",
+    description:
+      "Comando único `modulo.ordenes.capturarRespuesta`: compone en el servidor respuesta.guardarBorrador (anclada a clave+versión exacta) → respuesta.enviar (validación completa) → asociación a la OT re-leyendo su versión ACTUAL. Idempotente por opId y RECUPERABLE (los reintentos —incl. replay por /sync desde la cola offline— convergen al mismo resultado, sin duplicar ni dejar respuestas huérfanas). La respuesta queda ANCLADA a la asociación/plantilla/versión concreta.",
+    parameters: [idParam, pathParam("clase", "Clase de plantilla: formulario | checklist")],
+    requestBody: jsonBody(ref("CapturaRespuesta")),
+    responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
+  });
   add(`${BASE}/{id}/evidencias`, "post", {
     tags: ["Documentación"], operationId: "ordenes.agregarEvidencia", summary: "Agregar evidencia (platform.attachment, referencia-only)",
     parameters: [idParam], requestBody: jsonBody(ref("AgregarEvidencia")),
@@ -198,6 +273,33 @@ export function construirOpenApi(): Record<string, unknown> {
     tags: ["Documentación"], operationId: "ordenes.documentacion", summary: "Documentación de la OT (formularios/checklists/evidencias)",
     parameters: [idParam, queryParam("clase", "Filtro por clase de documento")],
     responses: { "200": jsonOk(obj({ documentacion: arr(obj({}, [])) }, [])), ...errores("401", "403") },
+  });
+  add(`${BASE}/{id}/documentacion`, "post", {
+    tags: ["Documentación"],
+    operationId: "ordenes.registrarDocumentacion",
+    summary: "Registrar evidencia por referencia (platform.attachment.register + agregarEvidencia)",
+    description:
+      "Registra el adjunto en el Attachment Service de plataforma (referencia-only: metadatos + hash, NUNCA el binario) obteniendo un attachmentId, y luego agrega la evidencia a la OT anclada a su versión (control de concurrencia).",
+    parameters: [idParam], requestBody: jsonBody(ref("RegistrarDocumentacion")),
+    responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
+  });
+  add(`${BASE}/{id}/documentacion/{attachmentId}/url`, "get", {
+    tags: ["Documentación"],
+    operationId: "ordenes.documentacionUrl",
+    summary: "URL firmada + metadatos de una evidencia (verificación de referencia)",
+    description:
+      "Devuelve la URL firmada (HMAC + caducidad) y los metadatos verificables del adjunto. El binario NUNCA se expone por esta vía; sirve para verificar la referencia.",
+    parameters: [idParam, pathParam("attachmentId", "Identificador del adjunto en plataforma")],
+    responses: { "200": jsonOk(ref("DocumentacionUrl")), ...errores("401", "403", "404") },
+  });
+  add(`${BASE}/plantillas/{clave}/{version}`, "get", {
+    tags: ["Documentación"],
+    operationId: "ordenes.plantillaDefinicion",
+    summary: "Definición de una plantilla de Dynamic Forms (clave + versión exacta)",
+    description:
+      "Proxy de sólo lectura a modulo.formularios.plantilla.obtener. Devuelve la definición renderizable y metadatos de la plantilla asociada, para capturar su resultado durante la ejecución (respuesta anclada a clave+versión).",
+    parameters: [pathParam("clave", "Clave de la plantilla"), pathParam("version", "Versión exacta de la plantilla")],
+    responses: { "200": jsonOk(ref("PlantillaDefinicion")), ...errores("400", "401", "403", "404") },
   });
   add(`${BASE}/{id}/formularios`, "get", {
     tags: ["Documentación"], operationId: "ordenes.formularios", summary: "Formularios asociados",

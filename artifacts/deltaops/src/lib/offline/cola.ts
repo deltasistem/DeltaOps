@@ -18,10 +18,12 @@ import type {
 } from "./tipos";
 import { ESTADOS_EXITO } from "./tipos";
 
-const PREFIJO = "deltaops:activos:cola:";
-
-function claveTenant(tenant: string): string {
-  return `${PREFIJO}${tenant}`;
+/**
+ * Base del prefijo de almacenamiento. Cada módulo (activos/ordenes) usa su propio
+ * espacio de nombres para aislar las colas, manteniendo el aislamiento por tenant.
+ */
+function claveTenant(tenant: string, modulo: string): string {
+  return `deltaops:${modulo}:cola:${tenant}`;
 }
 
 /** Genera un UUID v4 (usa crypto.randomUUID si está disponible). */
@@ -61,6 +63,8 @@ export class ColaSync {
     private readonly tenant: string,
     private readonly enviador: (ops: OperacionCola[]) => Promise<ResumenSync> = enviarPorHttp,
     private readonly storage: Storage | null = typeof localStorage !== "undefined" ? localStorage : null,
+    /** Espacio de nombres del módulo (aísla la cola por dominio). */
+    private readonly modulo: string = "activos",
   ) {
     this.cargar();
   }
@@ -70,7 +74,7 @@ export class ColaSync {
   private cargar(): void {
     if (!this.storage) return;
     try {
-      const raw = this.storage.getItem(claveTenant(this.tenant));
+      const raw = this.storage.getItem(claveTenant(this.tenant, this.modulo));
       if (raw) {
         const datos = JSON.parse(raw) as OperacionCola[];
         // Al recargar, 'enviando' vuelve a 'pendiente' (recuperación).
@@ -88,7 +92,7 @@ export class ColaSync {
   private guardar(): void {
     if (!this.storage) return;
     try {
-      this.storage.setItem(claveTenant(this.tenant), JSON.stringify(this.ops));
+      this.storage.setItem(claveTenant(this.tenant, this.modulo), JSON.stringify(this.ops));
     } catch {
       /* cuota excedida: se ignora, la cola sigue en memoria */
     }
@@ -215,17 +219,24 @@ export class ColaSync {
   }
 }
 
-/** Enviador HTTP por defecto: POST /api/deltaops/activos/sync. */
-export async function enviarPorHttp(ops: OperacionCola[]): Promise<ResumenSync> {
-  const operaciones = ops.map((o) => ({ opId: o.opId, comando: o.comando, input: o.input }));
-  const res = await fetch("/api/deltaops/activos/sync", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operaciones }),
-  });
-  if (!res.ok) {
-    throw new Error(`sync HTTP ${res.status}`);
-  }
-  return (await res.json()) as ResumenSync;
+/** Crea un enviador HTTP para el endpoint /sync de un módulo dado. */
+export function crearEnviadorHttp(
+  url: string,
+): (ops: OperacionCola[]) => Promise<ResumenSync> {
+  return async (ops: OperacionCola[]): Promise<ResumenSync> => {
+    const operaciones = ops.map((o) => ({ opId: o.opId, comando: o.comando, input: o.input }));
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operaciones }),
+    });
+    if (!res.ok) {
+      throw new Error(`sync HTTP ${res.status}`);
+    }
+    return (await res.json()) as ResumenSync;
+  };
 }
+
+/** Enviador HTTP por defecto: POST /api/deltaops/activos/sync. */
+export const enviarPorHttp = crearEnviadorHttp("/api/deltaops/activos/sync");

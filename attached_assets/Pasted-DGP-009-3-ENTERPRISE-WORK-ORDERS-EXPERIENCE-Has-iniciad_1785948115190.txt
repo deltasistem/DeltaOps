@@ -1,0 +1,481 @@
+DGP-009.3 — ENTERPRISE WORK ORDERS EXPERIENCE
+
+Has iniciado oficialmente la subfase DGP-009.3 — Enterprise Work Orders Experience del programa DeltaOps.
+
+Todo el corpus arquitectónico permanece completamente congelado.
+
+No está permitido modificar, reinterpretar ni sustituir ninguna decisión de:
+
+ETS-001…012
+ENGINEERING_CHARTER
+ESI-001…010
+DGP-000…009.2
+
+Toda implementación deberá construirse reutilizando exclusivamente:
+
+DGP-002 — Kernel
+DGP-003 — Shared Platform
+DGP-004 — Reference Module
+DGP-005 — Experience Foundation (Design System)
+DGP-006 — Business Foundation
+DGP-007 — Workflow Engine + Dynamic Forms
+DGP-008.x — Enterprise Assets
+DGP-009.1
+DGP-009.2
+
+No se podrán introducir patrones arquitectónicos nuevos.
+
+No se permite duplicar infraestructura.
+
+No se permite modificar el dominio.
+
+No se permite modificar el Workflow Engine.
+
+No se permite modificar Dynamic Forms.
+
+No se permite modificar Shared Platform.
+
+Todo deberá componerse sobre el corpus existente.
+
+OBJETIVO
+
+Construir la experiencia completa del módulo Órdenes de Trabajo, dejando un producto completamente operativo para:
+
+Técnicos
+Supervisores
+Planificadores
+Coordinadores
+Administradores
+
+El resultado deberá permitir operar una jornada completa de mantenimiento desde DeltaOps.
+
+No construir dashboards ejecutivos.
+
+No construir analítica.
+
+No construir IA.
+
+No construir reportes.
+
+No construir BI.
+
+Esta fase corresponde exclusivamente a la experiencia operacional.
+
+ALCANCE OBLIGATORIO
+1. Centro de Operaciones
+
+Construir la superficie principal del módulo.
+
+No será un CRUD.
+
+Será un Centro de Operaciones.
+
+Debe incluir:
+
+Mis órdenes
+Pendientes
+Nuevas
+En ejecución
+En espera
+En validación
+Próximas a vencer
+Críticas
+Canceladas
+Cerradas
+
+Con filtros rápidos.
+
+Búsqueda.
+
+Estados visuales.
+
+Acciones inmediatas.
+
+2. Centro del Técnico
+
+Experiencia completamente enfocada al trabajo de campo.
+
+Debe permitir:
+
+Aceptar orden.
+
+Rechazar.
+
+Pausar.
+
+Reanudar.
+
+Finalizar.
+
+Registrar horas.
+
+Registrar materiales utilizados.
+
+Registrar herramientas.
+
+Registrar observaciones.
+
+Registrar comentarios.
+
+Agregar fotografías.
+
+Agregar videos.
+
+Agregar documentos.
+
+Agregar firmas.
+
+Registrar ubicación.
+
+Escanear QR.
+
+Consultar historial del activo.
+
+Consultar información del activo.
+
+Todo desde una única experiencia.
+
+Todo Offline First.
+
+3. Centro del Supervisor
+
+Vista especializada para supervisión.
+
+Debe permitir:
+
+Asignar órdenes.
+
+Reasignar.
+
+Ver conflictos.
+
+Detectar bloqueos.
+
+Gestionar esperas.
+
+Validar trabajos.
+
+Aprobar.
+
+Rechazar.
+
+Visualizar carga de trabajo.
+
+Detectar órdenes vencidas.
+
+Seguimiento de SLA.
+
+Seguimiento de cuadrillas.
+
+Seguimiento de técnicos.
+
+4. Centro de Planificación
+
+Construir una experiencia especializada para programación.
+
+Debe incluir:
+
+Calendario.
+
+Agenda.
+
+Programación.
+
+Reprogramación.
+
+Drag & Drop.
+
+Conflictos visuales.
+
+Disponibilidad.
+
+Bloqueos.
+
+Ventanas de mantenimiento.
+
+Carga por técnico.
+
+Carga por cuadrilla.
+
+5. Wizard de Creación
+
+Construir un asistente completo utilizando exclusivamente Dynamic Forms.
+
+Persistencia automática.
+
+Borradores.
+
+Validación por paso.
+
+Resumen final.
+
+Confirmación.
+
+6. Ejecución de la Orden
+
+Cuando una OT pase a estado EN EJECUCIÓN deberán integrarse automáticamente:
+
+Checklist.
+
+Formulario.
+
+Materiales.
+
+Recursos.
+
+Bitácora.
+
+Comentarios.
+
+Adjuntos.
+
+Timeline.
+
+Todo dentro de una única experiencia.
+
+No obligar al usuario a navegar entre múltiples pantallas.
+
+7. Timeline Operacional
+
+Construir una experiencia visual utilizando exclusivamente Shared Timeline.
+
+Debe integrar:
+
+Eventos.
+
+Comentarios.
+
+Adjuntos.
+
+Cambios de estado.
+
+Cambios de responsable.
+
+Cambios de planificación.
+
+Evidencias.
+
+Todo cronológicamente.
+
+8. Gestión Documental
+
+Visualización completa de:
+
+Fotografías.
+
+Videos.
+
+PDF.
+
+Procedimientos.
+
+Manuales.
+
+Certificados.
+
+Planos.
+
+Diagramas.
+
+Siempre mediante Attachment Service.
+
+Nunca binarios en PostgreSQL.
+
+9. Offline First
+
+Implementar la experiencia completa Offline.
+
+Debe incluir:
+
+Cola visible.
+
+Estado de sincronización.
+
+Conflictos.
+
+Reintentos.
+
+Recuperación.
+
+Recepción de recibos.
+
+Resolución de conflictos.
+
+Operación sin conexión.
+
+10. QR
+
+Integración completa con Platform QR.
+
+Desde un escaneo deberá poder:
+
+Abrir el activo.
+
+Abrir las órdenes abiertas.
+
+Crear una nueva OT.
+
+Consultar historial.
+
+Todo mediante navegación contextual.
+
+11. Navegación
+
+Toda la navegación deberá seguir ESI-008.
+
+No crear marcos nuevos.
+
+No crear shells nuevos.
+
+No crear layouts nuevos.
+
+Usar únicamente el Experience Foundation.
+
+12. Design System
+
+Toda la interfaz deberá construirse exclusivamente utilizando:
+
+@workspace/design-system
+
+No crear componentes visuales propios.
+
+No crear nuevos colores.
+
+No crear nuevos estilos.
+
+No crear nuevas tipografías.
+
+No crear nuevos iconos.
+
+Todo deberá consumir los tokens oficiales del Brandbook DELTA.
+
+13. Responsive
+
+Desktop.
+
+Tablet.
+
+Mobile.
+
+Una única experiencia.
+
+No aplicaciones separadas.
+
+14. Accesibilidad
+
+Cumplimiento AA.
+
+Navegación por teclado.
+
+Foco visible.
+
+ARIA.
+
+Contraste.
+
+Semántica.
+
+15. API
+
+Completar únicamente los endpoints necesarios para la experiencia.
+
+Mantener:
+
+Contract First.
+
+OpenAPI.
+
+Drift Detection.
+
+Errores Kernel→HTTP.
+
+16. Pruebas
+
+Construir suites para:
+
+UI.
+
+Wizard.
+
+Offline.
+
+Timeline.
+
+QR.
+
+Planificación.
+
+Supervisor.
+
+Técnico.
+
+Workflow.
+
+Dynamic Forms.
+
+Accesibilidad.
+
+Responsive.
+
+Todo integrado al pipeline existente.
+
+17. Documentación
+
+Documentación completa.
+
+En español.
+
+Diagramas.
+
+Flujos.
+
+Capturas.
+
+Guías técnicas.
+
+Guías funcionales.
+
+REVISIÓN ARQUITECTÓNICA OBLIGATORIA
+
+Ejecutar una revisión independiente completa.
+
+Validar como mínimo:
+
+Experiencia de usuario.
+Mobile First.
+Offline First.
+Workflow.
+Dynamic Forms.
+Shared Platform.
+QR.
+Timeline.
+Accesibilidad.
+Responsive.
+Design System.
+Seguridad.
+Performance.
+Multitenancy.
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+CRITERIOS DE ACEPTACIÓN
+
+La fase solo podrá darse por terminada si:
+
+Un técnico puede ejecutar completamente una Orden de Trabajo desde DeltaOps.
+Un supervisor puede gestionar el ciclo completo de una OT.
+Un planificador puede programar y reprogramar órdenes.
+Todo funciona offline.
+Todo sincroniza correctamente.
+Toda la UI utiliza exclusivamente el Design System.
+No existe lógica duplicada.
+No existe infraestructura nueva.
+No existe código de negocio fuera del módulo.
+Todo el flujo queda validado mediante pruebas automatizadas.
+INFORME FINAL
+
+Al finalizar entregar únicamente el Informe Oficial de Cierre DGP-009.3, siguiendo exactamente el formato oficial del programa.
+
+No iniciar automáticamente DGP-010.
+
+Esperar instrucciones de la Dirección del Programa.
