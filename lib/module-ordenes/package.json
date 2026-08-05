@@ -16,10 +16,12 @@
     "@workspace/business-foundation": "workspace:*",
     "@workspace/workflow-engine": "workspace:*",
     "@workspace/dynamic-forms": "workspace:*",
+    "pg": "^8.20.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "^8.11.0",
     "vitest": "^4.1.10"
   }
 }

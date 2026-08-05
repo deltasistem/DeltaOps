@@ -28,8 +28,9 @@ indispensables se declaran como **puertos** en `domain/ports.ts` —
 memoria** (`infrastructure/fakes.ts`). Los **adaptadores concretos** (PostgreSQL
 / Record Store) y **todo el read-side** (proyección CQRS a read model, bitácora
 durable, dashboard, indexación de búsqueda) llegan en **DGP-009.2**. La única
-lectura del dominio es `modulo.ordenes.detalle`, que lee el **aggregate** del
-repositorio (no un read model materializado).
+lectura del dominio es `modulo.ordenes.detalle`. **DGP-009.2** materializa todo el
+read-side y `detalle` pasa a leer **exclusivamente** del read model de detalle
+(`ord_ordenes_read`), sin *fallback* al aggregate (CQRS estricto).
 
 ## Composición del runtime (pruebas)
 
@@ -41,7 +42,7 @@ de prueba, no de producción:
 2. `modulo.ordenes.workflow` — motor de Workflow (fuente de verdad del ciclo de vida).
 3. `modulo.ordenes` — este módulo de negocio (con fakes de sus puertos).
 
-## Documentos
+## Documentos (dominio · DGP-009.1)
 
 - `dominio.md` — aggregate, objetos de valor e invariantes.
 - `maquina-estados.md` — ciclo de vida declarativo y mapeo motor↔negocio.
@@ -50,6 +51,27 @@ de prueba, no de producción:
 - `formularios-checklists.md` — asociación anclada a versión y evidencias.
 - `offline.md` — idempotencia por `opId` y sincronización de colas.
 - `permisos.md` — permisos, capacidades y multitenancy.
+
+## Documentos (infraestructura operacional · DGP-009.2)
+
+- `read-models.md` — proyecciones CQRS, tablas e idempotencia.
+- `eventos.md` — event log durable (`ord_eventos`) y payload autosuficiente.
+- `reconstruccion-cqrs.md` — reproyección por replay con equivalencia.
+- `timeline.md` — Shared Timeline de plataforma.
+- `sync.md` — sincronización offline por orquestación (claim→ejecutar→finalizar).
+- `consola.md` — Consola Técnica (admin, solo API).
+- `api.md` — API HTTP en `/api/deltaops/ordenes` y contrato OpenAPI + drift test.
+- `planificacion.md` — planificación, agenda y calendario.
+- `asignaciones.md` — asignaciones y responsables.
+- `recursos.md` — recursos por referencia (sin inventario).
+- `sla.md` — SLA configurable (pausas/reanudación).
+- `bitacora-operacional.md` — bitácora (8 acciones) siempre por eventos.
+- `relaciones.md` — relaciones, dependencias y activos relacionados.
+
+> DGP-009.2 añade toda la **infraestructura operacional** (persistencia propia con
+> migraciones SQL y RLS, event log durable, read models CQRS, planificación,
+> asignaciones, recursos, SLA, relaciones, bitácora, offline, timeline, consola y
+> API contract-first). El dominio 009.1 permanece congelado y se reutiliza.
 
 ## Pruebas
 

@@ -70,7 +70,13 @@ composición de runtime de producción llegan en **DGP-009.2**.
 El **read-side** (read models materializados, proyección CQRS, **bitácora
 durable**, dashboard, indexación de búsqueda) NO forma parte de 009.1: es
 infraestructura de lectura de **DGP-009.2**. La única lectura expuesta es
-`modulo.ordenes.detalle`, que devuelve el **aggregate** del repositorio.
+`modulo.ordenes.detalle`.
+
+> **Actualización DGP-009.2 (CQRS estricto):** `modulo.ordenes.detalle` ahora lee
+> **exclusivamente** del read model de detalle (`ord_ordenes_read`), materializado por
+> la proyección de eventos (idéntico tras `reproyectar`). **No** consulta el aggregate/
+> repositorio ni tiene *fallback* a él: toda consulta pasa por read models. Véase
+> `docs/read-models.md`.
 
 Para pruebas se proveen **fakes en memoria** (`infrastructure/fakes.ts`) y un
 **harness de prueba** (`__tests__/harness.ts`) que monta los motores reales de

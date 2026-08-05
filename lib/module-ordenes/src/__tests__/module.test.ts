@@ -60,10 +60,14 @@ const exec = (ctx: ExecutionContext, cmd: string, input: unknown) => rt.platform
 const query = (ctx: ExecutionContext, q: string, input: unknown) => rt.platform.kernel.queries.execute(ctx, q, input);
 const sincronizar = (ctx: ExecutionContext, ops: readonly OperacionSync[]) =>
   procesarCola(rt.platform, rt.adapters, ctx, ops);
+// CQRS: `detalle` lee del read model, materializado al drenar el outbox. Los
+// helpers drenan tras cada comando para que las lecturas reflejen el estado.
+const drenar = () => rt.platform.kernel.outboxProcessor.processPending();
 
 async function crear(ctx: ExecutionContext, extra: Record<string, unknown> = {}) {
   const r = await exec(ctx, `${MODULO}.crear`, { titulo: "OT", tipo: "correctiva", ...extra });
   if (!r.ok) throw new Error(r.error.message);
+  await drenar();
   return r.value as { id: string; codigo: string; estado: string; version: number };
 }
 
@@ -72,6 +76,7 @@ async function avanzar(ctx: ExecutionContext, id: string, comandos: string[]) {
     const r = await exec(ctx, `${MODULO}.transicionar`, { id, comando });
     if (!r.ok) throw new Error(`${comando}: ${r.error.message}`);
   }
+  await drenar();
 }
 
 describe("consecutivo configurable", () => {
@@ -155,7 +160,7 @@ describe("ciclo de vida gobernado por Workflow Engine", () => {
     const ctx = ctxOf("t-wf3");
     const { id } = await crear(ctx);
     await avanzar(ctx, id, ["abrir", "planificar", "asignar", "iniciar", "pausar"]);
-    // `detalle` lee el AGGREGATE (no read model): el estado ya está sincronizado.
+    // `detalle` lee el READ MODEL (materializado al drenar en `avanzar`).
     const det = await query(ctx, `${MODULO}.detalle`, { id });
     expect(det.ok).toBe(true);
     if (det.ok) expect((det.value as { orden: { estado: string } }).orden.estado).toBe("PAUSADA");
@@ -310,17 +315,17 @@ describe("offline-first · idempotencia por opId", () => {
   });
 });
 
-describe("lectura mínima del dominio (detalle sobre el aggregate)", () => {
-  it("`detalle` devuelve el aggregate desde el repositorio (fuente de verdad)", async () => {
+describe("lectura mínima del dominio (detalle sobre el READ MODEL, CQRS)", () => {
+  it("`detalle` devuelve la fila del read model de detalle (nunca el repositorio)", async () => {
     const ctx = ctxOf("t-detalle");
     const { id, codigo } = await crear(ctx);
     const det = await query(ctx, `${MODULO}.detalle`, { id });
     expect(det.ok, !det.ok ? det.error.message : "").toBe(true);
     if (det.ok) {
-      const orden = (det.value as { orden: { id: string; estado: string; codigo: { valor: string } } }).orden;
+      const orden = (det.value as { orden: { id: string; estado: string; codigo: string } }).orden;
       expect(orden.id).toBe(id);
       expect(orden.estado).toBe("BORRADOR");
-      expect(orden.codigo.valor).toBe(codigo);
+      expect(orden.codigo).toBe(codigo);
     }
   });
 
@@ -436,6 +441,7 @@ describe("estados/transiciones extendidos por tenant (operables vía el motor)",
     const conPermiso = ctxOf(tenant, OPERADOR_ESPERA);
     const aceptado = await exec(conPermiso, `${MODULO}.transicionar`, { id, comando: "ponerEnEspera" });
     expect(aceptado.ok, !aceptado.ok ? aceptado.error.message : "").toBe(true);
+    await drenar();
     const det = await query(sys, `${MODULO}.detalle`, { id });
     if (det.ok) expect((det.value as { orden: { estado: string } }).orden.estado).toBe("EN_ESPERA");
   });

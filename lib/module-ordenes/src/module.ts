@@ -17,10 +17,12 @@ import { z } from "zod";
 import {
   childContext,
   createDomainEvent,
+  createExecutionContext,
   fail,
   KernelErrors,
   KernelTokens,
   ok,
+  SYSTEM_PRINCIPAL,
   type ExecutionContext,
   type KernelError,
   type Result,
@@ -93,13 +95,59 @@ import {
   type PlantillasPort,
   type ReciboPort,
 } from "./domain/ports";
+import {
+  ACCIONES_BITACORA,
+  ASIGNACION_REGISTRADA,
+  BITACORA_REGISTRADA,
+  CATEGORIAS_RELACION,
+  CLASES_RECURSO,
+  ESTADOS_SLA,
+  EVENTOS_OPERACIONALES,
+  PLANIFICACION_ACTUALIZADA,
+  PLANIFICACION_BLOQUEADA,
+  RECURSO_REGISTRADO,
+  RELACION_CREADA,
+  SLA_ACTUALIZADO,
+  TIPOS_ASIGNACION,
+} from "./domain/operacional";
+import {
+  ORDEN_ASIGNACION_ACTUALIZADA,
+  ORDEN_CHECKLIST_ASOCIADO,
+  ORDEN_CREADA,
+  ORDEN_ESTADO_CAMBIADO,
+  ORDEN_EVIDENCIA_AGREGADA,
+  ORDEN_FORMULARIO_ASOCIADO,
+} from "./domain/orden";
+import type {
+  OrdenReadModel,
+  OrdenReadRow,
+} from "./infrastructure/repository";
+import type {
+  Asignacion,
+  ConsolaStore,
+  EventLogStore,
+  MotorStore,
+  Planificacion,
+  ProyeccionesStore,
+  Recurso,
+  RelacionArista,
+  Sla as SlaOperativo,
+  SyncReceipt,
+  SyncReceiptStore,
+} from "./infrastructure/operacional";
+import {
+  aplicarEventoAggregate,
+  aplicarEventoOperacional,
+  handlerProyeccion,
+} from "./projection";
 
 export { MODULO };
 
 /**
- * Puertos de dominio que la capa de aplicación necesita. Los ADAPTADORES
- * concretos (Postgres / Record Store) llegan en DGP-009.2; en 009.1 se inyectan
- * FAKES en memoria (ver `infrastructure/fakes.ts`) para pruebas de dominio.
+ * Puertos de dominio + infraestructura que la capa de aplicación necesita. En
+ * runtime se inyectan adaptadores PostgreSQL (o Fakes en memoria para
+ * offline/pruebas). Incluye el aggregate + read models CQRS + bitácora durable
+ * (event log) + recibos de sync durables + stores operacionales + consola.
  */
 export interface ModuleAdapters {
   readonly repository: OrdenRepository;
@@ -107,6 +155,12 @@ export interface ModuleAdapters {
   readonly consecutivo: ConsecutivoPort;
   readonly recibos: ReciboPort;
   readonly plantillas: PlantillasPort;
+  readonly readModel: OrdenReadModel;
+  readonly eventLog: EventLogStore;
+  readonly proyecciones: ProyeccionesStore;
+  readonly motor: MotorStore;
+  readonly syncReceipts: SyncReceiptStore;
+  readonly consola: ConsolaStore;
 }
 
 /* ------------------------------ Configuración ---------------------------- */
@@ -128,13 +182,78 @@ async function configCodigo(deps: ServiceDeps, tenant: string): Promise<ConfigCo
 /* --------------------------- Application Service ------------------------- */
 
 /**
- * Persiste un cambio del aggregate + auditoría + evento de outbox, TODO dentro
- * de la misma UoW.
- *
- * NOTA (alcance 009.1): NO se materializa read model ni bitácora durable propia;
- * el read-side (proyección CQRS, bitácora, índices) es INFRAESTRUCTURA DE LECTURA
- * y llega en DGP-009.2. El evento de outbox sigue emitiéndose para que 009.2 lo
- * consuma.
+ * Emite un evento del módulo escribiéndolo ATÓMICAMENTE en la MISMA UoW en la
+ * bitácora durable (`ord_eventos`, fuente de verdad del replay) y en el outbox
+ * del Kernel (`registerEvent`), con el MISMO `event.id` en ambos. Así la
+ * reproyección desde la bitácora produce read models idénticos (mismo
+ * `lastEventId`/`eventId` que la proyección en vivo). El outbox NO es event
+ * store: es transporte at-least-once hacia los handlers idempotentes.
+ */
+async function emitirEvento(
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
+  tenantId: string,
+  evento: { tipo: string; payload: Record<string, unknown> },
+): Promise<Result<void, KernelError>> {
+  const dominio = createDomainEvent(evento.tipo, evento.payload, ctx.correlationId);
+  const logged = await adapters.eventLog.append(uow, {
+    tenantId,
+    eventId: dominio.id,
+    tipo: dominio.type,
+    payload: dominio.payload,
+    occurredAt: dominio.occurredAt,
+  });
+  if (!logged.ok) return logged;
+  uow.registerEvent(dominio);
+  return ok(undefined);
+}
+
+/**
+ * Registra un evento del módulo en el SHARED TIMELINE canónico de plataforma
+ * mediante el COMANDO `platform.timeline.record` (NUNCA escritura directa a las
+ * tablas de plataforma). Idempotente por `entryId=event.id`. Corre bajo un ctx
+ * de sistema que propaga el `correlationId` del evento.
+ */
+function registrarEnTimeline() {
+  return async (
+    deps: ServiceDeps,
+    event: { id: string; type: string; payload: Record<string, unknown>; correlationId: string },
+  ): Promise<Result<void, KernelError>> => {
+    const tenantId = String(event.payload["tenantId"] ?? "");
+    if (!tenantId) return ok(undefined);
+    const p = event.payload;
+    const ordenId = String(p["ordenId"] ?? p["id"] ?? "");
+    const entidadRelacionada = event.type === RELACION_CREADA && p["destinoId"]
+      ? `orden:${String(p["destinoId"])}`
+      : p["activoPrincipal"] && (p["activoPrincipal"] as { entityRef?: string }).entityRef
+        ? String((p["activoPrincipal"] as { entityRef?: string }).entityRef)
+        : null;
+    const sys = createExecutionContext({
+      principal: SYSTEM_PRINCIPAL,
+      correlationId: event.correlationId,
+      metadata: { tenantId },
+    });
+    const r = await deps.runtime.commands.execute(sys, "platform.timeline.record", {
+      entryId: event.id,
+      entityRef: `orden:${ordenId}`,
+      eventType: event.type,
+      actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+      occurredAt: String(p["actualizadoAt"] ?? p["ocurridoAt"] ?? new Date().toISOString()),
+      resumen: String(p["titulo"] ?? p["accion"] ?? event.type),
+      estado: p["estado"] ? String(p["estado"]) : null,
+      entidadRelacionada,
+      payload: p,
+    });
+    return r.ok ? ok(undefined) : (r as Result<void, KernelError>);
+  };
+}
+
+/**
+ * Persiste un cambio del aggregate + auditoría + evento (bitácora durable +
+ * outbox, mismo id), TODO dentro de la misma UoW. El read-side (proyección CQRS
+ * a read models, bitácora operacional, timeline compartido) lo materializan los
+ * eventHandlers idempotentes desde el payload autosuficiente (DGP-009.2).
  */
 async function persistir(
   deps: ServiceDeps,
@@ -158,8 +277,8 @@ async function persistir(
   });
   if (!audited.ok) return audited;
 
-  const evento = createDomainEvent(cambio.evento.tipo, cambio.evento.payload, ctx.correlationId);
-  uow.registerEvent(evento);
+  const emitido = await emitirEvento(adapters, ctx, uow, o.tenantId, cambio.evento);
+  if (!emitido.ok) return emitido;
   return ok(persisted.value);
 }
 
@@ -406,8 +525,9 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
       "modulo.formularios",
       "platform.attachment",
       "platform.config",
+      "platform.timeline",
     ],
-    events: [...EVENTOS_MODULO],
+    events: [...EVENTOS_MODULO, ...EVENTOS_OPERACIONALES],
     recordTypes: [
       "orden-trabajo",
       "secuencia",
@@ -1049,11 +1169,448 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           },
         };
       },
+      /* ==================== BITÁCORA OPERACIONAL (por eventos) ============= */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.bitacora.registrar`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            accion: z.enum(ACCIONES_BITACORA as unknown as [string, ...string[]]),
+            detalle: z.record(z.unknown()).optional(),
+            ocurridoAt: z.string().min(1).optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.operar`] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.bitacora.registrar`, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+            const orden = await adapters.repository.findById(tenant.value, input.ordenId);
+            if (!orden.ok) return orden;
+            if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
+            // La bitácora operacional (tiempos de campo) se admite mientras la
+            // OT no esté en estado FINAL (no exige EN_EJECUCION; ver POLICY_PUEDE_EDITAR).
+            const pol = evaluar(deps, ctx, POLICY_PUEDE_EDITAR, { estado: orden.value.estado });
+            if (!pol.ok) return pol;
+
+            const ocurridoAt = input.ocurridoAt ?? new Date().toISOString();
+            const emit = await emitirEvento(adapters, ctx, uow, tenant.value, {
+              tipo: BITACORA_REGISTRADA,
+              payload: {
+                tenantId: tenant.value, ordenId: input.ordenId, entityRef: `orden:${input.ordenId}`,
+                accion: input.accion, detalle: input.detalle ?? {}, ocurridoAt,
+                actorId: ctx.principal.id, eventoTipo: BITACORA_REGISTRADA,
+              },
+            });
+            if (!emit.ok) return emit;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, `bitacora:${input.accion}`, input.ordenId, {});
+            if (!audited.ok) return audited;
+            const resultado = { ordenId: input.ordenId, accion: input.accion, ocurridoAt };
+            if (input.opId) {
+              const rec = await adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando: `${MODULO}.bitacora.registrar`, resultado }, ctx.principal.id);
+              if (!rec.ok) return rec;
+            }
+            return ok({ ...resultado, idempotente: false });
+          },
+        };
+      },
+      /* ======================== PLANIFICACIÓN ============================== */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.planificar`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            inicioPlanificado: z.string().min(1).nullable().optional(),
+            finPlanificado: z.string().min(1).nullable().optional(),
+            ventanaInicio: z.string().min(1).nullable().optional(),
+            ventanaFin: z.string().min(1).nullable().optional(),
+            bloquear: z.boolean().optional(),
+            bloqueoMotivo: z.string().nullable().optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.write`] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.planificar`, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+            const orden = await adapters.repository.findById(tenant.value, input.ordenId);
+            if (!orden.ok) return orden;
+            if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
+            const pol = evaluar(deps, ctx, POLICY_PUEDE_EDITAR, { estado: orden.value.estado });
+            if (!pol.ok) return pol;
+
+            const actual = await adapters.motor.planificacionGet(tenant.value, input.ordenId);
+            if (!actual.ok) return actual;
+            const ahora = new Date();
+            const bloquear = input.bloquear === true;
+            const reprogramaciones = (actual.value?.reprogramaciones ?? 0) + (actual.value ? 1 : 0);
+
+            // Detección declarativa de conflicto: solape de ventana con otra OT
+            // planificada del mismo responsable (agenda). Declarativo, sin efectos.
+            const inicio = input.inicioPlanificado ? new Date(input.inicioPlanificado) : null;
+            const fin = input.finPlanificado ? new Date(input.finPlanificado) : null;
+            let enConflicto = false;
+            if (inicio && orden.value.responsable) {
+              // Solape de ventana con otra OT planificada del MISMO responsable.
+              const nuevoIni = inicio.getTime();
+              const nuevoFin = (fin ?? inicio).getTime();
+              const rango = await adapters.proyecciones.agendaRango(tenant.value, null, null, 1000);
+              if (rango.ok) {
+                enConflicto = rango.value.some((a) => {
+                  if (a.id === input.ordenId || a.responsable !== orden.value!.responsable) return false;
+                  const otroIni = a.inicioPlanificado?.getTime();
+                  if (otroIni == null) return false;
+                  const otroFin = a.finPlanificado?.getTime() ?? otroIni;
+                  return nuevoIni <= otroFin && otroIni <= nuevoFin;
+                });
+              }
+            }
+
+            const version = (actual.value?.version ?? 0) + 1;
+            const planif: Planificacion = {
+              ordenId: input.ordenId,
+              inicioPlanificado: inicio, finPlanificado: fin,
+              ventanaInicio: input.ventanaInicio ? new Date(input.ventanaInicio) : null,
+              ventanaFin: input.ventanaFin ? new Date(input.ventanaFin) : null,
+              estado: bloquear ? "bloqueada" : actual.value ? "reprogramada" : "programada",
+              bloqueoMotivo: bloquear ? input.bloqueoMotivo ?? null : null,
+              enConflicto, reprogramaciones,
+              datos: {}, version, updatedBy: ctx.principal.id, updatedAt: ahora,
+            };
+            const up = await adapters.motor.planificacionUpsert(uow, tenant.value, planif, actual.value?.version ?? null);
+            if (!up.ok) return up;
+
+            const emit = await emitirEvento(adapters, ctx, uow, tenant.value, {
+              tipo: bloquear ? PLANIFICACION_BLOQUEADA : PLANIFICACION_ACTUALIZADA,
+              payload: {
+                tenantId: tenant.value, ordenId: input.ordenId, id: input.ordenId, entityRef: `orden:${input.ordenId}`,
+                codigo: orden.value.codigo.valor, titulo: orden.value.titulo, estado: orden.value.estado,
+                responsable: orden.value.responsable,
+                inicioPlanificado: planif.inicioPlanificado?.toISOString() ?? null,
+                finPlanificado: planif.finPlanificado?.toISOString() ?? null,
+                ventanaInicio: planif.ventanaInicio?.toISOString() ?? null,
+                ventanaFin: planif.ventanaFin?.toISOString() ?? null,
+                programacionEstado: planif.estado, enConflicto, version,
+                actorId: ctx.principal.id, actualizadoAt: ahora.toISOString(),
+              },
+            });
+            if (!emit.ok) return emit;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "planificar", input.ordenId, { estado: planif.estado, enConflicto });
+            if (!audited.ok) return audited;
+            const resultado = { ordenId: input.ordenId, estado: planif.estado, enConflicto, version };
+            if (input.opId) {
+              const rec = await adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando: `${MODULO}.planificar`, resultado }, ctx.principal.id);
+              if (!rec.ok) return rec;
+            }
+            return ok({ ...resultado, idempotente: false });
+          },
+        };
+      },
+      /* ========================= ASIGNACIONES ============================= */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.asignar-recurso-humano`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            tipo: z.enum(TIPOS_ASIGNACION as unknown as [string, ...string[]]),
+            asignadoId: z.string().min(1),
+            rol: z.string().nullable().optional(),
+            reemplazaVigentes: z.boolean().optional(),
+            id: z.string().optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.write`] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.asignar-recurso-humano`, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+            const orden = await adapters.repository.findById(tenant.value, input.ordenId);
+            if (!orden.ok) return orden;
+            if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
+            const pol = evaluar(deps, ctx, POLICY_PUEDE_ASIGNAR, { estado: orden.value.estado });
+            if (!pol.ok) return pol;
+
+            if (input.reemplazaVigentes) {
+              const cerrar = await adapters.motor.asignacionCerrarVigentes(uow, tenant.value, input.ordenId, input.rol ?? null);
+              if (!cerrar.ok) return cerrar;
+            }
+            const id = input.id ?? crypto.randomUUID();
+            const ahora = new Date();
+            const asignacion: Asignacion = {
+              id, ordenId: input.ordenId, tipo: input.tipo, asignadoId: input.asignadoId,
+              rol: input.rol ?? null, vigente: true, datos: {}, createdBy: ctx.principal.id, createdAt: ahora,
+            };
+            const ins = await adapters.motor.asignacionInsert(uow, tenant.value, asignacion);
+            if (!ins.ok) return ins;
+
+            const emit = await emitirEvento(adapters, ctx, uow, tenant.value, {
+              tipo: ASIGNACION_REGISTRADA,
+              payload: {
+                tenantId: tenant.value, ordenId: input.ordenId, id, entityRef: `orden:${input.ordenId}`,
+                tipoAsignacion: input.tipo, asignadoId: input.asignadoId, rol: input.rol ?? null,
+                actorId: ctx.principal.id, actualizadoAt: ahora.toISOString(),
+              },
+            });
+            if (!emit.ok) return emit;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "asignar-recurso", input.ordenId, { tipo: input.tipo, asignadoId: input.asignadoId });
+            if (!audited.ok) return audited;
+            const resultado = { id, ordenId: input.ordenId, tipo: input.tipo, asignadoId: input.asignadoId };
+            if (input.opId) {
+              const rec = await adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando: `${MODULO}.asignar-recurso-humano`, resultado }, ctx.principal.id);
+              if (!rec.ok) return rec;
+            }
+            return ok({ ...resultado, idempotente: false });
+          },
+        };
+      },
+      /* ========================== RECURSOS ================================ */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.registrar-recurso`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            clase: z.enum(CLASES_RECURSO as unknown as [string, ...string[]]),
+            referenciaId: z.string().min(1),
+            descripcion: z.string().nullable().optional(),
+            cantidad: z.number().nullable().optional(),
+            unidad: z.string().nullable().optional(),
+            id: z.string().optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.write`] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.registrar-recurso`, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+            const orden = await adapters.repository.findById(tenant.value, input.ordenId);
+            if (!orden.ok) return orden;
+            if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
+            const pol = evaluar(deps, ctx, POLICY_PUEDE_EDITAR, { estado: orden.value.estado });
+            if (!pol.ok) return pol;
+
+            const id = input.id ?? crypto.randomUUID();
+            const ahora = new Date();
+            const recurso: Recurso = {
+              id, ordenId: input.ordenId, clase: input.clase, referenciaId: input.referenciaId,
+              descripcion: input.descripcion ?? null, cantidad: input.cantidad ?? null, unidad: input.unidad ?? null,
+              datos: {}, createdBy: ctx.principal.id, createdAt: ahora,
+            };
+            const ins = await adapters.motor.recursoInsert(uow, tenant.value, recurso);
+            if (!ins.ok) return ins;
+            const emit = await emitirEvento(adapters, ctx, uow, tenant.value, {
+              tipo: RECURSO_REGISTRADO,
+              payload: {
+                tenantId: tenant.value, ordenId: input.ordenId, id, entityRef: `orden:${input.ordenId}`,
+                clase: input.clase, referenciaId: input.referenciaId, actorId: ctx.principal.id, actualizadoAt: ahora.toISOString(),
+              },
+            });
+            if (!emit.ok) return emit;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "registrar-recurso", input.ordenId, { clase: input.clase });
+            if (!audited.ok) return audited;
+            const resultado = { id, ordenId: input.ordenId, clase: input.clase, referenciaId: input.referenciaId };
+            if (input.opId) {
+              const rec = await adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando: `${MODULO}.registrar-recurso`, resultado }, ctx.principal.id);
+              if (!rec.ok) return rec;
+            }
+            return ok({ ...resultado, idempotente: false });
+          },
+        };
+      },
+      /* ============================= SLA ================================== */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.sla.definir`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            politica: z.string().nullable().optional(),
+            minutosObjetivo: z.number().int().positive().nullable().optional(),
+            inicioAt: z.string().min(1).optional(),
+            suspender: z.boolean().optional(),
+            reanudar: z.boolean().optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.write`] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.sla.definir`, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+            const orden = await adapters.repository.findById(tenant.value, input.ordenId);
+            if (!orden.ok) return orden;
+            if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
+            const pol = evaluar(deps, ctx, POLICY_PUEDE_EDITAR, { estado: orden.value.estado });
+            if (!pol.ok) return pol;
+
+            const actual = await adapters.motor.slaGet(tenant.value, input.ordenId);
+            if (!actual.ok) return actual;
+            const ahora = new Date();
+            const previoSla = actual.value;
+            const minutosObjetivo = input.minutosObjetivo ?? previoSla?.minutosObjetivo ?? null;
+            const inicioAt = input.inicioAt ? new Date(input.inicioAt) : previoSla?.inicioAt ?? ahora;
+
+            // Cálculo de pausas y suspensión (configurable por política/tenant).
+            let minutosPausados = previoSla?.minutosPausados ?? 0;
+            let suspendido = previoSla?.suspendido ?? false;
+            let suspendidoDesde = previoSla?.suspendidoDesde ?? null;
+            if (input.suspender && !suspendido) { suspendido = true; suspendidoDesde = ahora; }
+            if (input.reanudar && suspendido) {
+              suspendido = false;
+              if (suspendidoDesde) minutosPausados += Math.max(0, Math.round((ahora.getTime() - suspendidoDesde.getTime()) / 60000));
+              suspendidoDesde = null;
+            }
+            const vencimientoAt = minutosObjetivo != null
+              ? new Date(inicioAt.getTime() + (minutosObjetivo + minutosPausados) * 60000)
+              : null;
+            const minutosRestantes = vencimientoAt ? Math.round((vencimientoAt.getTime() - ahora.getTime()) / 60000) : null;
+            const estadoSla = suspendido
+              ? "suspendido"
+              : minutosRestantes == null ? "vigente"
+              : minutosRestantes < 0 ? "vencido"
+              : minutosRestantes <= Math.max(1, Math.round((minutosObjetivo ?? 0) * 0.1)) ? "en-riesgo"
+              : "vigente";
+            const version = (previoSla?.version ?? 0) + 1;
+            const sla: SlaOperativo = {
+              ordenId: input.ordenId, politica: input.politica ?? previoSla?.politica ?? null,
+              inicioAt, vencimientoAt, minutosObjetivo, minutosPausados, minutosRestantes,
+              suspendido, suspendidoDesde, estado: estadoSla, datos: {}, version, updatedBy: ctx.principal.id, updatedAt: ahora,
+            };
+            const up = await adapters.motor.slaUpsert(uow, tenant.value, sla, previoSla?.version ?? null);
+            if (!up.ok) return up;
+            const emit = await emitirEvento(adapters, ctx, uow, tenant.value, {
+              tipo: SLA_ACTUALIZADO,
+              payload: {
+                tenantId: tenant.value, ordenId: input.ordenId, id: input.ordenId, entityRef: `orden:${input.ordenId}`,
+                estadoSla, minutosRestantes, suspendido, version, actorId: ctx.principal.id, actualizadoAt: ahora.toISOString(),
+              },
+            });
+            if (!emit.ok) return emit;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "sla:definir", input.ordenId, { estado: estadoSla });
+            if (!audited.ok) return audited;
+            const resultado = { ordenId: input.ordenId, estado: estadoSla, minutosRestantes, vencimientoAt: vencimientoAt?.toISOString() ?? null, version };
+            if (input.opId) {
+              const rec = await adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando: `${MODULO}.sla.definir`, resultado }, ctx.principal.id);
+              if (!rec.ok) return rec;
+            }
+            return ok({ ...resultado, idempotente: false });
+          },
+        };
+      },
+      /* ========================== RELACIONES ============================== */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.crear-relacion`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            categoria: z.enum(CATEGORIAS_RELACION as unknown as [string, ...string[]]),
+            tipo: z.string().min(1),
+            destinoId: z.string().min(1),
+            destinoCodigo: z.string().nullable().optional(),
+            destinoNombre: z.string().nullable().optional(),
+            id: z.string().optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.write`] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.crear-relacion`, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+            const orden = await adapters.repository.findById(tenant.value, input.ordenId);
+            if (!orden.ok) return orden;
+            if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
+            const pol = evaluar(deps, ctx, POLICY_PUEDE_EDITAR, { estado: orden.value.estado });
+            if (!pol.ok) return pol;
+            // OT↔OT: el destino debe existir; anti-lazo básico.
+            if (input.categoria === "orden") {
+              if (input.destinoId === input.ordenId) return fail(KernelErrors.validation("Una OT no puede relacionarse consigo misma"));
+              const destino = await adapters.repository.findById(tenant.value, input.destinoId);
+              if (!destino.ok) return destino;
+              if (!destino.value) return fail(KernelErrors.notFound("orden-trabajo", input.destinoId));
+            }
+            const existe = await adapters.motor.relacionExiste(tenant.value, input.categoria, input.tipo, input.ordenId, input.destinoId);
+            if (!existe.ok) return existe;
+            if (existe.value) return ok({ id: input.id ?? null, idempotente: true });
+
+            const id = input.id ?? crypto.randomUUID();
+            const ahora = new Date();
+            const arista: RelacionArista = {
+              id, categoria: input.categoria, tipo: input.tipo, ordenId: input.ordenId,
+              destinoId: input.destinoId, datos: {}, createdBy: ctx.principal.id, createdAt: ahora,
+            };
+            const ins = await adapters.motor.relacionInsert(uow, tenant.value, arista);
+            if (!ins.ok) return ins;
+            const emit = await emitirEvento(adapters, ctx, uow, tenant.value, {
+              tipo: RELACION_CREADA,
+              payload: {
+                tenantId: tenant.value, ordenId: input.ordenId, id, entityRef: `orden:${input.ordenId}`,
+                categoria: input.categoria, tipo: input.tipo, destinoId: input.destinoId,
+                destinoCodigo: input.destinoCodigo ?? null, destinoNombre: input.destinoNombre ?? null,
+                actorId: ctx.principal.id, actualizadoAt: ahora.toISOString(),
+              },
+            });
+            if (!emit.ok) return emit;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "crear-relacion", input.ordenId, { categoria: input.categoria, tipo: input.tipo });
+            if (!audited.ok) return audited;
+            const resultado = { id, ordenId: input.ordenId, categoria: input.categoria, tipo: input.tipo, destinoId: input.destinoId };
+            if (input.opId) {
+              const rec = await adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando: `${MODULO}.crear-relacion`, resultado }, ctx.principal.id);
+              if (!rec.ok) return rec;
+            }
+            return ok({ ...resultado, idempotente: false });
+          },
+        };
+      },
+      /* ==================== REPROYECCIÓN (replay) ========================= */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.reproyectar`,
+          inputSchema: z.object({}),
+          authorization: { permissions: [`${MODULO}.admin`] },
+          async handle(ctx, _input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            // Vacía TODOS los read models del tenant antes de reconstruir.
+            const c1 = await adapters.readModel.clear(uow, tenant.value);
+            if (!c1.ok) return c1;
+            const c2 = await adapters.proyecciones.clear(uow, tenant.value);
+            if (!c2.ok) return c2;
+            // Fuente del replay: la BITÁCORA DURABLE (`ord_eventos`), NO el outbox.
+            const stream = await adapters.eventLog.stream(tenant.value);
+            if (!stream.ok) return stream;
+            let eventos = 0;
+            const operacionales = new Set<string>(EVENTOS_OPERACIONALES);
+            for (const ev of stream.value) {
+              const evento = { id: ev.eventId, type: ev.tipo, payload: ev.payload };
+              const r = operacionales.has(ev.tipo)
+                ? await aplicarEventoOperacional(adapters, uow, evento)
+                : await aplicarEventoAggregate(adapters, uow, evento);
+              if (!r.ok) return r;
+              eventos += 1;
+            }
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "reproyectar", "-", { eventos });
+            if (!audited.ok) return audited;
+            return ok({ eventos });
+          },
+        };
+      },
     ],
     queries: [
-      // `detalle` es el MÍNIMO de lectura del dominio: lee el AGGREGATE del
-      // repositorio (fuente de verdad), NO un read model materializado.
-      // `listar`/`bitacora`/dashboard/índices son read-side y llegan en 009.2.
+      // CQRS ESTRICTO (DGP-009.2): `detalle` lee EXCLUSIVAMENTE del read model de
+      // detalle (`ord_ordenes_read`), materializado por la proyección de eventos
+      // (mismo read model tras `reproyectar`). NO consulta el aggregate/repositorio
+      // (fuente de escritura) ni tiene fallback a él: toda consulta pasa por read
+      // models. El read model es self-sufficient (se proyecta desde payloads).
       () => ({
         name: `${MODULO}.detalle`,
         inputSchema: z.object({ id: z.string() }),
@@ -1061,7 +1618,7 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
         async handle(ctx, input) {
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
-          const r = await adapters.repository.findById(tenant.value, input.id);
+          const r = await adapters.readModel.get(tenant.value, input.id);
           if (!r.ok) return r;
           if (!r.value) return fail(KernelErrors.notFound("orden-trabajo", input.id));
           return ok({ orden: r.value });
@@ -1078,12 +1635,268 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           return adapters.catalogos.opciones(tenant.value, input.catalogo as NombreCatalogo);
         },
       }),
+      /* ====================== CQRS: listado (read model) ================== */
+      () => ({
+        name: `${MODULO}.listar`,
+        inputSchema: z.object({
+          estado: z.string().optional(),
+          tipo: z.string().optional(),
+          responsable: z.string().optional(),
+          activoPrincipalId: z.string().optional(),
+          limit: z.number().int().positive().max(500).optional(),
+        }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.readModel.list(tenant.value, input);
+          if (!r.ok) return r;
+          return ok({ ordenes: r.value });
+        },
+      }),
+      /* ======================= CQRS: agenda / calendario ================== */
+      () => ({
+        name: `${MODULO}.agenda`,
+        inputSchema: z.object({ desde: z.string().optional(), hasta: z.string().optional(), limit: z.number().int().positive().max(1000).optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.agendaRango(
+            tenant.value,
+            input.desde ? new Date(input.desde) : null,
+            input.hasta ? new Date(input.hasta) : null,
+            input.limit,
+          );
+          if (!r.ok) return r;
+          return ok({ entradas: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.calendario`,
+        inputSchema: z.object({ desde: z.string().min(1), hasta: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.agendaRango(tenant.value, new Date(input.desde), new Date(input.hasta), 1000);
+          if (!r.ok) return r;
+          // Agrupación por día (calendario declarativo).
+          const dias: Record<string, unknown[]> = {};
+          for (const e of r.value) {
+            const dia = (e.inicioPlanificado ?? e.actualizadoAt).toISOString().slice(0, 10);
+            (dias[dia] ??= []).push(e);
+          }
+          return ok({ dias });
+        },
+      }),
+      /* ========================= CQRS: asignaciones ======================= */
+      () => ({
+        name: `${MODULO}.asignaciones`,
+        inputSchema: z.object({ ordenId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarAsignaciones(tenant.value, input.ordenId);
+          if (!r.ok) return r;
+          return ok({ asignaciones: r.value });
+        },
+      }),
+      /* ========================= CQRS: responsables ======================= */
+      () => ({
+        name: `${MODULO}.responsables`,
+        inputSchema: z.object({ ordenId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarResponsables(tenant.value, input.ordenId);
+          if (!r.ok) return r;
+          return ok({ responsables: r.value });
+        },
+      }),
+      /* =============== CQRS: activos relacionados / dependencias ========== */
+      () => ({
+        name: `${MODULO}.relaciones`,
+        inputSchema: z.object({ ordenId: z.string().min(1), categoria: z.enum(CATEGORIAS_RELACION as unknown as [string, ...string[]]).optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarRelaciones(tenant.value, input.ordenId, input.categoria);
+          if (!r.ok) return r;
+          return ok({ relaciones: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.activos-relacionados`,
+        inputSchema: z.object({ ordenId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarRelaciones(tenant.value, input.ordenId, "activo");
+          if (!r.ok) return r;
+          return ok({ activos: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.dependencias`,
+        inputSchema: z.object({ ordenId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarRelaciones(tenant.value, input.ordenId, "orden");
+          if (!r.ok) return r;
+          return ok({ dependencias: r.value });
+        },
+      }),
+      /* =========================== CQRS: historial ======================== */
+      () => ({
+        name: `${MODULO}.historial`,
+        inputSchema: z.object({ ordenId: z.string().min(1), limit: z.number().int().positive().max(500).optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarHistorial(tenant.value, input.ordenId, input.limit);
+          if (!r.ok) return r;
+          return ok({ historial: r.value });
+        },
+      }),
+      /* ===================== CQRS: bitácora operacional =================== */
+      () => ({
+        name: `${MODULO}.bitacora`,
+        inputSchema: z.object({ ordenId: z.string().min(1), limit: z.number().int().positive().max(500).optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarBitacora(tenant.value, input.ordenId, input.limit);
+          if (!r.ok) return r;
+          return ok({ bitacora: r.value });
+        },
+      }),
+      /* ============ CQRS: documentación / formularios / checklists ======== */
+      () => ({
+        name: `${MODULO}.documentacion`,
+        inputSchema: z.object({ ordenId: z.string().min(1), clase: z.string().optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarDocumentacion(tenant.value, input.ordenId, input.clase);
+          if (!r.ok) return r;
+          return ok({ documentacion: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.formularios`,
+        inputSchema: z.object({ ordenId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarDocumentacion(tenant.value, input.ordenId, "formulario");
+          if (!r.ok) return r;
+          return ok({ formularios: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.checklists`,
+        inputSchema: z.object({ ordenId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.proyecciones.listarDocumentacion(tenant.value, input.ordenId, "checklist");
+          if (!r.ok) return r;
+          return ok({ checklists: r.value });
+        },
+      }),
+      /* ===================== Consola técnica (solo admin) ================= */
+      (deps) => ({
+        name: `${MODULO}.consola`,
+        inputSchema: z.object({}),
+        authorization: { permissions: [`${MODULO}.admin`] },
+        async handle(ctx) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const t = tenant.value;
+          const LIMITE = 10;
+          const [stats, leiOrdenes, totalEventos, conteos, outbox, recibos] = await Promise.all([
+            adapters.readModel.stats(t),
+            adapters.readModel.lastEventId(t),
+            adapters.eventLog.contar(t),
+            adapters.proyecciones.contar(t),
+            adapters.consola.outboxDelModulo(t, LIMITE),
+            adapters.syncReceipts.listByTenant(t),
+          ]);
+          const listaRecibos: readonly SyncReceipt[] = recibos.ok ? recibos.value : [];
+          const porEstado: Record<string, number> = {};
+          for (const r of listaRecibos) porEstado[r.estado] = (porEstado[r.estado] ?? 0) + 1;
+          const totalRm = stats.ok ? Object.values(stats.value).reduce((a, b) => a + b, 0) : 0;
+          void deps;
+          return ok({
+            modulo: MODULO,
+            version: "1.0.0",
+            eventos: [...EVENTOS_MODULO, ...EVENTOS_OPERACIONALES],
+            catalogos: [...CATALOGOS],
+            readModels: {
+              ordenes: { total: totalRm, porEstado: stats.ok ? stats.value : {}, lastEventId: leiOrdenes.ok ? leiOrdenes.value : null },
+              especializados: conteos.ok ? conteos.value : {},
+            },
+            eventLog: { total: totalEventos.ok ? totalEventos.value : 0 },
+            outbox: outbox.ok ? outbox.value : { pendientes: 0, procesados: 0, ultimos: [], error: outbox.error.message },
+            sincronizacion: {
+              total: listaRecibos.length,
+              porEstado,
+              ultimos: listaRecibos.slice(0, LIMITE).map((r) => ({ opId: r.opId, comando: r.comando, estado: r.estado, clienteId: r.clienteId })),
+              conflictos: listaRecibos.filter((r) => r.estado === "conflicto").map((r) => ({ opId: r.opId, comando: r.comando, resultado: r.resultado })),
+            },
+            rls: {
+              tablas: [
+                "ord_ordenes", "ord_ordenes_read", "ord_sync_receipts", "ord_eventos",
+                "ord_agenda_read", "ord_asignaciones_read", "ord_responsables_read", "ord_relaciones_read",
+                "ord_historial_read", "ord_bitacora_read", "ord_documentacion_read",
+                "ord_planificacion", "ord_asignaciones", "ord_recursos", "ord_sla", "ord_relaciones",
+              ],
+              aislamiento: "app.tenant_id (RLS por tenant, lecturas y escrituras)",
+            },
+          });
+        },
+      }),
     ],
-    // NOTA (alcance 009.1): SIN eventHandlers de lectura. La proyección CQRS al
-    // read model, la bitácora durable y la indexación en búsqueda son
-    // INFRAESTRUCTURA DE LECTURA y llegan en DGP-009.2. El outbox sigue emitiendo
-    // los eventos de dominio para que 009.2 los consuma.
-    eventHandlers: [],
+    eventHandlers: [
+      // Proyección CQRS de los eventos del AGGREGATE a todos los read models
+      // derivados (listado/detalle, agenda, responsables, historial, doc).
+      // Payload-only, idempotente por last_event_id/eventId.
+      ...EVENTOS_MODULO.map((eventType) => ({
+        eventType,
+        handlerName: `proyectar:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          handlerProyeccion(adapters, false)(deps)(event, eventType),
+      })),
+      // Proyección CQRS de los eventos OPERACIONALES (bitácora, planificación,
+      // asignaciones, recursos, SLA, relaciones).
+      ...EVENTOS_OPERACIONALES.map((eventType) => ({
+        eventType,
+        handlerName: `proyectar-op:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          handlerProyeccion(adapters, true)(deps)(event, eventType),
+      })),
+      // Shared Timeline CANÓNICO (platform.timeline): cada evento del módulo
+      // (aggregate y operacional) se registra vía COMANDO (nunca escritura
+      // directa), idempotente por entryId=event.id.
+      ...[...EVENTOS_MODULO, ...EVENTOS_OPERACIONALES].map((eventType) => ({
+        eventType,
+        handlerName: `timeline:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown>; correlationId: string }) =>
+          registrarEnTimeline()(deps, { ...event, type: eventType }),
+      })),
+    ],
     // Salud del dominio: sonda mínima contra el repositorio (fuente de verdad).
     healthCheck: () => async () => {
       const probe = await adapters.repository.list("healthcheck", { limit: 1 });

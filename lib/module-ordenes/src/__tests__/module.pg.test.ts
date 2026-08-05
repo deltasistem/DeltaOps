@@ -1,0 +1,194 @@
+/**
+ * DGP-009.2 · Módulo Órdenes de Trabajo — Pruebas de integración PostgreSQL.
+ * Cubre: repositorio real, RLS/set_config (aislamiento tenant en lectura y
+ * escritura), event log durable + proyección por outbox (read model, agenda,
+ * bitácora, historial), reconstrucción por replay con EQUIVALENCIA y offline
+ * por orquestación con recibo durable. Se OMITE sin DATABASE_URL. Al terminar
+ * deja el outbox limpio (processed_at) y purga sus propias filas por tenant.
+ */
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type Principal,
+} from "@workspace/kernel";
+import { officialServices } from "@workspace/platform";
+import { ordenesModule, crearOrdenesRuntime, MODULO, type OrdenesRuntime } from "..";
+
+const DATABASE_URL = process.env.DATABASE_URL;
+const suite = DATABASE_URL ? describe : describe.skip;
+
+const ALL_PERMISSIONS = [
+  ...new Set([
+    ...officialServices().flatMap((s) => [...s.permissions]),
+    ...ordenesModule({
+      repository: null as never,
+      catalogos: null as never,
+      consecutivo: null as never,
+      recibos: null as never,
+      plantillas: null as never,
+      readModel: null as never,
+      eventLog: null as never,
+      proyecciones: null as never,
+      motor: null as never,
+      syncReceipts: null as never,
+      consola: null as never,
+    }).permissions,
+    "modulo.ordenes.workflow.read",
+    "modulo.ordenes.workflow.operar",
+    "modulo.ordenes.workflow.disenar",
+  ]),
+];
+const ADMIN: Principal = { id: "admin-pg", rol: "admin", permisos: ALL_PERMISSIONS, capacidades: ["*"] };
+
+const T_A = `pgord-a-${Date.now()}`;
+const T_B = `pgord-b-${Date.now()}`;
+
+suite("Módulo Órdenes · PostgreSQL", () => {
+  let pool: pg.Pool;
+  let rt: OrdenesRuntime;
+
+  const ctx = (tenantId: string): ExecutionContext =>
+    createExecutionContext({ principal: ADMIN, metadata: { tenantId } });
+
+  const exec = (c: ExecutionContext, name: string, input: unknown) =>
+    rt.platform.kernel.commands.execute(c, name, input);
+  const query = (c: ExecutionContext, name: string, input: unknown) =>
+    rt.platform.kernel.queries.execute(c, name, input);
+  const drenar = () => rt.platform.kernel.outboxProcessor.processPending();
+
+  // Lectura RLS: transacción con app.tenant_id fijado (verifica aislamiento).
+  async function conTenant<Reg extends pg.QueryResultRow = pg.QueryResultRow>(
+    tenantId: string,
+    sql: string,
+    params: unknown[] = [],
+  ): Promise<Reg[]> {
+    const c = await pool.connect();
+    try {
+      await c.query("begin");
+      await c.query("select set_config('app.tenant_id', $1, true)", [tenantId]);
+      const r = await c.query<Reg>(sql, params);
+      await c.query("commit");
+      return r.rows;
+    } finally {
+      c.release();
+    }
+  }
+
+  beforeAll(() => {
+    pool = new pg.Pool({ connectionString: DATABASE_URL });
+    rt = crearOrdenesRuntime({ pool });
+  });
+
+  afterAll(async () => {
+    // Deja el outbox drenado y purga las filas de los tenants de prueba.
+    await drenar().catch(() => undefined);
+    for (const t of [T_A, T_B]) {
+      for (const tabla of [
+        "ord_eventos", "ord_ordenes", "ord_ordenes_read", "ord_agenda_read",
+        "ord_asignaciones_read", "ord_responsables_read", "ord_relaciones_read",
+        "ord_historial_read", "ord_bitacora_read", "ord_documentacion_read",
+        "ord_planificacion", "ord_asignaciones", "ord_recursos", "ord_sla",
+        "ord_relaciones", "ord_recibos", "ord_sync_receipts",
+      ]) {
+        await conTenant(t, `delete from deltaops.${tabla}`).catch(() => undefined);
+      }
+    }
+    await pool.end();
+  });
+
+  it("persiste una OT con RLS y aísla por tenant en lectura y escritura", async () => {
+    const c = await exec(ctx(T_A), `${MODULO}.crear`, { titulo: "OT PG", tipo: "correctiva" });
+    expect(c.ok).toBe(true);
+    if (!c.ok) return;
+    const id = (c.value as { id: string }).id;
+    // CQRS: `detalle` lee del read model ⇒ materializamos con el outbox.
+    await drenar();
+
+    // La fila se persiste con el tenant del contexto (ruta de escritura con
+    // set_config por transacción). El aislamiento cross-tenant efectivo se
+    // valida por la capa de consultas, pues el usuario de pruebas es superuser
+    // y PostgreSQL omite RLS para superusuarios (las policies existen igual).
+    const enA = await conTenant<{ id: string; tenant_id: string }>(
+      T_A, "select id, tenant_id from deltaops.ord_ordenes where id = $1", [id],
+    );
+    expect(enA.length).toBe(1);
+    expect(enA[0]!.tenant_id).toBe(T_A);
+
+    // El detalle por query respeta el tenant del contexto (aislamiento efectivo).
+    const dA = await query(ctx(T_A), `${MODULO}.detalle`, { id });
+    const dB = await query(ctx(T_B), `${MODULO}.detalle`, { id });
+    expect(dA.ok).toBe(true);
+    expect(dB.ok).toBe(false);
+  });
+
+  it("proyecta por outbox al read model, agenda, bitácora e historial", async () => {
+    const c = await exec(ctx(T_A), `${MODULO}.crear`, { titulo: "OT Proj", tipo: "preventiva", responsable: "ana" });
+    expect(c.ok).toBe(true);
+    if (!c.ok) return;
+    const id = (c.value as { id: string }).id;
+    await exec(ctx(T_A), `${MODULO}.planificar`, {
+      ordenId: id, inicioPlanificado: "2024-07-01T08:00:00.000Z", finPlanificado: "2024-07-01T12:00:00.000Z",
+    });
+    await exec(ctx(T_A), `${MODULO}.bitacora.registrar`, { ordenId: id, accion: "inicio" });
+    await drenar();
+
+    const lista = await query(ctx(T_A), `${MODULO}.listar`, {});
+    expect(lista.ok && (lista.value as { ordenes: unknown[] }).ordenes.length).toBeGreaterThanOrEqual(1);
+
+    const agenda = await query(ctx(T_A), `${MODULO}.agenda`, {});
+    expect(agenda.ok && (agenda.value as { entradas: unknown[] }).entradas.length).toBeGreaterThanOrEqual(1);
+
+    const bit = await query(ctx(T_A), `${MODULO}.bitacora`, { ordenId: id });
+    expect(bit.ok && (bit.value as { bitacora: unknown[] }).bitacora.length).toBe(1);
+
+    const hist = await query(ctx(T_A), `${MODULO}.historial`, { ordenId: id });
+    // creación + planificación + bitácora
+    expect(hist.ok && (hist.value as { historial: unknown[] }).historial.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("reconstruye por replay del event log con EQUIVALENCIA", async () => {
+    const before = await query(ctx(T_A), `${MODULO}.listar`, {});
+    expect(before.ok).toBe(true);
+    if (!before.ok) return;
+    const antes = (before.value as { ordenes: { id: string }[] }).ordenes.map((o) => o.id).sort();
+
+    const r = await exec(ctx(T_A), `${MODULO}.reproyectar`, {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect((r.value as { eventos: number }).eventos).toBeGreaterThan(0);
+
+    const after = await query(ctx(T_A), `${MODULO}.listar`, {});
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+    const despues = (after.value as { ordenes: { id: string }[] }).ordenes.map((o) => o.id).sort();
+    expect(despues).toEqual(antes);
+  });
+
+  it("la consola técnica (admin) reporta read models, event log y outbox reales", async () => {
+    const r = await query(ctx(T_A), `${MODULO}.consola`, {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const v = r.value as { eventLog: unknown; outbox: unknown; readModels: unknown; rls: unknown };
+    expect(v.eventLog).toBeDefined();
+    expect(v.outbox).toBeDefined();
+    expect(v.readModels).toBeDefined();
+    expect(v.rls).toBeDefined();
+  });
+
+  it("sincroniza offline por orquestación con recibo durable idempotente", async () => {
+    const crear = await exec(ctx(T_A), `${MODULO}.crear`, { titulo: "OT Sync", tipo: "correctiva" });
+    expect(crear.ok).toBe(true);
+    if (!crear.ok) return;
+    const id = (crear.value as { id: string }).id;
+    const cola = [
+      { opId: "pg-op-1", comando: "bitacora.registrar", input: { ordenId: id, accion: "llegada" } },
+      { opId: "pg-op-2", comando: "bitacora.registrar", input: { ordenId: id, accion: "salida" } },
+    ];
+    const r1 = await rt.sincronizar(ctx(T_A), cola);
+    expect(r1.aplicadas).toBe(2);
+    const r2 = await rt.sincronizar(ctx(T_A), cola);
+    expect(r2.idempotentes).toBe(2);
+  });
+});

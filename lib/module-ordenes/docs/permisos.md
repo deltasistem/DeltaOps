@@ -2,7 +2,7 @@
 
 ## Permisos del servicio `modulo.ordenes`
 
-- `modulo.ordenes.read` — lectura (detalle del aggregate y opciones de catálogo).
+- `modulo.ordenes.read` — lectura (read models: detalle, listado, agenda, etc. y opciones de catálogo).
   El read-side ampliado (listar, bitácora, dashboard) llega en DGP-009.2.
 - `modulo.ordenes.write` — crear/editar/asignar/registrar ejecución/asociar/evidencia.
 - `modulo.ordenes.operar` — transiciones operativas del ciclo (abrir…enviar a validación, pausar/reanudar, cancelar).

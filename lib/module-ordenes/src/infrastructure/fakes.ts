@@ -30,6 +30,14 @@ import type {
   ReciboPort,
   TenantId,
 } from "../domain/ports";
+import { FakeOrdenReadModel } from "./repository";
+import {
+  FakeConsolaStore,
+  FakeEventLogStore,
+  FakeMotorStore,
+  FakeProyeccionesStore,
+  FakeSyncReceiptStore,
+} from "./operacional";
 
 const clone = <T>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
 const key = (tenant: string, id: string) => `${tenant}::${id}`;
@@ -228,15 +236,34 @@ export interface FakeAdapters {
   readonly consecutivo: FakeConsecutivo;
   readonly recibos: FakeRecibos;
   readonly plantillas: PlantillasPort;
+  readonly readModel: FakeOrdenReadModel;
+  readonly eventLog: FakeEventLogStore;
+  readonly proyecciones: FakeProyeccionesStore;
+  readonly motor: FakeMotorStore;
+  readonly syncReceipts: FakeSyncReceiptStore;
+  readonly consola: FakeConsolaStore;
 }
 
-/** Crea el juego completo de fakes en memoria. */
-export function crearFakeAdapters(plantillas: PlantillasPort = new FakePlantillas()): FakeAdapters {
+/**
+ * Crea el juego completo de fakes en memoria. `outboxRecords` inyecta el
+ * acceso perezoso a los registros del outbox in-memory para la consola técnica;
+ * la composición del runtime la cablea al `InMemoryOutboxStore` real.
+ */
+export function crearFakeAdapters(
+  plantillas: PlantillasPort = new FakePlantillas(),
+  outboxRecords: () => readonly import("@workspace/kernel").OutboxRecord[] = () => [],
+): FakeAdapters {
   return {
     repository: new FakeOrdenRepository(),
     catalogos: new FakeCatalogos(),
     consecutivo: new FakeConsecutivo(),
     recibos: new FakeRecibos(),
     plantillas,
+    readModel: new FakeOrdenReadModel(),
+    eventLog: new FakeEventLogStore(),
+    proyecciones: new FakeProyeccionesStore(),
+    motor: new FakeMotorStore(),
+    syncReceipts: new FakeSyncReceiptStore(),
+    consola: new FakeConsolaStore(outboxRecords),
   };
 }

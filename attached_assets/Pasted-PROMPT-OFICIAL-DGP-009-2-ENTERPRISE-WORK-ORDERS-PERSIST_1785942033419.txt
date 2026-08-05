@@ -1,0 +1,256 @@
+PROMPT OFICIAL — DGP-009.2
+ENTERPRISE WORK ORDERS PERSISTENCE, CQRS & OPERATIONAL ENGINE
+
+Has iniciado oficialmente la subfase DGP-009.2 del programa DeltaOps.
+
+Todo el corpus arquitectónico permanece completamente congelado.
+
+No está permitido modificar:
+
+ETS-001…012
+ENGINEERING_CHARTER
+ESI-001…010
+DGP-000…009.1
+
+Toda implementación deberá reutilizar exclusivamente:
+
+Kernel
+Shared Platform
+Business Foundation
+Workflow Engine
+Dynamic Forms
+Enterprise Asset Module
+Enterprise Work Orders Domain
+
+No podrán introducirse patrones arquitectónicos nuevos.
+
+Objetivo
+
+Construir toda la infraestructura operacional del módulo Órdenes de Trabajo, incluyendo persistencia, CQRS, sincronización, bitácora operacional e integración con los servicios compartidos.
+
+No construir todavía dashboards ejecutivos.
+
+No construir IA.
+
+No construir reportes.
+
+No construir analítica.
+
+Deben implementarse
+Persistencia completa
+
+Tablas propias del módulo.
+
+Migraciones oficiales.
+
+RLS completo.
+
+Auditoría.
+
+Versionado optimista.
+
+CQRS
+
+Read Models especializados para:
+
+listado
+detalle
+agenda
+calendario
+asignaciones
+responsables
+activos relacionados
+dependencias
+historial
+bitácora operacional
+documentación
+formularios
+checklists
+
+Toda consulta deberá utilizar exclusivamente Read Models.
+
+Event Log
+
+Bitácora durable propia.
+
+Replay.
+
+Reconstrucción completa.
+
+Verificación por equivalencia.
+
+Timeline
+
+Integración total con Shared Timeline.
+
+Bitácora Operacional
+
+Nueva superficie especializada.
+
+Registrar:
+
+inicio
+pausa
+reanudación
+espera
+cambio de responsable
+llegada
+salida
+finalización
+
+Todo mediante eventos.
+
+Nunca mediante escritura directa.
+
+Planificación
+
+Persistencia de:
+
+agenda
+programación
+reprogramación
+ventanas
+bloqueos
+conflictos
+
+Todo declarativo.
+
+Asignaciones
+
+Persistencia de:
+
+personas
+grupos
+cuadrillas
+contratistas
+
+Histórico completo.
+
+Recursos
+
+Persistencia de referencias a:
+
+herramientas
+materiales
+EPP
+vehículos
+equipos auxiliares
+
+Solo referencias.
+
+No inventario.
+
+SLA Operativo
+
+Persistencia de:
+
+vencimiento
+pausas
+tiempo restante
+suspensión
+
+Todo configurable.
+
+Relaciones
+
+Persistencia completa de:
+
+OT ↔ Activos
+
+OT ↔ OT
+
+OT ↔ Formularios
+
+OT ↔ Checklist
+
+OT ↔ Evidencias
+
+OT ↔ Recursos
+
+Offline
+
+Extender el protocolo completo del programa.
+
+Todas las operaciones deberán soportar sincronización.
+
+Consola Técnica
+
+Estado del módulo.
+
+Eventos.
+
+Outbox.
+
+Read Models.
+
+Replay.
+
+Sincronización.
+
+Bitácora.
+
+SLA.
+
+Solo administradores.
+
+API
+
+Completa.
+
+Contract First.
+
+OpenAPI.
+
+Pruebas
+
+Unitarias.
+
+Integración.
+
+RLS.
+
+Replay.
+
+Offline.
+
+CQRS.
+
+Bitácora.
+
+Planificación.
+
+Asignaciones.
+
+SLA.
+
+Documentación
+
+Completa.
+
+En español.
+
+Revisión Arquitectónica Obligatoria
+
+Validar especialmente:
+
+CQRS
+Event Log
+Replay
+Bitácora operacional
+Planificación
+Offline
+SLA
+Shared Platform
+Activos
+Workflow
+Dynamic Forms
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+Informe Final
+
+Entregar únicamente el informe oficial de cierre siguiendo el formato oficial del programa.
+
+No iniciar automáticamente DGP-009.3.
+
+Esperar instrucciones de la Dirección del Programa.

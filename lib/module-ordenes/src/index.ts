@@ -13,10 +13,42 @@ export * from "./domain/value-objects";
 export * from "./domain/catalogos";
 export * from "./domain/maquina-estados";
 export * from "./domain/orden";
+export * from "./domain/operacional";
 export * from "./domain/policies";
 export * from "./domain/ports";
 // FAKES en memoria de los puertos (para pruebas de dominio y para 009.2 hasta
 // que aterricen los adaptadores concretos de persistencia).
 export * from "./infrastructure/fakes";
+// Adaptadores de persistencia PostgreSQL + read models + stores operacionales.
+export * from "./infrastructure/repository";
+// `Sla` de operacional se renombra a `SlaOperativo` para no colisionar con el
+// objeto de valor `Sla` (dominio); el resto se reexporta tal cual.
+export {
+  FakeConsolaStore,
+  FakeEventLogStore,
+  FakeMotorStore,
+  FakeProyeccionesStore,
+  FakeSyncReceiptStore,
+  PgConsolaStore,
+  PgEventLogStore,
+  PgMotorStore,
+  PgProyeccionesStore,
+  PgSyncReceiptStore,
+  type Asignacion,
+  type ClaimResult,
+  type ConsolaStore,
+  type EventLogStore,
+  type EventoBitacora,
+  type MotorStore,
+  type Planificacion,
+  type ProyeccionesStore,
+  type Recurso,
+  type RelacionArista,
+  type Sla as SlaOperativo,
+  type SyncReceipt,
+  type SyncReceiptStore,
+} from "./infrastructure/operacional";
+export * from "./projection";
 export { ordenesModule, type ModuleAdapters } from "./module";
+export { crearOrdenesRuntime, type OrdenesRuntime, type OrdenesRuntimeOptions } from "./runtime";
 export * from "./sincronizacion";
