@@ -32,12 +32,16 @@ import {
 } from "../lib/ordenes/hooks";
 import { useOffline } from "../lib/offline/contexto";
 import { transicionar, aprobarCierre } from "../lib/ordenes/mutaciones";
-import { fusionarCronologia } from "../lib/ordenes/cronologia";
+import { fusionarEcosistema } from "../lib/ecosistema/timeline";
+import { useTimelineActivo } from "../lib/ecosistema/hooks";
 import { TRANSICIONES, ETIQUETA_ESTADO, TONO_ESTADO } from "../lib/ordenes/constantes";
 import { BadgeEstado, BadgePrioridad, vencimientoSla } from "../lib/ordenes/componentes";
 import type { OrdenRow } from "../lib/ordenes/tipos";
 import { TabEjecucion } from "./ordenes/tab-ejecucion";
 import { TabDocumentacionOrden } from "./ordenes/tab-documentacion";
+import { TabActivoOrden } from "./ordenes/tab-activo";
+import { TabDependencias } from "./ordenes/tab-dependencias";
+import { leerParam } from "../lib/ecosistema/deep-links";
 
 export default function OrdenesFichaPage() {
   const [, params] = useRoute("/ordenes/:id");
@@ -71,11 +75,14 @@ function Ficha({ id }: { id: string }) {
       />
       <Tabs
         etiquetaLista="Secciones de la orden"
+        porDefecto={leerParam(typeof window !== "undefined" ? window.location.search : "", "tab")}
         items={[
           { id: "resumen", etiqueta: "Resumen", contenido: <TabResumen orden={datos} /> },
           { id: "ejecucion", etiqueta: "Ejecución", contenido: <TabEjecucion orden={datos} onCambio={recargar} /> },
+          { id: "activo", etiqueta: "Activo", contenido: <TabActivoOrden orden={datos} /> },
+          { id: "dependencias", etiqueta: "Dependencias", contenido: <TabDependencias orden={datos} onCambio={recargar} /> },
           { id: "documentacion", etiqueta: "Documentación", contenido: <TabDocumentacionOrden orden={datos} onCambio={recargar} /> },
-          { id: "cronologia", etiqueta: "Cronología", contenido: <TabCronologia id={id} /> },
+          { id: "cronologia", etiqueta: "Cronología", contenido: <TabCronologia orden={datos} id={id} /> },
         ]}
       />
     </>
@@ -179,19 +186,25 @@ function TabResumen({ orden }: { orden: OrdenRow }) {
 }
 
 /** Timeline Operacional: cronología de eventos + bitácora vía Shared Timeline. */
-function TabCronologia({ id }: { id: string }) {
+/**
+ * DGP-010 · Cronología UNIFICADA del ecosistema: fusiona la actividad del activo
+ * intervenido (Shared Timeline) con el historial + bitácora de la orden en una
+ * sola línea temporal ordenada por `ocurridoAt` (función pura reutilizable).
+ */
+function TabCronologia({ id, orden }: { id: string; orden: OrdenRow }) {
   const historial = useHistorial(id);
   const bitacora = useBitacora(id);
+  const timelineActivo = useTimelineActivo(orden.activoPrincipalId);
 
   const eventos = useMemo(
     () =>
-      fusionarCronologia(historial.datos, bitacora.datos, "desc").map((e) => ({
-        titulo: e.titulo,
+      fusionarEcosistema(timelineActivo.datos, historial.datos, bitacora.datos, "desc").map((e) => ({
+        titulo: `[${e.fuente}] ${e.titulo}`,
         hora: e.hora,
         descripcion: e.descripcion,
         tono: e.tono,
       })),
-    [historial.datos, bitacora.datos],
+    [timelineActivo.datos, historial.datos, bitacora.datos],
   );
 
   if (historial.cargando || bitacora.cargando) return <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div>;
@@ -200,7 +213,7 @@ function TabCronologia({ id }: { id: string }) {
   return (
     <Card>
       <CardContent>
-        <Timeline label="Cronología operacional de la orden" eventos={eventos} />
+        <Timeline label="Cronología unificada (activo + orden)" eventos={eventos} />
       </CardContent>
     </Card>
   );

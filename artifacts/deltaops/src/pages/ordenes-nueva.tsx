@@ -14,6 +14,7 @@ import { useCatalogo } from "../lib/ordenes/hooks";
 import { FormularioDinamico } from "../lib/forms/FormularioDinamico";
 import { validar, hayBloqueos } from "../lib/forms/motor";
 import { plantillaCreacion, PASOS_CREACION } from "../lib/forms/plantillas-ordenes";
+import { leerParam } from "../lib/ecosistema/deep-links";
 import type { ValoresFormulario, HallazgoCampo } from "../lib/forms/tipos";
 import { crearOrden } from "../lib/ordenes/mutaciones";
 import { construirInput, leerBorrador, guardarBorrador, borrarBorrador } from "../lib/ordenes/alta";
@@ -27,6 +28,25 @@ export default function OrdenesNuevaPage() {
       <WizardCreacion />
     </ShellOrdenes>
   );
+}
+
+/**
+ * DGP-010 · Fusiona el borrador guardado con el contexto de la URL
+ * (`?activo=&activoEtiqueta=&componente=&ubicacion=`). Los parámetros de la URL
+ * tienen prioridad. Pura y exportada para pruebas deterministas.
+ */
+export function prefillDesdeUrl(base: ValoresFormulario, search: string): ValoresFormulario {
+  const activo = leerParam(search, "activo");
+  const activoEtiqueta = leerParam(search, "activoEtiqueta");
+  const componente = leerParam(search, "componente");
+  const ubicacion = leerParam(search, "ubicacion");
+  if (!activo && !componente && !ubicacion && !activoEtiqueta) return base;
+  return {
+    ...base,
+    ...(activo ? { activoId: activo } : componente ? { activoId: componente } : {}),
+    ...(activoEtiqueta ? { activoEtiqueta } : {}),
+    ...(ubicacion ? { ubicacionId: ubicacion } : {}),
+  };
 }
 
 function useOpcionesCatalogo() {
@@ -52,7 +72,11 @@ function WizardCreacion() {
   const opciones = useOpcionesCatalogo();
   const definicion = useMemo(() => plantillaCreacion(opciones), [opciones]);
 
-  const [valores, setValores] = useState<ValoresFormulario>(() => leerBorrador(TENANT));
+  // DGP-010 · Navegación contextual: pre-rellena el activo/ubicación cuando se
+  // llega desde la Vista 360° o el QR (`/ordenes/nueva?activo=…`).
+  const [valores, setValores] = useState<ValoresFormulario>(() =>
+    prefillDesdeUrl(leerBorrador(TENANT), typeof window !== "undefined" ? window.location.search : ""),
+  );
   const [hallazgos, setHallazgos] = useState<HallazgoCampo[]>([]);
   const [pasoActual, setPasoActual] = useState(0);
   const [enviando, setEnviando] = useState(false);

@@ -8,7 +8,6 @@
  * consumimos su lectura vía el resolvedor compartido de la plataforma.
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
 import {
   PageHeader,
   Section,
@@ -28,6 +27,7 @@ import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/Formular
 import { plantillaEscaneoOrden } from "../lib/forms/plantillas-ordenes";
 import { useListado } from "../lib/ordenes/hooks";
 import { TarjetaOrden } from "../lib/ordenes/componentes";
+import { MenuAccionesEscaneo } from "../lib/ecosistema/flujo-escaneo";
 
 export default function OrdenesEscanearPage() {
   return (
@@ -126,7 +126,7 @@ function Escanear() {
     <>
       <PageHeader
         titulo="Escanear"
-        descripcion="Escanea el QR de un activo para operar sus órdenes de trabajo."
+        descripcion="Un solo escaneo: abre el activo, su historial y órdenes, crea OT, registra lecturas de medidor o evidencias."
         acciones={
           <div style={{ display: "flex", gap: "var(--do-sp-1)" }}>
             <Badge variant="neutro">NFC preparado</Badge>
@@ -195,9 +195,8 @@ function Escanear() {
   );
 }
 
-/** Menú de navegación contextual tras resolver un activo. */
+/** Menú de navegación contextual tras resolver un activo (flujo QR unificado). */
 function NavegacionContextual({ activoId, onReiniciar }: { activoId: string; onReiniciar: () => void }) {
-  const [, navegar] = useLocation();
   const { datos, cargando } = useListado({ activoPrincipalId: activoId, limit: 100 });
   const ordenes = datos ?? [];
   const abiertas = ordenes.filter((o) => o.estado !== "CERRADA" && o.estado !== "CANCELADA");
@@ -207,21 +206,10 @@ function NavegacionContextual({ activoId, onReiniciar }: { activoId: string; onR
       titulo="Activo resuelto"
       acciones={<Button variant="fantasma" size="sm" onClick={onReiniciar}>Escanear otro</Button>}
     >
-      <Card>
-        <CardHeader>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>Activo</div>
-              <code>{activoId}</code>
-            </div>
-            <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
-              <Button variant="secundario" size="sm" onClick={() => navegar(`/activos/${activoId}`)}>Abrir activo</Button>
-              <Button variant="primario" size="sm" onClick={() => navegar("/ordenes/nueva")}>Crear orden</Button>
-            </div>
-          </div>
-        </CardHeader>
+      <MenuAccionesEscaneo activoId={activoId} />
+      <Card style={{ marginTop: "var(--do-sp-4)" }}>
+        <CardHeader><strong>Órdenes del activo</strong></CardHeader>
         <CardContent>
-          <strong>Órdenes del activo</strong>
           {cargando ? (
             <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-4)" }}><Spinner /></div>
           ) : ordenes.length === 0 ? (

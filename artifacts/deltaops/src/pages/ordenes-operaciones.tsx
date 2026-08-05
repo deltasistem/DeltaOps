@@ -5,11 +5,13 @@
  * búsqueda, filtros (Dynamic Forms), estados visuales y acciones inmediatas.
  */
 import React, { useMemo, useState } from "react";
+import { useSearch, useLocation } from "wouter";
 import {
   PageHeader,
   Section,
   Card,
   CardContent,
+  Badge,
   Button,
   Spinner,
   EmptyState,
@@ -20,6 +22,8 @@ import {
 } from "@workspace/design-system";
 import { ShellOrdenes } from "../lib/ordenes/Shell";
 import { useListado } from "../lib/ordenes/hooks";
+import { useActivoResumen } from "../lib/ecosistema/hooks";
+import { leerParam } from "../lib/ecosistema/deep-links";
 import { useOffline } from "../lib/offline/contexto";
 import { transicionar } from "../lib/ordenes/mutaciones";
 import { BANDEJAS, TRANSICIONES, type BandejaDef } from "../lib/ordenes/constantes";
@@ -34,16 +38,32 @@ export default function OrdenesOperacionesPage() {
   );
 }
 
-function Contenido() {
+export function Contenido() {
+  // Contexto de la URL: el deep link QR/Activo → «Ver órdenes» filtra la lista
+  // por el activo (contrato `activoPrincipalId`; se acepta `activo` como alias).
+  const search = useSearch();
+  const [, navegar] = useLocation();
+  const activoPrincipalId = useMemo(
+    () => leerParam(search, "activoPrincipalId") ?? leerParam(search, "activo"),
+    [search],
+  );
+
   // Una sola carga del read model; las bandejas derivan en cliente. Evita 10
-  // peticiones simultáneas (los paneles del DS Tabs se montan todos).
-  const { datos, cargando, error, recargar } = useListado({ limit: 300 });
+  // peticiones simultáneas (los paneles del DS Tabs se montan todos). Cuando hay
+  // contexto de activo, la consulta se filtra en servidor por `activoPrincipalId`.
+  const { datos, cargando, error, recargar } = useListado(
+    activoPrincipalId ? { activoPrincipalId, limit: 300 } : { limit: 300 },
+  );
+
   return (
     <>
       <PageHeader
         titulo="Centro de Operaciones"
         descripcion="Órdenes de trabajo organizadas por bandeja del ciclo de vida."
       />
+      {activoPrincipalId && (
+        <FiltroContextualActivo activoId={activoPrincipalId} onQuitar={() => navegar("/ordenes")} />
+      )}
       <Tabs
         etiquetaLista="Bandejas de órdenes"
         porDefecto="mis"
@@ -54,6 +74,22 @@ function Contenido() {
         }))}
       />
     </>
+  );
+}
+
+/** Chip visible del filtro contextual por activo, con acción de quitarlo. */
+function FiltroContextualActivo({ activoId, onQuitar }: { activoId: string; onQuitar: () => void }) {
+  const { datos: activo } = useActivoResumen(activoId);
+  const etiqueta = activo?.nombre ?? activo?.codigoEmpresarial ?? activoId;
+  return (
+    <div
+      role="status"
+      aria-label="Filtro contextual por activo"
+      style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)", flexWrap: "wrap", margin: "var(--do-sp-2) 0 var(--do-sp-4)" }}
+    >
+      <Badge variant="info">🏭 Filtrando por activo: {etiqueta}</Badge>
+      <Button variant="fantasma" size="sm" onClick={onQuitar}>Quitar filtro</Button>
+    </div>
   );
 }
 

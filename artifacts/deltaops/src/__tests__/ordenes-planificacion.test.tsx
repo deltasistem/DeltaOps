@@ -8,13 +8,16 @@ import { render, screen } from "@testing-library/react";
 import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { OfflineProvider } from "../lib/offline/contexto";
 import { Calendario } from "../pages/ordenes-planificacion";
-import type { EntradaAgenda } from "../lib/ordenes/tipos";
+import type { EntradaIntegrada } from "../lib/ecosistema/agenda-integrada";
 
-function entrada(p: Partial<EntradaAgenda>): EntradaAgenda {
+const SIN_SLA = { riesgo: "sin-sla", vencimiento: null, restanteMs: null, etiqueta: "Sin SLA", escalar: false } as const;
+
+function entrada(p: Partial<EntradaIntegrada>): EntradaIntegrada {
   return {
     id: "e", codigo: "OT-1", titulo: "Tarea", estado: "PLANIFICADA", responsable: null,
     inicioPlanificado: null, finPlanificado: null, ventanaInicio: null, ventanaFin: null,
-    programacionEstado: null, enConflicto: false, version: 1, ...p,
+    programacionEstado: null, enConflicto: false, version: 1,
+    activoId: null, prioridad: null, cuadrilla: null, sla: SIN_SLA, ...p,
   };
 }
 
@@ -25,12 +28,12 @@ const dias = Array.from({ length: 7 }, (_, i) => {
   return d;
 });
 
-function Wrap({ entradas }: { entradas: EntradaAgenda[] }) {
+function Wrap({ entradas }: { entradas: EntradaIntegrada[] }) {
   return (
     <ThemeProvider>
       <ToastProvider>
         <OfflineProvider tenant="deltaops" modulo="ordenes">
-          <Calendario dias={dias} entradas={entradas} onCambio={() => {}} />
+          <Calendario dias={dias} entradas={entradas} ahoraMs={Date.parse("2024-06-03T00:00:00Z")} onCambio={() => {}} />
         </OfflineProvider>
       </ToastProvider>
     </ThemeProvider>

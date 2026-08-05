@@ -95,6 +95,19 @@ export interface OpcionCatalogo {
   readonly habilitado?: boolean;
 }
 
+/** Relación / dependencia OT↔OT (GET /:id/relaciones|dependencias → {relaciones|dependencias:[]}). */
+export interface RelacionOrden {
+  readonly id: string;
+  readonly categoria: string;
+  readonly tipo: string;
+  readonly ordenId: string;
+  readonly destinoId: string;
+  readonly destinoCodigo: string | null;
+  readonly destinoNombre: string | null;
+  readonly datos?: Record<string, unknown>;
+  readonly actualizadoAt?: string;
+}
+
 /** Asignación / responsable / recurso (GET /:id/asignaciones|responsables). */
 export interface Asignacion {
   readonly id?: string;

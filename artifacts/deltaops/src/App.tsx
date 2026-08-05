@@ -23,6 +23,7 @@ import OrdenesPlanificacion from '@/pages/ordenes-planificacion';
 import OrdenesEscanear from '@/pages/ordenes-escanear';
 import OrdenesSincronizacion from '@/pages/ordenes-sincronizacion';
 import OrdenesFicha from '@/pages/ordenes-ficha';
+import CentroMantenimiento from '@/pages/centro-mantenimiento';
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Console} />
+      <Route path="/centro" component={CentroMantenimiento} />
       <Route path="/plataforma" component={Plataforma} />
       <Route path="/referencia" component={Referencia} />
       <Route path="/referencia/:id" component={ReferenciaDetalle} />

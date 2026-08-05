@@ -13,6 +13,7 @@ import type {
   DocumentoOrden,
   OpcionCatalogo,
   Asignacion,
+  RelacionOrden,
 } from "./tipos";
 
 export interface EstadoAsync<T> {
@@ -187,6 +188,33 @@ export function usePlantillaDefinicion(clave: string | null, version: number | n
       return ordenesFetch<PlantillaResuelta>(`/plantillas/${encodeURIComponent(clave)}/${version}`, { signal, toleraNoEncontrado: true });
     },
     [clave, version],
+  );
+}
+
+/** Dependencias OT↔OT (GET /:id/dependencias → {dependencias:[]}, categoría `orden`). */
+export function useDependencias(id: string): EstadoAsync<RelacionOrden[]> {
+  return useConsulta<RelacionOrden[]>(
+    async (signal) => {
+      if (!id) return [];
+      const r = await ordenesFetch<{ dependencias?: RelacionOrden[] } | RelacionOrden[]>(`/${id}/dependencias`, { signal, toleraNoEncontrado: true });
+      if (Array.isArray(r)) return r;
+      return r?.dependencias ?? [];
+    },
+    [id],
+  );
+}
+
+/** Relaciones de la OT (GET /:id/relaciones → {relaciones:[]}). */
+export function useRelaciones(id: string, categoria?: string): EstadoAsync<RelacionOrden[]> {
+  const query = qs({ categoria });
+  return useConsulta<RelacionOrden[]>(
+    async (signal) => {
+      if (!id) return [];
+      const r = await ordenesFetch<{ relaciones?: RelacionOrden[] } | RelacionOrden[]>(`/${id}/relaciones${query}`, { signal, toleraNoEncontrado: true });
+      if (Array.isArray(r)) return r;
+      return r?.relaciones ?? [];
+    },
+    [id, query],
   );
 }
 

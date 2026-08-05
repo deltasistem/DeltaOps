@@ -6,7 +6,6 @@
  * la ficha). NFC y lector físico marcados como «preparado».
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
 import {
   PageHeader,
   Section,
@@ -22,6 +21,7 @@ import { activosFetch, esFuncionNoDisponible } from "../lib/activos/api";
 import { resolverCodigoActivo, type RespuestaResolver } from "../lib/qr/etiqueta";
 import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/FormularioDinamico";
 import { plantillaEscaneoManual } from "../lib/forms/plantillas";
+import { MenuAccionesEscaneo } from "../lib/ecosistema/flujo-escaneo";
 
 export default function ActivosEscanearPage() {
   return (
@@ -46,7 +46,6 @@ function obtenerDetector(): BarcodeDetectorCtor | null {
 }
 
 function Escanear() {
-  const [, navegar] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -57,6 +56,7 @@ function Escanear() {
   const form = useFormularioDinamico(defManual);
   const [resolviendo, setResolviendo] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [activoId, setActivoId] = useState<string | null>(null);
 
   const manual = String(form.valores.codigo ?? "");
 
@@ -126,10 +126,10 @@ function Escanear() {
     try {
       const res = await resolverCodigoActivo(codigo, consultar);
       if (res.origen === "servidor") {
-        navegar(`/activos/${res.activoId}`);
+        setActivoId(res.activoId);
       } else if (res.origen === "local") {
         setAviso("Resolvedor del servidor no disponible; código interpretado localmente (degradación).");
-        navegar(`/activos/${res.activoId}`);
+        setActivoId(res.activoId);
       } else {
         setError(`No se pudo interpretar el código: ${codigo}`);
       }
@@ -144,7 +144,7 @@ function Escanear() {
     <>
       <PageHeader
         titulo="Escanear"
-        descripcion="Escanea un código QR de activo con la cámara o introdúcelo manualmente."
+        descripcion="Un solo escaneo: abre el activo, su historial y órdenes, crea OT, registra lecturas de medidor o evidencias."
         acciones={
           <div style={{ display: "flex", gap: "var(--do-sp-1)" }}>
             <Badge variant="neutro">NFC preparado</Badge>
@@ -156,6 +156,12 @@ function Escanear() {
       {error && <Alert variant="error" titulo={error} />}
       {aviso && <Alert variant="advertencia" titulo={aviso} />}
 
+      {activoId ? (
+        <Section titulo="Activo resuelto" acciones={<Button variant="fantasma" size="sm" onClick={() => { setActivoId(null); form.setValores({}); }}>Escanear otro</Button>}>
+          <MenuAccionesEscaneo activoId={activoId} />
+        </Section>
+      ) : (
+      <>
       <Section titulo="Cámara">
         <Card>
           <CardContent>
@@ -204,6 +210,8 @@ function Escanear() {
           </CardContent>
         </Card>
       </Section>
+      </>
+      )}
     </>
   );
 }

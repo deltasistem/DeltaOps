@@ -25,9 +25,20 @@ import {
   asociarFormulario,
   asociarChecklist,
   capturarRespuestaPlantilla,
+  agregarEvidencia,
   type RefPlantilla,
 } from "../../lib/ordenes/mutaciones";
 import { useFormularios, useChecklists, usePlantillaDefinicion } from "../../lib/ordenes/hooks";
+import { sha256Hex } from "../../lib/activos/hash";
+import {
+  BarraAccionesCampo,
+  AccionRapida,
+  CapturaFoto,
+  CapturaFirma,
+  CapturaGeolocalizacion,
+  useGeolocalizacion,
+  type ArchivoCampo,
+} from "../../lib/ecosistema/campo";
 import { FormularioDinamico, useFormularioDinamico } from "../../lib/forms/FormularioDinamico";
 import { validarDefinicion, type DefinicionFormulario } from "@workspace/dynamic-forms/definicion";
 import {
@@ -72,7 +83,74 @@ export function TabEjecucion({ orden, onCambio }: { orden: OrdenRow; onCambio: (
         <RegistroRecurso orden={orden} onCambio={onCambio} />
         <Observaciones orden={orden} onCambio={onCambio} />
       </div>
+      <CapturaCampo orden={orden} onCambio={onCambio} />
+      <BarraCampo orden={orden} onCambio={onCambio} />
     </div>
+  );
+}
+
+/**
+ * Captura de terreno (punto 9): foto, firma y geolocalización con objetivos
+ * táctiles amplios. La foto y la firma se registran como EVIDENCIA de la OT
+ * (patrón Attachment de plataforma, paso online). Reutiliza `agregarEvidencia`.
+ */
+function CapturaCampo({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+  const toast = useToast();
+  const { cola } = useOffline();
+  const geo = useGeolocalizacion();
+  const [ocupado, setOcupado] = useState(false);
+
+  async function subir(archivo: ArchivoCampo, categoria: string) {
+    setOcupado(true);
+    try {
+      const hashSha256 = await sha256Hex(await archivo.blob.arrayBuffer());
+      const r = await agregarEvidencia(cola, orden.id, orden.version, {
+        categoria,
+        nombreArchivo: archivo.nombreArchivo,
+        mimeType: archivo.mimeType,
+        tamanoBytes: archivo.tamanoBytes,
+        hashSha256,
+      });
+      if (r.error) toast.mostrar({ variant: "error", titulo: "No se pudo registrar", mensaje: r.error.message });
+      else { toast.mostrar({ variant: "exito", titulo: categoria === "firma" ? "Firma registrada" : "Foto registrada" }); onCambio(); }
+    } catch (e) {
+      toast.mostrar({ variant: "error", titulo: (e as Error).message });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader><strong>Captura de terreno</strong></CardHeader>
+      <CardContent>
+        <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }} aria-busy={ocupado}>
+          <CapturaFoto onCapturar={(a) => void subir(a, "fotografia")} />
+          <CapturaFirma onFirmar={(a) => void subir(a, "firma")} />
+          <CapturaGeolocalizacion geo={geo} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Barra de acciones rápidas a una mano (móvil), fija al pie de la ejecución. */
+function BarraCampo({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+  const { cola } = useOffline();
+  const toast = useToast();
+  async function bitacora(accion: string) {
+    const r = await registrarBitacora(cola, orden.id, accion, { origen: "campo" });
+    if (r.error) toast.mostrar({ variant: "error", titulo: r.error.message });
+    else { toast.mostrar({ variant: r.encolada ? "info" : "exito", titulo: ETIQUETA_BITACORA[accion as keyof typeof ETIQUETA_BITACORA] ?? accion }); onCambio(); }
+  }
+  return (
+    <BarraAccionesCampo etiqueta="Acciones rápidas de campo">
+      <AccionRapida variant="primario" onClick={() => void bitacora("inicio")}>▶ Inicio</AccionRapida>
+      <AccionRapida onClick={() => void bitacora("pausa")}>⏸ Pausa</AccionRapida>
+      <AccionRapida onClick={() => void bitacora("reanudacion")}>⏵ Reanudar</AccionRapida>
+      <AccionRapida onClick={() => void bitacora("llegada")}>📍 Llegada</AccionRapida>
+      <AccionRapida onClick={() => void bitacora("salida")}>🚪 Salida</AccionRapida>
+    </BarraAccionesCampo>
   );
 }
 

@@ -18,6 +18,7 @@ import { TENANT } from "./constantes";
 const SYNC_URL = "/api/deltaops/ordenes/sync";
 
 const NAV: { href: string; etiqueta: string }[] = [
+  { href: "/centro", etiqueta: "Centro Global" },
   { href: "/ordenes", etiqueta: "Operaciones" },
   { href: "/ordenes/supervisor", etiqueta: "Supervisor" },
   { href: "/ordenes/planificacion", etiqueta: "Planificación" },

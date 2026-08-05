@@ -1,0 +1,520 @@
+DGP-010 — MAINTENANCE EXECUTION ECOSYSTEM
+
+Has iniciado oficialmente el DGP-010 — Maintenance Execution Ecosystem del programa DeltaOps.
+
+Todo el corpus arquitectónico permanece completamente congelado.
+
+No está permitido modificar, reinterpretar ni sustituir ninguna decisión tomada en:
+
+ETS-001…012
+ENGINEERING_CHARTER
+ESI-001…010
+DGP-000…009.3
+
+Toda implementación deberá componerse exclusivamente reutilizando:
+
+Kernel
+Shared Platform
+Business Foundation
+Workflow Engine
+Dynamic Forms
+Experience Foundation
+Design System
+Module Assets
+Module Work Orders
+
+No podrán introducirse patrones arquitectónicos nuevos.
+
+No podrán duplicarse capacidades existentes.
+
+Todo deberá implementarse como composición de los componentes ya construidos.
+
+OBJETIVO
+
+Construir el ecosistema operativo completo que conecte Activos, Órdenes de Trabajo, Técnicos, Supervisores, Recursos, Formularios, Checklist, Evidencias y Workflow para convertir DeltaOps en una plataforma integrada de ejecución de mantenimiento.
+
+No construir un módulo independiente.
+
+No construir dashboards ejecutivos.
+
+No construir analítica.
+
+No construir IA.
+
+No construir BI.
+
+No construir reportes.
+
+ALCANCE OBLIGATORIO
+1. Centro Global de Mantenimiento
+
+Construir una superficie única donde converjan:
+
+Activos.
+Órdenes.
+Técnicos.
+SLA.
+Prioridades.
+Estados.
+Alertas operativas.
+
+No será un dashboard.
+
+Será una consola operacional.
+
+2. Vista 360° del Activo
+
+Desde cualquier activo deberá poder visualizarse:
+
+Información técnica.
+
+Historial completo.
+
+Órdenes abiertas.
+
+Órdenes cerradas.
+
+Próximos mantenimientos.
+
+Documentación.
+
+Comentarios.
+
+Timeline.
+
+Relaciones.
+
+Componentes.
+
+Ubicación.
+
+Responsables.
+
+Medidores.
+
+QR.
+
+Todo desde una única experiencia.
+
+3. Ejecución integrada
+
+Desde una Orden de Trabajo deberá poder accederse inmediatamente a:
+
+Activo.
+
+Manual.
+
+Procedimientos.
+
+Checklist.
+
+Formulario.
+
+Fotografías.
+
+Videos.
+
+Documentación.
+
+Historial del activo.
+
+Relaciones.
+
+Todo sin abandonar la ejecución de la OT.
+
+4. Navegación contextual
+
+Toda navegación deberá ser contextual.
+
+Ejemplos:
+
+Escanear QR →
+
+Activo →
+
+Órdenes →
+
+Nueva OT.
+
+Activo →
+
+Historial →
+
+Orden específica.
+
+Orden →
+
+Activo relacionado.
+
+Activo →
+
+Componentes.
+
+Componente →
+
+Nueva OT.
+
+Todo mediante navegación profunda.
+
+5. Gestión de Recursos
+
+Integrar completamente en la ejecución:
+
+Herramientas.
+
+Materiales.
+
+Equipos auxiliares.
+
+EPP.
+
+Vehículos.
+
+Todo como referencias.
+
+Nunca inventario.
+
+Nunca compras.
+
+6. Calendario operacional
+
+Construir una experiencia integrada que permita visualizar simultáneamente:
+
+OT.
+
+Programaciones.
+
+Disponibilidad.
+
+Técnicos.
+
+Cuadrillas.
+
+Activos.
+
+Ventanas.
+
+SLA.
+
+Todo sincronizado.
+
+7. Gestión de dependencias
+
+Implementar:
+
+OT bloqueadas.
+
+OT dependientes.
+
+OT relacionadas.
+
+Impacto visual.
+
+Secuencia de ejecución.
+
+Alertas.
+
+8. Gestión operacional del SLA
+
+Construir la experiencia operacional del SLA.
+
+Mostrar:
+
+Tiempo restante.
+
+Tiempo consumido.
+
+Riesgo.
+
+Prioridad.
+
+Escalamiento.
+
+Alertas.
+
+Sin construir analítica.
+
+9. Experiencia móvil de campo
+
+Optimizar completamente:
+
+Modo offline.
+
+Botones grandes.
+
+Acciones rápidas.
+
+Escaneo QR.
+
+Captura fotográfica.
+
+Firma.
+
+Geolocalización.
+
+Trabajo con una sola mano.
+
+10. Timeline unificado
+
+Construir un Timeline único donde converjan:
+
+Eventos.
+
+Comentarios.
+
+Adjuntos.
+
+Cambios.
+
+Workflow.
+
+Bitácora.
+
+Medidores.
+
+Actividad del activo.
+
+Actividad de la OT.
+
+Todo ordenado cronológicamente.
+
+11. Experiencia de Supervisor
+
+Crear un Centro de Control operativo.
+
+Debe permitir:
+
+Visualizar técnicos.
+
+Visualizar cuadrillas.
+
+Detectar bloqueos.
+
+Mover prioridades.
+
+Gestionar esperas.
+
+Reasignar.
+
+Abrir OT.
+
+Abrir activos.
+
+Sin cambiar de contexto.
+
+12. Experiencia del Planificador
+
+Debe permitir:
+
+Programar.
+
+Reprogramar.
+
+Mover.
+
+Arrastrar.
+
+Detectar conflictos.
+
+Optimizar carga.
+
+Visualizar ventanas.
+
+Visualizar recursos.
+
+13. Integración QR
+
+Escanear un QR deberá permitir:
+
+Abrir activo.
+
+Consultar historial.
+
+Consultar OT abiertas.
+
+Crear OT.
+
+Registrar lectura de medidor.
+
+Registrar evidencia.
+
+Todo desde un único flujo.
+
+14. Offline First
+
+Toda la experiencia deberá funcionar sin conexión.
+
+Incluyendo:
+
+Checklist.
+
+Formularios.
+
+Comentarios.
+
+Timeline.
+
+Medidores.
+
+Recursos.
+
+Workflow.
+
+Evidencias.
+
+Colas.
+
+Reintentos.
+
+Conflictos.
+
+Recuperación.
+
+15. Design System
+
+Toda la experiencia deberá utilizar exclusivamente:
+
+@workspace/design-system
+
+No crear componentes nuevos.
+
+No crear colores nuevos.
+
+No crear tipografías nuevas.
+
+No crear iconografía nueva.
+
+Todo deberá consumir los tokens oficiales del Brandbook DELTA.
+
+16. Responsive
+
+Desktop.
+
+Tablet.
+
+Mobile.
+
+Una única experiencia.
+
+17. Accesibilidad
+
+Cumplimiento AA.
+
+Navegación por teclado.
+
+Foco visible.
+
+ARIA.
+
+Contraste.
+
+Semántica.
+
+18. API
+
+Agregar únicamente los endpoints estrictamente necesarios para soportar la nueva experiencia integrada.
+
+Mantener:
+
+Contract First.
+
+OpenAPI.
+
+Drift Detection.
+
+Errores Kernel→HTTP.
+
+19. Pruebas
+
+Construir pruebas para:
+
+Centro Global.
+
+Vista 360.
+
+Timeline.
+
+Workflow integrado.
+
+QR.
+
+Offline.
+
+Calendario.
+
+Supervisor.
+
+Planificador.
+
+Activo.
+
+Orden.
+
+Accesibilidad.
+
+Responsive.
+
+Todo integrado al pipeline existente.
+
+20. Documentación
+
+Documentación completa.
+
+En español.
+
+Diagramas.
+
+Flujos.
+
+Casos de uso.
+
+Guías funcionales.
+
+Guías técnicas.
+
+REVISIÓN ARQUITECTÓNICA OBLIGATORIA
+
+Ejecutar una revisión independiente completa.
+
+Validar especialmente:
+
+Integración entre módulos.
+Reutilización del corpus.
+Navegación contextual.
+Offline.
+Workflow.
+Dynamic Forms.
+Shared Platform.
+Timeline.
+QR.
+SLA.
+Accesibilidad.
+Responsive.
+Seguridad.
+Performance.
+Multitenancy.
+
+Toda desviación crítica o mayor deberá corregirse antes del cierre.
+
+CRITERIOS DE ACEPTACIÓN
+
+La fase únicamente podrá darse por terminada cuando:
+
+Un técnico pueda ejecutar una jornada completa de mantenimiento sin abandonar DeltaOps.
+Un supervisor pueda controlar toda la operación desde una única superficie.
+Un planificador pueda organizar la carga operativa completa.
+Toda la navegación sea contextual.
+Activos y Órdenes funcionen como un único ecosistema.
+Todo opere Offline First.
+Todo sincronice correctamente.
+No exista lógica duplicada.
+No exista infraestructura nueva.
+Toda la experiencia utilice exclusivamente el Design System oficial.
+Todos los criterios estén respaldados por pruebas automatizadas.
+INFORME FINAL
+
+Al finalizar entregar únicamente el Informe Oficial de Cierre DGP-010, siguiendo exactamente el formato oficial del programa.
+
+No iniciar automáticamente el siguiente DGP.
+
+Esperar instrucciones de la Dirección del Programa.

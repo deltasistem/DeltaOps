@@ -40,6 +40,8 @@ import { TabDocumentacion } from "./ficha/tab-documentacion";
 import { TabRelaciones } from "./ficha/tab-relaciones";
 import { TabHistoricos } from "./ficha/tab-historicos";
 import { TabComentarios } from "./ficha/tab-comentarios";
+import { TabOrdenes } from "./ficha/tab-ordenes";
+import { leerParam } from "../lib/ecosistema/deep-links";
 
 export default function ActivosFichaPage() {
   const [, params] = useRoute("/activos/:id");
@@ -112,7 +114,9 @@ function Ficha({ id }: { id: string }) {
       <DatosGenerales a={a} />
 
       <Tabs
+        porDefecto={leerParam(typeof window !== "undefined" ? window.location.search : "", "tab")}
         items={[
+          { id: "ordenes", etiqueta: "Órdenes", contenido: <TabOrdenes activoId={id} activoNombre={a.nombre} /> },
           { id: "timeline", etiqueta: "Timeline", contenido: <TabTimeline id={id} /> },
           { id: "documentacion", etiqueta: "Documentación", contenido: <TabDocumentacion id={id} /> },
           { id: "relaciones", etiqueta: "Relaciones", contenido: <TabRelaciones id={id} nombre={a.nombre} onNavegar={(x) => navegar(`/activos/${x}`)} /> },

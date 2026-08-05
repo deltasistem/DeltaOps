@@ -30,6 +30,7 @@ import { asignar, aprobarCierre } from "../lib/ordenes/mutaciones";
 import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/FormularioDinamico";
 import { plantillaAsignacion } from "../lib/forms/plantillas-ordenes";
 import { BadgeEstado, esCritica, proximaAVencer } from "../lib/ordenes/componentes";
+import { PanelSupervisor } from "./ordenes/panel-supervisor";
 import type { OrdenRow } from "../lib/ordenes/tipos";
 
 export default function OrdenesSupervisorPage() {
@@ -43,6 +44,7 @@ export default function OrdenesSupervisorPage() {
 function Supervisor() {
   const { datos, cargando, error, recargar } = useListado({ limit: 300 });
   const ahoraMs = useMemo(() => Date.parse(new Date().toISOString()), []);
+  const [panelId, setPanelId] = useState<string | null>(null);
 
   if (cargando) return <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-8)" }}><Spinner /></div>;
   if (error) return <ErrorState titulo="No se pudo cargar" descripcion={error.message} onReintentar={recargar} />;
@@ -62,7 +64,7 @@ function Supervisor() {
 
   return (
     <>
-      <PageHeader titulo="Centro del Supervisor" descripcion="Asignación, validación, carga de trabajo y SLA." />
+      <PageHeader titulo="Centro del Supervisor" descripcion="Asignación, validación, carga de trabajo y SLA — gestión in-place sin cambiar de contexto." />
 
       <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
         <KpiCard titulo="Activas" valor={String(activas.length)} />
@@ -77,8 +79,32 @@ function Supervisor() {
           <Card><CardContent><EmptyState titulo="Nada por validar" /></CardContent></Card>
         ) : (
           <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
-            {enValidacion.map((o) => <TarjetaValidacion key={o.id} orden={o} onCambio={recargar} />)}
+            {enValidacion.map((o) => <TarjetaValidacion key={o.id} orden={o} onCambio={recargar} onAbrir={setPanelId} />)}
           </div>
+        )}
+      </Section>
+
+      <Section titulo="Órdenes activas" acciones={<Badge variant="info">{activas.length}</Badge>}>
+        {activas.length === 0 ? (
+          <Card><CardContent><EmptyState titulo="Sin órdenes activas" /></CardContent></Card>
+        ) : (
+          <Card>
+            <CardContent>
+              <DoTable caption="Órdenes activas (gestión in-place)">
+                <thead><tr><th>Orden</th><th>Estado</th><th>Responsable</th><th></th></tr></thead>
+                <tbody>
+                  {activas.slice(0, 50).map((o) => (
+                    <tr key={o.id}>
+                      <td><code style={{ fontSize: "var(--do-text-xs)" }}>{o.codigo}</code> {o.titulo}</td>
+                      <td><BadgeEstado estado={o.estado} /></td>
+                      <td>{o.responsable ?? "—"}</td>
+                      <td><Button variant="secundario" size="sm" onClick={() => setPanelId(o.id)}>Gestionar</Button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DoTable>
+            </CardContent>
+          </Card>
         )}
       </Section>
 
@@ -87,7 +113,7 @@ function Supervisor() {
           <Card><CardContent><EmptyState titulo="Todo asignado" descripcion="No hay órdenes activas sin responsable." /></CardContent></Card>
         ) : (
           <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
-            {sinAsignar.map((o) => <TarjetaAsignacion key={o.id} orden={o} onCambio={recargar} />)}
+            {sinAsignar.map((o) => <TarjetaAsignacion key={o.id} orden={o} onCambio={recargar} onAbrir={setPanelId} />)}
           </div>
         )}
       </Section>
@@ -110,11 +136,15 @@ function Supervisor() {
           </Card>
         )}
       </Section>
+
+      {panelId && (
+        <PanelSupervisor ordenId={panelId} onCerrar={() => setPanelId(null)} onCambio={recargar} />
+      )}
     </>
   );
 }
 
-function TarjetaValidacion({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+function TarjetaValidacion({ orden, onCambio, onAbrir }: { orden: OrdenRow; onCambio: () => void; onAbrir: (id: string) => void }) {
   const { cola } = useOffline();
   const toast = useToast();
   const [ocupado, setOcupado] = useState(false);
@@ -140,13 +170,14 @@ function TarjetaValidacion({ orden, onCambio }: { orden: OrdenRow; onCambio: () 
         <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
           <Button variant="primario" size="sm" disabled={ocupado} onClick={() => void resolver(true)}>Aprobar cierre</Button>
           <Button variant="peligro" size="sm" disabled={ocupado} onClick={() => void resolver(false)}>Devolver</Button>
+          <Button variant="fantasma" size="sm" onClick={() => onAbrir(orden.id)}>Gestionar in-place</Button>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function TarjetaAsignacion({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+function TarjetaAsignacion({ orden, onCambio, onAbrir }: { orden: OrdenRow; onCambio: () => void; onAbrir: (id: string) => void }) {
   const [abierto, setAbierto] = useState(false);
   return (
     <Card>
@@ -158,7 +189,10 @@ function TarjetaAsignacion({ orden, onCambio }: { orden: OrdenRow; onCambio: () 
       </CardHeader>
       <CardContent>
         <p style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>Sin responsable asignado.</p>
-        <Button variant="primario" size="sm" onClick={() => setAbierto(true)}>Asignar</Button>
+        <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
+          <Button variant="primario" size="sm" onClick={() => setAbierto(true)}>Asignar</Button>
+          <Button variant="fantasma" size="sm" onClick={() => onAbrir(orden.id)}>Gestionar in-place</Button>
+        </div>
       </CardContent>
       {abierto && <ModalAsignacion orden={orden} onCerrar={() => setAbierto(false)} onGuardado={() => { setAbierto(false); onCambio(); }} />}
     </Card>

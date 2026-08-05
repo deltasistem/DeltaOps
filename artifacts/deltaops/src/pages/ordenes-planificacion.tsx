@@ -7,6 +7,7 @@
  * degradación offline).
  */
 import React, { useMemo, useState } from "react";
+import { Link } from "wouter";
 import {
   PageHeader,
   Section,
@@ -23,13 +24,16 @@ import {
   useToast,
 } from "@workspace/design-system";
 import { ShellOrdenes } from "../lib/ordenes/Shell";
-import { useAgenda } from "../lib/ordenes/hooks";
+import { useAgenda, useListado } from "../lib/ordenes/hooks";
 import { useOffline } from "../lib/offline/contexto";
 import { planificar } from "../lib/ordenes/mutaciones";
 import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/FormularioDinamico";
 import { plantillaPlanificacion } from "../lib/forms/plantillas-ordenes";
 import { BadgeEstado } from "../lib/ordenes/componentes";
-import type { EntradaAgenda } from "../lib/ordenes/tipos";
+import { tonoRiesgo } from "../lib/ecosistema/sla";
+import { urlActivo } from "../lib/ecosistema/deep-links";
+import { integrarAgenda, filtrarAgenda, opcionesAgenda, type EntradaIntegrada, type FiltroAgenda } from "../lib/ecosistema/agenda-integrada";
+import type { EntradaAgenda, OrdenRow } from "../lib/ordenes/tipos";
 
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -74,12 +78,20 @@ export function Planificacion({ hoyIso }: { hoyIso?: string }) {
   const hasta = ymd(finSemana);
 
   const { datos, cargando, error, recargar } = useAgenda(desde, hasta);
+  // Composición: enriquece la agenda con el read model de órdenes (activo/SLA/
+  // prioridad/cuadrilla) para un calendario operacional integrado.
+  const listado = useListado({ limit: 300 });
+  const ahoraMs = useMemo(() => base.getTime(), [base]);
+  const integradas = useMemo(
+    () => integrarAgenda(datos ?? [], listado.datos ?? [], ahoraMs),
+    [datos, listado.datos, ahoraMs],
+  );
 
   return (
     <>
       <PageHeader
         titulo="Centro de Planificación"
-        descripcion="Calendario semanal y agenda. Arrastra una orden a otro día para reprogramarla."
+        descripcion="Calendario operacional integrado: órdenes, programaciones, técnicos/cuadrillas, activos, ventanas y SLA sincronizados. Arrastra para reprogramar."
         acciones={
           <div style={{ display: "flex", gap: "var(--do-sp-2)", alignItems: "center" }}>
             <Button variant="secundario" size="sm" onClick={() => setOffsetSemanas((o) => o - 1)}>← Semana anterior</Button>
@@ -93,28 +105,33 @@ export function Planificacion({ hoyIso }: { hoyIso?: string }) {
       ) : cargando ? (
         <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-8)" }}><Spinner /></div>
       ) : (
-        <Calendario dias={dias} entradas={datos ?? []} onCambio={recargar} />
+        <Calendario dias={dias} entradas={integradas} ahoraMs={ahoraMs} onCambio={recargar} />
       )}
     </>
   );
 }
 
-export function Calendario({ dias, entradas, onCambio }: { dias: Date[]; entradas: EntradaAgenda[]; onCambio: () => void }) {
+export function Calendario({ dias, entradas, ahoraMs, onCambio }: { dias: Date[]; entradas: EntradaIntegrada[]; ahoraMs: number; onCambio: () => void }) {
   const { cola } = useOffline();
   const toast = useToast();
   const [reprogramar, setReprogramar] = useState<EntradaAgenda | null>(null);
+  const [filtro, setFiltro] = useState<FiltroAgenda>({});
+
+  const opciones = useMemo(() => opcionesAgenda(entradas), [entradas]);
+  const visibles = useMemo(() => filtrarAgenda(entradas, filtro), [entradas, filtro]);
+  void ahoraMs;
 
   // Agrupa por día (usa inicioPlanificado o ventanaInicio).
   const porDia = useMemo(() => {
-    const mapa = new Map<string, EntradaAgenda[]>();
-    for (const e of entradas) {
+    const mapa = new Map<string, EntradaIntegrada[]>();
+    for (const e of visibles) {
       const iso = e.inicioPlanificado ?? e.ventanaInicio;
       const clave = iso ? iso.slice(0, 10) : "sin-fecha";
       if (!mapa.has(clave)) mapa.set(clave, []);
       mapa.get(clave)!.push(e);
     }
     return mapa;
-  }, [entradas]);
+  }, [visibles]);
 
   const sinFecha = porDia.get("sin-fecha") ?? [];
 
@@ -129,6 +146,23 @@ export function Calendario({ dias, entradas, onCambio }: { dias: Date[]; entrada
 
   return (
     <>
+      <Section titulo="Capas y filtros">
+        <Card>
+          <CardContent>
+            <div style={{ display: "flex", gap: "var(--do-sp-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
+              <FiltroSelect etiqueta="Técnico" valor={filtro.tecnico ?? ""} opciones={opciones.tecnicos} onCambio={(v) => setFiltro((f) => ({ ...f, tecnico: v || null }))} />
+              <FiltroSelect etiqueta="Cuadrilla" valor={filtro.cuadrilla ?? ""} opciones={opciones.cuadrillas} onCambio={(v) => setFiltro((f) => ({ ...f, cuadrilla: v || null }))} />
+              <FiltroSelect etiqueta="Activo" valor={filtro.activoId ?? ""} opciones={opciones.activos} onCambio={(v) => setFiltro((f) => ({ ...f, activoId: v || null }))} />
+              <label style={{ display: "flex", gap: "var(--do-sp-1)", alignItems: "center", fontSize: "var(--do-text-sm)" }}>
+                <input type="checkbox" checked={!!filtro.soloRiesgoSla} onChange={(e) => setFiltro((f) => ({ ...f, soloRiesgoSla: e.target.checked }))} />
+                Solo SLA en riesgo
+              </label>
+              <Button variant="fantasma" size="sm" onClick={() => setFiltro({})}>Limpiar filtros</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </Section>
+
       <Section titulo="Semana">
         <div style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
           {dias.map((d) => {
@@ -167,12 +201,31 @@ export function Calendario({ dias, entradas, onCambio }: { dias: Date[]; entrada
   );
 }
 
+function FiltroSelect({ etiqueta, valor, opciones, onCambio }: {
+  etiqueta: string; valor: string; opciones: string[]; onCambio: (v: string) => void;
+}) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)", fontSize: "var(--do-text-sm)" }}>
+      <span>{etiqueta}</span>
+      <select
+        value={valor}
+        onChange={(e) => onCambio(e.target.value)}
+        aria-label={`Filtrar por ${etiqueta.toLowerCase()}`}
+        style={{ padding: "var(--do-sp-2)", borderRadius: "var(--do-radius-sm)", border: "1px solid var(--do-borde)", minHeight: "var(--do-sp-10)", minWidth: 160 }}
+      >
+        <option value="">Todos</option>
+        {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
+  );
+}
+
 function ColumnaDia({
   fecha, iso, items, onSoltar, onReprogramar,
 }: {
   fecha: Date;
   iso: string;
-  items: EntradaAgenda[];
+  items: EntradaIntegrada[];
   onSoltar: (e: EntradaAgenda) => void;
   onReprogramar: (e: EntradaAgenda) => void;
 }) {
@@ -222,10 +275,11 @@ function ColumnaDia({
 function TarjetaEntrada({
   entrada, onReprogramar, arrastrable,
 }: {
-  entrada: EntradaAgenda;
+  entrada: EntradaIntegrada;
   onReprogramar: (e: EntradaAgenda) => void;
   arrastrable?: boolean;
 }) {
+  const ventana = entrada.ventanaInicio || entrada.ventanaFin;
   return (
     <div
       draggable={arrastrable}
@@ -243,9 +297,24 @@ function TarjetaEntrada({
         <BadgeEstado estado={entrada.estado} />
       </div>
       <div style={{ fontSize: "var(--do-text-sm)" }}>{entrada.titulo}</div>
-      {entrada.enConflicto && <Badge variant="error">Conflicto</Badge>}
+      <div style={{ display: "flex", gap: "var(--do-sp-1)", flexWrap: "wrap", marginTop: "var(--do-sp-1)" }}>
+        {entrada.enConflicto && <Badge variant="error">Conflicto</Badge>}
+        {entrada.prioridad && <Badge variant="neutro">{entrada.prioridad}</Badge>}
+        {entrada.cuadrilla && <Badge variant="info">👥 {entrada.cuadrilla}</Badge>}
+        {entrada.sla.riesgo !== "sin-sla" && <Badge variant={tonoRiesgo(entrada.sla.riesgo)}>SLA: {entrada.sla.etiqueta}</Badge>}
+      </div>
       {entrada.responsable && (
-        <div style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>{entrada.responsable}</div>
+        <div style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>🧰 {entrada.responsable}</div>
+      )}
+      {entrada.activoId && (
+        <div style={{ fontSize: "var(--do-text-xs)" }}>
+          <Link href={urlActivo(entrada.activoId)}>🏭 Ver activo</Link>
+        </div>
+      )}
+      {ventana && (
+        <div style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>
+          Ventana: {entrada.ventanaInicio?.slice(5, 16) ?? "—"} → {entrada.ventanaFin?.slice(5, 16) ?? "—"}
+        </div>
       )}
       <Button variant="fantasma" size="sm" onClick={() => onReprogramar(entrada)}>Reprogramar</Button>
     </div>

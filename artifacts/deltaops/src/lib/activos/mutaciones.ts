@@ -171,6 +171,29 @@ export async function cambiarUbicacion(
   });
 }
 
+/**
+ * Registra una lectura de medidor (horómetro/odómetro). Las mediciones son
+ * MONÓTONAS en el dominio (`permite-retroceso-*=false`): una relectura con el
+ * mismo valor es un no-op, por lo que el replay offline converge sin duplicar.
+ * Degrada a la cola de sincronización si falla la red.
+ */
+export async function registrarMedidor(
+  cola: ColaSync,
+  id: string,
+  expectedVersion: number,
+  clase: "horometro" | "odometro",
+  medicion: { valor: number; unidad: string; fecha: string },
+): Promise<ResultadoMutacion> {
+  const opId = nuevoOpId();
+  const cuerpo = { id, expectedVersion, medicion, opId };
+  return mutarConOffline(cola, {
+    comando: `${MODULO}.actualizar-${clase}`,
+    input: cuerpo,
+    descripcion: `Registrar ${clase} de ${id} (${medicion.valor} ${medicion.unidad})`,
+    directo: () => activosFetch(`/${id}/${clase}`, { method: "POST", body: cuerpo }),
+  });
+}
+
 /** Asigna responsable. */
 export async function asignarResponsable(
   cola: ColaSync,
