@@ -13,6 +13,7 @@
  *
  * MANDATO OFICIAL: la contraseña inicial vive ÚNICAMENTE en este seed.
  */
+import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, pool, deltaopsUsersTable } from "@workspace/db";
@@ -24,6 +25,7 @@ import { ordenesRuntime, principalOrdenes } from "../routes/deltaops/ordenes-run
 import { inventarioRuntime, principalInventario } from "../routes/deltaops/inventario-runtime";
 import { planesRuntime, principalPlanes } from "../routes/deltaops/planes-runtime";
 import { abastecimientoRuntime, principalAbastecimiento } from "../routes/deltaops/abastecimiento-runtime";
+import { preventivoRuntime, principalPreventivo } from "../routes/deltaops/preventivo-runtime";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -1034,6 +1036,300 @@ async function seedAbastecimiento(): Promise<void> {
   log(`Recepciones de abastecimiento: ${recepcionesHechas} (parcial + total con novedad) materializadas a Inventario`);
 }
 
+/* ------------------- 8) Mantenimiento preventivo (DGP-014) --------------- */
+/**
+ * Amplía el tenant DEMO con el módulo PREVENTIVO por VÍAS OFICIALES (comandos del
+ * módulo `modulo.preventivo.*` + orquestación real vía MaterializadorOrdenes):
+ *   · Catálogos (tipos-programa, motivos reprogramación/suspensión/exclusión,
+ *     roles-personal, tipos-recurso, clasificaciones-sla).
+ *   · 3 programas PUBLICADOS (crear → enviarRevision → publicar) sobre planes
+ *     DEMO vigentes de `modulo.planes` y activos DEMO, con jerarquía padre→hijo,
+ *     vigencias variadas y SLA.
+ *   · ~8 actividades con dependencias (DAG real), checklists anclados a plantillas
+ *     de formularios, recursos (personal/herramientas/repuestos ligados a
+ *     artículos/items DEMO reales), tiempos y costos estimados.
+ *   · GENERACIÓN oficial (`generar`) para varios vencimientos ⇒ OT preventivas
+ *     REALES materializadas por el MaterializadorOrdenes (opId=claveDedup, id de
+ *     OT derivado de la generación ⇒ sin duplicados; idempotente al re-sembrar).
+ *   · 1 reprogramación + 1 suspensión parcial + 1 exclusión con motivos de
+ *     catálogo (para que el calendario DEMO muestre todos los estados).
+ *
+ * IDEMPOTENTE: id/opId deterministas + guardas por estado real del aggregate.
+ * El `absId` (aquí prefijo `prv:`) lleva un token discriminante AL INICIO.
+ */
+
+/**
+ * Id DETERMINISTA fuerte (UUIDv5 sobre SHA-1) con token discriminante `prv:` AL
+ * INICIO de la semilla. A diferencia del `idDet` genérico (suficiente para las
+ * claves cortas del resto del seed), aquí las semillas son largas y numerosas;
+ * un hash criptográfico evita colisiones entre actividades/programas.
+ */
+function prvId(seed: string): string {
+  const hash = createHash("sha1").update(`prv:${seed}`).digest();
+  const b = hash.subarray(0, 16);
+  b[6] = (b[6] & 0x0f) | 0x50; // versión 5
+  b[8] = (b[8] & 0x3f) | 0x80; // variante RFC-4122
+  const hex = b.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+interface DefActividadPrv {
+  clave: string; nombre: string; orden: number; dependencias: string[];
+  checklist: { plantillaId: string; version: number };
+  tiempo: { valor: number; unidad: string };
+  recursos: Record<string, unknown>;
+}
+
+/** Programas preventivos DEMO (uno raíz + un hijo ⇒ jerarquía padre→hijo). */
+interface DefProgramaPrv {
+  clave: string; nombre: string; tipo: string; clasificacion: string;
+  padre?: string; plan: string; planActivo: string; activos: string[];
+  vigencia: { desde: string; hasta: string | null };
+  sla: { clasificacion: string; ventanaRespuestaHoras: number; ventanaCumplimientoHoras: number; toleranciaHoras?: number };
+  actividades: DefActividadPrv[];
+}
+
+const PROGRAMAS_PRV: DefProgramaPrv[] = [
+  // RAÍZ — servicio mayor excavadora (basado en plan preventivo mensual DEMO).
+  {
+    clave: "PRV-MAQ-MAYOR", nombre: "Servicio mayor excavadora CAT 320",
+    tipo: "servicio-mayor", clasificacion: "operativo",
+    plan: "PLN-MAQ-PREV", planActivo: "MAQ-001", activos: ["MAQ-001"],
+    vigencia: { desde: "2026-01-01T00:00:00.000Z", hasta: "2026-12-31T23:59:59.000Z" },
+    sla: { clasificacion: "critico", ventanaRespuestaHoras: 8, ventanaCumplimientoHoras: 72, toleranciaHoras: 12 },
+    actividades: [
+      { clave: "A1", nombre: "Inspección visual y bloqueo/etiquetado", orden: 1, dependencias: [],
+        checklist: { plantillaId: "chk-inspeccion-general", version: 1 }, tiempo: { valor: 1, unidad: "horas" },
+        recursos: { personal: [{ rol: "tecnico", cantidad: 1, horasPorPersona: 1, costoHora: { moneda: "usd", monto: 12 } }],
+          herramientas: [{ tipo: "manual", descripcion: "Kit de bloqueo LOTO", cantidad: 1 }] } },
+      { clave: "A2", nombre: "Cambio de aceite y filtros", orden: 2, dependencias: ["A1"],
+        checklist: { plantillaId: "chk-cambio-aceite", version: 1 }, tiempo: { valor: 2, unidad: "horas" },
+        recursos: {
+          personal: [{ rol: "tecnico-lider", cantidad: 1, horasPorPersona: 2, costoHora: { moneda: "usd", monto: 18 } }],
+          herramientas: [{ tipo: "manual", descripcion: "Juego de llaves", cantidad: 1, referencia: { tipo: "inventario-item", id: "HER-001", etiqueta: "Juego de llaves combinadas" } }],
+          repuestos: [
+            { referencia: { tipo: "inventario-item", id: "ACE-001", etiqueta: "Aceite hidráulico ISO 68" }, cantidad: 20, unidad: "litros", costoUnitario: { moneda: "usd", monto: 6 } },
+            { referencia: { tipo: "inventario-item", id: "FIL-001", etiqueta: "Filtro de aire HD" }, cantidad: 2, unidad: "unidad", costoUnitario: { moneda: "usd", monto: 22 } },
+          ] } },
+      { clave: "A3", nombre: "Engrase de puntos críticos", orden: 3, dependencias: ["A1"],
+        checklist: { plantillaId: "chk-engrase", version: 1 }, tiempo: { valor: 1, unidad: "horas" },
+        recursos: {
+          personal: [{ rol: "auxiliar", cantidad: 1, horasPorPersona: 1, costoHora: { moneda: "usd", monto: 8 } }],
+          repuestos: [{ referencia: { tipo: "inventario-item", id: "GRA-001", etiqueta: "Grasa de litio EP2" }, cantidad: 2, unidad: "kilogramos", costoUnitario: { moneda: "usd", monto: 9 } }] } },
+      { clave: "A4", nombre: "Prueba funcional y desbloqueo", orden: 4, dependencias: ["A2", "A3"],
+        checklist: { plantillaId: "chk-prueba-funcional", version: 1 }, tiempo: { valor: 1, unidad: "horas" },
+        recursos: { personal: [{ rol: "supervisor", cantidad: 1, horasPorPersona: 1, costoHora: { moneda: "usd", monto: 25 } }] } },
+    ],
+  },
+  // HIJO — lubricación menor (rutina anidada bajo el servicio mayor: padre→hijo).
+  {
+    clave: "PRV-MAQ-LUBRIC", nombre: "Lubricación semanal excavadora",
+    tipo: "lubricacion", clasificacion: "operativo", padre: "PRV-MAQ-MAYOR",
+    plan: "PLN-MAQ-PREV", planActivo: "MAQ-001", activos: ["MAQ-001"],
+    vigencia: { desde: "2026-02-01T00:00:00.000Z", hasta: null },
+    sla: { clasificacion: "medio", ventanaRespuestaHoras: 24, ventanaCumplimientoHoras: 48 },
+    actividades: [
+      { clave: "B1", nombre: "Engrase rápido de articulaciones", orden: 1, dependencias: [],
+        checklist: { plantillaId: "chk-engrase", version: 1 }, tiempo: { valor: 0.5, unidad: "horas" },
+        recursos: {
+          personal: [{ rol: "auxiliar", cantidad: 1, horasPorPersona: 0.5, costoHora: { moneda: "usd", monto: 8 } }],
+          repuestos: [{ referencia: { tipo: "inventario-item", id: "GRA-001", etiqueta: "Grasa de litio EP2" }, cantidad: 1, unidad: "kilogramos", costoUnitario: { moneda: "usd", monto: 9 } }] } },
+      { clave: "B2", nombre: "Verificación de niveles", orden: 2, dependencias: ["B1"],
+        checklist: { plantillaId: "chk-inspeccion-general", version: 1 }, tiempo: { valor: 0.5, unidad: "horas" },
+        recursos: { personal: [{ rol: "tecnico", cantidad: 1, horasPorPersona: 0.5, costoHora: { moneda: "usd", monto: 12 } }] } },
+    ],
+  },
+  // INDEPENDIENTE — inspección banda transportadora (otro activo/plan DEMO).
+  {
+    clave: "PRV-BAN-INSP", nombre: "Inspección mensual banda transportadora",
+    tipo: "ruta", clasificacion: "seguridad",
+    plan: "PLN-BAN-INS", planActivo: "BAN-001", activos: ["BAN-001"],
+    vigencia: { desde: "2026-01-15T00:00:00.000Z", hasta: "2026-07-15T23:59:59.000Z" },
+    sla: { clasificacion: "alto", ventanaRespuestaHoras: 12, ventanaCumplimientoHoras: 36, toleranciaHoras: 6 },
+    actividades: [
+      { clave: "C1", nombre: "Inspección de bandas y rodillos", orden: 1, dependencias: [],
+        checklist: { plantillaId: "chk-inspeccion-general", version: 1 }, tiempo: { valor: 1, unidad: "horas" },
+        recursos: {
+          personal: [{ rol: "tecnico", cantidad: 1, horasPorPersona: 1, costoHora: { moneda: "usd", monto: 12 } }],
+          repuestos: [{ referencia: { tipo: "inventario-item", id: "BND-001", etiqueta: "Banda en V B-52" }, cantidad: 1, unidad: "unidad", costoUnitario: { moneda: "usd", monto: 15 } }] } },
+      { clave: "C2", nombre: "Ajuste de tensión y alineación", orden: 2, dependencias: ["C1"],
+        checklist: { plantillaId: "chk-ajuste", version: 1 }, tiempo: { valor: 1.5, unidad: "horas" },
+        recursos: { personal: [{ rol: "especialista", cantidad: 1, horasPorPersona: 1.5, costoHora: { moneda: "usd", monto: 20 } }] } },
+    ],
+  },
+];
+
+/** Catálogos del módulo Preventivo que consume el dataset demo (upsert idempotente). */
+const CATALOGOS_PRV: [string, string, string][] = [
+  ["tipos-programa", "servicio-mayor", "Servicio mayor"],
+  ["tipos-programa", "servicio-menor", "Servicio menor"],
+  ["tipos-programa", "lubricacion", "Lubricación"],
+  ["tipos-programa", "ruta", "Ruta de inspección"],
+  ["clasificaciones-programa", "operativo", "Operativo"],
+  ["clasificaciones-programa", "seguridad", "Seguridad"],
+  ["motivos-reprogramacion", "clima", "Condiciones climáticas"],
+  ["motivos-reprogramacion", "disponibilidad-recurso", "Disponibilidad de recurso"],
+  ["motivos-suspension", "en-reparacion", "Activo en reparación"],
+  ["motivos-suspension", "fuera-de-servicio", "Fuera de servicio"],
+  ["motivos-exclusion", "parada-planta", "Parada de planta"],
+  ["motivos-exclusion", "inventario-fisico", "Inventario físico"],
+  ["roles-personal", "tecnico", "Técnico"],
+  ["roles-personal", "tecnico-lider", "Técnico líder"],
+  ["roles-personal", "especialista", "Especialista"],
+  ["roles-personal", "supervisor", "Supervisor"],
+  ["roles-personal", "auxiliar", "Auxiliar"],
+  ["tipos-recurso", "personal", "Personal"],
+  ["tipos-recurso", "herramienta", "Herramienta"],
+  ["tipos-recurso", "repuesto", "Repuesto"],
+  ["clasificaciones-sla", "critico", "Crítico"],
+  ["clasificaciones-sla", "alto", "Alto"],
+  ["clasificaciones-sla", "medio", "Medio"],
+  ["origenes-generacion", "programada", "Programada"],
+];
+
+async function seedPreventivo(activoIds: Map<string, string>): Promise<void> {
+  const rt = preventivoRuntime();
+  const ctx = ctxCon(principalPreventivo("seed-demo", "admin"));
+  const cmd = (n: string, i: unknown) => rt.platform.kernel.commands.execute(ctx, n, i);
+  const q = (n: string, i: unknown) => rt.platform.kernel.queries.execute(ctx, n, i);
+  const drain = () => drenarCompleto(rt.platform.kernel);
+
+  // Catálogos (upsert idempotente por clave).
+  for (const [c, k, e] of CATALOGOS_PRV) unwrap(await cmd("modulo.preventivo.catalogo-upsert", { catalogo: c, clave: k, etiqueta: e }), `catalogo.prv ${c}/${k}`);
+  await drain();
+  log(`Catálogos de preventivo habilitados (${CATALOGOS_PRV.length})`);
+
+  // Estado actual del programa (fuente de verdad = aggregate) para idempotencia.
+  const estadoPrograma = async (id: string): Promise<{ estado: string; version: number } | null> => {
+    const r = await q("modulo.preventivo.programa", { id });
+    if (!r.ok || !r.value) return null;
+    const v = r.value as { estado?: string; version?: number };
+    return { estado: v.estado ?? "preparacion", version: v.version ?? 1 };
+  };
+
+  const progIds = new Map<string, string>();
+  const actIds = new Map<string, string>(); // `${progClave}:${actClave}` → id
+  let publicados = 0;
+
+  // 1) Crear programas (padre ANTES que hijo por la jerarquía), publicarlos y
+  //    definir sus actividades (DAG). Todo idempotente por id/opId/estado.
+  for (const p of PROGRAMAS_PRV) {
+    const id = prvId(`programa:${p.clave}`);
+    progIds.set(p.clave, id);
+    const planId = idDet(`plan:${p.plan}`);
+    const activos = p.activos.map((a) => activoIds.get(a) ?? idDet(`activo:${a}`));
+
+    unwrap(await cmd("modulo.preventivo.crear-programa", {
+      id, opId: `seed:prv:programa:${p.clave}`,
+      nombre: p.nombre, descripcion: `${p.nombre} — programa preventivo DEMO`,
+      tipo: p.tipo, clasificacion: p.clasificacion,
+      padreId: p.padre ? progIds.get(p.padre) ?? null : null,
+      planes: [{ planId, version: 1, etiqueta: p.plan }],
+      activos,
+      vigencia: p.vigencia,
+      sla: p.sla,
+    }), `crear-programa ${p.clave}`);
+    await drain();
+
+    // Definir actividades ANTES de publicar (el programa es inmutable al publicar).
+    for (const a of p.actividades) {
+      const aid = prvId(`actividad:${p.clave}:${a.clave}`);
+      actIds.set(`${p.clave}:${a.clave}`, aid);
+      const st = await estadoPrograma(id);
+      // Sólo define en preparación/revisión (idempotente: si ya publicado, se omite).
+      if (st && (st.estado === "preparacion" || st.estado === "revision")) {
+        unwrap(await cmd("modulo.preventivo.definir-actividad", {
+          id: aid, opId: `seed:prv:actividad:${p.clave}:${a.clave}`,
+          programaId: id, nombre: a.nombre, orden: a.orden,
+          dependencias: a.dependencias.map((d) => actIds.get(`${p.clave}:${d}`)!),
+          checklist: { ...a.checklist, obligatorio: true },
+          tiempoEstimado: a.tiempo, moneda: "usd",
+          recursos: a.recursos,
+        }), `definir-actividad ${p.clave}:${a.clave}`);
+        await drain();
+      }
+    }
+
+    // Publicar: preparacion → enviarRevision → revision → publicar (workflow real).
+    let st = await estadoPrograma(id);
+    if (st && st.estado === "preparacion") {
+      unwrap(await cmd("modulo.preventivo.transicionar-programa", { id, accion: "enviarRevision", expectedVersion: st.version, opId: `seed:prv:rev:${p.clave}` }), `enviarRevision ${p.clave}`);
+      await drain();
+      st = await estadoPrograma(id);
+    }
+    if (st && st.estado === "revision") {
+      unwrap(await cmd("modulo.preventivo.transicionar-programa", { id, accion: "publicar", expectedVersion: st.version, opId: `seed:prv:pub:${p.clave}` }), `publicar ${p.clave}`);
+      await drain();
+      st = await estadoPrograma(id);
+    }
+    if (st?.estado === "publicado") publicados++;
+  }
+  log(`Programas preventivos publicados (${publicados}/${PROGRAMAS_PRV.length}, incl. jerarquía padre→hijo)`);
+
+  // 2) GENERACIÓN oficial (`generar`) para varios vencimientos ⇒ OT preventivas
+  //    REALES materializadas por el MaterializadorOrdenes. Idempotente por opId
+  //    (recibo) y por claveDedup (dedup de generación). Cada generación toma la
+  //    primera actividad del programa raíz/independiente y un vencimiento distinto.
+  const VENCIMIENTOS: { prog: string; act: string; activo: string; ventana: string; fecha: string }[] = [
+    { prog: "PRV-MAQ-MAYOR", act: "A1", activo: "MAQ-001", ventana: "2026-01", fecha: "2026-01-20T08:00:00.000Z" },
+    { prog: "PRV-MAQ-MAYOR", act: "A1", activo: "MAQ-001", ventana: "2026-02", fecha: "2026-02-20T08:00:00.000Z" },
+    { prog: "PRV-BAN-INSP", act: "C1", activo: "BAN-001", ventana: "2026-01", fecha: "2026-01-25T08:00:00.000Z" },
+    { prog: "PRV-BAN-INSP", act: "C1", activo: "BAN-001", ventana: "2026-02", fecha: "2026-02-25T08:00:00.000Z" },
+  ];
+  let materializadas = 0; let idempotentes = 0;
+  for (const v of VENCIMIENTOS) {
+    const programaId = progIds.get(v.prog)!;
+    const actividadId = actIds.get(`${v.prog}:${v.act}`)!;
+    const activoId = activoIds.get(v.activo) ?? idDet(`activo:${v.activo}`);
+    const genId = prvId(`generacion:${v.prog}:${v.ventana}`);
+    const r = unwrap(await cmd("modulo.preventivo.generar", {
+      id: genId, opId: `seed:prv:gen:${v.prog}:${v.ventana}`,
+      programaId, actividadId, activoId, ventana: v.ventana, origen: "programada",
+      fechaObjetivo: v.fecha, corresponde: true,
+    }), `generar ${v.prog}/${v.ventana}`) as { estado?: string; ordenTrabajoId?: string | null; idempotente?: boolean };
+    // Drena Órdenes INMEDIATAMENTE: el materializador ya creó la OT; proyecta su
+    // read model antes de que otro runtime reclame el outbox compartido.
+    await drain();
+    await drenarCompleto(ordenesRuntime().platform.kernel);
+    if (r.estado === "materializada" && r.ordenTrabajoId) {
+      if (r.idempotente === true) idempotentes++; else materializadas++;
+    }
+  }
+  await drenarCompleto(ordenesRuntime().platform.kernel);
+  log(`Generaciones preventivas materializadas: ${materializadas} nuevas, ${idempotentes} idempotentes (OT reales)`);
+
+  // 3) PROGRAMACIONES del calendario: 1 reprogramación, 1 suspensión parcial y 1
+  //    exclusión con motivos de catálogo (append-only; idempotente por opId).
+  const progRaiz = progIds.get("PRV-MAQ-MAYOR")!;
+  const actRaiz = actIds.get("PRV-MAQ-MAYOR:A2")!;
+  unwrap(await cmd("modulo.preventivo.reprogramar", {
+    opId: "seed:prv:reprog:MAQ-MAYOR",
+    programaId: progRaiz, actividadId: actRaiz, activoId: activoIds.get("MAQ-001") ?? idDet("activo:MAQ-001"),
+    fechaOriginal: "2026-01-20T08:00:00.000Z", fechaNueva: "2026-01-27T08:00:00.000Z", motivo: "clima",
+  }), "reprogramar MAQ-MAYOR");
+  await drain();
+  unwrap(await cmd("modulo.preventivo.suspender", {
+    opId: "seed:prv:susp:BAN-INSP",
+    programaId: progIds.get("PRV-BAN-INSP")!, ambito: "activo",
+    sujetoId: activoIds.get("BAN-001") ?? idDet("activo:BAN-001"),
+    activoId: activoIds.get("BAN-001") ?? idDet("activo:BAN-001"),
+    motivo: "en-reparacion", desde: "2026-03-01T00:00:00.000Z", hasta: "2026-03-15T23:59:59.000Z",
+  }), "suspender BAN-INSP");
+  await drain();
+  unwrap(await cmd("modulo.preventivo.excluir", {
+    opId: "seed:prv:excl:MAQ-MAYOR",
+    programaId: progRaiz, desde: "2026-04-01T00:00:00.000Z", hasta: "2026-04-07T23:59:59.000Z",
+    activos: [activoIds.get("MAQ-001") ?? idDet("activo:MAQ-001")], motivo: "parada-planta",
+  }), "excluir MAQ-MAYOR");
+  await drain();
+  log("Programaciones DEMO: 1 reprogramación + 1 suspensión parcial + 1 exclusión (motivos de catálogo)");
+
+  // 4) Reproyección FINAL desde la bitácora durable (equivalencia por replay) por
+  //    si el outbox COMPARTIDO fue reclamado por otro runtime sin sus handlers.
+  unwrap(await cmd("modulo.preventivo.reproyectar", {}), "reproyectar preventivo");
+  await drain();
+}
+
 /* ------------------------------- Orquestación ---------------------------- */
 
 export async function seedDeltaDemo(): Promise<void> {
@@ -1045,6 +1341,7 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedInventario();
   await seedPlanes(activoIds);
   await seedAbastecimiento();
+  await seedPreventivo(activoIds);
   await seedPlataforma(activoIds);
   console.log("Seed DEMO completado.\n");
 }

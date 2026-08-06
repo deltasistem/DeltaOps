@@ -76,6 +76,10 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
       absOrdenes: await contarPorTenant("abs_ordenes_compra_read", DEMO_TENANT),
       absRecepciones: await contarPorTenant("abs_recepciones_read", DEMO_TENANT),
       absMaterializaciones: await contarPorTenant("abs_recepcion_materializaciones", DEMO_TENANT),
+      prvProgramas: await contarPorTenant("prv_programas_read", DEMO_TENANT),
+      prvActividades: await contarPorTenant("prv_actividades_read", DEMO_TENANT),
+      prvGeneraciones: await contarPorTenant("prv_generaciones_read", DEMO_TENANT),
+      prvProgramaciones: await contarPorTenant("prv_programaciones_read", DEMO_TENANT),
     });
     const antes = await snapshot();
 
@@ -90,7 +94,10 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     // vida (seedOrdenes) MÁS las 7 preventivas materializadas por el motor de
     // planes (orquestación `modulo.ordenes.crear`, dedup por claveDedup).
     expect(antes.activos).toBe(10);
-    expect(antes.ordenes).toBe(14);
+    // Órdenes: 7 del ciclo de vida (seedOrdenes) + 7 preventivas del motor de
+    // Planes + 4 preventivas del módulo Preventivo (seedPreventivo, materializadas
+    // por el MaterializadorOrdenes vía orquestación oficial) = 18.
+    expect(antes.ordenes).toBe(18);
     expect(antes.items).toBe(12);
     // Abastecimiento: 10 artículos, 4 proveedores, 3 solicitudes, 2 cotizaciones,
     // 2 órdenes de compra, 2 recepciones.
@@ -100,6 +107,12 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(antes.absCotizaciones).toBe(2);
     expect(antes.absOrdenes).toBe(2);
     expect(antes.absRecepciones).toBe(2);
+    // Preventivo (DGP-014): 3 programas publicados, 8 actividades (DAG),
+    // 4 generaciones materializadas y 3 programaciones (reprog/susp/excl).
+    expect(antes.prvProgramas).toBe(3);
+    expect(antes.prvActividades).toBe(8);
+    expect(antes.prvGeneraciones).toBe(4);
+    expect(antes.prvProgramaciones).toBe(3);
   }, 120_000);
 
   it("ABASTECIMIENTO · artículos ligados a Inventario, proveedores calificados y OC recibida", async () => {
@@ -248,11 +261,12 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(Number(distintas.rows[0]?.n ?? 0)).toBe(total); // dedup: sin duplicados
 
     // Evidencia funcional: se crearon OT de tipo preventiva por la orquestación.
+    // 7 desde el motor de Planes + 4 desde el módulo Preventivo (seedPreventivo).
     const ot = await pool.query(
       `SELECT count(*)::int AS n FROM deltaops.ord_ordenes WHERE tenant_id = $1 AND tipo = 'preventiva'`,
       [DEMO_TENANT],
     );
-    expect(Number(ot.rows[0]?.n ?? 0)).toBe(7);
+    expect(Number(ot.rows[0]?.n ?? 0)).toBe(11);
 
     // VÍNCULO persistido: las 7 generaciones quedan MATERIALIZADAS con su OT
     // enlazada (orden_trabajo_id NO nulo + estado=materializada en el snapshot).
@@ -268,6 +282,92 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
   it("AISLAMIENTO PLANES · un tenant ajeno no ve planes del DEMO", async () => {
     expect(await contarPorTenant("pln_planes_read", "tenant-inexistente")).toBe(0);
     expect(await contarPorTenant("pln_generaciones_read", "tenant-inexistente")).toBe(0);
+  });
+
+  it("PREVENTIVO · 3 programas publicados con jerarquía padre→hijo y 8 actividades (DAG)", async () => {
+    const programas = await contarPorTenant("prv_programas_read", DEMO_TENANT);
+    expect(programas).toBe(3);
+
+    // Todos los programas quedan PUBLICADOS (crear→enviarRevision→publicar).
+    const estados = await pool.query(
+      `SELECT DISTINCT estado FROM deltaops.prv_programas_read WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    expect(estados.rows.map((x: { estado: string }) => x.estado)).toEqual(["publicado"]);
+
+    // Jerarquía padre→hijo: al menos un programa referencia a otro como padre.
+    const conPadre = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.prv_programas_read
+        WHERE tenant_id = $1 AND (datos->>'padreId') IS NOT NULL`,
+      [DEMO_TENANT],
+    );
+    expect(Number(conPadre.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(1);
+
+    // 8 actividades definidas con dependencias reales (DAG): existe al menos una
+    // actividad con dependencias no vacías.
+    const actividades = await contarPorTenant("prv_actividades_read", DEMO_TENANT);
+    expect(actividades).toBe(8);
+    const conDeps = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.prv_actividades_read
+        WHERE tenant_id = $1 AND jsonb_array_length(COALESCE(datos->'dependencias','[]'::jsonb)) > 0`,
+      [DEMO_TENANT],
+    );
+    expect(Number(conDeps.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("PREVENTIVO · generaciones materializan OT preventivas REALES sin duplicados", async () => {
+    const total = await contarPorTenant("prv_generaciones_read", DEMO_TENANT);
+    expect(total).toBe(4);
+
+    // claveDedup ÚNICA (sin duplicados) — idempotencia end-to-end.
+    const distintas = await pool.query(
+      `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.prv_generaciones_read WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    expect(Number(distintas.rows[0]?.n ?? 0)).toBe(total);
+
+    // Todas MATERIALIZADAS con su OT enlazada (orden_trabajo_id NO nulo).
+    const vinculadas = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.prv_generaciones_read
+        WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL AND estado = 'materializada'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(vinculadas.rows[0]?.n ?? 0)).toBe(4);
+
+    // El vínculo apunta a OT REALES de tipo preventiva en el módulo de Órdenes.
+    const otReales = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.prv_generaciones_read g
+         JOIN deltaops.ord_ordenes o ON o.id = g.orden_trabajo_id AND o.tenant_id = g.tenant_id
+        WHERE g.tenant_id = $1 AND o.tipo = 'preventiva'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(otReales.rows[0]?.n ?? 0)).toBe(4);
+
+    // Sin OT duplicadas: cada generación materializada enlaza una OT distinta.
+    const otDistintas = await pool.query(
+      `SELECT count(DISTINCT orden_trabajo_id)::int AS n FROM deltaops.prv_generaciones_read
+        WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL`,
+      [DEMO_TENANT],
+    );
+    expect(Number(otDistintas.rows[0]?.n ?? 0)).toBe(4);
+  });
+
+  it("PREVENTIVO · el calendario muestra reprogramación, suspensión y exclusión", async () => {
+    const total = await contarPorTenant("prv_programaciones_read", DEMO_TENANT);
+    expect(total).toBe(3);
+
+    const tipos = await pool.query(
+      `SELECT DISTINCT tipo FROM deltaops.prv_programaciones_read WHERE tenant_id = $1 ORDER BY 1`,
+      [DEMO_TENANT],
+    );
+    const setTipos = tipos.rows.map((x: { tipo: string }) => x.tipo);
+    expect(setTipos).toEqual(expect.arrayContaining(["exclusion", "reprogramacion", "suspension"]));
+  });
+
+  it("AISLAMIENTO PREVENTIVO · un tenant ajeno no ve datos del DEMO", async () => {
+    expect(await contarPorTenant("prv_programas_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("prv_generaciones_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("prv_programaciones_read", "tenant-inexistente")).toBe(0);
   });
 
   it("AISLAMIENTO · delta-demo y deltaops están particionados por tenant_id", async () => {

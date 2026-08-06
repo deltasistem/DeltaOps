@@ -52,6 +52,13 @@ import AbastecimientoOrdenNueva from '@/pages/abastecimiento-orden-nueva';
 import AbastecimientoOrdenFicha from '@/pages/abastecimiento-orden-ficha';
 import AbastecimientoSincronizacion from '@/pages/abastecimiento-sincronizacion';
 import AbastecimientoEscanear from '@/pages/abastecimiento-escanear';
+import PreventivoProgramas from '@/pages/preventivo-programas';
+import PreventivoProgramaNueva from '@/pages/preventivo-programa-nueva';
+import PreventivoProgramaFicha from '@/pages/preventivo-programa-ficha';
+import PreventivoActividad from '@/pages/preventivo-actividad';
+import PreventivoCalendario from '@/pages/preventivo-calendario';
+import PreventivoEscanear from '@/pages/preventivo-escanear';
+import PreventivoSincronizacion from '@/pages/preventivo-sincronizacion';
 
 const queryClient = new QueryClient();
 
@@ -123,6 +130,13 @@ function Router() {
       <Route path="/abastecimiento/ordenes-compra/:id" component={AbastecimientoOrdenFicha} />
       <Route path="/abastecimiento/escanear" component={AbastecimientoEscanear} />
       <Route path="/abastecimiento/sincronizacion" component={AbastecimientoSincronizacion} />
+      <Route path="/preventivo/programas" component={PreventivoProgramas} />
+      <Route path="/preventivo/programas/nuevo" component={PreventivoProgramaNueva} />
+      <Route path="/preventivo/calendario" component={PreventivoCalendario} />
+      <Route path="/preventivo/escanear" component={PreventivoEscanear} />
+      <Route path="/preventivo/sincronizacion" component={PreventivoSincronizacion} />
+      <Route path="/preventivo/programas/:id/actividad" component={PreventivoActividad} />
+      <Route path="/preventivo/programas/:id" component={PreventivoProgramaFicha} />
       <Route component={NotFound} />
     </Switch>
   );

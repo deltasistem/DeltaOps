@@ -76,6 +76,7 @@ export function Centro() {
             <Link href="/inventario"><Button variant="secundario" size="sm">Inventario</Button></Link>
             <Link href="/planes"><Button variant="secundario" size="sm">Planes</Button></Link>
             <Link href="/abastecimiento/articulos"><Button variant="secundario" size="sm">Abastecimiento</Button></Link>
+            <Link href="/preventivo/programas"><Button variant="secundario" size="sm">Preventivo</Button></Link>
             <Link href="/ordenes/nueva"><Button variant="primario" size="sm">Nueva orden</Button></Link>
           </div>
         }

@@ -40,6 +40,9 @@
       "path": "./lib/module-abastecimiento"
     },
     {
+      "path": "./lib/module-preventivo"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

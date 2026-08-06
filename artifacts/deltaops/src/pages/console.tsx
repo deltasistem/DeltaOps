@@ -177,6 +177,11 @@ export default function Console() {
                 Abastecimiento
               </Button>
             </Link>
+            <Link href="/preventivo/programas" data-testid="link-preventivo">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Preventivo
+              </Button>
+            </Link>
             {(user.rol === "admin" || user.rol === "platform_admin") && (
               <Link href="/consola-activos" data-testid="link-consola-activos">
                 <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">

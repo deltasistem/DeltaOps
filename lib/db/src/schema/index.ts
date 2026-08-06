@@ -15,3 +15,4 @@ export * from "./deltaops-activos";
 export * from "./deltaops-inventario";
 export * from "./deltaops-planes";
 export * from "./deltaops-abastecimiento";
+export * from "./deltaops-preventivo";
