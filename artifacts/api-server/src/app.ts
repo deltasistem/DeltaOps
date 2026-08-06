@@ -8,6 +8,7 @@ import attachmentServeRouter from "./routes/deltaops/attachment-serve";
 import referenceModuleRouter from "./routes/deltaops/reference-module";
 import activosModuleRouter from "./routes/deltaops/activos-module";
 import ordenesModuleRouter from "./routes/deltaops/ordenes-module";
+import inventarioModuleRouter from "./routes/deltaops/inventario-module";
 import { logger } from "./lib/logger";
 import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
@@ -55,6 +56,7 @@ app.use("/api", platformConsoleRouter);
 app.use("/api", referenceModuleRouter);
 app.use("/api", activosModuleRouter);
 app.use("/api", ordenesModuleRouter);
+app.use("/api", inventarioModuleRouter);
 app.use("/api", router);
 app.use("/api/deltaops", deltaopsErrorHandler);
 

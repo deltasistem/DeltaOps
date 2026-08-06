@@ -16,7 +16,14 @@ const TENANT = "t-gov";
 
 function harness(rt: InventarioRuntime) {
   const ctx = () => rt.ctx(TENANT);
-  const exec = (n: string, i: Record<string, unknown>) => rt.platform.kernel.commands.execute(ctx(), n, i);
+  // CQRS (DGP-011.2): las lecturas sirven desde read models materializados al
+  // drenar el outbox. `exec` drena tras cada comando (equivalente al patrón de
+  // `module-ordenes`) para que las consultas vean el efecto proyectado.
+  const exec = async (n: string, i: Record<string, unknown>) => {
+    const r = await rt.platform.kernel.commands.execute(ctx(), n, i);
+    await rt.platform.kernel.outboxProcessor.processPending();
+    return r;
+  };
   const query = (n: string, i: Record<string, unknown>) => rt.platform.kernel.queries.execute(ctx(), n, i);
   return { exec, query };
 }

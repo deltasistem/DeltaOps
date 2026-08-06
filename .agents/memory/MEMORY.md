@@ -15,4 +15,5 @@
 - [Experiencia Órdenes DGP-009.3](deltaops-experiencia-ordenes-dgp009-3.md) — tests de contrato contra OpenAPI congelado; offline literal si el input es completo; composición ⇒ comando orquestador idempotente; IDOR en rutas anidadas.
 - [Ecosistema DGP-010](deltaops-ecosistema-dgp010.md) — fases de integración = composición pura sin API nueva; un deep link no está terminado hasta que el destino consume el parámetro (test ruta→filtro).
 - [Inventario dominio DGP-011.1](deltaops-inventario-dominio-dgp011-1.md) — comandos gobernados exigen WorkflowPort explícito con fallo seguro; auto-aprobación solo en test; verificar Result de transicionar antes de efectos.
+- [Inventario persistencia DGP-011.2](deltaops-inventario-persistencia-dgp011-2.md) — timeline vía comandos es obligatorio en persistencia; drizzle push no detecta tablas nuevas (aplicar .sql con psql); estados de workflow camelCase con traducción.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.

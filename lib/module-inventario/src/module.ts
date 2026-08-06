@@ -15,9 +15,11 @@
 import { z } from "zod";
 import {
   createDomainEvent,
+  createExecutionContext,
   fail,
   KernelErrors,
   ok,
+  SYSTEM_PRINCIPAL,
   type ExecutionContext,
   type KernelError,
   type Result,
@@ -94,6 +96,18 @@ import {
   type TransferenciaRepository,
 } from "./domain/ports";
 import type { ProcesoWorkflow, WorkflowPort } from "./domain/workflow";
+import type {
+  ConsolaStore,
+  EventLogStore,
+  ExistenciaReadRow,
+  ReadModelsStore,
+  SyncReceiptStore,
+} from "./infrastructure/operacional";
+import {
+  aplicarEventoAggregate,
+  aplicarEventoOperacional,
+  handlerProyeccion,
+} from "./projection";
 
 export { MODULO };
 
@@ -111,6 +125,14 @@ export interface ModuleAdapters {
   readonly catalogos: CatalogoPort;
   readonly consecutivo: ConsecutivoPort;
   readonly recibos: ReciboPort;
+  /** Read models CQRS (items/existencias/movimientos + proyectados). */
+  readonly readModel: ReadModelsStore;
+  /** Bitácora de eventos durable (fuente de verdad del replay/reproyección). */
+  readonly eventLog: EventLogStore;
+  /** Recibos de sincronización offline (protocolo de reclamación durable). */
+  readonly syncReceipts: SyncReceiptStore;
+  /** Consola técnica (diagnóstico del outbox del Kernel filtrado al módulo). */
+  readonly consola: ConsolaStore;
   /**
    * Adaptador del Workflow Engine (contrato neutro). Es OPCIONAL en el tipo
    * porque el módulo puede montarse sin él, pero los comandos gobernados
@@ -160,17 +182,96 @@ async function configCodigo(deps: ServiceDeps, tenant: string): Promise<ConfigCo
 /* --------------------------- Emisión de eventos -------------------------- */
 
 /**
- * Emite un evento AUTOSUFICIENTE del módulo al outbox del Kernel (transporte
+ * Emite un evento AUTOSUFICIENTE del módulo de forma DURABLE: lo persiste en la
+ * bitácora de eventos (`inv_eventos`, fuente de verdad del replay/reproyección)
+ * y lo registra en el outbox del Kernel con el MISMO id de dominio (transporte
  * at-least-once hacia handlers idempotentes). El payload lleva el snapshot
- * completo para proyecciones futuras (DGP-011.2) sin releer el aggregate.
+ * completo para proyecciones sin releer el aggregate. Ambas escrituras ocurren
+ * en la misma UoW del comando ⇒ atomicidad efecto/bitácora/outbox.
  */
-function emitir(
+async function emitirEvento(
+  adapters: ModuleAdapters,
   ctx: ExecutionContext,
   uow: UnitOfWork,
+  tenantId: string,
   evento: { tipo: string; payload: Record<string, unknown> },
-): void {
+): Promise<Result<void, KernelError>> {
   const dominio = createDomainEvent(evento.tipo, evento.payload, ctx.correlationId);
+  const appended = await adapters.eventLog.append(uow, {
+    tenantId,
+    eventId: dominio.id,
+    tipo: dominio.type,
+    payload: dominio.payload,
+    occurredAt: dominio.occurredAt,
+  });
+  if (!appended.ok) return appended;
   uow.registerEvent(dominio);
+  return ok(undefined);
+}
+
+/**
+ * Registra un evento del módulo en el SHARED TIMELINE canónico de plataforma
+ * mediante el COMANDO `platform.timeline.record` (NUNCA escritura directa a las
+ * tablas de plataforma). Idempotente por `entryId = event.id`: una reentrega
+ * tardía del outbox (at-least-once) NO duplica la entrada. Corre bajo un ctx de
+ * sistema que propaga el `correlationId` del evento y el tenant del payload
+ * (eventos autosuficientes). Mismo patrón que module-ordenes/activos (DGP-009.2).
+ */
+function registrarEnTimeline() {
+  return async (
+    deps: ServiceDeps,
+    event: { id: string; type: string; payload: Record<string, unknown>; correlationId: string },
+  ): Promise<Result<void, KernelError>> => {
+    const p = event.payload;
+    const tenantId = String(p["tenantId"] ?? "");
+    if (!tenantId) return ok(undefined);
+    const entityRef = String(p["entityRef"] ?? (p["id"] ? `inventario:${String(p["id"])}` : ""));
+    if (!entityRef) return ok(undefined);
+    const resumen = String(
+      p["sku"] ?? p["codigo"] ?? p["numero"] ?? p["tipo"] ?? p["motivo"] ?? event.type,
+    );
+    const occurredAt = String(
+      p["registradoAt"] ?? p["actualizadoAt"] ?? p["ocurridoAt"] ?? new Date().toISOString(),
+    );
+    const sys = createExecutionContext({
+      principal: SYSTEM_PRINCIPAL,
+      correlationId: event.correlationId,
+      metadata: { tenantId },
+    });
+    const r = await deps.runtime.commands.execute(sys, "platform.timeline.record", {
+      entryId: event.id,
+      entityRef,
+      eventType: event.type,
+      actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+      occurredAt,
+      resumen,
+      estado: p["estado"] != null ? String(p["estado"]) : null,
+      entidadRelacionada: p["itemId"] != null ? `inventario-item:${String(p["itemId"])}` : null,
+      payload: p,
+    });
+    return r.ok ? ok(undefined) : (r as Result<void, KernelError>);
+  };
+}
+
+/**
+ * Reconstruye la forma canónica de existencia CQRS: expone el modelo `stock` con
+ * los 7 buckets (más `total`) a partir de la fila plana del read model, para
+ * mantener el contrato de lectura del dominio (011.1) sin releer el aggregate.
+ */
+function conStock(row: ExistenciaReadRow): Record<string, unknown> {
+  return {
+    ...row,
+    stock: {
+      disponible: row.disponible,
+      reservado: row.reservado,
+      comprometido: row.comprometido,
+      enTransito: row.enTransito,
+      enInspeccion: row.enInspeccion,
+      bloqueado: row.bloqueado,
+      vencido: row.vencido,
+    },
+    total: row.total,
+  };
 }
 
 /* --------------------------- Idempotencia offline ------------------------ */
@@ -305,7 +406,7 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
       `${MODULO}.adjust`,
       `${MODULO}.admin`,
     ],
-    dependsOn: ["platform.config"],
+    dependsOn: ["platform.config", "platform.timeline"],
     events: [...EVENTOS_MODULO],
     recordTypes: [
       "inventario-item",
@@ -443,7 +544,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "crear-item", id, { sku: sku.value.valor });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id, codigo: codigo.value.valor, sku: sku.value.valor, version: saved.value.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.crear-item`, input.opId, resultado, ctx.principal.id);
@@ -507,7 +611,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "editar-item", input.id, { version: saved.value.version });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id: input.id, version: saved.value.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.editar-item`, input.opId, resultado, ctx.principal.id);
@@ -546,7 +653,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "eliminar-item", input.id, {});
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id: input.id, version: saved.value.version, eliminado: true };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.eliminar-item`, input.opId, resultado, ctx.principal.id);
@@ -608,7 +718,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "crear-bodega", id, {});
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
             const resultado = { id, codigo: input.codigo };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.crear-bodega`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
@@ -665,7 +778,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "crear-ubicacion", id, { ruta: cambio.value.ubicacion.ruta });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
             const resultado = { id, ruta: cambio.value.ubicacion.ruta };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.crear-ubicacion`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
@@ -714,7 +830,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "crear-lote", id, { codigo: input.codigo });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
             const resultado = { id, codigo: input.codigo };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.crear-lote`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
@@ -762,7 +881,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "registrar-serie", id, { numero: input.numero });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
             const resultado = { id, numero: input.numero };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.registrar-serie`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
@@ -869,12 +991,18 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
               const cItem = aplicarCostos(item.value, { promedio: promedio.value, ultimaCompra: costo.value }, ctx.principal.id, new Date());
               const upItem = await adapters.items.update(uow, cItem.item, item.value.version);
               if (!upItem.ok) return upItem;
-              emitir(ctx, uow, cItem.evento);
+              {
+                const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cItem.evento);
+                if (!_e.ok) return _e;
+              }
             }
 
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "mover", movimientoId, { tipo: input.tipo, familia, cantidad: input.cantidad });
             if (!audited.ok) return audited;
-            for (const ev of cambio.value.eventos) emitir(ctx, uow, ev);
+            for (const ev of cambio.value.eventos) {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = {
               movimientoId,
@@ -959,8 +1087,14 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!savedRes.ok) return savedRes;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "reservar", id, { cantidad: input.cantidad });
             if (!audited.ok) return audited;
-            for (const ev of mov.value.eventos) emitir(ctx, uow, ev);
-            emitir(ctx, uow, cambio.value.evento);
+            for (const ev of mov.value.eventos) {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+              if (!_e.ok) return _e;
+            }
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id, inventarioId: inv.value.id, stock: mov.value.inventario.stock };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.reservar`, input.opId, resultado, ctx.principal.id);
@@ -1024,8 +1158,14 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!movSaved.ok) return movSaved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "liberar-reserva", input.id, { liberado });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
-            for (const ev of mov.value.eventos) emitir(ctx, uow, ev);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
+            for (const ev of mov.value.eventos) {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id: input.id, liberado, estado: cambio.value.reserva.estado, version: cambio.value.reserva.version, stock: mov.value.inventario.stock };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.liberar-reserva`, input.opId, resultado, ctx.principal.id);
@@ -1114,14 +1254,20 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
               if (!persisted.ok) return persisted;
               const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
               if (!ms.ok) return ms;
-              for (const ev of mov.value.eventos) emitir(ctx, uow, ev);
+              for (const ev of mov.value.eventos) {
+                const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+                if (!_e.ok) return _e;
+              }
             }
 
             const saved = await adapters.transferencias.insert(uow, cambio.value.transferencia);
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "transferir", id, { lineas: input.lineas.length });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id, estado: cambio.value.transferencia.estado, version: cambio.value.transferencia.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.transferir`, input.opId, resultado, ctx.principal.id);
@@ -1190,14 +1336,20 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
               if (!persisted.ok) return persisted;
               const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
               if (!ms.ok) return ms;
-              for (const ev of mov.value.eventos) emitir(ctx, uow, ev);
+              for (const ev of mov.value.eventos) {
+                const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+                if (!_e.ok) return _e;
+              }
             }
 
             const saved = await adapters.transferencias.update(uow, cambio.value.transferencia, input.expectedVersion);
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "completar-transferencia", input.id, {});
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id: input.id, estado: "completada", version: cambio.value.transferencia.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.completar-transferencia`, input.opId, resultado, ctx.principal.id);
@@ -1301,14 +1453,20 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
               if (!persisted.ok) return persisted;
               const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
               if (!ms.ok) return ms;
-              for (const ev of mov.value.eventos) emitir(ctx, uow, ev);
+              for (const ev of mov.value.eventos) {
+                const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+                if (!_e.ok) return _e;
+              }
             }
 
             const saved = await adapters.ajustes.insert(uow, aplicado.value.ajuste);
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "ajustar", id, { tipo: input.tipo, lineas: input.lineas.length });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, aplicado.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, aplicado.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id, estado: aplicado.value.ajuste.estado, version: aplicado.value.ajuste.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.ajustar`, input.opId, resultado, ctx.principal.id);
@@ -1380,7 +1538,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "iniciar-conteo", id, { tipo: input.tipo });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
             const resultado = { id, estado: cambio.value.conteo.estado, version: cambio.value.conteo.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.iniciar-conteo`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
@@ -1420,7 +1581,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "registrar-conteo", input.id, {});
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
             const resultado = { id: input.id, estado: cambio.value.conteo.estado, version: cambio.value.conteo.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.registrar-conteo`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
@@ -1480,14 +1644,20 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
               if (!up.ok) return up;
               const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
               if (!ms.ok) return ms;
-              for (const ev of mov.value.eventos) emitir(ctx, uow, ev);
+              for (const ev of mov.value.eventos) {
+                const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+                if (!_e.ok) return _e;
+              }
             }
 
             const saved = await adapters.conteos.update(uow, cambio.value.conteo, input.expectedVersion);
             if (!saved.ok) return saved;
             const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "cerrar-conteo", input.id, { diferencias: diferencias.length });
             if (!audited.ok) return audited;
-            emitir(ctx, uow, cambio.value.evento);
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
 
             const resultado = { id: input.id, estado: "cerrado", diferencias: diferencias.length, version: cambio.value.conteo.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.cerrar-conteo`, input.opId, resultado, ctx.principal.id);
@@ -1544,9 +1714,37 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
           },
         };
       },
+      /* --------------------------- reproyectar (admin) ------------------- */
+      // Reconstrucción determinista de TODOS los read models desde la bitácora
+      // durable (`inv_eventos`), NO desde el outbox. Idempotente ⇒ equivalencia.
+      (deps) => ({
+        name: `${MODULO}.reproyectar`,
+        inputSchema: z.object({}).passthrough(),
+        authorization: { permissions: [`${MODULO}.admin`] },
+        async handle(ctx, _input, uow) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          void deps;
+          const limpiado = await adapters.readModel.clear(uow, tenant.value);
+          if (!limpiado.ok) return limpiado;
+          const stream = await adapters.eventLog.stream(tenant.value);
+          if (!stream.ok) return stream;
+          const proyAdapters = { readModel: adapters.readModel };
+          let aplicados = 0;
+          for (const ev of stream.value) {
+            const evLike = { id: ev.eventId, type: ev.tipo, payload: ev.payload };
+            const rAgg = await aplicarEventoAggregate(proyAdapters, uow, evLike);
+            if (!rAgg.ok) return rAgg;
+            const rOp = await aplicarEventoOperacional(proyAdapters, uow, evLike);
+            if (!rOp.ok) return rOp;
+            aplicados += 1;
+          }
+          return ok({ reproyectados: aplicados });
+        },
+      }),
     ],
     queries: [
-      /* -------------------------------- item ----------------------------- */
+      /* -------------------------------- item (READ MODEL) ---------------- */
       (deps) => ({
         name: `${MODULO}.item`,
         inputSchema: z.object({ id: z.string().min(1) }),
@@ -1555,13 +1753,15 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
           void deps;
-          const r = await adapters.items.findById(tenant.value, input.id);
+          const r = await adapters.readModel.itemGet(tenant.value, input.id);
           if (!r.ok) return r;
           if (!r.value) return fail(KernelErrors.notFound("inventario-item", input.id));
-          return ok(r.value);
+          // El detalle expone el snapshot completo del item (JSONB `datos`)
+          // más las columnas indexadas del read model.
+          return ok({ ...r.value.datos, id: r.value.id, version: r.value.version });
         },
       }),
-      /* ----------------------------- items lista ------------------------- */
+      /* ----------------------------- items lista (READ MODEL) ------------ */
       (deps) => ({
         name: `${MODULO}.items`,
         inputSchema: z.object({ estado: z.string().optional(), tipoItem: z.string().optional(), incluirEliminados: z.boolean().optional(), limit: z.number().int().positive().optional() }),
@@ -1570,10 +1770,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
           void deps;
-          return adapters.items.list(tenant.value, input);
+          return adapters.readModel.itemList(tenant.value, input);
         },
       }),
-      /* ---------------------------- existencia --------------------------- */
+      /* ---------------------------- existencia (READ MODEL) -------------- */
       (deps) => ({
         name: `${MODULO}.existencia`,
         inputSchema: z.object({ id: z.string().min(1) }),
@@ -1582,13 +1782,13 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
           void deps;
-          const r = await adapters.inventario.findById(tenant.value, input.id);
+          const r = await adapters.readModel.existenciaGet(tenant.value, input.id);
           if (!r.ok) return r;
           if (!r.value) return fail(KernelErrors.notFound("inventario", input.id));
-          return ok({ ...r.value, total: totalStock(r.value.stock) });
+          return ok(conStock(r.value));
         },
       }),
-      /* ------------------------- existencias por item -------------------- */
+      /* --------------------- existencias/disponibilidad por item --------- */
       (deps) => ({
         name: `${MODULO}.existencias-item`,
         inputSchema: z.object({ itemId: z.string().min(1) }),
@@ -1597,21 +1797,24 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
           void deps;
-          const r = await adapters.inventario.listPorItem(tenant.value, input.itemId);
+          const r = await adapters.readModel.existenciasPorItem(tenant.value, input.itemId);
           if (!r.ok) return r;
-          return ok(r.value.map((e) => ({ ...e, total: totalStock(e.stock) })));
+          return ok(r.value.map(conStock));
         },
       }),
-      /* ------------------------- movimientos historial ------------------- */
+      /* ------------------------- movimientos historial (READ MODEL) ------ */
       (deps) => ({
         name: `${MODULO}.movimientos`,
-        inputSchema: z.object({ inventarioId: z.string().min(1) }),
+        inputSchema: z.object({ inventarioId: z.string().min(1), limit: z.number().int().positive().optional() }),
         authorization: { permissions: [`${MODULO}.read`] },
         async handle(ctx, input) {
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
           void deps;
-          return adapters.inventario.movimientosDe(tenant.value, input.inventarioId);
+          const r = await adapters.readModel.movimientosDe(tenant.value, input.inventarioId, input.limit);
+          if (!r.ok) return r;
+          // Cada movimiento expone su snapshot completo (incluye stockDespues).
+          return ok(r.value.map((m) => ({ ...m.datos, eventId: m.eventId, tipo: m.tipo, familia: m.familia })));
         },
       }),
       /* --------------------------- catálogo opciones --------------------- */
@@ -1626,8 +1829,103 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
           return adapters.catalogos.opciones(tenant.value, input.catalogo as NombreCatalogo);
         },
       }),
+      /* ----------- listados proyectados por (tenant,id) ------------------ */
+      ...(
+        [
+          ["reservas", "inv_reservas_read"],
+          ["transferencias", "inv_transferencias_read"],
+          ["conteos", "inv_conteos_read"],
+          ["ajustes", "inv_ajustes_read"],
+          ["lotes", "inv_lotes_read"],
+          ["series", "inv_series_read"],
+          ["bodegas", "inv_bodegas_read"],
+          ["ubicaciones", "inv_ubicaciones_read"],
+        ] as const
+      ).flatMap(([nombre, tabla]) => [
+        (deps: ServiceDeps) => ({
+          name: `${MODULO}.${nombre}`,
+          inputSchema: z.object({ limit: z.number().int().positive().optional() }),
+          authorization: { permissions: [`${MODULO}.read`] },
+          async handle(ctx: ExecutionContext, input: { limit?: number }) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            void deps;
+            return adapters.readModel.proyList(tenant.value, tabla, input.limit);
+          },
+        }),
+        (deps: ServiceDeps) => ({
+          name: `${MODULO}.${nombre.replace(/s$/, "")}`,
+          inputSchema: z.object({ id: z.string().min(1) }),
+          authorization: { permissions: [`${MODULO}.read`] },
+          async handle(ctx: ExecutionContext, input: { id: string }) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            void deps;
+            const r = await adapters.readModel.proyGet(tenant.value, tabla, input.id);
+            if (!r.ok) return r;
+            if (!r.value) return fail(KernelErrors.notFound(tabla, input.id));
+            return ok(r.value);
+          },
+        }),
+      ]),
+      /* ------------------------- consola técnica (admin) ----------------- */
+      (deps) => ({
+        name: `${MODULO}.consola`,
+        inputSchema: z.object({ limit: z.number().int().positive().optional() }),
+        authorization: { permissions: [`${MODULO}.admin`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          void deps;
+          const [stats, eventos, proyecciones, outbox, recibos] = await Promise.all([
+            adapters.readModel.itemStats(tenant.value),
+            adapters.eventLog.contar(tenant.value),
+            adapters.readModel.contar(tenant.value),
+            adapters.consola.outboxDelModulo(tenant.value, input.limit ?? 10),
+            adapters.syncReceipts.listByTenant(tenant.value),
+          ]);
+          if (!stats.ok) return stats;
+          if (!eventos.ok) return eventos;
+          if (!proyecciones.ok) return proyecciones;
+          if (!outbox.ok) return outbox;
+          if (!recibos.ok) return recibos;
+          return ok({
+            statsItems: stats.value,
+            eventLog: eventos.value,
+            proyecciones: proyecciones.value,
+            outbox: outbox.value,
+            receipts: recibos.value,
+            tablasRLS: [
+              "inv_items", "inv_existencias", "inv_movimientos", "inv_eventos",
+              "inv_items_read", "inv_existencias_read", "inv_movimientos_read",
+              "inv_reservas_read", "inv_transferencias_read", "inv_conteos_read",
+              "inv_ajustes_read", "inv_lotes_read", "inv_series_read",
+              "inv_bodegas_read", "inv_ubicaciones_read", "inv_sync_receipts",
+            ],
+          });
+        },
+      }),
     ],
-    eventHandlers: [],
+    eventHandlers: [
+      // Proyección CQRS por evento del AGGREGATE (payload-only, idempotente por
+      // last_event_id/eventId). El inventario proyecta TODO su modelo de lectura
+      // por el stream aggregate; no hay eventos operacionales separados.
+      ...EVENTOS_MODULO.map((eventType) => ({
+        eventType,
+        handlerName: `proyectar:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          handlerProyeccion({ readModel: adapters.readModel }, false)(deps)(event, eventType),
+      })),
+      // Shared Timeline CANÓNICO (platform.timeline): CADA evento del módulo se
+      // registra vía COMANDO `platform.timeline.record` (nunca escritura directa),
+      // idempotente por entryId=event.id ⇒ la reentrega del outbox no duplica.
+      ...EVENTOS_MODULO.map((eventType) => ({
+        eventType,
+        handlerName: `timeline:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown>; correlationId: string }) =>
+          registrarEnTimeline()(deps, { ...event, type: eventType }),
+      })),
+    ],
     healthCheck: () => async () => ({ healthy: true, detail: `${MODULO} operativo` }),
   };
 }

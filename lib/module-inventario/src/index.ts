@@ -37,3 +37,27 @@ export {
   type CrearRuntimeOpts,
   type InventarioRuntime,
 } from "./test-runtime";
+// DGP-011.2 · Persistencia, CQRS y runtime OPERATIVO.
+export {
+  crearInventarioRuntimeOperacional,
+  type InventarioRuntimeOptions,
+  type InventarioRuntimeOperacional,
+} from "./runtime";
+export {
+  procesarCola,
+  OperacionSyncSchema,
+  ColaSyncSchema,
+  type OperacionSync,
+  type ResultadoSync,
+  type ResumenSync,
+  type EstadoSync,
+} from "./sincronizacion";
+export * from "./infrastructure/repository";
+export * from "./infrastructure/operacional";
+export { WorkflowMotorAdapter } from "./infrastructure/workflow-adapter";
+export {
+  aplicarEventoAggregate,
+  aplicarEventoOperacional,
+  handlerProyeccion,
+} from "./projection";
+export { construirOpenApi, serializarOpenApi } from "./openapi/spec";

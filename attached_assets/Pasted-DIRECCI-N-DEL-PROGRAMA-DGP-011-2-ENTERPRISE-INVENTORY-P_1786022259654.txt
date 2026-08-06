@@ -1,0 +1,403 @@
+DIRECCIÓN DEL PROGRAMA — DGP-011.2
+ENTERPRISE INVENTORY PERSISTENCE, CQRS & OPERATIONAL ENGINE
+
+A partir de este momento inicia oficialmente la subfase DGP-011.2 del Programa Maestro DeltaOps.
+
+====================================================================
+REGLAS ABSOLUTAS
+====================================================================
+
+Respetar íntegramente:
+
+ETS-001…012
+Engineering Charter
+ESI-001…010
+DGP-000…011.1
+
+No modificar:
+
+Kernel
+
+Shared Platform
+
+Business Foundation
+
+Workflow Engine
+
+Dynamic Forms
+
+Design System
+
+Activos
+
+Órdenes
+
+Experience Foundation
+
+Ninguna arquitectura congelada.
+
+Todo deberá construirse reutilizando exclusivamente el corpus existente.
+
+====================================================================
+OBJETIVO
+====================================================================
+
+Construir toda la infraestructura operacional del módulo Enterprise Inventory.
+
+Esta fase deberá convertir el dominio construido en DGP-011.1 en un módulo completamente operativo.
+
+====================================================================
+PERSISTENCIA
+====================================================================
+
+Construir toda la persistencia oficial.
+
+Migraciones oficiales.
+
+Espejo Drizzle.
+
+Versionado.
+
+Auditoría.
+
+Optimistic Locking.
+
+RLS completo.
+
+Todas las tablas deberán pertenecer exclusivamente al módulo inventario.
+
+====================================================================
+READ MODELS
+====================================================================
+
+Construir read models especializados.
+
+Como mínimo:
+
+Listado
+
+Detalle
+
+Existencias
+
+Movimientos
+
+Histórico
+
+Lotes
+
+Series
+
+Reservas
+
+Transferencias
+
+Conteos
+
+Ajustes
+
+Bodegas
+
+Ubicaciones
+
+Disponibilidad
+
+Todo separado del agregado.
+
+Nunca leer el agregado.
+
+====================================================================
+CQRS
+====================================================================
+
+CQRS estricto.
+
+Comandos → Agregado
+
+Consultas → Read Models
+
+Nunca excepciones.
+
+====================================================================
+EVENT LOG
+====================================================================
+
+Bitácora durable propia.
+
+Replay.
+
+Reconstrucción completa.
+
+Equivalencia demostrable.
+
+Outbox nunca será Event Store.
+
+====================================================================
+TIMELINE
+====================================================================
+
+Integración completa con Shared Timeline.
+
+Todos los eventos deberán proyectarse automáticamente.
+
+Nunca escritura directa.
+
+====================================================================
+COMENTARIOS
+====================================================================
+
+Integración con platform.comment.
+
+====================================================================
+ADJUNTOS
+====================================================================
+
+Integración con platform.attachment.
+
+Referencia únicamente.
+
+Nunca binarios.
+
+====================================================================
+RESERVAS
+====================================================================
+
+Persistencia completa.
+
+Estados.
+
+Histórico.
+
+Liberaciones.
+
+Consumos.
+
+====================================================================
+TRANSFERENCIAS
+====================================================================
+
+Persistencia completa.
+
+Workflow.
+
+Recepción.
+
+Confirmación.
+
+Histórico.
+
+====================================================================
+LOTES
+====================================================================
+
+Persistencia completa.
+
+Histórico.
+
+Vencimientos.
+
+Trazabilidad.
+
+====================================================================
+SERIES
+====================================================================
+
+Persistencia completa.
+
+Histórico.
+
+Movimiento completo.
+
+====================================================================
+CONTEOS
+====================================================================
+
+Persistencia completa.
+
+Histórico.
+
+Reconteos.
+
+Diferencias.
+
+Ajustes.
+
+====================================================================
+STOCK
+====================================================================
+
+Persistencia completa.
+
+Disponible.
+
+Reservado.
+
+Comprometido.
+
+Tránsito.
+
+Bloqueado.
+
+Inspección.
+
+Vencido.
+
+====================================================================
+SINCRONIZACIÓN
+====================================================================
+
+Implementar completamente:
+
+claim durable
+
+opId
+
+UUID cliente
+
+replay
+
+cola
+
+conflictos
+
+recibos
+
+recuperación
+
+Todo conforme al protocolo aprobado.
+
+====================================================================
+CONSOLA TÉCNICA
+====================================================================
+
+Construir consola técnica.
+
+Estado del módulo.
+
+Read models.
+
+Replay.
+
+Outbox.
+
+Sincronización.
+
+RLS.
+
+Workflow.
+
+Solo administradores.
+
+====================================================================
+API
+====================================================================
+
+Contract First.
+
+OpenAPI generado.
+
+Sin deriva.
+
+Endpoints completos.
+
+CRUD.
+
+Movimientos.
+
+Reservas.
+
+Transferencias.
+
+Conteos.
+
+Ajustes.
+
+Series.
+
+Lotes.
+
+Ubicaciones.
+
+Bodegas.
+
+Sincronización.
+
+Consola.
+
+====================================================================
+REVISIÓN ARQUITECTÓNICA
+====================================================================
+
+Ejecutar revisión independiente obligatoria.
+
+Corregir todos los hallazgos.
+
+No cerrar con hallazgos críticos.
+
+No cerrar con hallazgos mayores.
+
+====================================================================
+PRUEBAS
+====================================================================
+
+Construir batería completa:
+
+Fake
+
+PostgreSQL
+
+CQRS
+
+Replay
+
+RLS
+
+Offline
+
+Workflow
+
+Concurrencia
+
+OpenAPI Drift
+
+Typecheck
+
+====================================================================
+DISCIPLINA DE ALCANCE
+====================================================================
+
+NO construir:
+
+Experiencia de usuario
+
+Pantallas
+
+Dashboards
+
+BI
+
+IA
+
+Reportes
+
+Importaciones
+
+Exportaciones
+
+Analytics
+
+Eso pertenece exclusivamente a DGP-011.3.
+
+====================================================================
+ENTREGABLE
+====================================================================
+
+Al finalizar entregar únicamente el
+
+INFORME OFICIAL DE CIERRE
+
+siguiendo exactamente el estándar utilizado por todos los DGP anteriores.
+
+No iniciar DGP-011.3.
+
+Esperar instrucciones de la Dirección del Programa.

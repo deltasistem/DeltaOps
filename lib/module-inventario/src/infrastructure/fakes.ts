@@ -13,7 +13,13 @@
  * EXCLUSIVAMENTE en la infraestructura de test (`test-runtime.ts`), jamás aquí
  * como modo operativo por defecto.
  */
-import { ok, fail, KernelErrors, type KernelError, type Result, type UnitOfWork } from "@workspace/kernel";
+import { ok, fail, KernelErrors, type KernelError, type OutboxRecord, type Result, type UnitOfWork } from "@workspace/kernel";
+import {
+  FakeConsolaStore,
+  FakeEventLogStore,
+  FakeReadModelsStore,
+  FakeSyncReceiptStore,
+} from "./operacional";
 import { CANONICOS_POR_CATALOGO, type EntradaCatalogo, type NombreCatalogo } from "../domain/catalogos";
 import { crearCodigoInventario, type CodigoInventario } from "../domain/value-objects";
 import type { ItemInventario } from "../domain/item";
@@ -361,9 +367,20 @@ export interface FakeAdapters {
   readonly catalogos: FakeCatalogos;
   readonly consecutivo: FakeConsecutivo;
   readonly recibos: FakeRecibos;
+  readonly readModel: FakeReadModelsStore;
+  readonly eventLog: FakeEventLogStore;
+  readonly syncReceipts: FakeSyncReceiptStore;
+  readonly consola: FakeConsolaStore;
 }
 
-export function crearFakeAdapters(): FakeAdapters {
+/**
+ * Fakes de dominio + operacionales. Por defecto la consola in-memory lee un
+ * accesor de outbox VACÍO; el runtime operacional lo reemplaza con el accesor
+ * perezoso del outbox in-memory del Kernel tras montar la plataforma.
+ */
+export function crearFakeAdapters(
+  outboxRecords: () => readonly OutboxRecord[] = () => [],
+): FakeAdapters {
   return {
     items: new FakeItemRepository(),
     inventario: new FakeInventarioRepository(),
@@ -376,5 +393,9 @@ export function crearFakeAdapters(): FakeAdapters {
     catalogos: new FakeCatalogos(),
     consecutivo: new FakeConsecutivo(),
     recibos: new FakeRecibos(),
+    readModel: new FakeReadModelsStore(),
+    eventLog: new FakeEventLogStore(),
+    syncReceipts: new FakeSyncReceiptStore(),
+    consola: new FakeConsolaStore(outboxRecords),
   };
 }

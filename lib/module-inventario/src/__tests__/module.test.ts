@@ -13,7 +13,11 @@ function ctx() {
   return rt.ctx(TENANT);
 }
 async function exec(nombre: string, input: Record<string, unknown>) {
-  return rt.platform.kernel.commands.execute(ctx(), nombre, input);
+  // CQRS (DGP-011.2): drena el outbox tras cada comando para materializar los
+  // read models antes de que las consultas los lean.
+  const r = await rt.platform.kernel.commands.execute(ctx(), nombre, input);
+  await rt.platform.kernel.outboxProcessor.processPending();
+  return r;
 }
 async function query(nombre: string, input: Record<string, unknown>) {
   return rt.platform.kernel.queries.execute(ctx(), nombre, input);
