@@ -15,7 +15,7 @@ import {
 } from "@workspace/kernel";
 import { officialServices } from "@workspace/platform";
 import { createWorkflowRuntime, crearMotorWorkflow, nombresInstancia, type WorkflowRuntime } from "..";
-import { PERMISO_REVISAR, SERVICIO, workflowSolicitud } from "./ejemplo";
+import { PERMISO_REVISAR, SERVICIO, workflowSolicitud, workflowTicket } from "./ejemplo";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -42,9 +42,9 @@ suite("Workflow Engine · PostgreSQL", () => {
   const query = (c: ExecutionContext, q: string, input: unknown) =>
     rt.platform.kernel.queries.execute(c, q, input);
 
-  async function publicarActivar(c: ExecutionContext): Promise<void> {
+  async function publicarActivar(c: ExecutionContext, def = workflowSolicitud): Promise<void> {
     const id = crypto.randomUUID();
-    await exec(c, `${SERVICIO}.definicion.publicar`, { id, definicion: workflowSolicitud });
+    await exec(c, `${SERVICIO}.definicion.publicar`, { id, definicion: def });
     await exec(c, `${SERVICIO}.definicion.activar`, { id, version: 1 });
   }
 
@@ -52,6 +52,9 @@ suite("Workflow Engine · PostgreSQL", () => {
     pool = new pg.Pool({ connectionString: DATABASE_URL });
     rt = createWorkflowRuntime({ servicio: SERVICIO }, { pool, logger: new MemoryLogger() });
     await publicarActivar(ctx(T));
+    // Multiplexación: un SEGUNDO proceso activo (clave distinta) bajo el mismo
+    // servicio, para el caso de regresión DGP-013 con persistencia real.
+    await publicarActivar(ctx(T), workflowTicket);
   });
 
   afterAll(async () => {
@@ -132,6 +135,40 @@ suite("Workflow Engine · PostgreSQL", () => {
     await exec(ctx(T), n.transicionar, { id, version: 3, comando: "resolver" });
     const pend = await pool.query(`SELECT status FROM deltaops.platform_records WHERE tenant_id=$1 AND id=$2`, [T, id]);
     expect(pend.rows[0].status).toBe("enRevision");
+  });
+
+  it("multiplexación en PG: cada instancia resuelve SU definición por clave (persistencia real de _workflow)", async () => {
+    // Con DOS definiciones activas del mismo servicio (solicitud + ticket), la
+    // clave se persiste en la instancia (columna data->>'_workflow') y gobierna
+    // la resolución de la definición en cada transición.
+    const idS = crypto.randomUUID();
+    const idT = crypto.randomUUID();
+    await exec(ctx(T), n.iniciar, { id: idS, data: { titulo: "PG mux S", definicion: "solicitud-generica" } });
+    await exec(ctx(T), n.iniciar, { id: idT, data: { titulo: "PG mux T", definicion: "ticket-generico" } });
+
+    // La clave del proceso quedó persistida en cada registro.
+    const claves = await pool.query(
+      `SELECT id, data->>'_workflow' AS clave FROM deltaops.platform_records WHERE tenant_id=$1 AND id = ANY($2)`,
+      [T, [idS, idT]],
+    );
+    const porId = Object.fromEntries(claves.rows.map((r) => [r.id, r.clave]));
+    expect(porId[idS]).toBe("solicitud-generica");
+    expect(porId[idT]).toBe("ticket-generico");
+
+    // Comando propio de cada proceso: válido y no confundido con el ajeno.
+    const okS = await exec(ctx(T), n.transicionar, { id: idS, version: 1, comando: "enviar" });
+    const okT = await exec(ctx(T), n.transicionar, { id: idT, version: 1, comando: "abrir" });
+    expect(okS.ok && (okS.value as { estado: string }).estado).toBe("enviada");
+    expect(okT.ok && (okT.value as { estado: string }).estado).toBe("atendido");
+
+    // Comando ajeno es ILEGAL en cada proceso (vocabularios disjuntos).
+    const idS2 = crypto.randomUUID();
+    await exec(ctx(T), n.iniciar, { id: idS2, data: { titulo: "PG mux S2", definicion: "solicitud-generica" } });
+    const mal = await exec(ctx(T), n.transicionar, { id: idS2, version: 1, comando: "abrir" });
+    expect(mal.ok).toBe(false);
+    if (!mal.ok) expect(mal.error.code).toBe("KRN-CFL-001");
+    const rowS2 = await pool.query(`SELECT status FROM deltaops.platform_records WHERE tenant_id=$1 AND id=$2`, [T, idS2]);
+    expect(rowS2.rows[0].status).toBe("borrador"); // rollback: sin efecto
   });
 
   it("multitenancy en PG: otro tenant no ve las instancias", async () => {

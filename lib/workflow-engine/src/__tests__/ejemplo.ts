@@ -63,6 +63,30 @@ export const workflowSolicitud: DefinicionWorkflow = {
   ],
 };
 
+/**
+ * Segundo proceso NEUTRO bajo el MISMO servicio (`flujo.demo`) pero con `clave`
+ * distinta. Multiplexación: un solo servicio de motor gobierna varios procesos
+ * (el defecto histórico confundía definiciones homónimas por versión). Su
+ * vocabulario de comandos es DISJUNTO respecto a `workflowSolicitud`:
+ *   - `abrir` es válido aquí (abierto→atendido) pero NO existe en solicitud.
+ *   - `enviar` es válido en solicitud pero NO existe aquí.
+ * Ambos publican como versión N=1 en el mismo servicio.
+ */
+export const workflowTicket: DefinicionWorkflow = {
+  clave: "ticket-generico",
+  etiqueta: "Proceso de ticket genérico",
+  estados: [
+    { nombre: "abierto", inicial: true, etiqueta: "Abierto" },
+    { nombre: "atendido", etiqueta: "Atendido" },
+    { nombre: "cerrado", final: true, etiqueta: "Cerrado" },
+  ],
+  transiciones: [
+    { de: "abierto", a: "atendido", comando: "abrir" },
+    { de: "atendido", a: "cerrado", comando: "cerrar", permiso: PERMISO_REVISAR },
+  ],
+  operacionesEstandar: { cancelar: false, suspender: false, reabrir: false, reanudar: false },
+};
+
 /** Variante v2 con un estado adicional (para migración N/N-1). */
 export const workflowSolicitudV2: DefinicionWorkflow = {
   ...workflowSolicitud,

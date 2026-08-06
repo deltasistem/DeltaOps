@@ -22,6 +22,7 @@ import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/Formular
 import { plantillaRecepcion } from "../lib/forms/plantillas-abastecimiento";
 import { BadgeEstadoOC, fechaCorta, montoMoneda, cantidadTexto, dinero } from "../lib/abastecimiento/componentes";
 import { leerParam, urlMovimientosInventario } from "../lib/abastecimiento/deep-links";
+import { EtiquetaRecepcion, EtiquetaItem } from "../lib/abastecimiento/EtiquetaAbastecimiento";
 import {
   ACCIONES_OC, ACCIONES_OC_POR_ESTADO, type AccionOC, type DefinicionAccion,
 } from "../lib/abastecimiento/constantes";
@@ -217,6 +218,8 @@ export function TarjetaRecepcion({ recepcion, onCambio }: { recepcion: Recepcion
   const [ocupado, setOcupado] = useState(false);
   const [resultado, setResultado] = useState<ResultadoMaterializacion | null>(null);
   const [msg, setMsg] = useState<{ tono: "exito" | "info" | "error"; texto: string } | null>(null);
+  const [etiqueta, setEtiqueta] = useState(false);
+  const [almacenExpandido, setAlmacenExpandido] = useState<string | null>(null);
 
   async function materializar() {
     setOcupado(true); setMsg(null);
@@ -246,6 +249,9 @@ export function TarjetaRecepcion({ recepcion, onCambio }: { recepcion: Recepcion
             </div>
           </div>
           <div style={{ display: "flex", gap: "var(--do-sp-2)", alignItems: "center" }}>
+            <Button variant="secundario" size="sm" data-testid={`etiqueta-recepcion-${recepcion.id}`} aria-pressed={etiqueta} onClick={() => setEtiqueta((v) => !v)}>
+              {etiqueta ? "Ocultar etiqueta" : "Etiqueta"}
+            </Button>
             {recepcion.materializada ? (
               <Badge variant="exito">Materializada</Badge>
             ) : (
@@ -255,6 +261,12 @@ export function TarjetaRecepcion({ recepcion, onCambio }: { recepcion: Recepcion
             )}
           </div>
         </div>
+
+        {etiqueta && (
+          <div style={{ marginTop: "var(--do-sp-3)" }} data-testid={`panel-etiqueta-recepcion-${recepcion.id}`}>
+            <EtiquetaRecepcion recepcionId={recepcion.id} ordenCompraId={recepcion.ordenCompraId} materializada={recepcion.materializada} />
+          </div>
+        )}
 
         {(recepcion.lineas ?? []).length > 0 && (
           <Table caption="Líneas recibidas" captionOculto>
@@ -273,7 +285,7 @@ export function TarjetaRecepcion({ recepcion, onCambio }: { recepcion: Recepcion
           <div style={{ marginTop: "var(--do-sp-3)" }}>
             <strong style={{ fontSize: "var(--do-text-sm)" }}>Movimientos de inventario</strong>
             <Table caption="Movimientos creados" captionOculto>
-              <thead><tr><th scope="col">Movimiento</th><th scope="col">Item</th><th scope="col">Cantidad</th><th scope="col">Resultado</th><th scope="col"><span className="do-visualmente-oculto">Deep link</span></th></tr></thead>
+              <thead><tr><th scope="col">Movimiento</th><th scope="col">Item</th><th scope="col">Cantidad</th><th scope="col">Resultado</th><th scope="col">Almacenamiento</th><th scope="col"><span className="do-visualmente-oculto">Deep link</span></th></tr></thead>
               <tbody>
                 {movs.map((m) => (
                   <tr key={m.movimientoId} data-testid={`movimiento-${m.movimientoId}`}>
@@ -281,11 +293,26 @@ export function TarjetaRecepcion({ recepcion, onCambio }: { recepcion: Recepcion
                     <td>{m.itemId ?? "—"}</td>
                     <td>{m.cantidad ?? "—"}</td>
                     <td><Badge variant={m.idempotente ? "neutro" : "exito"}>{m.idempotente ? "Idempotente" : "Creado"}</Badge></td>
+                    <td>
+                      {m.itemId
+                        ? <Button variant="secundario" size="sm" data-testid={`etiqueta-almacenamiento-${m.movimientoId}`} aria-pressed={almacenExpandido === m.movimientoId} onClick={() => setAlmacenExpandido((v) => (v === m.movimientoId ? null : m.movimientoId))}>Etiqueta</Button>
+                        : "—"}
+                    </td>
                     <td><Button variant="fantasma" size="sm" data-testid={`ver-movimiento-${m.movimientoId}`} onClick={() => navegar(urlMovimientosInventario(m.itemId))}>Ver en inventario</Button></td>
                   </tr>
                 ))}
               </tbody>
             </Table>
+            {(() => {
+              const mov = movs.find((m) => m.movimientoId === almacenExpandido);
+              if (!mov || !mov.itemId) return null;
+              return (
+                <div style={{ marginTop: "var(--do-sp-3)" }} data-testid={`panel-almacenamiento-${mov.movimientoId}`}>
+                  <div style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)", marginBottom: "var(--do-sp-1)" }}>Etiqueta de almacenamiento (QR del item de inventario)</div>
+                  <EtiquetaItem itemId={mov.itemId} sku={mov.itemId} nombre={`Item ${mov.itemId}`} />
+                </div>
+              );
+            })()}
           </div>
         )}
       </CardContent>

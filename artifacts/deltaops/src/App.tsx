@@ -51,6 +51,7 @@ import AbastecimientoOrdenes from '@/pages/abastecimiento-ordenes';
 import AbastecimientoOrdenNueva from '@/pages/abastecimiento-orden-nueva';
 import AbastecimientoOrdenFicha from '@/pages/abastecimiento-orden-ficha';
 import AbastecimientoSincronizacion from '@/pages/abastecimiento-sincronizacion';
+import AbastecimientoEscanear from '@/pages/abastecimiento-escanear';
 
 const queryClient = new QueryClient();
 
@@ -120,6 +121,7 @@ function Router() {
       <Route path="/abastecimiento/ordenes-compra" component={AbastecimientoOrdenes} />
       <Route path="/abastecimiento/ordenes-compra/nueva" component={AbastecimientoOrdenNueva} />
       <Route path="/abastecimiento/ordenes-compra/:id" component={AbastecimientoOrdenFicha} />
+      <Route path="/abastecimiento/escanear" component={AbastecimientoEscanear} />
       <Route path="/abastecimiento/sincronizacion" component={AbastecimientoSincronizacion} />
       <Route component={NotFound} />
     </Switch>

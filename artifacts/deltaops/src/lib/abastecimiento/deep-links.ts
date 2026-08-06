@@ -85,6 +85,12 @@ export function urlSincronizacion(): string {
   return "/abastecimiento/sincronizacion";
 }
 
+/* ------------------------------ Escaneo QR ------------------------------ */
+
+export function urlEscanearAbastecimiento(): string {
+  return "/abastecimiento/escanear";
+}
+
 /* ----------------------- Deep links a otros módulos --------------------- */
 
 /** Ficha del item de inventario (destino que ya consume su `:id`). */

@@ -486,3 +486,15 @@ export function plantillaCatalogoUpsert(): DefinicionFormulario {
     }],
   };
 }
+
+/** Entrada manual del escáner de Abastecimiento (código o URL del QR). */
+export function plantillaEscaneoAbastecimiento(): DefinicionFormulario {
+  return {
+    clave: "abastecimiento.escaneo.manual",
+    titulo: "Entrada manual",
+    nodos: [{
+      clase: "contenedor", clave: "g", tipo: "grupo", etiqueta: "Campos",
+      hijos: [campo({ clave: "codigo", tipo: "texto", etiqueta: "Código o URL del QR", obligatorio: true, restricciones: { longitudMin: 1 } })],
+    }],
+  };
+}

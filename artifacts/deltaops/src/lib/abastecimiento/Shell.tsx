@@ -19,6 +19,7 @@ const NAV: { href: string; etiqueta: string }[] = [
   { href: "/abastecimiento/proveedores", etiqueta: "Proveedores" },
   { href: "/abastecimiento/solicitudes", etiqueta: "Solicitudes" },
   { href: "/abastecimiento/ordenes-compra", etiqueta: "Órdenes de compra" },
+  { href: "/abastecimiento/escanear", etiqueta: "Escanear" },
   { href: "/abastecimiento/sincronizacion", etiqueta: "Sincronización" },
 ];
 

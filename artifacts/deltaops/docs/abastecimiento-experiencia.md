@@ -29,6 +29,7 @@ funciona el modo sin conexión y qué garantiza cada acción de negocio.
 | `/abastecimiento/ordenes-compra` | Listado de OC | Órdenes de compra por estado. |
 | `/abastecimiento/ordenes-compra/nueva` | Wizard de alta | Cabecera y líneas (puede hidratarse desde una cotización). |
 | `/abastecimiento/ordenes-compra/:id` | Ficha de OC | Workflow, avance de recepción y **materialización a inventario**. |
+| `/abastecimiento/escanear` | Escaneo QR | Un solo escaneo abre la recepción o la OC (Platform QR). |
 | `/abastecimiento/sincronizacion` | Sincronización | Cola offline, recibos, conflictos y reintentos. |
 
 La navegación superior (Shell) resalta la sección activa y muestra el **banner
@@ -162,7 +163,31 @@ Cada recepción registrada puede **materializarse a inventario** con el comando
 
 ---
 
-## 6. Integración con el ecosistema
+## 6. Códigos QR: etiquetas para recepción y almacenamiento
+
+Abastecimiento se **ancla a `platform.qr`** (la misma superficie de QR/impresión
+que Inventario y Activos): **no crea ningún QR propio** ni fabrica datos.
+
+- **Etiqueta de RECEPCIÓN**: en la ficha de la OC, cada tarjeta de recepción
+  ofrece el botón **Etiqueta**, que despliega una etiqueta QR imprimible. El QR
+  codifica el **código de plataforma** de la recepción (`abr:rec:<id>`) — no una
+  URL. Se imprime con la utilidad de plataforma (`imprimirEtiqueta`).
+- **Etiqueta de ALMACENAMIENTO**: tras materializar una recepción, cada
+  movimiento de inventario creado ofrece **Etiqueta** de almacenamiento, que
+  **reutiliza la etiqueta del item de inventario** (`EtiquetaItem`, QR
+  `inv:<sku>`) para rotular la ubicación de guardado. Es el QR de plataforma del
+  item ya existente; nunca se inventa un código.
+- **Escaneo unificado** (`/abastecimiento/escanear`): un solo escaneo (cámara o
+  entrada manual) resuelve el código. Un **resolvedor puro** prioriza el
+  resolvedor del servidor de plataforma (`/qr/resolver`) y **degrada** a la
+  interpretación local (`abr:rec:<id>`, `abr:oc:<id>`, URL de ficha de OC o UUID
+  directo, tratado como recepción). Según el resultado se navega al destino: la
+  recepción abre la ficha de **su** orden de compra (pestaña *Recepciones*); la
+  OC abre su ficha. La degradación local se avisa explícitamente.
+
+---
+
+## 7. Integración con el ecosistema
 
 - **Consola** y **Centro de Mantenimiento** incluyen accesos directos a la
   sección (`data-testid="link-abastecimiento"` en Consola).
@@ -177,7 +202,7 @@ Cada recepción registrada puede **materializarse a inventario** con el comando
 
 ---
 
-## 7. Modo sin conexión (Offline First)
+## 8. Modo sin conexión (Offline First)
 
 - Las mutaciones usan una **cola por módulo y tenant** con el namespace
   `deltaops:abastecimiento:cola:<tenant>`, aislada de las demás secciones.
@@ -195,7 +220,7 @@ Cada recepción registrada puede **materializarse a inventario** con el comando
 
 ---
 
-## 8. Garantías de contrato
+## 9. Garantías de contrato
 
 - Todos los cuerpos que construye el frontend cumplen los esquemas del OpenAPI
   congelado, tanto **online** como **encolados** (`additionalProperties:false`,
@@ -204,5 +229,8 @@ Cada recepción registrada puede **materializarse a inventario** con el comando
   `expectedVersion`; `motivoRechazo` sólo en el rechazo de solicitudes.
 - La materialización a inventario es **idempotente** y expone la trazabilidad de
   los movimientos generados.
-- Las capacidades de plataforma no montadas (comentarios/adjuntos) **degradan con
-  aviso**; nunca se muestran datos ficticios.
+- Las capacidades de plataforma no montadas (comentarios/adjuntos, resolvedor
+  QR) **degradan con aviso**; nunca se muestran datos ficticios.
+- Las etiquetas QR (recepción y almacenamiento) se **anclan a `platform.qr`** y
+  codifican códigos de plataforma, no URLs; el escaneo se resuelve con el
+  servidor y sólo degrada a interpretación local.

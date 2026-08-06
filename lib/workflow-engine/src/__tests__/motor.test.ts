@@ -37,6 +37,7 @@ import {
   SERVICIO,
   workflowSolicitud,
   workflowSolicitudV2,
+  workflowTicket,
 } from "./ejemplo";
 
 /* ------------------------------- Utilidades -------------------------------- */
@@ -367,6 +368,138 @@ describe("Workflow Runtime: iniciar y transicionar", () => {
     await drain(rt);
     const trail = await rt.platform.audit.list("t-ev", { service: SERVICIO });
     expect(trail.ok && trail.value.some((a) => a.action === "transicionar:enviar")).toBe(true);
+  });
+});
+
+/* ============ Multiplexación de PROCESOS bajo un mismo servicio =========== */
+/**
+ * Regresión DGP-013: un ÚNICO servicio de motor (`flujo.demo`) publica DOS
+ * definiciones activas con claves distintas (`solicitud-generica` y
+ * `ticket-generico`). Antes del hotfix, `crearResolverDefinicion` resolvía sólo
+ * por servicio+versión y confundía definiciones homónimas por versión (N=1 en
+ * ambas): transicionar una instancia resolvía la definición equivocada. Estas
+ * pruebas fijan que cada instancia resuelve SU propia definición por `clave`.
+ */
+describe("Multiplexación: dos definiciones activas del mismo servicio por clave", () => {
+  /** Publica+activa AMBAS definiciones (misma versión N=1) en el mismo servicio. */
+  async function prepararDual(tenant: string): Promise<{ rt: WorkflowRuntime; ctx: ExecutionContext }> {
+    const rt = runtime();
+    const ctx = ctxOf(tenant, REVISOR);
+    await publicarActivar(rt, ctxOf(tenant, ADMIN), workflowSolicitud);
+    await publicarActivar(rt, ctxOf(tenant, ADMIN), workflowTicket);
+    return { rt, ctx };
+  }
+
+  it("ambas quedan activas simultáneamente bajo el mismo servicio", async () => {
+    const { rt, ctx } = await prepararDual("t-mux-activas");
+    const a = await query(rt, ctx, `${SERVICIO}.definicion.activa`, { clave: "solicitud-generica" });
+    const b = await query(rt, ctx, `${SERVICIO}.definicion.activa`, { clave: "ticket-generico" });
+    expect(a.ok && (a.value as { status: string }).status).toBe("activa");
+    expect(b.ok && (b.value as { status: string }).status).toBe("activa");
+  });
+
+  it("iniciar por clave persiste el proceso correcto y arranca en SU estado inicial", async () => {
+    const { rt, ctx } = await prepararDual("t-mux-iniciar");
+    const idS = crypto.randomUUID();
+    const idT = crypto.randomUUID();
+    const rs = await exec(rt, ctx, n.iniciar, { id: idS, data: { titulo: "s", definicion: "solicitud-generica" } });
+    const rt2 = await exec(rt, ctx, n.iniciar, { id: idT, data: { titulo: "t", definicion: "ticket-generico" } });
+    expect(rs.ok && rt2.ok).toBe(true);
+    // Cada instancia arranca en el estado inicial de SU definición.
+    expect(await estadoActual(rt, ctx, idS)).toBe("borrador"); // solicitud
+    expect(await estadoActual(rt, ctx, idT)).toBe("abierto"); // ticket
+    // El proceso quedó grabado en la instancia (_workflow).
+    const instT = await query(rt, ctx, n.obtener, { id: idT });
+    expect(instT.ok && ((instT.value as { data: Record<string, unknown> }).data["_workflow"])).toBe("ticket-generico");
+  });
+
+  it("transicionar resuelve la definición de la instancia: comando ajeno es ILEGAL en cada proceso", async () => {
+    const { rt, ctx } = await prepararDual("t-mux-trans");
+    const idS = crypto.randomUUID();
+    const idT = crypto.randomUUID();
+    await exec(rt, ctx, n.iniciar, { id: idS, data: { titulo: "s", definicion: "solicitud-generica" } });
+    await exec(rt, ctx, n.iniciar, { id: idT, data: { titulo: "t", definicion: "ticket-generico" } });
+
+    // (a) Comando propio de CADA proceso es válido y NO se confunde con el otro.
+    const okS = await exec(rt, ctx, n.transicionar, { id: idS, version: 1, comando: "enviar" });
+    expect(okS.ok && (okS.value as { estado: string }).estado).toBe("enviada");
+    const okT = await exec(rt, ctx, n.transicionar, { id: idT, version: 1, comando: "abrir" });
+    expect(okT.ok && (okT.value as { estado: string }).estado).toBe("atendido");
+
+    // (b) El comando de un proceso es ILEGAL en el otro (vocabularios disjuntos):
+    //     'abrir' NO existe en solicitud; 'enviar' NO existe en ticket.
+    const idS2 = crypto.randomUUID();
+    const idT2 = crypto.randomUUID();
+    await exec(rt, ctx, n.iniciar, { id: idS2, data: { titulo: "s2", definicion: "solicitud-generica" } });
+    await exec(rt, ctx, n.iniciar, { id: idT2, data: { titulo: "t2", definicion: "ticket-generico" } });
+    const malS = await exec(rt, ctx, n.transicionar, { id: idS2, version: 1, comando: "abrir" });
+    const malT = await exec(rt, ctx, n.transicionar, { id: idT2, version: 1, comando: "enviar" });
+    expect(malS.ok).toBe(false);
+    expect(malT.ok).toBe(false);
+    if (!malS.ok) expect(malS.error.code).toBe("KRN-CFL-001");
+    if (!malT.ok) expect(malT.error.code).toBe("KRN-CFL-001");
+  });
+
+  it("aprobar (gate) resuelve la definición de la instancia sin confundir procesos", async () => {
+    // Sólo 'solicitud-generica' declara una transición GOBERNADA por aprobación.
+    // Con 'ticket-generico' también activo, el gate debe resolver la definición
+    // correcta por clave (antes: el resolver podía tomar la definición ajena).
+    const { rt } = await prepararDual("t-mux-aprobar");
+    const admin = ctxOf("t-mux-aprobar", ADMIN);
+    const id = crypto.randomUUID();
+    await exec(rt, admin, n.iniciar, { id, data: { titulo: "t", definicion: "solicitud-generica" } });
+    await exec(rt, admin, n.transicionar, { id, version: 1, comando: "enviar" });
+    await exec(rt, admin, n.transicionar, { id, version: 2, comando: "tomar" });
+    const abrir = await exec(rt, admin, n.transicionar, { id, version: 3, comando: "resolver" }); // gate
+    expect(abrir.ok && (abrir.value as { pendienteAprobacion: boolean }).pendienteAprobacion).toBe(true);
+    const ctxRev = ctxOf("t-mux-aprobar", REVISOR);
+    const v = await versionActual(rt, ctxRev, id);
+    const r = await exec(rt, ctxRev, n.aprobar, { id, version: v, transicion: "resolver" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect((r.value as { estado: string }).estado).toBe("aprobada");
+  });
+});
+
+/* ============ Retrocompatibilidad: instancias SIN clave persistida ======== */
+/**
+ * Regresión DGP-013 (retrocompatibilidad): una instancia en formato ANTIGUO no
+ * persiste `_workflow`. En un servicio con UNA sola definición, el motor debe
+ * seguir resolviendo por servicio+versión (comportamiento previo intacto), sin
+ * que el hotfix introduzca dependencia obligatoria de `clave`.
+ */
+describe("Retrocompatibilidad: instancia sin _workflow resuelve por servicio+versión", () => {
+  it("transiciona correctamente aunque la instancia no tenga clave persistida", async () => {
+    const rt = runtime();
+    const ctx = ctxOf("t-legacy");
+    await publicarActivar(rt, ctx, workflowSolicitud); // servicio con UNA definición
+    const id = crypto.randomUUID();
+    await exec(rt, ctx, n.iniciar, { id, data: { titulo: "legacy" } });
+
+    // Simula el formato ANTIGUO: eliminamos `_workflow`/`_versionDefinicion` de la
+    // instancia persistida (el Fake ignora la UoW). Deja intacta la versión de
+    // datos para la posterior transición optimista.
+    const store = rt.platform.store;
+    const found = await store.findById("t-legacy", id);
+    if (!found.ok || !found.value) throw new Error("instancia no encontrada");
+    const rec = found.value;
+    const datosSinClave = { ...rec.data };
+    delete datosSinClave["_workflow"];
+    delete datosSinClave["_versionDefinicion"];
+    const upd = await store.update({} as never, "t-legacy", id, rec.version, { data: datosSinClave });
+    expect(upd.ok).toBe(true);
+    if (!upd.ok) return;
+
+    // Confirmamos que NO quedó clave persistida.
+    const check = await query(rt, ctx, n.obtener, { id });
+    expect(check.ok && ((check.value as { data: Record<string, unknown> }).data["_workflow"])).toBeUndefined();
+
+    // La transición estándar sigue resolviendo la definición por servicio+versión.
+    const v = (check.ok ? (check.value as { version: number }).version : 1);
+    const r = await exec(rt, ctx, n.transicionar, { id, version: v, comando: "enviar" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect((r.value as { estado: string }).estado).toBe("enviada");
   });
 });
 
