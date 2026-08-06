@@ -178,6 +178,7 @@ export interface OpcionesMotor {
     deps: ServiceDeps,
     tenantId: string,
     versionDef?: number,
+    clave?: string,
   ) => Promise<Result<{ def: DefinicionWorkflow; version: number }, KernelError>>;
 }
 
@@ -364,8 +365,8 @@ export function crearComandosInstancia(
   const servicio = opts.servicio;
   const n = nombresInstancia(servicio);
 
-  const resolverPara = (deps: ServiceDeps, tenantId: string, versionDef?: number) =>
-    opts.resolverDefinicion(deps, tenantId, versionDef);
+  const resolverPara = (deps: ServiceDeps, tenantId: string, versionDef?: number, clave?: string) =>
+    opts.resolverDefinicion(deps, tenantId, versionDef, clave);
 
   /* ------------------------------ iniciar -------------------------------- */
   const iniciar = (deps: ServiceDeps): CommandDefinition<any, any> => ({
@@ -386,7 +387,11 @@ export function crearComandosInstancia(
         return ok({ id: input.id, version: previo.value.version, estado: previo.value.estado, idempotente: true });
       }
 
-      const resuelto = await resolverPara(deps, tenant.value);
+      // Multiplexación de PROCESOS bajo un mismo servicio: si el iniciador
+      // declara la definición (`data.definicion`), resolvemos por esa clave para
+      // no colisionar con otras definiciones activas del mismo servicio.
+      const claveIniciar = typeof input.data?.["definicion"] === "string" ? String(input.data["definicion"]) : undefined;
+      const resuelto = await resolverPara(deps, tenant.value, undefined, claveIniciar);
       if (!resuelto.ok) return resuelto;
       const runtime = new RuntimeInstancia(resuelto.value.def);
 
@@ -497,7 +502,8 @@ export function crearComandosInstancia(
     }
 
     const versionDef = Number(actual.value.data[VERSION_DEF_KEY]) || undefined;
-    const resuelto = await resolverPara(deps, tenant.value, versionDef);
+    const claveInst = typeof actual.value.data[WORKFLOW_KEY] === "string" ? String(actual.value.data[WORKFLOW_KEY]) : undefined;
+    const resuelto = await resolverPara(deps, tenant.value, versionDef, claveInst);
     if (!resuelto.ok) return resuelto;
     const runtime = new RuntimeInstancia(resuelto.value.def);
 
@@ -631,7 +637,8 @@ export function crearComandosInstancia(
       if (!actual.ok) return actual;
       if (!actual.value) return fail(KernelErrors.notFound(RECORD_TYPE_INSTANCIA, input.id));
       const versionDef = Number(actual.value.data[VERSION_DEF_KEY]) || undefined;
-      const resuelto = await resolverPara(deps, tenant.value, versionDef);
+      const claveInst = typeof actual.value.data[WORKFLOW_KEY] === "string" ? String(actual.value.data[WORKFLOW_KEY]) : undefined;
+      const resuelto = await resolverPara(deps, tenant.value, versionDef, claveInst);
       if (!resuelto.ok) return resuelto;
       const permisoExtra = permisoDe(resuelto.value.def);
       return ejecutarTransicion(deps, ctx, uow, input, comando, permisoExtra);
@@ -671,7 +678,8 @@ export function crearComandosInstancia(
     }
 
     const versionDef = Number(actual.value.data[VERSION_DEF_KEY]) || undefined;
-    const resuelto = await resolverPara(deps, tenant.value, versionDef);
+    const claveInst = typeof actual.value.data[WORKFLOW_KEY] === "string" ? String(actual.value.data[WORKFLOW_KEY]) : undefined;
+    const resuelto = await resolverPara(deps, tenant.value, versionDef, claveInst);
     if (!resuelto.ok) return resuelto;
 
     const aprobacion = aprobacionDe(actual.value.data, input.transicion);
@@ -843,7 +851,8 @@ export function crearComandosInstancia(
         return ok({ id: input.id, version: actual.value.version, idempotente: true });
       }
       const versionDef = Number(actual.value.data[VERSION_DEF_KEY]) || undefined;
-      const resuelto = await resolverPara(deps, tenant.value, versionDef);
+      const claveInst = typeof actual.value.data[WORKFLOW_KEY] === "string" ? String(actual.value.data[WORKFLOW_KEY]) : undefined;
+      const resuelto = await resolverPara(deps, tenant.value, versionDef, claveInst);
       if (!resuelto.ok) return resuelto;
       const aprobacion = aprobacionDe(actual.value.data, input.transicion);
       if (!aprobacion || aprobacion.estado !== "pendiente") {

@@ -23,6 +23,7 @@ import { activosRuntime, principalActivos } from "../routes/deltaops/activos-run
 import { ordenesRuntime, principalOrdenes } from "../routes/deltaops/ordenes-runtime";
 import { inventarioRuntime, principalInventario } from "../routes/deltaops/inventario-runtime";
 import { planesRuntime, principalPlanes } from "../routes/deltaops/planes-runtime";
+import { abastecimientoRuntime, principalAbastecimiento } from "../routes/deltaops/abastecimiento-runtime";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -681,6 +682,358 @@ async function seedPlanes(activoIds: Map<string, string>): Promise<void> {
   log(`Generación preventiva: ${decididas} decididas, ${ordenesCreadas} OT nuevas, ${ordenesIdempotentes} idempotentes (vínculo generación→OT persistido)`);
 }
 
+/* ----------------------- 8) Abastecimiento (compras) --------------------- */
+/**
+ * Amplía el DEMO con el Módulo Enterprise Procurement (DGP-013) por VÍAS
+ * OFICIALES (comandos del módulo + Workflow Engine real), idempotente por
+ * id/opId deterministas y drenando el outbox INMEDIATAMENTE tras cada bloque
+ * (lección DGP-012: el outbox es COMPARTIDO entre runtimes; hay que materializar
+ * las proyecciones propias antes de que otro runtime reclame los eventos).
+ *
+ * Siembra: catálogos de abastecimiento; ~10 artículos del catálogo maestro
+ * LIGADOS a los items de Inventario DEMO; 4 proveedores (contactos +
+ * certificaciones + SLA + calificación); 3 solicitudes (origen inventario / OT /
+ * usuario, en estados variados incl. aprobada); cotizaciones múltiples para una
+ * solicitud con SELECCIÓN; 2 órdenes de compra (una aprobada/enviada sin
+ * recepción, otra con recepciones); recepciones (una parcial y una total con
+ * novedad) MATERIALIZADAS a Inventario por el comando oficial (movimientos reales
+ * + costos en abs_costos_read); historial/timeline poblados.
+ *
+ * Moneda: se declara el catálogo `monedas` con "USD" (mayúsculas, alineado con
+ * Inventario/Activos DEMO); a partir de ahí SÓLO "USD" es válido en el módulo.
+ */
+const AB_MONEDA = "USD";
+
+/** Catálogos del módulo Abastecimiento que consume el dataset demo (upsert). */
+const CATALOGOS_ABS: [string, string, string][] = [
+  ["monedas", "USD", "Dólar"],
+  ["metodos-valoracion", "promedio-ponderado", "Promedio ponderado"],
+  ["metodos-valoracion", "ultimo-costo", "Último costo"],
+  ["metodos-valoracion", "costo-estandar", "Costo estándar"],
+  ["tipos-articulo", "componente", "Componente"],
+  ["tipos-articulo", "lubricante", "Lubricante"],
+  ["tipos-articulo", "consumible", "Consumible"],
+  ["tipos-articulo", "kit", "Kit"],
+  ["tipos-articulo", "herramienta", "Herramienta"],
+  ["tipos-articulo", "servicio", "Servicio"],
+  ["unidades-medida", "unidad", "Unidad"],
+  ["unidades-medida", "litro", "Litro"],
+  ["unidades-medida", "kilogramo", "Kilogramo"],
+  ["unidades-medida", "juego", "Juego"],
+  ["unidades-medida", "servicio", "Servicio"],
+  ["tipos-proveedor", "distribuidor", "Distribuidor"],
+  ["tipos-proveedor", "fabricante", "Fabricante"],
+  ["tipos-proveedor", "mayorista", "Mayorista"],
+  ["tipos-proveedor", "servicios", "Servicios"],
+  ["certificaciones", "iso-9001", "ISO 9001"],
+  ["certificaciones", "iso-14001", "ISO 14001"],
+  ["certificaciones", "api", "API"],
+  ["prioridades", "alta", "Alta"],
+  ["prioridades", "media", "Media"],
+  ["prioridades", "critica", "Crítica"],
+  ["origenes-solicitud", "inventario", "Inventario"],
+  ["origenes-solicitud", "orden", "Orden de trabajo"],
+  ["origenes-solicitud", "usuario", "Usuario"],
+  ["novedades-recepcion", "ninguna", "Ninguna"],
+  ["novedades-recepcion", "averiado", "Averiado"],
+  ["novedades-recepcion", "faltante", "Faltante"],
+  ["condiciones-pago", "credito-30", "Crédito 30 días"],
+  ["condiciones-pago", "contado", "Contado"],
+  ["condiciones-entrega", "en-bodega", "En bodega"],
+];
+
+/** Artículos del catálogo maestro, ligados (por SKU) a los items de Inventario. */
+const ARTICULOS_ABS: {
+  clave: string; nombre: string; tipo: string; unidad: string; costo: number; sku?: string;
+}[] = [
+  { clave: "ART-FIL", nombre: "Filtro de aire HD (compra)", tipo: "componente", unidad: "unidad", costo: 18, sku: "FIL-001" },
+  { clave: "ART-ROD", nombre: "Rodamiento SKF 6205 (compra)", tipo: "componente", unidad: "unidad", costo: 9, sku: "ROD-001" },
+  { clave: "ART-LUB", nombre: "Lubricante multiuso (compra)", tipo: "lubricante", unidad: "litro", costo: 6, sku: "LUB-001" },
+  { clave: "ART-ACE", nombre: "Aceite hidráulico ISO 68 (compra)", tipo: "lubricante", unidad: "litro", costo: 7, sku: "ACE-001" },
+  { clave: "ART-GRA", nombre: "Grasa de litio EP2 (compra)", tipo: "lubricante", unidad: "kilogramo", costo: 5, sku: "GRA-001" },
+  { clave: "ART-HER", nombre: "Juego de llaves combinadas (compra)", tipo: "herramienta", unidad: "juego", costo: 45, sku: "HER-001" },
+  { clave: "ART-CON", nombre: "Trapos industriales (compra)", tipo: "consumible", unidad: "unidad", costo: 2, sku: "CON-001" },
+  { clave: "ART-BND", nombre: "Banda en V B-52 (compra)", tipo: "componente", unidad: "unidad", costo: 11, sku: "BND-001" },
+  { clave: "ART-MOT", nombre: "Motor eléctrico 5HP (compra)", tipo: "componente", unidad: "unidad", costo: 320, sku: "MOT-001" },
+  { clave: "ART-SVC", nombre: "Servicio de calibración de sensores", tipo: "servicio", unidad: "servicio", costo: 150 },
+];
+
+/** Proveedores DEMO con contactos, certificaciones y SLA. */
+const PROVEEDORES_ABS: {
+  clave: string; razonSocial: string; tipo: string; cert: string; calif: { calidad: number; tiempo: number; precio: number; servicio: number };
+}[] = [
+  { clave: "PRV-ACE", razonSocial: "Aceros y Rodamientos S.A.", tipo: "distribuidor", cert: "iso-9001", calif: { calidad: 5, tiempo: 4, precio: 4, servicio: 5 } },
+  { clave: "PRV-LUB", razonSocial: "Lubricantes Industriales Ltda.", tipo: "fabricante", cert: "iso-14001", calif: { calidad: 4, tiempo: 5, precio: 3, servicio: 4 } },
+  { clave: "PRV-FER", razonSocial: "Ferretería Mayorista del Norte", tipo: "mayorista", cert: "iso-9001", calif: { calidad: 4, tiempo: 4, precio: 5, servicio: 4 } },
+  { clave: "PRV-SVC", razonSocial: "Servicios Técnicos Delta", tipo: "servicios", cert: "api", calif: { calidad: 5, tiempo: 3, precio: 3, servicio: 5 } },
+];
+
+async function seedAbastecimiento(): Promise<void> {
+  const rt = abastecimientoRuntime();
+  const ctx = ctxCon(principalAbastecimiento("seed-demo", "admin"));
+  const cmd = (n: string, i: unknown) => rt.platform.kernel.commands.execute(ctx, n, i);
+  const q = (n: string, i: unknown) => rt.platform.kernel.queries.execute(ctx, n, i);
+  const drain = () => drenarCompleto(rt.platform.kernel);
+
+  // Id determinista LOCAL del módulo: el token discriminante va DELANTE (el
+  // hash idDet muestrea con `i % len`, así que prefijos comunes largos podrían
+  // colisionar; front-load garantiza unicidad entre artículos/proveedores/etc.).
+  const absId = (token: string) => idDet(`${token}:abs-procurement`);
+
+  // Referencias a Inventario DEMO (mismos idDet del seed de Inventario).
+  const bodegaCentral = idDet("bodega:central");
+  const ubicA = idDet("ubic:A");
+  const itemDe = (sku: string) => idDet(`item:${sku}`);
+
+  // (1) Catálogos configurables del módulo (upsert idempotente).
+  for (const [c, k, e] of CATALOGOS_ABS) {
+    unwrap(await cmd("modulo.abastecimiento.catalogo-upsert", { catalogo: c, clave: k, etiqueta: e }), `catalogo.abs ${c}/${k}`);
+  }
+  await drain();
+  log(`Catálogos de abastecimiento habilitados (${CATALOGOS_ABS.length})`);
+
+  // (2) Artículos del catálogo maestro (ligados a items de Inventario por sku).
+  const artId = new Map<string, string>();
+  for (const a of ARTICULOS_ABS) {
+    const id = absId(`${a.clave}:art`);
+    artId.set(a.clave, id);
+    unwrap(await cmd("modulo.abastecimiento.crear-articulo", {
+      id, opId: `seed:abs:art:${a.clave}`,
+      nombre: a.nombre, tipo: a.tipo, unidad: a.unidad,
+      metodoValoracion: "promedio-ponderado", moneda: AB_MONEDA, costoEstandar: a.costo,
+      ...(a.sku ? { inventarioItemId: itemDe(a.sku) } : {}),
+    }), `abs.crear-articulo ${a.clave}`);
+  }
+  await drain();
+  log(`Artículos de abastecimiento creados (${ARTICULOS_ABS.length})`);
+
+  // (3) Proveedores + calificación (idempotente por existencia de versión).
+  const provId = new Map<string, string>();
+  const provVersion = async (id: string): Promise<number | null> => {
+    const r = await q("modulo.abastecimiento.proveedor", { id });
+    if (!r.ok || !r.value) return null;
+    return (r.value as { version?: number }).version ?? null;
+  };
+  for (const p of PROVEEDORES_ABS) {
+    const id = absId(`${p.clave}:prov`);
+    provId.set(p.clave, id);
+    unwrap(await cmd("modulo.abastecimiento.crear-proveedor", {
+      id, opId: `seed:abs:prov:${p.clave}`,
+      razonSocial: p.razonSocial, tipo: p.tipo, monedaPreferida: AB_MONEDA,
+      contactos: [{ nombre: "Contacto Comercial", cargo: "Ventas", email: `ventas@${p.clave.toLowerCase()}.demo`, principal: true }],
+      certificaciones: [{ tipo: p.cert, numero: `CERT-${p.clave}`, vigenteHasta: "2027-12-31", emisor: "Ente Certificador" }],
+      sla: { plazoEntregaDias: 7, nivelCumplimientoObjetivo: 0.95, penalizacionPorDia: 10 },
+    }), `abs.crear-proveedor ${p.clave}`);
+  }
+  await drain();
+  // Calificación (sólo si aún no calificado: idempotente por opId + expectedVersion actual).
+  let calificados = 0;
+  for (const p of PROVEEDORES_ABS) {
+    const id = provId.get(p.clave)!;
+    const v = await provVersion(id);
+    if (v == null) continue;
+    // Si el proveedor sigue en versión 1 (recién creado) lo calificamos una vez.
+    if (v === 1) {
+      unwrap(await cmd("modulo.abastecimiento.calificar-proveedor", {
+        id, expectedVersion: v, opId: `seed:abs:calif:${p.clave}`,
+        calidad: p.calif.calidad, tiempo: p.calif.tiempo, precio: p.calif.precio, servicio: p.calif.servicio,
+        nota: "Calificación inicial DEMO",
+      }), `abs.calificar ${p.clave}`);
+      calificados++;
+      await drain();
+    }
+  }
+  log(`Proveedores de abastecimiento creados (${PROVEEDORES_ABS.length}), calificados ${calificados}`);
+
+  // (4) Solicitudes de compra (origen inventario / OT / usuario), estados variados.
+  const solEstado = async (id: string): Promise<{ estado: string; version: number } | null> => {
+    const r = await q("modulo.abastecimiento.solicitud", { id });
+    if (!r.ok || !r.value) return null;
+    const v = r.value as { estado?: string; version?: number };
+    return { estado: v.estado ?? "borrador", version: v.version ?? 0 };
+  };
+  const transicionarSolicitud = async (id: string, acciones: string[]) => {
+    for (const accion of acciones) {
+      const st = await solEstado(id);
+      if (!st) break;
+      // Idempotencia: no re-enviar si ya avanzó más allá.
+      if (accion === "enviar" && st.estado !== "borrador") continue;
+      if (accion === "aprobar" && st.estado !== "enviada") continue;
+      unwrap(await cmd("modulo.abastecimiento.transicionar-solicitud", {
+        id, accion, expectedVersion: st.version, opId: `seed:abs:sol-tr:${id}:${accion}`,
+      }), `abs.transicionar-solicitud ${accion}`);
+      await drain();
+    }
+  };
+
+  const otServicioGenerador = idDet("orden:OT · Servicio generador");
+  const solInvId = absId("SC-INV:sol");
+  const solOtId = absId("SC-OT:sol");
+  const solUsrId = absId("SC-USR:sol");
+
+  unwrap(await cmd("modulo.abastecimiento.crear-solicitud", {
+    id: solInvId, opId: "seed:abs:sol:SC-INV",
+    titulo: "Reposición por bajo stock de filtros y rodamientos", prioridad: "alta",
+    origen: { tipo: "inventario", referenciaId: itemDe("FIL-001"), referenciaTipo: "inventario-item" },
+    lineas: [
+      { numero: 1, articuloId: artId.get("ART-FIL"), cantidad: { valor: 30, unidad: "unidad" } },
+      { numero: 2, articuloId: artId.get("ART-ROD"), cantidad: { valor: 20, unidad: "unidad" } },
+    ],
+  }), "abs.crear-solicitud SC-INV");
+  unwrap(await cmd("modulo.abastecimiento.crear-solicitud", {
+    id: solOtId, opId: "seed:abs:sol:SC-OT",
+    titulo: "Insumos para servicio del generador", prioridad: "critica",
+    origen: { tipo: "orden", referenciaId: otServicioGenerador, referenciaTipo: "orden-trabajo" },
+    lineas: [
+      { numero: 1, articuloId: artId.get("ART-ACE"), cantidad: { valor: 40, unidad: "litro" } },
+      { numero: 2, articuloId: artId.get("ART-GRA"), cantidad: { valor: 10, unidad: "kilogramo" } },
+    ],
+  }), "abs.crear-solicitud SC-OT");
+  unwrap(await cmd("modulo.abastecimiento.crear-solicitud", {
+    id: solUsrId, opId: "seed:abs:sol:SC-USR",
+    titulo: "Herramienta manual solicitada por taller", prioridad: "media",
+    origen: { tipo: "usuario", referenciaId: null, referenciaTipo: null },
+    lineas: [{ numero: 1, articuloId: artId.get("ART-HER"), cantidad: { valor: 3, unidad: "juego" } }],
+  }), "abs.crear-solicitud SC-USR");
+  await drain();
+
+  // Estados variados: SC-INV → aprobada; SC-OT → enviada; SC-USR → borrador.
+  await transicionarSolicitud(solInvId, ["enviar", "aprobar"]);
+  await transicionarSolicitud(solOtId, ["enviar"]);
+  log("Solicitudes de compra creadas (3: aprobada / enviada / borrador)");
+
+  // (5) Cotizaciones múltiples para SC-INV + selección de la mejor.
+  const cotAceId = absId("ACE:cot");
+  const cotFerId = absId("FER:cot");
+  const lineasCotFil = (precioFil: number, precioRod: number) => [
+    { numero: 1, articuloId: artId.get("ART-FIL"), cantidad: { valor: 30, unidad: "unidad" }, precioUnitario: { moneda: AB_MONEDA, monto: precioFil }, plazoEntregaDias: 6 },
+    { numero: 2, articuloId: artId.get("ART-ROD"), cantidad: { valor: 20, unidad: "unidad" }, precioUnitario: { moneda: AB_MONEDA, monto: precioRod }, plazoEntregaDias: 6 },
+  ];
+  unwrap(await cmd("modulo.abastecimiento.registrar-cotizacion", {
+    id: cotAceId, opId: "seed:abs:cot:SC-INV:ACE", solicitudId: solInvId, proveedorId: provId.get("PRV-ACE"),
+    moneda: AB_MONEDA, lineas: lineasCotFil(18, 9),
+  }), "abs.registrar-cotizacion ACE");
+  unwrap(await cmd("modulo.abastecimiento.registrar-cotizacion", {
+    id: cotFerId, opId: "seed:abs:cot:SC-INV:FER", solicitudId: solInvId, proveedorId: provId.get("PRV-FER"),
+    moneda: AB_MONEDA, lineas: lineasCotFil(20, 10),
+  }), "abs.registrar-cotizacion FER");
+  await drain();
+  // Selecciona explícitamente la cotización de PRV-ACE (mejor precio total).
+  unwrap(await cmd("modulo.abastecimiento.seleccionar-cotizacion", {
+    solicitudId: solInvId, cotizacionId: cotAceId, opId: "seed:abs:sel:SC-INV",
+  }), "abs.seleccionar-cotizacion SC-INV");
+  await drain();
+  log("Cotizaciones registradas (2 para SC-INV) y seleccionada la mejor");
+
+  // (6) Órdenes de compra. Helper: crear → aprobar → enviar (idempotente).
+  const ocEstado = async (id: string): Promise<{ estado: string; version: number } | null> => {
+    const r = await q("modulo.abastecimiento.orden-compra", { id });
+    if (!r.ok || !r.value) return null;
+    const v = r.value as { estado?: string; version?: number };
+    return { estado: v.estado ?? "borrador", version: v.version ?? 0 };
+  };
+  const ORDEN_OC = ["borrador", "aprobada", "enviada", "parcialmenteRecibida", "recibida"];
+  const transicionarOC = async (id: string, acciones: string[]) => {
+    for (const accion of acciones) {
+      const st = await ocEstado(id);
+      if (!st) break;
+      const objetivo = accion === "aprobar" ? "aprobada" : accion === "enviar" ? "enviada" : "";
+      if (objetivo && ORDEN_OC.indexOf(st.estado) >= ORDEN_OC.indexOf(objetivo)) continue;
+      unwrap(await cmd("modulo.abastecimiento.transicionar-orden-compra", {
+        id, accion, expectedVersion: st.version, opId: `seed:abs:oc-tr:${id}:${accion}`,
+      }), `abs.transicionar-orden-compra ${accion}`);
+      await drain();
+    }
+  };
+
+  // OC-A: aprobada/enviada, SIN recepción (lubricantes para SC-OT).
+  const ocAId = absId("OC-A:oc");
+  unwrap(await cmd("modulo.abastecimiento.crear-orden-compra", {
+    id: ocAId, opId: "seed:abs:oc:OC-A", proveedorId: provId.get("PRV-LUB"),
+    solicitudId: solOtId, moneda: AB_MONEDA, condicionesPago: "credito-30", condicionesEntrega: "en-bodega",
+    lineas: [
+      { numero: 1, articuloId: artId.get("ART-ACE"), cantidad: { valor: 40, unidad: "litro" }, precioUnitario: { moneda: AB_MONEDA, monto: 7 }, toleranciaSobreRecepcion: 0.05,
+        referencia: { tipo: "inventario-item", id: itemDe("ACE-001") }, bodega: { tipo: "bodega", id: bodegaCentral } },
+      { numero: 2, articuloId: artId.get("ART-GRA"), cantidad: { valor: 10, unidad: "kilogramo" }, precioUnitario: { moneda: AB_MONEDA, monto: 5 }, toleranciaSobreRecepcion: 0.05,
+        referencia: { tipo: "inventario-item", id: itemDe("GRA-001") }, bodega: { tipo: "bodega", id: bodegaCentral } },
+    ],
+  }), "abs.crear-orden-compra OC-A");
+  await drain();
+  await transicionarOC(ocAId, ["aprobar", "enviar"]);
+
+  // OC-B: aprobada/enviada, CON recepciones (filtros/rodamientos de SC-INV).
+  const ocBId = absId("OC-B:oc");
+  unwrap(await cmd("modulo.abastecimiento.crear-orden-compra", {
+    id: ocBId, opId: "seed:abs:oc:OC-B", proveedorId: provId.get("PRV-ACE"),
+    solicitudId: solInvId, cotizacionId: cotAceId, moneda: AB_MONEDA,
+    condicionesPago: "credito-30", condicionesEntrega: "en-bodega",
+    lineas: [
+      { numero: 1, articuloId: artId.get("ART-FIL"), cantidad: { valor: 30, unidad: "unidad" }, precioUnitario: { moneda: AB_MONEDA, monto: 18 }, toleranciaSobreRecepcion: 0.1,
+        referencia: { tipo: "inventario-item", id: itemDe("FIL-001") }, bodega: { tipo: "bodega", id: bodegaCentral } },
+      { numero: 2, articuloId: artId.get("ART-ROD"), cantidad: { valor: 20, unidad: "unidad" }, precioUnitario: { moneda: AB_MONEDA, monto: 9 }, toleranciaSobreRecepcion: 0.1,
+        referencia: { tipo: "inventario-item", id: itemDe("ROD-001") }, bodega: { tipo: "bodega", id: bodegaCentral } },
+    ],
+  }), "abs.crear-orden-compra OC-B");
+  await drain();
+  await transicionarOC(ocBId, ["aprobar", "enviar"]);
+  log("Órdenes de compra creadas (2: OC-A enviada sin recepción, OC-B enviada con recepciones)");
+
+  // (7) Recepciones sobre OC-B: una PARCIAL y una TOTAL (con novedad), cada una
+  // MATERIALIZADA a Inventario por el comando oficial. Idempotente por
+  // id/opId/expectedVersion (se salta si la OC ya está recibida).
+  const recParcialId = absId("OCB-parcial:rec");
+  const recTotalId = absId("OCB-total:rec");
+  const materializar = async (recepcionId: string) => {
+    unwrap(await cmd("modulo.abastecimiento.materializar-recepcion", {
+      recepcionId, opId: `seed:abs:mat:${recepcionId}`,
+      bodegaId: bodegaCentral, ubicacionId: ubicA,
+    }), `abs.materializar-recepcion ${recepcionId}`);
+    await drain();
+    // El materializador ya drenó el outbox de Inventario al crear el movimiento;
+    // se refuerza para asegurar la proyección del movimiento en su read model.
+    await drenarCompleto(inventarioRuntime().platform.kernel);
+  };
+
+  let recepcionesHechas = 0;
+  const stOcB = await ocEstado(ocBId);
+  if (stOcB && stOcB.estado === "enviada") {
+    // Recepción PARCIAL: filtros 20/30, rodamientos 12/20. Ambos items son
+    // TRAZADOS POR LOTE en Inventario ⇒ la línea aporta el `lote` existente para
+    // que el movimiento oficial (`mover`) impute a ese lote.
+    const parcial = unwrap(await cmd("modulo.abastecimiento.registrar-recepcion", {
+      id: recParcialId, opId: "seed:abs:rec:OC-B:parcial", ordenCompraId: ocBId, expectedVersion: stOcB.version,
+      lineas: [
+        { numeroLineaOC: 1, cantidad: { valor: 20, unidad: "unidad" }, lote: "L-FIL-2601", bodega: { tipo: "bodega", id: bodegaCentral } },
+        { numeroLineaOC: 2, cantidad: { valor: 12, unidad: "unidad" }, lote: "L-ROD-2601", bodega: { tipo: "bodega", id: bodegaCentral } },
+      ],
+    }), "abs.registrar-recepcion parcial") as { recepcionId: string; version: number; estadoOrden: string };
+    await drain();
+    await materializar(parcial.recepcionId);
+    recepcionesHechas++;
+
+    // Recepción TOTAL del remanente: filtros 10/10, rodamientos 8 con NOVEDAD (1 averiado).
+    const stTras = await ocEstado(ocBId);
+    const total = unwrap(await cmd("modulo.abastecimiento.registrar-recepcion", {
+      id: recTotalId, opId: "seed:abs:rec:OC-B:total", ordenCompraId: ocBId, expectedVersion: stTras?.version ?? parcial.version,
+      lineas: [
+        { numeroLineaOC: 1, cantidad: { valor: 10, unidad: "unidad" }, lote: "L-FIL-2601", bodega: { tipo: "bodega", id: bodegaCentral } },
+        { numeroLineaOC: 2, cantidad: { valor: 8, unidad: "unidad" }, novedad: "averiado", notaNovedad: "1 rodamiento con daño de transporte", bodega: { tipo: "bodega", id: bodegaCentral } },
+      ],
+    }), "abs.registrar-recepcion total") as { recepcionId: string; estadoOrden: string };
+    await drain();
+    await materializar(total.recepcionId);
+    recepcionesHechas++;
+  }
+  await drain();
+  await drenarCompleto(inventarioRuntime().platform.kernel);
+
+  // Reproyección FINAL del módulo desde su bitácora durable (equivalencia por
+  // replay) por si el outbox COMPARTIDO fue reclamado por otro runtime.
+  unwrap(await cmd("modulo.abastecimiento.reproyectar", {}), "reproyectar abastecimiento");
+  await drain();
+  log(`Recepciones de abastecimiento: ${recepcionesHechas} (parcial + total con novedad) materializadas a Inventario`);
+}
+
 /* ------------------------------- Orquestación ---------------------------- */
 
 export async function seedDeltaDemo(): Promise<void> {
@@ -691,6 +1044,7 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedOrdenes();
   await seedInventario();
   await seedPlanes(activoIds);
+  await seedAbastecimiento();
   await seedPlataforma(activoIds);
   console.log("Seed DEMO completado.\n");
 }

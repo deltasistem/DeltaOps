@@ -159,6 +159,7 @@ export function crearResolverDefinicion(servicio: string) {
     deps: ServiceDeps,
     tenantId: string,
     versionN?: number,
+    clave?: string,
   ): Promise<Result<{ def: DefinicionWorkflow; version: number }, KernelError>> => {
     const rows = await deps.store.list(tenantId, {
       service: servicio,
@@ -166,13 +167,19 @@ export function crearResolverDefinicion(servicio: string) {
       limit: 500,
     });
     if (!rows.ok) return rows;
-    const registros = rows.value.map((r) => ({
+    const todos = rows.value.map((r) => ({
       versionN: Number(r.data["versionN"]),
       status: r.status,
       data: r.data,
     }));
+    // Multiplexación de PROCESOS bajo un mismo servicio (p. ej. un módulo con
+    // varias definiciones: solicitud/ordenCompra/recepción): si se indica `clave`
+    // filtramos por ella para no confundir definiciones homónimas por versión.
+    const registros = clave === undefined
+      ? todos
+      : todos.filter((r) => String(r.data["clave"] ?? (r.data["definicion"] as { clave?: string } | undefined)?.clave) === clave);
     if (registros.length === 0) {
-      return fail(KernelErrors.notFound(RECORD_TYPE_DEFINICION, servicio));
+      return fail(KernelErrors.notFound(RECORD_TYPE_DEFINICION, clave ?? servicio));
     }
     if (versionN !== undefined) {
       const exacta = registros.find((r) => r.versionN === versionN);

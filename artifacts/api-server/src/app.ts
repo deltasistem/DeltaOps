@@ -10,6 +10,7 @@ import activosModuleRouter from "./routes/deltaops/activos-module";
 import ordenesModuleRouter from "./routes/deltaops/ordenes-module";
 import inventarioModuleRouter from "./routes/deltaops/inventario-module";
 import planesModuleRouter from "./routes/deltaops/planes-module";
+import abastecimientoModuleRouter from "./routes/deltaops/abastecimiento-module";
 import { logger } from "./lib/logger";
 import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
@@ -59,6 +60,7 @@ app.use("/api", activosModuleRouter);
 app.use("/api", ordenesModuleRouter);
 app.use("/api", inventarioModuleRouter);
 app.use("/api", planesModuleRouter);
+app.use("/api", abastecimientoModuleRouter);
 app.use("/api", router);
 app.use("/api/deltaops", deltaopsErrorHandler);
 

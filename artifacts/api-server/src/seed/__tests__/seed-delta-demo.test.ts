@@ -64,23 +64,26 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
   });
 
   it("IDEMPOTENCIA · re-ejecutar el seed no duplica datos", async () => {
-    const antes = {
+    const snapshot = async () => ({
       activos: await contarPorTenant("act_activos_read", DEMO_TENANT),
       ordenes: await contarPorTenant("ord_ordenes_read", DEMO_TENANT),
       items: await contarPorTenant("inv_items_read", DEMO_TENANT),
       movimientos: await contarPorTenant("inv_movimientos_read", DEMO_TENANT),
-    };
+      absArticulos: await contarPorTenant("abs_articulos_read", DEMO_TENANT),
+      absProveedores: await contarPorTenant("abs_proveedores_read", DEMO_TENANT),
+      absSolicitudes: await contarPorTenant("abs_solicitudes_read", DEMO_TENANT),
+      absCotizaciones: await contarPorTenant("abs_cotizaciones_read", DEMO_TENANT),
+      absOrdenes: await contarPorTenant("abs_ordenes_compra_read", DEMO_TENANT),
+      absRecepciones: await contarPorTenant("abs_recepciones_read", DEMO_TENANT),
+      absMaterializaciones: await contarPorTenant("abs_recepcion_materializaciones", DEMO_TENANT),
+    });
+    const antes = await snapshot();
 
     // Segunda pasada: los comandos oficiales (id/opId deterministas + guardas de
     // existencia) deben ser idempotentes.
     await seedDeltaDemo();
 
-    const despues = {
-      activos: await contarPorTenant("act_activos_read", DEMO_TENANT),
-      ordenes: await contarPorTenant("ord_ordenes_read", DEMO_TENANT),
-      items: await contarPorTenant("inv_items_read", DEMO_TENANT),
-      movimientos: await contarPorTenant("inv_movimientos_read", DEMO_TENANT),
-    };
+    const despues = await snapshot();
 
     expect(despues).toEqual(antes);
     // Datos base del mandato presentes. Las órdenes incluyen las 7 del ciclo de
@@ -89,7 +92,107 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(antes.activos).toBe(10);
     expect(antes.ordenes).toBe(14);
     expect(antes.items).toBe(12);
+    // Abastecimiento: 10 artículos, 4 proveedores, 3 solicitudes, 2 cotizaciones,
+    // 2 órdenes de compra, 2 recepciones.
+    expect(antes.absArticulos).toBe(10);
+    expect(antes.absProveedores).toBe(4);
+    expect(antes.absSolicitudes).toBe(3);
+    expect(antes.absCotizaciones).toBe(2);
+    expect(antes.absOrdenes).toBe(2);
+    expect(antes.absRecepciones).toBe(2);
   }, 120_000);
+
+  it("ABASTECIMIENTO · artículos ligados a Inventario, proveedores calificados y OC recibida", async () => {
+    // Artículos con inventarioItemId ligado a un item real de Inventario DEMO.
+    const ligados = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.abs_articulos_read
+        WHERE tenant_id = $1 AND (datos->>'inventarioItemId') IS NOT NULL`,
+      [DEMO_TENANT],
+    );
+    expect(Number(ligados.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(9);
+
+    // Proveedores calificados (calificación promedio > 0 en el snapshot).
+    const calif = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.abs_proveedores_read
+        WHERE tenant_id = $1 AND calificacion_promedio > 0`,
+      [DEMO_TENANT],
+    );
+    expect(Number(calif.rows[0]?.n ?? 0)).toBe(4);
+
+    // Solicitudes en estados variados: al menos una aprobada, una enviada, una borrador.
+    const estados = await pool.query(
+      `SELECT DISTINCT estado FROM deltaops.abs_solicitudes_read WHERE tenant_id = $1 ORDER BY 1`,
+      [DEMO_TENANT],
+    );
+    const setEstados = estados.rows.map((x: { estado: string }) => x.estado);
+    expect(setEstados).toEqual(expect.arrayContaining(["aprobada", "borrador", "enviada"]));
+
+    // Una cotización SELECCIONADA para la solicitud origen-inventario.
+    const sel = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.abs_cotizaciones_read
+        WHERE tenant_id = $1 AND seleccionada = true`,
+      [DEMO_TENANT],
+    );
+    expect(Number(sel.rows[0]?.n ?? 0)).toBe(1);
+
+    // OC-B llegó a estado "recibida" (recepción parcial + total).
+    const ordenEstados = await pool.query(
+      `SELECT DISTINCT estado FROM deltaops.abs_ordenes_compra_read WHERE tenant_id = $1 ORDER BY 1`,
+      [DEMO_TENANT],
+    );
+    const setOc = ordenEstados.rows.map((x: { estado: string }) => x.estado);
+    expect(setOc).toEqual(expect.arrayContaining(["enviada", "recibida"]));
+  });
+
+  it("ABASTECIMIENTO · las recepciones materializaron movimientos de Inventario SIN duplicar", async () => {
+    // Cada línea materializada tiene su vínculo con movimiento_id NO nulo y estado
+    // "aplicada"; la clave_dedup es única (sin duplicados) — idempotente por opId
+    // ${recepcionId}:${numeroLineaOC}.
+    const mats = await pool.query(
+      `SELECT count(*)::int AS total,
+              count(movimiento_id)::int AS con_mov,
+              count(DISTINCT clave_dedup)::int AS distintas
+         FROM deltaops.abs_recepcion_materializaciones WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    const row = mats.rows[0] as { total: number; con_mov: number; distintas: number };
+    // 3 líneas ingresables materializadas: parcial(fil+rod) + total(fil).
+    // (La línea 2 de la total es 'averiado' ⇒ NO ingresa a Inventario.)
+    expect(Number(row.total)).toBe(3);
+    expect(Number(row.con_mov)).toBe(3);
+    expect(Number(row.distintas)).toBe(Number(row.total)); // dedup: sin duplicados
+
+    const aplicadas = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.abs_recepcion_materializaciones
+        WHERE tenant_id = $1 AND estado = 'aplicada'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(aplicadas.rows[0]?.n ?? 0)).toBe(3);
+
+    // Evidencia en Inventario: existen movimientos de entrada cuya referencia es
+    // una recepción del módulo Abastecimiento (enlace real, no duplicado por opId).
+    const movs = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.inv_movimientos_read
+        WHERE tenant_id = $1 AND (datos->'referencia'->>'tipo') = 'recepcion'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(movs.rows[0]?.n ?? 0)).toBe(3);
+
+    // Costos del catálogo actualizados (abs_costos_read poblado para los artículos
+    // recibidos, en la moneda USD).
+    const costos = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.abs_costos_read
+        WHERE tenant_id = $1 AND moneda = 'USD' AND (costo_unitario)::numeric > 0`,
+      [DEMO_TENANT],
+    );
+    expect(Number(costos.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("AISLAMIENTO ABASTECIMIENTO · un tenant ajeno no ve datos del DEMO", async () => {
+    expect(await contarPorTenant("abs_articulos_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("abs_ordenes_compra_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("abs_recepcion_materializaciones", "tenant-inexistente")).toBe(0);
+  });
 
   it("ÓRDENES · existen las 7 en sus 7 estados del ciclo de vida", async () => {
     const r = await pool.query(

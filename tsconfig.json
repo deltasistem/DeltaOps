@@ -37,6 +37,9 @@
       "path": "./lib/module-planes"
     },
     {
+      "path": "./lib/module-abastecimiento"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

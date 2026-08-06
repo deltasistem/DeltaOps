@@ -17,6 +17,7 @@
     "@workspace/kernel": "workspace:*",
     "@workspace/module-reference": "workspace:*",
     "@workspace/module-activos": "workspace:*",
+    "@workspace/module-abastecimiento": "workspace:*",
     "@workspace/module-inventario": "workspace:*",
     "@workspace/module-planes": "workspace:*",
     "@workspace/module-ordenes": "workspace:*",

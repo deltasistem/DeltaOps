@@ -1,0 +1,205 @@
+DGP-013 — ENTERPRISE PROCUREMENT & SUPPLY CHAIN FOR MAINTENANCE
+Objetivo
+
+Construir el ecosistema de abastecimiento del mantenimiento.
+
+Hasta hoy podemos:
+
+detectar una necesidad,
+planificar un mantenimiento,
+generar una OT,
+consumir inventario.
+
+Pero aún no podemos responder automáticamente preguntas como:
+
+¿No hay stock?
+¿Qué debo comprar?
+¿A qué proveedor?
+¿Cuánto cuesta?
+¿Cuándo llega?
+¿Qué OC está abierta?
+¿Qué repuesto está pendiente?
+
+Ese vacío lo cubrirá DGP-013.
+
+Alcance del DGP-013
+
+No será un simple módulo de compras.
+
+Será un ecosistema completo compuesto por:
+
+1. Catálogo Maestro de Repuestos
+Productos
+Servicios
+Lubricantes
+Consumibles
+Componentes
+Kits
+Herramientas
+Servicios externos
+2. Proveedores
+Información comercial
+Contactos
+Certificaciones
+Calificación
+SLA
+Historial
+3. Solicitudes de Compra
+
+Generadas desde:
+
+Inventario
+Órdenes
+Planes
+Usuarios
+4. Cotizaciones
+
+Comparación de múltiples proveedores.
+
+5. Órdenes de Compra
+
+Workflow completo.
+
+6. Recepción
+
+Recepción parcial.
+
+Recepción total.
+
+Recepción con novedades.
+
+7. Integración con Inventario
+
+Cuando se recibe:
+
+↓
+
+Entrada automática al inventario.
+
+8. Integración con Órdenes
+
+Si el repuesto estaba reservado:
+
+↓
+
+queda disponible automáticamente.
+
+9. Integración con Planes
+
+Si el plan requería un repuesto:
+
+↓
+
+queda listo para ejecutar.
+
+10. Costos
+
+Actualización automática de:
+
+costo promedio
+último costo
+costo estándar
+11. Workflow
+
+Todo gobernado por Workflow Engine.
+
+Nada hardcodeado.
+
+12. Dynamic Forms
+
+Toda la captura.
+
+13. Offline
+
+Compatible completamente.
+
+14. Timeline
+
+Cada compra.
+
+Cada recepción.
+
+Cada cambio.
+
+Todo auditado.
+
+15. QR
+
+Etiquetas para recepción.
+
+Etiquetas para almacenamiento.
+
+Restricciones
+
+Como siempre:
+
+❌ Sin BI
+
+❌ Sin IA
+
+❌ Sin dashboards ejecutivos
+
+❌ Sin reportes
+
+❌ Sin modificar el Kernel
+
+❌ Sin modificar Shared Platform
+
+❌ Sin modificar Business Foundation
+
+❌ Sin romper el corpus congelado
+
+Instrucción oficial para Replit (DGP-013)
+DGP-013 — ENTERPRISE PROCUREMENT & SUPPLY CHAIN FOR MAINTENANCE
+
+OBJETIVO
+
+Implementar el ecosistema empresarial de abastecimiento y compras para mantenimiento de DeltaOps, reutilizando exclusivamente el corpus congelado (DGP-000…012), sin modificar Kernel, Shared Platform, Business Foundation, Workflow Engine, Dynamic Forms, Design System ni los módulos existentes.
+
+ALCANCE
+
+Construir el nuevo módulo @workspace/module-abastecimiento (servicio: modulo.abastecimiento), dividido en subfases internas (dominio, persistencia/CQRS, experiencia), manteniendo el mismo estándar arquitectónico de Activos, Órdenes, Inventario y Planes.
+
+El módulo deberá cubrir:
+
+- Catálogo maestro de artículos y servicios para mantenimiento.
+- Proveedores empresariales.
+- Solicitudes de compra.
+- Cotizaciones múltiples.
+- Órdenes de compra.
+- Recepciones parciales y totales.
+- Integración automática con Inventario.
+- Integración con Órdenes de Trabajo.
+- Integración con Planes de Mantenimiento.
+- Actualización automática de costos del inventario.
+- Workflow completo para aprobaciones.
+- Dynamic Forms para toda captura.
+- Timeline.
+- Comentarios.
+- Adjuntos referencia-only.
+- QR para recepción y almacenamiento.
+- Offline First completo.
+- API Contract-First.
+- OpenAPI congelado.
+- Event Log.
+- CQRS estricto.
+- Replay.
+- Consola técnica.
+- Tenant DEMO ampliado.
+
+RESTRICCIONES
+
+- No construir BI.
+- No construir IA.
+- No construir dashboards ejecutivos.
+- No construir reportes.
+- No modificar el corpus congelado.
+- Mantener compatibilidad total con DGP-000…012.
+
+OBLIGATORIO
+
+Antes de finalizar la fase, ejecutar una revisión arquitectónica independiente sobre seguridad, CQRS, Workflow, Offline, RLS, Event Log, integración entre módulos y cumplimiento del programa DGP.
+
+La fase solo podrá cerrarse cuando todas las pruebas estén en verde, el typecheck del monorepo sea limpio y la revisión arquitectónica concluya sin hallazgos críticos ni mayores abiertos.
+
+Al finalizar, entregar exclusivamente el INFORME OFICIAL DE CIERRE DGP-013, siguiendo exactamente el formato u

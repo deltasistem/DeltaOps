@@ -38,6 +38,19 @@ import PlanesNueva from '@/pages/planes-nueva';
 import PlanesCalendario from '@/pages/planes-calendario';
 import PlanesSincronizacion from '@/pages/planes-sincronizacion';
 import PlanesFicha from '@/pages/planes-ficha';
+import AbastecimientoArticulos from '@/pages/abastecimiento-articulos';
+import AbastecimientoArticuloNueva from '@/pages/abastecimiento-articulo-nueva';
+import AbastecimientoArticuloFicha from '@/pages/abastecimiento-articulo-ficha';
+import AbastecimientoProveedores from '@/pages/abastecimiento-proveedores';
+import AbastecimientoProveedorNueva from '@/pages/abastecimiento-proveedor-nueva';
+import AbastecimientoProveedorFicha from '@/pages/abastecimiento-proveedor-ficha';
+import AbastecimientoSolicitudes from '@/pages/abastecimiento-solicitudes';
+import AbastecimientoSolicitudNueva from '@/pages/abastecimiento-solicitud-nueva';
+import AbastecimientoSolicitudFicha from '@/pages/abastecimiento-solicitud-ficha';
+import AbastecimientoOrdenes from '@/pages/abastecimiento-ordenes';
+import AbastecimientoOrdenNueva from '@/pages/abastecimiento-orden-nueva';
+import AbastecimientoOrdenFicha from '@/pages/abastecimiento-orden-ficha';
+import AbastecimientoSincronizacion from '@/pages/abastecimiento-sincronizacion';
 
 const queryClient = new QueryClient();
 
@@ -95,6 +108,19 @@ function Router() {
       <Route path="/planes/calendario" component={PlanesCalendario} />
       <Route path="/planes/sincronizacion" component={PlanesSincronizacion} />
       <Route path="/planes/:id" component={PlanesFicha} />
+      <Route path="/abastecimiento/articulos" component={AbastecimientoArticulos} />
+      <Route path="/abastecimiento/articulos/nuevo" component={AbastecimientoArticuloNueva} />
+      <Route path="/abastecimiento/articulos/:id" component={AbastecimientoArticuloFicha} />
+      <Route path="/abastecimiento/proveedores" component={AbastecimientoProveedores} />
+      <Route path="/abastecimiento/proveedores/nuevo" component={AbastecimientoProveedorNueva} />
+      <Route path="/abastecimiento/proveedores/:id" component={AbastecimientoProveedorFicha} />
+      <Route path="/abastecimiento/solicitudes" component={AbastecimientoSolicitudes} />
+      <Route path="/abastecimiento/solicitudes/nueva" component={AbastecimientoSolicitudNueva} />
+      <Route path="/abastecimiento/solicitudes/:id" component={AbastecimientoSolicitudFicha} />
+      <Route path="/abastecimiento/ordenes-compra" component={AbastecimientoOrdenes} />
+      <Route path="/abastecimiento/ordenes-compra/nueva" component={AbastecimientoOrdenNueva} />
+      <Route path="/abastecimiento/ordenes-compra/:id" component={AbastecimientoOrdenFicha} />
+      <Route path="/abastecimiento/sincronizacion" component={AbastecimientoSincronizacion} />
       <Route component={NotFound} />
     </Switch>
   );

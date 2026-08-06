@@ -37,6 +37,7 @@ import {
   TabTimeline,
   TabHistorial,
 } from "./inventario/tabs-item";
+import { TabAbastecimientoItem } from "./abastecimiento/tab-item-inventario";
 import type { ItemRow } from "../lib/inventario/tipos";
 
 export default function InventarioFichaPage() {
@@ -72,6 +73,7 @@ function Contenido({ item, onCambio }: { item: ItemRow; onCambio: () => void }) 
       { id: "transferencias", etiqueta: "Transferencias", contenido: <TabTransferencias itemId={item.id} /> },
       { id: "conteos", etiqueta: "Conteos", contenido: <TabConteos /> },
       { id: "ajustes", etiqueta: "Ajustes", contenido: <TabAjustes item={item} onCambio={onCambio} /> },
+      { id: "abastecimiento", etiqueta: "Abastecimiento", contenido: <TabAbastecimientoItem itemId={item.id} nombreItem={item.nombre} /> },
       { id: "comentarios", etiqueta: "Comentarios", contenido: <TabComentarios itemId={item.id} /> },
       { id: "adjuntos", etiqueta: "Adjuntos", contenido: <TabAdjuntos itemId={item.id} /> },
       { id: "timeline", etiqueta: "Timeline", contenido: <TabTimeline itemId={item.id} /> },
