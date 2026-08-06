@@ -1,0 +1,151 @@
+DGP-014 — ENTERPRISE PREVENTIVE MAINTENANCE SYSTEM
+
+Iniciar la implementación de la fase DGP-014 del programa DeltaOps.
+
+OBJETIVO
+
+Construir el Sistema Empresarial de Mantenimiento Preventivo sobre el corpus congelado del programa (DGP-000…013), reutilizando exclusivamente:
+
+- Kernel
+- Shared Platform
+- Business Foundation
+- Workflow Engine
+- Dynamic Forms
+- Design System
+- Module Activos
+- Module Órdenes
+- Module Inventario
+- Module Planes
+- Module Abastecimiento
+
+SIN modificar ninguno de ellos.
+
+ALCANCE
+
+Esta fase deberá construir el ecosistema completo de mantenimiento preventivo empresarial.
+
+Incluye:
+
+• Planes de mantenimiento preventivo.
+
+• Rutinas reutilizables.
+
+• Frecuencias:
+
+- calendario
+- días
+- semanas
+- meses
+- años
+- horas de motor
+- horómetro
+- odómetro
+- ciclos
+- producción
+- múltiples disparadores combinados.
+
+• Versionado de planes.
+
+• Vigencias.
+
+• Plantillas.
+
+• Asociación múltiple de activos.
+
+• Jerarquías de planes.
+
+• Dependencias entre actividades.
+
+• Checklist obligatorios.
+
+• Formularios dinámicos.
+
+• Recursos requeridos.
+
+• Repuestos requeridos.
+
+• Herramientas.
+
+• Personal requerido.
+
+• Tiempo estimado.
+
+• Costos estimados.
+
+• SLA.
+
+• Workflow completo.
+
+• Programación automática.
+
+• Generación automática de Órdenes de Trabajo.
+
+• Evitar generación duplicada.
+
+• Reprogramaciones.
+
+• Suspensiones.
+
+• Exclusiones.
+
+• Calendario preventivo.
+
+• Vista anual.
+
+• Vista mensual.
+
+• Vista semanal.
+
+• Vista diaria.
+
+• Gantt.
+
+• Timeline.
+
+• QR.
+
+• Offline First.
+
+• Multiempresa.
+
+• CQRS.
+
+• Event Log.
+
+• Replay.
+
+• Tenant Demo.
+
+RESTRICCIONES
+
+No construir:
+
+- IA
+- BI
+- Reportes ejecutivos
+- Analítica
+- Integraciones externas
+
+Solo el ecosistema preventivo.
+
+OBLIGATORIO
+
+Seguir exactamente la metodología DGP utilizada en todas las fases anteriores.
+
+Dividir internamente la implementación en:
+
+- Dominio
+- Persistencia
+- Experiencia
+
+Realizar revisión arquitectónica independiente.
+
+Corregir todos los hallazgos críticos y mayores antes del cierre.
+
+Ejecutar pruebas completas.
+
+Actualizar CI.
+
+Actualizar documentación.
+
+Entregar únicamente el INFORME OFICIAL DE CIERRE DGP-014 cuando toda la fase haya finalizado satisfactoriamente.
