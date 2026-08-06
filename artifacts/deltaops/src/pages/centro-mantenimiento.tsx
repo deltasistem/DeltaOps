@@ -74,6 +74,7 @@ export function Centro() {
         acciones={
           <div style={{ display: "flex", gap: "var(--do-sp-2)" }}>
             <Link href="/inventario"><Button variant="secundario" size="sm">Inventario</Button></Link>
+            <Link href="/planes"><Button variant="secundario" size="sm">Planes</Button></Link>
             <Link href="/ordenes/nueva"><Button variant="primario" size="sm">Nueva orden</Button></Link>
           </div>
         }

@@ -33,6 +33,11 @@ import InventarioBodegas from '@/pages/inventario-bodegas';
 import InventarioEscanear from '@/pages/inventario-escanear';
 import InventarioSincronizacion from '@/pages/inventario-sincronizacion';
 import InventarioFicha from '@/pages/inventario-ficha';
+import PlanesListado from '@/pages/planes-listado';
+import PlanesNueva from '@/pages/planes-nueva';
+import PlanesCalendario from '@/pages/planes-calendario';
+import PlanesSincronizacion from '@/pages/planes-sincronizacion';
+import PlanesFicha from '@/pages/planes-ficha';
 
 const queryClient = new QueryClient();
 
@@ -85,6 +90,11 @@ function Router() {
       <Route path="/inventario/escanear" component={InventarioEscanear} />
       <Route path="/inventario/sincronizacion" component={InventarioSincronizacion} />
       <Route path="/inventario/:id" component={InventarioFicha} />
+      <Route path="/planes" component={PlanesListado} />
+      <Route path="/planes/nuevo" component={PlanesNueva} />
+      <Route path="/planes/calendario" component={PlanesCalendario} />
+      <Route path="/planes/sincronizacion" component={PlanesSincronizacion} />
+      <Route path="/planes/:id" component={PlanesFicha} />
       <Route component={NotFound} />
     </Switch>
   );

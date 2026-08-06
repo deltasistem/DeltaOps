@@ -13,3 +13,4 @@ export * from "./deltaops-platform";
 export * from "./deltaops-reference";
 export * from "./deltaops-activos";
 export * from "./deltaops-inventario";
+export * from "./deltaops-planes";

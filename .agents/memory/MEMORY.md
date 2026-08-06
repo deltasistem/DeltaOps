@@ -17,4 +17,5 @@
 - [Inventario dominio DGP-011.1](deltaops-inventario-dominio-dgp011-1.md) — comandos gobernados exigen WorkflowPort explícito con fallo seguro; auto-aprobación solo en test; verificar Result de transicionar antes de efectos.
 - [Inventario persistencia DGP-011.2](deltaops-inventario-persistencia-dgp011-2.md) — timeline vía comandos es obligatorio en persistencia; drizzle push no detecta tablas nuevas (aplicar .sql con psql); estados de workflow camelCase con traducción.
 - [Experiencia Inventario DGP-011.3](deltaops-experiencia-inventario-dgp011-3.md) — acciones UI 1:1 con transiciones del motor; cambio de espejo Drizzle exige migración .sql; tenant demo delta-demo con seed:demo idempotente.
+- [Planes DGP-012](deltaops-planes-dgp012.md) — acciones offline = comandos oficiales del runtime (no rutas HTTP); vínculo orquestación→OT atómico con guarda; CQRS también en calendarios/historial.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.

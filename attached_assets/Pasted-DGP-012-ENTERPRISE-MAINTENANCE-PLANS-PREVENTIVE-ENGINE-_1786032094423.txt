@@ -1,0 +1,499 @@
+DGP-012 — ENTERPRISE MAINTENANCE PLANS & PREVENTIVE ENGINE
+
+Directiva Oficial de la Dirección del Programa
+
+La fase DGP-012 tiene como objetivo construir el Motor Oficial de Planes de Mantenimiento de DeltaOps.
+
+Esta fase convierte a DeltaOps en un sistema verdaderamente preventivo y predictivo desde el punto de vista operativo.
+
+NO se permite modificar:
+
+Kernel
+Shared Platform
+Business Foundation
+Workflow Engine
+Dynamic Forms
+Design System
+Enterprise Assets
+Enterprise Work Orders
+Enterprise Inventory
+
+Todo debe construirse como un nuevo módulo reutilizando exclusivamente el corpus congelado.
+
+OBJETIVO
+
+Construir el módulo completo de Planes de Mantenimiento Empresariales.
+
+Debe permitir definir, programar, controlar y ejecutar cualquier estrategia de mantenimiento.
+
+No construir IA.
+
+No construir analítica.
+
+No construir BI.
+
+No construir dashboards ejecutivos.
+
+DOMINIO
+
+Crear el paquete
+
+lib/module-planes
+
+Servicio
+
+modulo.planes
+AGREGADOS
+
+Construir como mínimo:
+
+PlanMantenimiento
+
+ProgramaMantenimiento
+
+Frecuencia
+
+Rutina
+
+ActividadPlanificada
+
+CalendarioOperacional
+
+GeneracionOrden
+
+SuspensionPlan
+
+HistorialPlan
+
+SOPORTAR
+
+Preventivo
+
+Predictivo
+
+Inspecciones
+
+Lubricación
+
+Calibración
+
+Cambio de componentes
+
+Limpieza
+
+Campañas
+
+Legales
+
+Normativos
+
+Rutinas del fabricante
+
+Rutinas internas
+
+Planes personalizados
+
+Todo configurable.
+
+Nada hardcodeado.
+
+FRECUENCIAS
+
+Debe soportar simultáneamente:
+
+Por días
+
+Por semanas
+
+Por meses
+
+Por años
+
+Por horas
+
+Por horómetro
+
+Por odómetro
+
+Por ciclos
+
+Por producción
+
+Por contador
+
+Por eventos
+
+Por combinación de múltiples frecuencias
+
+Ejemplo:
+
+Cada 30 días
+
+o
+
+250 horas
+
+lo que ocurra primero.
+
+Todo declarativo.
+
+ACTIVOS
+
+Un plan podrá asociarse a:
+
+Un activo
+
+Muchos activos
+
+Una categoría
+
+Una familia
+
+Una subfamilia
+
+Una empresa
+
+Un proyecto
+
+Una ubicación
+
+Una clase de activos
+
+Nunca mediante código específico.
+
+RUTINAS
+
+Cada plan tendrá:
+
+Actividades
+
+Duración estimada
+
+Recursos sugeridos
+
+Herramientas
+
+EPP
+
+Materiales
+
+Repuestos
+
+Checklists
+
+Formularios
+
+Documentación
+
+Observaciones
+
+Riesgos
+
+Todo reutilizando módulos existentes.
+
+WORKFLOW
+
+Todo plan tendrá Workflow.
+
+Estados mínimos:
+
+BORRADOR
+
+VIGENTE
+
+SUSPENDIDO
+
+FINALIZADO
+
+ARCHIVADO
+
+Extensible por tenant.
+
+GENERACIÓN AUTOMÁTICA
+
+Construir el runtime oficial capaz de determinar cuándo un plan debe generar una Orden de Trabajo.
+
+La generación debe soportar:
+
+Generación manual
+
+Generación programada
+
+Generación por frecuencia
+
+Generación por horómetro
+
+Generación por odómetro
+
+Generación por eventos
+
+Generación múltiple
+
+Nunca crear duplicados.
+
+Toda generación debe ser idempotente.
+
+CALENDARIO
+
+Construir un calendario operacional.
+
+Debe soportar:
+
+Días laborales
+
+Festivos
+
+Turnos
+
+Ventanas
+
+Paradas
+
+Bloqueos
+
+Exclusiones
+
+Calendarios por empresa
+
+Calendarios por proyecto
+
+Calendarios por activo
+
+SUSPENSIONES
+
+Permitir:
+
+Suspender un plan.
+
+Reanudar.
+
+Posponer.
+
+Extender.
+
+Cancelar.
+
+Reprogramar.
+
+Todo con Workflow.
+
+VERSIONADO
+
+Todo plan será versionado.
+
+Nunca modificar versiones publicadas.
+
+Debe existir:
+
+Versión activa.
+
+Versiones históricas.
+
+Comparación.
+
+Publicación.
+
+Rollback.
+
+OFFLINE
+
+Todo el módulo debe operar offline.
+
+opId
+
+UUID
+
+Replay
+
+Recibos
+
+Conflictos
+
+Sincronización
+
+Siguiendo exactamente el protocolo aprobado.
+
+EVENTOS
+
+Emitir eventos autosuficientes.
+
+Como mínimo:
+
+PlanCreado
+
+PlanActualizado
+
+PlanPublicado
+
+PlanSuspendido
+
+PlanReanudado
+
+PlanArchivado
+
+PlanEjecutado
+
+OrdenGenerada
+
+FrecuenciaCumplida
+
+FrecuenciaVencida
+
+PlanVencido
+
+RutinaCompletada
+
+TIMELINE
+
+Integración total con Shared Timeline.
+
+Nunca escritura directa.
+
+COMENTARIOS
+
+Integración completa.
+
+ADJUNTOS
+
+Integración completa.
+
+Referencia solamente.
+
+SEARCH
+
+Integración completa.
+
+QR
+
+Los planes podrán consultarse desde el QR del activo correspondiente.
+
+No crear un QR propio.
+
+CQRS
+
+Comandos.
+
+Consultas.
+
+Read Models.
+
+Replay.
+
+Event Log.
+
+Todo siguiendo exactamente el patrón de Activos, Órdenes e Inventario.
+
+EXPERIENCIA
+
+Construir:
+
+Listado.
+
+Ficha.
+
+Calendario.
+
+Programación.
+
+Historial.
+
+Versiones.
+
+Wizard de creación.
+
+Timeline.
+
+Documentación.
+
+Comentarios.
+
+Adjuntos.
+
+Todo mediante Dynamic Forms.
+
+Nunca HTML manual.
+
+DEMO
+
+Ampliar el Tenant DEMO.
+
+Crear automáticamente:
+
+Planes preventivos.
+
+Planes predictivos.
+
+Planes de inspección.
+
+Planes legales.
+
+Planes mensuales.
+
+Planes por horómetro.
+
+Planes por odómetro.
+
+Planes para maquinaria amarilla.
+
+Planes para bandas.
+
+Planes para montacargas.
+
+Planes para empacadoras.
+
+Planes para compresores.
+
+Planes para generadores.
+
+Planes asociados a los activos DEMO.
+
+Generar varias órdenes automáticamente como evidencia funcional.
+
+REVISIÓN ARQUITECTÓNICA
+
+Obligatoria.
+
+Todas las observaciones deben corregirse antes del cierre.
+
+PRUEBAS
+
+Agregar pruebas.
+
+No romper ninguna existente.
+
+Todos los baselines deben permanecer verdes.
+
+DOCUMENTACIÓN
+
+Actualizar toda la documentación oficial.
+
+Todo en español.
+
+INFORME FINAL
+
+Al finalizar entregar únicamente el Informe Oficial de Cierre DGP-012, siguiendo exactamente el formato oficial del programa:
+
+Resumen ejecutivo
+Alcance
+Componentes
+Dominio
+Persistencia
+CQRS
+Workflow
+Calendario
+Generación automática
+Offline
+Experiencia
+Tenant DEMO
+Revisión arquitectónica
+Verificación técnica
+Documentación
+Deuda técnica
+Estado del programa
+Declaración oficial de cierre
+Oportunidades de mejora (sin implementarlas)
+Directriz adicional de la Dirección del Programa
+
+A partir de DGP-012 comienza la etapa de automatización operativa de DeltaOps.
+
+Cada nuevo módulo deberá aportar capacidades que reduzcan trabajo manual y conecten los módulos existentes, manteniendo intactos los principios de arquitectura establecidos desde DGP-000. El objetivo es que la plataforma no solo registre el mantenimiento, sino que también sea capaz de planificarlo y desencadenarlo de forma controlada mediante las reglas configuradas por cada empresa.

@@ -83,9 +83,11 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     };
 
     expect(despues).toEqual(antes);
-    // Datos base del mandato presentes.
+    // Datos base del mandato presentes. Las órdenes incluyen las 7 del ciclo de
+    // vida (seedOrdenes) MÁS las 7 preventivas materializadas por el motor de
+    // planes (orquestación `modulo.ordenes.crear`, dedup por claveDedup).
     expect(antes.activos).toBe(10);
-    expect(antes.ordenes).toBe(7);
+    expect(antes.ordenes).toBe(14);
     expect(antes.items).toBe(12);
   }, 120_000);
 
@@ -105,6 +107,64 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
       "EN_VALIDACION",
       "PLANIFICADA",
     ]);
+  });
+
+  it("PLANES · se sembraron 8 planes (7 vigentes + 1 suspendido) y 1 calendario", async () => {
+    const planes = await contarPorTenant("pln_planes_read", DEMO_TENANT);
+    expect(planes).toBe(8);
+
+    const estados = await pool.query(
+      `SELECT estado, count(*)::int AS n FROM deltaops.pln_planes_read
+        WHERE tenant_id = $1 GROUP BY estado ORDER BY estado`,
+      [DEMO_TENANT],
+    );
+    const porEstado = Object.fromEntries(estados.rows.map((x: { estado: string; n: number }) => [x.estado, Number(x.n)]));
+    expect(porEstado["vigente"]).toBe(7);
+    expect(porEstado["suspendido"]).toBe(1);
+
+    // Cobertura de tipos del mandato (preventivo/predictivo/inspeccion/legal).
+    const tipos = await pool.query(
+      `SELECT DISTINCT tipo_plan FROM deltaops.pln_planes_read WHERE tenant_id = $1 ORDER BY 1`,
+      [DEMO_TENANT],
+    );
+    const setTipos = tipos.rows.map((x: { tipo_plan: string }) => x.tipo_plan);
+    expect(setTipos).toEqual(expect.arrayContaining(["inspeccion", "legal", "predictivo", "preventivo"]));
+
+    // Calendario operacional demo presente.
+    const cal = await contarPorTenant("pln_calendarios", DEMO_TENANT);
+    expect(cal).toBe(1);
+  });
+
+  it("GENERACIÓN · las generaciones tienen claveDedup ÚNICA (sin duplicados) y materializan OT preventivas", async () => {
+    const total = await contarPorTenant("pln_generaciones_read", DEMO_TENANT);
+    const distintas = await pool.query(
+      `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.pln_generaciones_read WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    expect(total).toBe(7);
+    expect(Number(distintas.rows[0]?.n ?? 0)).toBe(total); // dedup: sin duplicados
+
+    // Evidencia funcional: se crearon OT de tipo preventiva por la orquestación.
+    const ot = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.ord_ordenes WHERE tenant_id = $1 AND tipo = 'preventiva'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(ot.rows[0]?.n ?? 0)).toBe(7);
+
+    // VÍNCULO persistido: las 7 generaciones quedan MATERIALIZADAS con su OT
+    // enlazada (orden_trabajo_id NO nulo + estado=materializada en el snapshot).
+    const vinculadas = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.pln_generaciones_read
+        WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL
+          AND datos->>'estado' = 'materializada'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(vinculadas.rows[0]?.n ?? 0)).toBe(7);
+  });
+
+  it("AISLAMIENTO PLANES · un tenant ajeno no ve planes del DEMO", async () => {
+    expect(await contarPorTenant("pln_planes_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("pln_generaciones_read", "tenant-inexistente")).toBe(0);
   });
 
   it("AISLAMIENTO · delta-demo y deltaops están particionados por tenant_id", async () => {

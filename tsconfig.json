@@ -34,6 +34,9 @@
       "path": "./lib/module-inventario"
     },
     {
+      "path": "./lib/module-planes"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

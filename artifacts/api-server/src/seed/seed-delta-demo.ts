@@ -22,6 +22,7 @@ import { DELTA_DEMO_TENANT } from "../routes/deltaops/reference-runtime";
 import { activosRuntime, principalActivos } from "../routes/deltaops/activos-runtime";
 import { ordenesRuntime, principalOrdenes } from "../routes/deltaops/ordenes-runtime";
 import { inventarioRuntime, principalInventario } from "../routes/deltaops/inventario-runtime";
+import { planesRuntime, principalPlanes } from "../routes/deltaops/planes-runtime";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -472,6 +473,214 @@ async function seedPlataforma(activoIds: Map<string, string>): Promise<void> {
   log(`QR generados (activo:${q1 ? "nuevo" : "existía"}, item:${q2 ? "nuevo" : "existía"})`);
 }
 
+/* ----------------------- 7) Planes de mantenimiento ---------------------- */
+/**
+ * Planes de mantenimiento DEMO por VÍAS OFICIALES (comandos del módulo Planes),
+ * asociados a los activos DEMO existentes. Cubre el mandato: preventivos,
+ * predictivos, de inspección, legales, mensuales, por horómetro y por odómetro;
+ * para maquinaria amarilla, bandas, montacargas, empacadoras, compresores y
+ * generadores. Publica versiones (estado `vigente`), deja al menos un plan
+ * SUSPENDIDO y uno con frecuencia COMBINADA "cada 30 días o 250 horas, lo que
+ * ocurra primero". Crea un calendario operacional (festivos/turnos). Después
+ * ejecuta la GENERACIÓN preventiva oficial por comandos (evaluar-generacion +
+ * orquestación `modulo.ordenes.crear` con opId=claveDedup) para materializar
+ * varias OT como evidencia. Idempotente: reejecutar NO duplica (opId/id
+ * deterministas + dedup por claveDedup).
+ */
+
+/** Catálogos del módulo Planes que consume el dataset demo (upsert idempotente). */
+const CATALOGOS_PLANES: [string, string, string][] = [
+  ["tipos-plan", "preventivo", "Preventivo"],
+  ["tipos-plan", "predictivo", "Predictivo"],
+  ["tipos-plan", "inspeccion", "Inspección"],
+  ["tipos-plan", "legal", "Legal / Normativo"],
+  ["estrategias", "basado-tiempo", "Basado en tiempo"],
+  ["estrategias", "basado-condicion", "Basado en condición"],
+  ["estrategias", "basado-uso", "Basado en uso"],
+  ["estrategias", "normativo", "Normativo"],
+  ["prioridades", "alta", "Alta"],
+  ["prioridades", "media", "Media"],
+  ["prioridades", "critica", "Crítica"],
+  ["tipos-calendario", "operacional", "Operacional"],
+];
+
+interface DefPlan {
+  clave: string; nombre: string; tipoPlan: string; estrategia: string; prioridad: string;
+  activo: string; familia: string;
+  frecuencia: { reglas: { tipo: string; cada?: number; unidad?: string | null; evento?: string | null }[]; modo?: string };
+  suspender?: boolean;
+  origen: "manual" | "frecuencia" | "horometro" | "odometro";
+}
+
+const PLANES: DefPlan[] = [
+  // Preventivo — maquinaria amarilla (excavadora), basado en tiempo (mensual).
+  { clave: "PLN-MAQ-PREV", nombre: "Preventivo mensual excavadora", tipoPlan: "preventivo", estrategia: "basado-tiempo", prioridad: "alta",
+    activo: "MAQ-001", familia: "maquinaria-amarilla", frecuencia: { reglas: [{ tipo: "meses", cada: 1 }] }, origen: "manual" },
+  // Preventivo por HORÓMETRO — montacargas.
+  { clave: "PLN-MON-HOR", nombre: "Preventivo por horómetro montacargas", tipoPlan: "preventivo", estrategia: "basado-uso", prioridad: "media",
+    activo: "MON-001", familia: "montacargas", frecuencia: { reglas: [{ tipo: "horometro", cada: 500, unidad: "horas" }] }, origen: "manual" },
+  // Inspección — banda transportadora (mensual).
+  { clave: "PLN-BAN-INS", nombre: "Inspección mensual banda transportadora", tipoPlan: "inspeccion", estrategia: "basado-tiempo", prioridad: "media",
+    activo: "BAN-001", familia: "bandas", frecuencia: { reglas: [{ tipo: "meses", cada: 1 }] }, origen: "manual" },
+  // Predictivo — empacadora (basado en condición).
+  { clave: "PLN-EMP-PRED", nombre: "Predictivo por vibración empacadora", tipoPlan: "predictivo", estrategia: "basado-condicion", prioridad: "alta",
+    activo: "EMP-001", familia: "empacadoras", frecuencia: { reglas: [{ tipo: "dias", cada: 15 }] }, origen: "manual" },
+  // Preventivo COMBINADO — compresor: "cada 30 días o 250 horas, lo que ocurra primero".
+  { clave: "PLN-COM-COMB", nombre: "Preventivo compresor (30 días o 250 h)", tipoPlan: "preventivo", estrategia: "basado-uso", prioridad: "critica",
+    activo: "COM-001", familia: "compresores",
+    frecuencia: { reglas: [{ tipo: "dias", cada: 30 }, { tipo: "horometro", cada: 250, unidad: "horas" }], modo: "lo-que-ocurra-primero" }, origen: "manual" },
+  // Legal / normativo — generador (inspección anual normativa).
+  { clave: "PLN-GEN-LEGAL", nombre: "Inspección legal anual generador", tipoPlan: "legal", estrategia: "normativo", prioridad: "critica",
+    activo: "GEN-001", familia: "generadores", frecuencia: { reglas: [{ tipo: "meses", cada: 12 }] }, origen: "manual" },
+  // Preventivo por ODÓMETRO — camión.
+  { clave: "PLN-CAM-ODO", nombre: "Preventivo por odómetro camión", tipoPlan: "preventivo", estrategia: "basado-uso", prioridad: "alta",
+    activo: "CAM-001", familia: "camiones", frecuencia: { reglas: [{ tipo: "odometro", cada: 10000, unidad: "kilometros" }] }, origen: "manual" },
+  // Preventivo mensual — planta eléctrica (SUSPENDIDO como evidencia de ciclo).
+  { clave: "PLN-PLA-SUSP", nombre: "Preventivo mensual planta eléctrica", tipoPlan: "preventivo", estrategia: "basado-tiempo", prioridad: "media",
+    activo: "PLA-001", familia: "plantas-electricas", frecuencia: { reglas: [{ tipo: "meses", cada: 1 }] }, suspender: true, origen: "manual" },
+];
+
+const CALENDARIO_DEMO_ID = idDet("calendario:operacional");
+
+const rutinaDe = (nombre: string) => ({
+  id: idDet(`rutina:${nombre}`),
+  nombre: `Rutina · ${nombre}`,
+  actividades: [
+    { id: "act-1", orden: 0, tipo: "inspeccion", titulo: "Inspección visual y de seguridad" },
+    { id: "act-2", orden: 1, tipo: "lubricacion", titulo: "Lubricación de puntos críticos" },
+  ],
+});
+
+async function seedPlanes(activoIds: Map<string, string>): Promise<void> {
+  const rt = planesRuntime();
+  const ctx = ctxCon(principalPlanes("seed-demo", "admin"));
+  const cmd = (n: string, i: unknown) => rt.platform.kernel.commands.execute(ctx, n, i);
+  const q = (n: string, i: unknown) => rt.platform.kernel.queries.execute(ctx, n, i);
+  const drain = () => drenarCompleto(rt.platform.kernel);
+
+  // Catálogos del módulo Planes (upsert idempotente).
+  for (const [c, k, e] of CATALOGOS_PLANES) unwrap(await cmd("modulo.planes.catalogo-upsert", { catalogo: c, clave: k, etiqueta: e }), `catalogo.planes ${c}/${k}`);
+  await drain();
+  log(`Catálogos de planes habilitados (${CATALOGOS_PLANES.length})`);
+
+  // Calendario operacional demo (días laborales L-V, festivos y turnos).
+  unwrap(await cmd("modulo.planes.crear-calendario", {
+    id: CALENDARIO_DEMO_ID, opId: "seed:calendario:operacional",
+    tipo: "operacional", ambito: "planta", nombre: "Calendario operacional DEMO",
+    diasLaborales: [1, 2, 3, 4, 5],
+    festivos: ["2026-01-01", "2026-05-01", "2026-09-16", "2026-12-25"],
+    turnos: [
+      { clave: "matutino", inicioMin: 360, finMin: 840 },
+      { clave: "vespertino", inicioMin: 840, finMin: 1320 },
+    ],
+  }), "crear-calendario");
+  await drain();
+  log("Calendario operacional demo creado (festivos + 2 turnos)");
+
+  // Planes: crear → publicar (vigente) → (opcional) suspender. Idempotente por
+  // opId/id deterministas y por estado real del aggregate.
+  const estadoActual = async (id: string): Promise<{ estado: string; version: number } | null> => {
+    const r = await q("modulo.planes.plan", { id });
+    if (!r.ok || !r.value) return null;
+    const v = r.value as { estado?: string; version?: number };
+    return { estado: v.estado ?? "borrador", version: v.version ?? 0 };
+  };
+
+  const planIds = new Map<string, string>();
+  let vigentes = 0; let suspendidos = 0;
+
+  for (const p of PLANES) {
+    const id = idDet(`plan:${p.clave}`);
+    planIds.set(p.clave, id);
+
+    unwrap(await cmd("modulo.planes.crear-plan", {
+      id, opId: `seed:plan:${p.clave}`,
+      nombre: p.nombre, descripcion: `${p.nombre} — activo ${p.activo}`,
+      tipoPlan: p.tipoPlan, estrategia: p.estrategia, prioridad: p.prioridad,
+      alcance: { activos: [activoIds.get(p.activo) ?? p.activo], familias: [p.familia] },
+      rutina: rutinaDe(p.clave),
+      programa: {
+        frecuencia: p.frecuencia,
+        calendarioId: CALENDARIO_DEMO_ID,
+        vigenteDesde: "2026-01-01T00:00:00.000Z",
+      },
+    }), `crear-plan ${p.clave}`);
+    await drain();
+
+    // Publicar → vigente (idempotente: sólo si aún en borrador).
+    let st = await estadoActual(id);
+    if (st && st.estado === "borrador") {
+      unwrap(await cmd("modulo.planes.publicar-plan", { id, expectedVersion: st.version, opId: `seed:pub:${p.clave}` }), `publicar-plan ${p.clave}`);
+      await drain();
+      st = await estadoActual(id);
+    }
+
+    // Suspender uno como evidencia de ciclo gobernado.
+    if (p.suspender && st && st.estado === "vigente") {
+      unwrap(await cmd("modulo.planes.transicionar-plan", {
+        id, accion: "suspender", expectedVersion: st.version, motivo: "Parada programada de la planta eléctrica", opId: `seed:susp:${p.clave}`,
+      }), `suspender ${p.clave}`);
+      await drain();
+      st = await estadoActual(id);
+    }
+
+    if (st?.estado === "vigente") vigentes++;
+    if (st?.estado === "suspendido") suspendidos++;
+  }
+  log(`Planes creados (${PLANES.length}): ${vigentes} vigentes, ${suspendidos} suspendido(s)`);
+
+  // GENERACIÓN preventiva OFICIAL en dos etapas por comandos del módulo:
+  //  (1) `evaluar-generacion` DECIDE la ocurrencia (idempotente por opId +
+  //      claveDedup), con ocurrencia manual determinista (sin depender del reloj).
+  //  (2) `generar-ordenes-preventivas` MATERIALIZA la generación decidida en una
+  //      OT REAL (vía el puerto oficial que compone `modulo.ordenes.crear` con
+  //      opId=claveDedup) y persiste ATÓMICAMENTE el vínculo generación→OT
+  //      (estado=materializada) — sin generaciones eternamente pendientes.
+  let decididas = 0; let ordenesCreadas = 0; let ordenesIdempotentes = 0;
+
+  for (const p of PLANES) {
+    if (p.suspender) continue; // no genera desde estados no vigentes
+    const id = planIds.get(p.clave)!;
+    const activoId = activoIds.get(p.activo) ?? p.activo;
+    const ocurrencia = `seed-${p.clave}-2026-01`;
+
+    const gen = unwrap(await cmd("modulo.planes.evaluar-generacion", {
+      planId: id, activoId, origen: "manual", ahora: "2026-01-15T08:00:00.000Z",
+      anclaje: { desde: "2026-01-01T00:00:00.000Z" }, ocurrenciaManual: ocurrencia,
+      opId: `seed:gen:${p.clave}`,
+    }), `evaluar-generacion ${p.clave}`) as { corresponde?: boolean; claveDedup?: string };
+    await drain();
+    if (gen.corresponde !== true || !gen.claveDedup) continue;
+    decididas++;
+
+    // Materialización oficial (idempotente): crea la OT REAL y VINCULA la
+    // generación. Drena el outbox de Órdenes INMEDIATAMENTE para materializar la
+    // OT en su read model antes de que otro runtime reclame esos eventos.
+    const mat = unwrap(await cmd("modulo.planes.generar-ordenes-preventivas", {
+      planId: id, tipoOrden: "preventiva", opId: `seed:mat:${p.clave}`,
+    }), `generar-ordenes-preventivas ${p.clave}`) as {
+      ordenesCreadas?: Array<{ idempotente?: boolean }>; errores?: unknown[];
+    };
+    // Proyecta el vínculo (orden-materializada) al read model de PLANES ANTES de
+    // que otro runtime reclame el outbox compartido sin sus handlers. El
+    // materializador ya drenó el outbox de Órdenes al crear la OT.
+    await drain();
+    await drenarCompleto(ordenesRuntime().platform.kernel);
+    for (const oc of mat.ordenesCreadas ?? []) {
+      if (oc.idempotente === true) ordenesIdempotentes++; else ordenesCreadas++;
+    }
+  }
+  await drenarCompleto(ordenesRuntime().platform.kernel);
+
+  // Reproyección FINAL del módulo Planes desde la bitácora durable: garantiza
+  // que el read model refleje TODOS los vínculos generación→OT aunque el drenado
+  // del outbox COMPARTIDO entre runtimes haya sido reclamado por otro runtime
+  // (sin sus handlers de proyección). Equivalencia por replay determinista.
+  unwrap(await cmd("modulo.planes.reproyectar", {}), "reproyectar planes");
+  await drain();
+  log(`Generación preventiva: ${decididas} decididas, ${ordenesCreadas} OT nuevas, ${ordenesIdempotentes} idempotentes (vínculo generación→OT persistido)`);
+}
+
 /* ------------------------------- Orquestación ---------------------------- */
 
 export async function seedDeltaDemo(): Promise<void> {
@@ -481,6 +690,7 @@ export async function seedDeltaDemo(): Promise<void> {
   const activoIds = await seedActivos();
   await seedOrdenes();
   await seedInventario();
+  await seedPlanes(activoIds);
   await seedPlataforma(activoIds);
   console.log("Seed DEMO completado.\n");
 }
