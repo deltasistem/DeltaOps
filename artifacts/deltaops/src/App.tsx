@@ -24,6 +24,15 @@ import OrdenesEscanear from '@/pages/ordenes-escanear';
 import OrdenesSincronizacion from '@/pages/ordenes-sincronizacion';
 import OrdenesFicha from '@/pages/ordenes-ficha';
 import CentroMantenimiento from '@/pages/centro-mantenimiento';
+import InventarioListado from '@/pages/inventario-listado';
+import InventarioNueva from '@/pages/inventario-nueva';
+import InventarioMovimientos from '@/pages/inventario-movimientos';
+import InventarioTransferencias from '@/pages/inventario-transferencias';
+import InventarioConteos from '@/pages/inventario-conteos';
+import InventarioBodegas from '@/pages/inventario-bodegas';
+import InventarioEscanear from '@/pages/inventario-escanear';
+import InventarioSincronizacion from '@/pages/inventario-sincronizacion';
+import InventarioFicha from '@/pages/inventario-ficha';
 
 const queryClient = new QueryClient();
 
@@ -67,6 +76,15 @@ function Router() {
       <Route path="/ordenes/escanear" component={OrdenesEscanear} />
       <Route path="/ordenes/sincronizacion" component={OrdenesSincronizacion} />
       <Route path="/ordenes/:id" component={OrdenesFicha} />
+      <Route path="/inventario" component={InventarioListado} />
+      <Route path="/inventario/nuevo" component={InventarioNueva} />
+      <Route path="/inventario/movimientos" component={InventarioMovimientos} />
+      <Route path="/inventario/transferencias" component={InventarioTransferencias} />
+      <Route path="/inventario/conteos" component={InventarioConteos} />
+      <Route path="/inventario/bodegas" component={InventarioBodegas} />
+      <Route path="/inventario/escanear" component={InventarioEscanear} />
+      <Route path="/inventario/sincronizacion" component={InventarioSincronizacion} />
+      <Route path="/inventario/:id" component={InventarioFicha} />
       <Route component={NotFound} />
     </Switch>
   );

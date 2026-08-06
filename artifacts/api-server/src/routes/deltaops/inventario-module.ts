@@ -23,14 +23,14 @@ router.use(BASE, async (req, res, next): Promise<void> => {
     return;
   }
   const [user] = await db
-    .select({ id: deltaopsUsersTable.id, rol: deltaopsUsersTable.rol })
+    .select({ id: deltaopsUsersTable.id, rol: deltaopsUsersTable.rol, tenant: deltaopsUsersTable.tenant })
     .from(deltaopsUsersTable)
     .where(eq(deltaopsUsersTable.id, userId));
   if (!user) {
     res.status(401).json({ error: "Sesión inválida" });
     return;
   }
-  res.locals.ctx = contextForInventario(String(user.id), user.rol);
+  res.locals.ctx = contextForInventario(String(user.id), user.rol, user.tenant);
   next();
 });
 
@@ -211,6 +211,10 @@ router.post(`${BASE}/transferencias`, async (req, res) => {
 });
 router.post(`${BASE}/transferencias/:id/completar`, async (req, res) => {
   send(res, await exec(ctxOf(res), `${MODULO}.completar-transferencia`, { ...req.body, id: req.params.id }));
+  await drain();
+});
+router.post(`${BASE}/transferencias/:id/transicion`, async (req, res) => {
+  send(res, await exec(ctxOf(res), `${MODULO}.transicionar-transferencia`, { ...req.body, id: req.params.id }));
   await drain();
 });
 

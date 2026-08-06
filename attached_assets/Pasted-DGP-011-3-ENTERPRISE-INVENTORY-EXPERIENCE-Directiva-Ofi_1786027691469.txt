@@ -1,0 +1,514 @@
+DGP-011.3 — ENTERPRISE INVENTORY EXPERIENCE
+
+Directiva Oficial de la Dirección del Programa
+
+La subfase DGP-011.3 tiene como objetivo construir la experiencia completa del módulo Enterprise Inventory reutilizando exclusivamente el corpus congelado del programa (ETS, Engineering Charter, ESI y DGP-000…011.2).
+
+NO se permite modificar Kernel, Shared Platform, Business Foundation, Workflow Engine, Dynamic Forms, Design System, Activos ni Órdenes.
+
+Toda la implementación debe ser estrictamente aditiva.
+
+ALCANCE FUNCIONAL
+
+Construir la experiencia completa del módulo Inventario.
+
+Debe quedar completamente operativo para usuarios finales.
+
+Debe reutilizar únicamente:
+
+Design System
+Dynamic Forms
+Workflow Engine
+Shared Timeline
+Shared Attachment
+Shared Comment
+Search
+QR
+Offline Framework
+Business Foundation
+
+No crear componentes visuales nuevos.
+
+Todo debe utilizar el Design System oficial.
+
+EXPERIENCIA DE INVENTARIO
+
+Construir como mínimo las siguientes superficies:
+
+Inventario
+
+Listado completo
+
+Vista tabla
+
+Vista tarjetas
+
+Búsqueda
+
+Filtros
+
+Ordenamiento
+
+Paginación
+
+Estados vacíos
+
+Estados de error
+
+Estados offline
+
+Item
+
+Ficha completa
+
+Información general
+
+Existencias
+
+Lotes
+
+Series
+
+Movimientos
+
+Reservas
+
+Transferencias
+
+Conteos
+
+Ajustes
+
+Comentarios
+
+Adjuntos
+
+Timeline
+
+Historial
+
+QR
+
+Movimientos
+
+Listado
+
+Detalle
+
+Filtros
+
+Timeline
+
+Comentarios
+
+Adjuntos
+
+Transferencias
+
+Crear
+
+Aprobar
+
+Despachar
+
+Recibir
+
+Completar
+
+Cancelar
+
+Todo gobernado por Workflow.
+
+Reservas
+
+Crear
+
+Liberar
+
+Consumir
+
+Historial
+
+Conteos
+
+Programar
+
+Ejecutar
+
+Reconteo
+
+Cerrar
+
+Aplicar diferencias
+
+Ajustes
+
+Positivos
+
+Negativos
+
+Motivos
+
+Workflow
+
+Historial
+
+Lotes
+
+Listado
+
+Detalle
+
+Trazabilidad
+
+Vencimientos
+
+Historial
+
+Series
+
+Listado
+
+Detalle
+
+Movimiento completo
+
+Historial
+
+Bodegas
+
+Árbol
+
+Ubicaciones
+
+Capacidad
+
+Disponibilidad
+
+Ubicaciones
+
+Mapa jerárquico
+
+Navegación
+
+Existencias
+
+FORMULARIOS
+
+Toda captura debe utilizar Dynamic Forms.
+
+NO HTML manual.
+
+NO formularios codificados.
+
+Todo debe renderizarse desde definiciones.
+
+WORKFLOW
+
+Las operaciones gobernadas deben usar el Workflow Engine existente.
+
+Nunca bypass.
+
+Nunca aprobación automática.
+
+TIMELINE
+
+Todos los movimientos deben aparecer automáticamente en Timeline.
+
+Sin escritura directa.
+
+Siempre mediante platform.timeline.
+
+COMENTARIOS
+
+Integrar completamente:
+
+platform.comment
+
+ADJUNTOS
+
+Integrar completamente:
+
+platform.attachment
+
+Referencia solamente.
+
+Nunca binarios.
+
+BÚSQUEDA
+
+Integrar completamente:
+
+platform.search
+
+QR
+
+Integrar completamente:
+
+platform.qr
+
+Cada Item podrá imprimir su etiqueta.
+
+Resolver QR.
+
+Navegar automáticamente.
+
+OFFLINE
+
+Toda la experiencia debe soportar:
+
+cola
+
+conflictos
+
+sincronización
+
+replay
+
+recibos
+
+opId
+
+UUID cliente
+
+recuperación
+
+RESPONSIVE
+
+Desktop
+
+Tablet
+
+Mobile
+
+Una sola experiencia.
+
+ACCESIBILIDAD
+
+Cumplimiento AA.
+
+Teclado.
+
+ARIA.
+
+Foco.
+
+Contraste.
+
+DEMO TENANT (NUEVO MANDATO)
+
+A partir de esta fase se crea oficialmente el Tenant DEMO del programa.
+
+Este tenant será permanente y servirá para demostraciones funcionales, pruebas internas y presentaciones comerciales.
+
+Crear automáticamente mediante seed oficial:
+
+Empresa
+
+Nombre:
+
+DELTA DEMO
+
+Logo:
+
+Brand oficial existente.
+
+Tema:
+
+Brand oficial.
+
+Usuario Administrador
+
+Nombre:
+
+Carlos Pacheco
+
+Cargo:
+
+Director TIC
+
+Correo:
+
+admin@delta.demo
+
+Contraseña inicial:
+
+DeltaOps2026!
+
+Debe iniciar sesión correctamente.
+
+Debe tener permisos completos.
+
+Debe pertenecer únicamente al tenant DEMO.
+
+Datos Demo
+
+Crear datos suficientes para mostrar el sistema funcionando.
+
+Como mínimo:
+
+Activos
+Maquinaria amarilla
+Montacargas
+Banda transportadora
+Tolva
+Empacadora
+Compresor
+Generador
+Camión
+Tractor
+Planta eléctrica
+Órdenes
+
+Crear órdenes en diferentes estados:
+
+BORRADOR
+
+ABIERTA
+
+PLANIFICADA
+
+ASIGNADA
+
+EJECUCIÓN
+
+VALIDACIÓN
+
+CERRADA
+
+Inventario
+
+Crear:
+
+Herramientas
+
+Lubricantes
+
+Filtros
+
+Rodamientos
+
+Bandas
+
+Aceites
+
+Grasas
+
+Motores
+
+Sensores
+
+EPP
+
+Consumibles
+
+Material eléctrico
+
+Lotes
+
+Series
+
+Movimientos
+
+Reservas
+
+Transferencias
+
+Conteos
+
+Ajustes
+
+Técnicos
+
+Crear varios técnicos.
+
+Supervisores.
+
+Cuadrillas.
+
+Timeline
+
+Debe contener actividad histórica.
+
+Comentarios
+
+Debe contener conversaciones.
+
+Adjuntos
+
+Debe contener referencias simuladas.
+
+QR
+
+Debe existir al menos un activo y un ítem con QR generado.
+
+EXPERIENCIA DE DEMOSTRACIÓN
+
+Cuando el usuario ingrese con:
+
+admin@delta.demo
+
+Debe poder recorrer todo el sistema sin encontrar módulos vacíos.
+
+Toda navegación debe estar poblada.
+
+No deben existir pantallas completamente vacías.
+
+Cuando no existan datos reales deberán utilizarse datos DEMO.
+
+DISCIPLINA
+
+NO construir:
+
+BI
+
+Analytics
+
+IA
+
+Reportes
+
+Importaciones
+
+Exportaciones
+
+Módulos nuevos
+
+REVISIÓN ARQUITECTÓNICA
+
+Obligatoria.
+
+Todas las observaciones deben corregirse antes del cierre.
+
+PRUEBAS
+
+Agregar pruebas.
+
+No romper ninguna existente.
+
+Todos los baselines deben permanecer en verde.
+
+DOCUMENTACIÓN
+
+Actualizar la documentación oficial del módulo.
+
+Todo en español.
+
+INFORME FINAL
+
+Al finalizar entregar únicamente el Informe Oficial de Cierre DGP-011.3, siguiendo exactamente el formato de las fases anteriores:
+
+Resumen ejecutivo.
+Alcance.
+Componentes.
+Experiencia implementada.
+Tenant DEMO.
+Usuario administrador.
+Datos de demostración.
+Revisión arquitectónica.
+Verificación técnica.
+Documentación.
+Deuda técnica.
+Estado del programa.
+Declaración oficial de cierre.
+Oportunidades de mejora (sin implementarlas).

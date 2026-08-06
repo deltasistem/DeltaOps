@@ -72,7 +72,10 @@ export function Centro() {
         titulo="Centro Global de Mantenimiento"
         descripcion="Consola operacional: órdenes, activos, técnicos, SLA, prioridades, estados y alertas en una sola superficie."
         acciones={
-          <Link href="/ordenes/nueva"><Button variant="primario" size="sm">Nueva orden</Button></Link>
+          <div style={{ display: "flex", gap: "var(--do-sp-2)" }}>
+            <Link href="/inventario"><Button variant="secundario" size="sm">Inventario</Button></Link>
+            <Link href="/ordenes/nueva"><Button variant="primario" size="sm">Nueva orden</Button></Link>
+          </div>
         }
       />
 

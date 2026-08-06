@@ -16,8 +16,15 @@ import {
   type ReferenceRuntime,
 } from "@workspace/module-reference";
 
-/** Tenant único de la instancia DeltaOps (los usuarios no portan tenant). */
+/** Tenant principal de la instancia DeltaOps (defecto de los usuarios). */
 export const DELTAOPS_TENANT = "deltaops";
+
+/**
+ * Tenant DEMO oficial del programa (DGP-011.3). Permanente, aislado por RLS del
+ * tenant principal `deltaops`. El usuario administrador demo (`admin@delta.demo`)
+ * pertenece ÚNICAMENTE a este tenant (columna `tenant` en `deltaops.users`).
+ */
+export const DELTA_DEMO_TENANT = "delta-demo";
 
 let runtime: ReferenceRuntime | null = null;
 
@@ -70,9 +77,9 @@ export function principalFor(userId: string, rol: string): Principal {
   };
 }
 
-export function contextFor(userId: string, rol: string): ExecutionContext {
+export function contextFor(userId: string, rol: string, tenant: string = DELTAOPS_TENANT): ExecutionContext {
   return createExecutionContext({
     principal: principalFor(userId, rol),
-    metadata: { tenantId: DELTAOPS_TENANT },
+    metadata: { tenantId: tenant },
   });
 }

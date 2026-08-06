@@ -2025,6 +2025,98 @@
         }
       }
     },
+    "/api/deltaops/inventario/transferencias/{id}/transicion": {
+      "post": {
+        "tags": [
+          "Transferencias"
+        ],
+        "operationId": "inventario.transicionar-transferencia",
+        "summary": "Transición gobernada del ciclo de vida (recibir/completar/cancelar/rechazar). Sólo recibir/completar aplican la entrada en destino; cancelar/rechazar liberan el en-tránsito al origen.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del recurso"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionarTransferencia"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/deltaops/inventario/transferencias/{id}": {
       "get": {
         "tags": [
@@ -3597,15 +3689,46 @@
             "type": "integer",
             "minimum": 1
           },
-          "aprobado": {
-            "type": "boolean"
-          },
           "opId": {
             "type": "string"
           }
         },
         "required": [
-          "id"
+          "id",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "TransicionarTransferencia": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "recibir",
+              "completar",
+              "cancelar",
+              "rechazar"
+            ]
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "opId": {
+            "type": "string"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "accion",
+          "expectedVersion"
         ],
         "additionalProperties": false
       },
@@ -3662,24 +3785,47 @@
             "type": "string",
             "format": "uuid"
           },
-          "tipo": {
+          "opId": {
             "type": "string"
           },
-          "bodegaId": {
+          "tipo": {
             "type": "string"
           },
           "alcance": {
             "type": "object",
-            "properties": {},
+            "properties": {
+              "tipo": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tipo",
+              "id"
+            ],
             "additionalProperties": false
           },
-          "opId": {
-            "type": "string"
+          "lineas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "inventarioId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "inventarioId"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "tipo",
-          "bodegaId"
+          "lineas"
         ],
         "additionalProperties": false
       },
@@ -3693,7 +3839,10 @@
             "type": "integer",
             "minimum": 1
           },
-          "conteos": {
+          "opId": {
+            "type": "string"
+          },
+          "contados": {
             "type": "array",
             "items": {
               "type": "object",
@@ -3701,24 +3850,23 @@
                 "inventarioId": {
                   "type": "string"
                 },
-                "contado": {
-                  "type": "number"
+                "cantidad": {
+                  "type": "number",
+                  "minimum": 0
                 }
               },
               "required": [
                 "inventarioId",
-                "contado"
+                "cantidad"
               ],
               "additionalProperties": false
             }
-          },
-          "opId": {
-            "type": "string"
           }
         },
         "required": [
           "id",
-          "conteos"
+          "expectedVersion",
+          "contados"
         ],
         "additionalProperties": false
       },
@@ -3732,15 +3880,17 @@
             "type": "integer",
             "minimum": 1
           },
-          "aprobado": {
-            "type": "boolean"
-          },
           "opId": {
             "type": "string"
+          },
+          "aplicarDiferencias": {
+            "type": "boolean"
           }
         },
         "required": [
-          "id"
+          "id",
+          "expectedVersion",
+          "aplicarDiferencias"
         ],
         "additionalProperties": false
       },

@@ -18,6 +18,8 @@ export const RESERVA_CREADA = "modulo.inventario.reserva-creada";
 export const RESERVA_LIBERADA = "modulo.inventario.reserva-liberada";
 export const TRANSFERENCIA_CREADA = "modulo.inventario.transferencia-creada";
 export const TRANSFERENCIA_COMPLETADA = "modulo.inventario.transferencia-completada";
+export const TRANSFERENCIA_RECIBIDA = "modulo.inventario.transferencia-recibida";
+export const TRANSFERENCIA_CANCELADA = "modulo.inventario.transferencia-cancelada";
 export const CONTEO_INICIADO = "modulo.inventario.conteo-iniciado";
 export const CONTEO_FINALIZADO = "modulo.inventario.conteo-finalizado";
 export const AJUSTE_APLICADO = "modulo.inventario.ajuste-aplicado";
@@ -37,6 +39,8 @@ export const EVENTOS_MODULO = [
   RESERVA_LIBERADA,
   TRANSFERENCIA_CREADA,
   TRANSFERENCIA_COMPLETADA,
+  TRANSFERENCIA_RECIBIDA,
+  TRANSFERENCIA_CANCELADA,
   CONTEO_INICIADO,
   CONTEO_FINALIZADO,
   AJUSTE_APLICADO,

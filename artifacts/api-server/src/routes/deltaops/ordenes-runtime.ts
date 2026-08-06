@@ -81,9 +81,9 @@ export function principalOrdenes(userId: string, rol: string): Principal {
   };
 }
 
-export function contextForOrdenes(userId: string, rol: string): ExecutionContext {
+export function contextForOrdenes(userId: string, rol: string, tenant: string = DELTAOPS_TENANT): ExecutionContext {
   return createExecutionContext({
     principal: principalOrdenes(userId, rol),
-    metadata: { tenantId: DELTAOPS_TENANT },
+    metadata: { tenantId: tenant },
   });
 }

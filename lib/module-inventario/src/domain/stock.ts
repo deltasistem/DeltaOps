@@ -127,6 +127,7 @@ export const FAMILIAS_MOVIMIENTO = [
   "salida",
   "transferencia-salida",
   "transferencia-entrada",
+  "transferencia-confirmacion",
   "reserva",
   "liberacion",
   "consumo",
@@ -177,6 +178,12 @@ export function deltaDeMovimiento(actual: Stock, mov: EntradaMovimiento): Result
       return ok({ disponible: -q, enTransito: +q });
     case "transferencia-entrada":
       return ok({ enTransito: -q, disponible: +q });
+    case "transferencia-confirmacion":
+      // Confirmación de recepción en ORIGEN: descarga el `en-tránsito` sin
+      // devolverlo a disponible (la contraparte `entrada` lo materializa en el
+      // DESTINO). Conserva masa origen+destino: origen perdió `disponible` al
+      // despachar; destino gana `disponible` al recibir.
+      return ok({ enTransito: -q });
     case "ajuste-positivo":
       return ok({ disponible: +q });
     case "ajuste-negativo":

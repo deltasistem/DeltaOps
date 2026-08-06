@@ -82,9 +82,9 @@ export function principalInventario(userId: string, rol: string): Principal {
   };
 }
 
-export function contextForInventario(userId: string, rol: string): ExecutionContext {
+export function contextForInventario(userId: string, rol: string, tenant: string = DELTAOPS_TENANT): ExecutionContext {
   return createExecutionContext({
     principal: principalInventario(userId, rol),
-    metadata: { tenantId: DELTAOPS_TENANT },
+    metadata: { tenantId: tenant },
   });
 }

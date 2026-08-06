@@ -7,11 +7,53 @@
  * En dos fases (salida→en tránsito→entrada) SIN romper consistencia de stock.
  */
 import { fail, KernelErrors, ok, type KernelError, type Result } from "@workspace/kernel";
-import { TRANSFERENCIA_COMPLETADA, TRANSFERENCIA_CREADA } from "./events";
+import {
+  TRANSFERENCIA_CANCELADA,
+  TRANSFERENCIA_COMPLETADA,
+  TRANSFERENCIA_CREADA,
+  TRANSFERENCIA_RECIBIDA,
+} from "./events";
 import type { ReferenciaWorkflow } from "./workflow";
 
-export const ESTADOS_TRANSFERENCIA = ["borrador", "en-transito", "completada", "cancelada"] as const;
+export const ESTADOS_TRANSFERENCIA = [
+  "borrador",
+  "en-transito",
+  "recibida",
+  "completada",
+  "cancelada",
+] as const;
 export type EstadoTransferencia = (typeof ESTADOS_TRANSFERENCIA)[number];
+
+/** Estados terminales del ciclo de vida (inmutables). */
+export const ESTADOS_TRANSFERENCIA_TERMINALES: readonly EstadoTransferencia[] = [
+  "recibida",
+  "completada",
+  "cancelada",
+];
+
+/**
+ * Acciones del ciclo de vida GOBERNADO que el motor de workflow autoriza. La
+ * app traduce cada acción de dominio a un comando del motor (camelCase) y refleja
+ * el estado neutro resultante en el aggregate.
+ */
+export const ACCIONES_TRANSFERENCIA = ["recibir", "completar", "cancelar", "rechazar"] as const;
+export type AccionTransferencia = (typeof ACCIONES_TRANSFERENCIA)[number];
+
+/** Estado de dominio resultante de cada acción autorizada. */
+export const ESTADO_DESTINO_ACCION: Record<AccionTransferencia, EstadoTransferencia> = {
+  recibir: "recibida",
+  completar: "completada",
+  cancelar: "cancelada",
+  rechazar: "cancelada",
+};
+
+/**
+ * Acciones que materializan la ENTRADA en destino (única etapa que aplica stock
+ * de recepción). El resto libera el `en-tránsito` de vuelta al origen.
+ */
+export function accionAplicaRecepcion(accion: AccionTransferencia): boolean {
+  return accion === "recibir" || accion === "completar";
+}
 
 export interface ExtremoTransferencia {
   readonly bodegaId: string;
@@ -47,7 +89,12 @@ export interface CambioTransferencia {
   readonly evento: { tipo: string; payload: Record<string, unknown> };
 }
 
-function eventoDe(t: Transferencia, tipo: string, actorId: string): CambioTransferencia["evento"] {
+function eventoDe(
+  t: Transferencia,
+  tipo: string,
+  actorId: string,
+  extra: Record<string, unknown> = {},
+): CambioTransferencia["evento"] {
   return {
     tipo,
     payload: {
@@ -64,9 +111,19 @@ function eventoDe(t: Transferencia, tipo: string, actorId: string): CambioTransf
       actualizadoAt: t.updatedAt.toISOString(),
       actorId,
       eventoTipo: tipo,
+      ...extra,
     },
   };
 }
+
+/** Evento canónico de cada estado terminal (payload autosuficiente). */
+const EVENTO_POR_ESTADO: Record<EstadoTransferencia, string> = {
+  borrador: TRANSFERENCIA_CREADA,
+  "en-transito": TRANSFERENCIA_CREADA,
+  recibida: TRANSFERENCIA_RECIBIDA,
+  completada: TRANSFERENCIA_COMPLETADA,
+  cancelada: TRANSFERENCIA_CANCELADA,
+};
 
 export interface DatosNuevaTransferencia {
   readonly id: string;
@@ -117,10 +174,31 @@ export function aplicarEstadoTransferencia(
   actorId: string,
   ahora: Date,
 ): Result<CambioTransferencia, KernelError> {
-  if (t.estado === "completada" || t.estado === "cancelada") {
+  if (ESTADOS_TRANSFERENCIA_TERMINALES.includes(t.estado)) {
     return fail(KernelErrors.conflict(`La transferencia ya está ${t.estado}`));
   }
   const siguiente: Transferencia = { ...t, estado, version: t.version + 1, updatedAt: ahora };
-  const tipo = estado === "completada" ? TRANSFERENCIA_COMPLETADA : TRANSFERENCIA_CREADA;
-  return ok({ transferencia: siguiente, evento: eventoDe(siguiente, tipo, actorId) });
+  const tipo = EVENTO_POR_ESTADO[estado] ?? TRANSFERENCIA_CREADA;
+  return ok({ transferencia: siguiente, evento: eventoDe(siguiente, tipo, actorId, { accionEstado: estado }) });
+}
+
+/**
+ * Aplica una ACCIÓN del ciclo de vida gobernado (recibir/completar/cancelar/
+ * rechazar) al aggregate, reflejando el estado neutro que el motor resolvió. El
+ * aggregate NO decide la transición: la app verifica el Result del motor ANTES
+ * de invocar esta función y ANTES de aplicar cualquier efecto sobre stock.
+ */
+export function aplicarAccionTransferencia(
+  t: Transferencia,
+  accion: AccionTransferencia,
+  actorId: string,
+  ahora: Date,
+): Result<CambioTransferencia, KernelError> {
+  if (ESTADOS_TRANSFERENCIA_TERMINALES.includes(t.estado)) {
+    return fail(KernelErrors.conflict(`La transferencia ya está ${t.estado}`));
+  }
+  if (t.estado !== "en-transito") {
+    return fail(KernelErrors.conflict(`No se puede ${accion} una transferencia en estado ${t.estado}`));
+  }
+  return aplicarEstadoTransferencia(t, ESTADO_DESTINO_ACCION[accion], actorId, ahora);
 }

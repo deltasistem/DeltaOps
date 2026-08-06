@@ -23,14 +23,14 @@ router.use(BASE, async (req, res, next): Promise<void> => {
     return;
   }
   const [user] = await db
-    .select({ id: deltaopsUsersTable.id, rol: deltaopsUsersTable.rol })
+    .select({ id: deltaopsUsersTable.id, rol: deltaopsUsersTable.rol, tenant: deltaopsUsersTable.tenant })
     .from(deltaopsUsersTable)
     .where(eq(deltaopsUsersTable.id, userId));
   if (!user) {
     res.status(401).json({ error: "Sesión inválida" });
     return;
   }
-  res.locals.ctx = contextForOrdenes(String(user.id), user.rol);
+  res.locals.ctx = contextForOrdenes(String(user.id), user.rol, user.tenant);
   next();
 });
 

@@ -22,6 +22,12 @@ export const deltaopsUsersTable = deltaopsSchema.table("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   nombre: varchar("nombre", { length: 255 }).notNull(),
   rol: varchar("rol", { length: 64 }).notNull().default("admin"),
+  /**
+   * Tenant al que pertenece el usuario (aislamiento por RLS `app.tenant_id`).
+   * Por defecto la instancia principal `deltaops`; el Tenant DEMO oficial
+   * (DGP-011.3) usa `delta-demo`, quedando aislado del resto.
+   */
+  tenant: varchar("tenant", { length: 64 }).notNull().default("deltaops"),
   passwordHash: text("password_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

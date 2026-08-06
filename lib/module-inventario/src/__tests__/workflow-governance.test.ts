@@ -133,6 +133,35 @@ describe("Gobierno · WorkflowPort que RECHAZA ⇒ sin efecto de negocio", () =>
     if (exs.ok) expect((exs.value as unknown[]).length).toBe(1); // no existencia en destino
   });
 
+  it("transicionar-transferencia con motor que deniega no aplica recepción (no-bypass)", async () => {
+    // Motor que aprueba el despacho pero RECHAZA la transición de recepción: la
+    // transferencia queda en tránsito y el destino NO recibe stock.
+    const rt = crearInventarioRuntime({ workflow: new WorkflowPruebaRechazoTransicion() });
+    const sem = await sembrar(rt);
+    const { exec, query } = harness(rt);
+    const tr = await exec(`${MODULO}.transferir`, {
+      origen: { bodegaId: sem.bodegaId, ubicacionId: sem.ubic1 },
+      destino: { bodegaId: sem.bodegaId, ubicacionId: sem.ubic2 },
+      lineas: [{ itemId: sem.itemId, cantidad: 6 }],
+    });
+    if (!tr.ok) throw new Error(tr.error.message);
+    const trId = (tr.value as { id: string }).id;
+    // Despacho aplicado: 6 en tránsito, 4 disponibles en origen.
+    expect(await disponible(rt, sem.invId)).toBe(4);
+    const movsAntes = await movimientos(rt, sem.invId);
+    const r = await exec(`${MODULO}.transicionar-transferencia`, { id: trId, accion: "recibir", expectedVersion: 1 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("KRN-AUTH-002");
+    // Sin recepción: destino no recibió stock y no hubo movimientos nuevos.
+    expect(await stockTotal(rt, sem.itemId)).toBe(10);
+    expect(await movimientos(rt, sem.invId)).toBe(movsAntes);
+    const exs = await query(`${MODULO}.existencias-item`, { itemId: sem.itemId });
+    if (exs.ok) {
+      const destino = (exs.value as { ubicacionId: string; stock: { disponible: number } }[]).find((e) => e.ubicacionId === sem.ubic2);
+      expect(destino?.stock.disponible ?? 0).toBe(0);
+    }
+  });
+
   it("ajustar con motor que deniega no altera existencias", async () => {
     const rt = crearInventarioRuntime({ workflow: new WorkflowPruebaRechazo() });
     const sem = await sembrar(rt);
@@ -157,7 +186,7 @@ describe("Gobierno · WorkflowPort que RECHAZA ⇒ sin efecto de negocio", () =>
     const reg = await h.exec(`${MODULO}.registrar-conteo`, { id: conteoId, expectedVersion: 1, contados: [{ inventarioId: sem.invId, cantidad: 3 }] });
     expect(reg.ok).toBe(true);
     const movsAntes = await movimientos(rt, sem.invId);
-    const cerrar = await h.exec(`${MODULO}.cerrar-conteo`, { id: conteoId, expectedVersion: 2 });
+    const cerrar = await h.exec(`${MODULO}.cerrar-conteo`, { id: conteoId, expectedVersion: 2, aplicarDiferencias: true });
     expect(cerrar.ok).toBe(false);
     if (!cerrar.ok) expect(cerrar.error.code).toBe("KRN-AUTH-002");
     expect(await disponible(rt, sem.invId)).toBe(10); // sin conciliación

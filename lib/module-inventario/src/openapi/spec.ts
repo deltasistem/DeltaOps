@@ -126,7 +126,17 @@ export function construirOpenApi(): Record<string, unknown> {
       { id: str({ format: "uuid" }), opId: str(), origen: ref("Extremo"), destino: ref("Extremo"), lineas: arr(ref("LineaTransferencia")) },
       ["origen", "destino", "lineas"],
     ),
-    CompletarTransferencia: obj({ id: str(), expectedVersion: int({ minimum: 1 }), aprobado: bool(), opId: str() }, ["id"]),
+    CompletarTransferencia: obj({ id: str(), expectedVersion: int({ minimum: 1 }), opId: str() }, ["id", "expectedVersion"]),
+    TransicionarTransferencia: obj(
+      {
+        id: str(),
+        accion: str({ enum: ["recibir", "completar", "cancelar", "rechazar"] }),
+        expectedVersion: int({ minimum: 1 }),
+        opId: str(),
+        motivo: str(),
+      },
+      ["id", "accion", "expectedVersion"],
+    ),
     Ajustar: obj(
       {
         id: str({ format: "uuid" }), itemId: str(), bodegaId: str(), ubicacionId: str(),
@@ -135,17 +145,24 @@ export function construirOpenApi(): Record<string, unknown> {
       ["itemId", "bodegaId", "ubicacionId", "tipo", "cantidad", "motivo"],
     ),
     IniciarConteo: obj(
-      { id: str({ format: "uuid" }), tipo: str(), bodegaId: str(), alcance: obj({}, []), opId: str() },
-      ["tipo", "bodegaId"],
+      {
+        id: str({ format: "uuid" }), opId: str(), tipo: str(),
+        alcance: obj({ tipo: str(), id: str() }, ["tipo", "id"]),
+        lineas: arr(obj({ inventarioId: str() }, ["inventarioId"])),
+      },
+      ["tipo", "lineas"],
     ),
     RegistrarConteo: obj(
       {
-        id: str(), expectedVersion: int({ minimum: 1 }),
-        conteos: arr(obj({ inventarioId: str(), contado: num() }, ["inventarioId", "contado"])), opId: str(),
+        id: str(), expectedVersion: int({ minimum: 1 }), opId: str(),
+        contados: arr(obj({ inventarioId: str(), cantidad: num({ minimum: 0 }) }, ["inventarioId", "cantidad"])),
       },
-      ["id", "conteos"],
+      ["id", "expectedVersion", "contados"],
     ),
-    CerrarConteo: obj({ id: str(), expectedVersion: int({ minimum: 1 }), aprobado: bool(), opId: str() }, ["id"]),
+    CerrarConteo: obj(
+      { id: str(), expectedVersion: int({ minimum: 1 }), opId: str(), aplicarDiferencias: bool() },
+      ["id", "expectedVersion", "aplicarDiferencias"],
+    ),
     CatalogoUpsert: obj({ catalogo: str(), clave: str(), etiqueta: str(), posicion: int(), padre: str({ nullable: true }) }, ["catalogo", "clave", "etiqueta"]),
     CatalogoHabilitar: obj({ catalogo: str(), clave: str(), habilitado: bool() }, ["catalogo", "clave", "habilitado"]),
     OperacionSync: obj({ opId: str(), comando: str(), input: obj({}, []) }, ["opId", "comando", "input"]),
@@ -311,6 +328,12 @@ export function construirOpenApi(): Record<string, unknown> {
   add(`${BASE}/transferencias/{id}/completar`, "post", {
     tags: ["Transferencias"], operationId: "inventario.completar-transferencia", summary: "Completar transferencia (aprobación gobernada)",
     parameters: [idParam], requestBody: jsonBody(ref("CompletarTransferencia")),
+    responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
+  });
+  add(`${BASE}/transferencias/{id}/transicion`, "post", {
+    tags: ["Transferencias"], operationId: "inventario.transicionar-transferencia",
+    summary: "Transición gobernada del ciclo de vida (recibir/completar/cancelar/rechazar). Sólo recibir/completar aplican la entrada en destino; cancelar/rechazar liberan el en-tránsito al origen.",
+    parameters: [idParam], requestBody: jsonBody(ref("TransicionarTransferencia")),
     responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
   });
   add(`${BASE}/transferencias`, "get", {

@@ -70,9 +70,9 @@ export function principalActivos(userId: string, rol: string): Principal {
   };
 }
 
-export function contextForActivos(userId: string, rol: string): ExecutionContext {
+export function contextForActivos(userId: string, rol: string, tenant: string = DELTAOPS_TENANT): ExecutionContext {
   return createExecutionContext({
     principal: principalActivos(userId, rol),
-    metadata: { tenantId: DELTAOPS_TENANT },
+    metadata: { tenantId: tenant },
   });
 }

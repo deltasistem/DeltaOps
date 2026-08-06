@@ -162,6 +162,11 @@ export default function Console() {
                 Órdenes
               </Button>
             </Link>
+            <Link href="/inventario" data-testid="link-inventario">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Inventario
+              </Button>
+            </Link>
             {(user.rol === "admin" || user.rol === "platform_admin") && (
               <Link href="/consola-activos" data-testid="link-consola-activos">
                 <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">

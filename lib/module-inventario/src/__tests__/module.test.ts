@@ -146,6 +146,101 @@ describe("Módulo · transferencias (workflow por contrato, modo directo)", () =
   });
 });
 
+describe("Módulo · transferencias (ciclo de vida gobernado 011.3)", () => {
+  /** Siembra origen(10) + destino(0) y despacha `cant` a tránsito. */
+  async function sembrarTransferencia(cant: number) {
+    const b = await crearBodegaYUbicacion();
+    const u2 = await exec(`${MODULO}.crear-ubicacion`, { bodegaId: b.bodegaId, nivel: "pasillo", valor: "B" });
+    if (!u2.ok) throw new Error("ubic destino");
+    const destinoUb = (u2.value as { id: string }).id;
+    const itemId = await crearItem();
+    await exec(`${MODULO}.mover`, { itemId, bodegaId: b.bodegaId, ubicacionId: b.ubicacionId, tipo: "entrada", cantidad: 10 });
+    const tr = await exec(`${MODULO}.transferir`, {
+      origen: { bodegaId: b.bodegaId, ubicacionId: b.ubicacionId },
+      destino: { bodegaId: b.bodegaId, ubicacionId: destinoUb },
+      lineas: [{ itemId, cantidad: cant }],
+    });
+    if (!tr.ok) throw new Error(tr.error.message);
+    return { itemId, bodegaId: b.bodegaId, origenUb: b.ubicacionId, destinoUb, trId: (tr.value as { id: string }).id };
+  }
+  async function stockPorUbic(itemId: string, ubicacionId: string) {
+    const exs = await query(`${MODULO}.existencias-item`, { itemId });
+    if (!exs.ok) throw new Error(exs.error.message);
+    const e = (exs.value as { ubicacionId: string; stock: { disponible: number; enTransito: number } }[]).find((x) => x.ubicacionId === ubicacionId);
+    return e?.stock ?? { disponible: 0, enTransito: 0 };
+  }
+
+  it("despacho pone stock en tránsito en el origen (no en disponible)", async () => {
+    const s = await sembrarTransferencia(6);
+    const origen = await stockPorUbic(s.itemId, s.origenUb);
+    expect(origen.disponible).toBe(4);
+    expect(origen.enTransito).toBe(6);
+  });
+
+  it("recibir materializa la entrada en destino y salda el tránsito del origen", async () => {
+    const s = await sembrarTransferencia(6);
+    const r = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "recibir", expectedVersion: 1 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { estado: string }).estado).toBe("recibida");
+    const origen = await stockPorUbic(s.itemId, s.origenUb);
+    const destino = await stockPorUbic(s.itemId, s.destinoUb);
+    expect(origen.disponible).toBe(4);
+    expect(origen.enTransito).toBe(0); // tránsito saldado
+    expect(destino.disponible).toBe(6); // materializado en destino
+  });
+
+  it("completar es la ÚNICA etapa (junto a recibir) que aplica stock de recepción", async () => {
+    const s = await sembrarTransferencia(6);
+    const r = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "completar", expectedVersion: 1 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { estado: string }).estado).toBe("completada");
+    const destino = await stockPorUbic(s.itemId, s.destinoUb);
+    expect(destino.disponible).toBe(6);
+  });
+
+  it("cancelar libera el tránsito de vuelta al origen (conserva masa)", async () => {
+    const s = await sembrarTransferencia(6);
+    const r = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "cancelar", expectedVersion: 1, motivo: "error de captura" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { estado: string }).estado).toBe("cancelada");
+    const origen = await stockPorUbic(s.itemId, s.origenUb);
+    const destino = await stockPorUbic(s.itemId, s.destinoUb);
+    expect(origen.disponible).toBe(10); // restituido íntegro
+    expect(origen.enTransito).toBe(0);
+    expect(destino.disponible).toBe(0); // destino intacto
+  });
+
+  it("rechazar restituye el stock al origen igual que cancelar", async () => {
+    const s = await sembrarTransferencia(6);
+    const r = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "rechazar", expectedVersion: 1 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { estado: string }).estado).toBe("cancelada");
+    const origen = await stockPorUbic(s.itemId, s.origenUb);
+    expect(origen.disponible).toBe(10);
+    expect(origen.enTransito).toBe(0);
+  });
+
+  it("una transferencia terminal no admite nuevas transiciones", async () => {
+    const s = await sembrarTransferencia(6);
+    const r1 = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "completar", expectedVersion: 1 });
+    expect(r1.ok).toBe(true);
+    const r2 = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "cancelar", expectedVersion: 2 });
+    expect(r2.ok).toBe(false); // ya terminal
+  });
+
+  it("es idempotente por opId (no aplica stock dos veces)", async () => {
+    const s = await sembrarTransferencia(6);
+    const opId = "op-recibir-1";
+    const r1 = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "recibir", expectedVersion: 1, opId });
+    expect(r1.ok).toBe(true);
+    const r2 = await exec(`${MODULO}.transicionar-transferencia`, { id: s.trId, accion: "recibir", expectedVersion: 1, opId });
+    expect(r2.ok).toBe(true);
+    if (r2.ok) expect((r2.value as { idempotente: boolean }).idempotente).toBe(true);
+    const destino = await stockPorUbic(s.itemId, s.destinoUb);
+    expect(destino.disponible).toBe(6); // no se duplicó
+  });
+});
+
 describe("Módulo · ajustes y conteos", () => {
   it("ajuste aplica delta positivo/negativo a existencias", async () => {
     const { bodegaId, ubicacionId } = await crearBodegaYUbicacion();
@@ -167,11 +262,34 @@ describe("Módulo · ajustes y conteos", () => {
     const conteoId = (ini.value as { id: string }).id;
     const reg = await exec(`${MODULO}.registrar-conteo`, { id: conteoId, expectedVersion: 1, contados: [{ inventarioId: invId, cantidad: 8 }] });
     expect(reg.ok).toBe(true);
-    const cerrar = await exec(`${MODULO}.cerrar-conteo`, { id: conteoId, expectedVersion: 2 });
+    const cerrar = await exec(`${MODULO}.cerrar-conteo`, { id: conteoId, expectedVersion: 2, aplicarDiferencias: true });
     expect(cerrar.ok).toBe(true);
-    if (cerrar.ok) expect((cerrar.value as { diferencias: number }).diferencias).toBe(1);
+    if (cerrar.ok) expect((cerrar.value as { diferencias: number; aplicadas: number }).diferencias).toBe(1);
+    if (cerrar.ok) expect((cerrar.value as { aplicadas: number }).aplicadas).toBe(1);
     const q = await query(`${MODULO}.existencia`, { id: invId });
     if (q.ok) expect((q.value as { stock: { disponible: number } }).stock.disponible).toBe(8);
+  });
+  it("cerrar-conteo con aplicarDiferencias=false cierra SIN mutar stock", async () => {
+    const { bodegaId, ubicacionId } = await crearBodegaYUbicacion();
+    const itemId = await crearItem();
+    const entrada = await exec(`${MODULO}.mover`, { itemId, bodegaId, ubicacionId, tipo: "entrada", cantidad: 10 });
+    if (!entrada.ok) return;
+    const invId = (entrada.value as { inventarioId: string }).inventarioId;
+    const ini = await exec(`${MODULO}.iniciar-conteo`, { tipo: "ciclico", lineas: [{ inventarioId: invId }] });
+    if (!ini.ok) return;
+    const conteoId = (ini.value as { id: string }).id;
+    const reg = await exec(`${MODULO}.registrar-conteo`, { id: conteoId, expectedVersion: 1, contados: [{ inventarioId: invId, cantidad: 8 }] });
+    expect(reg.ok).toBe(true);
+    const cerrar = await exec(`${MODULO}.cerrar-conteo`, { id: conteoId, expectedVersion: 2, aplicarDiferencias: false });
+    expect(cerrar.ok).toBe(true);
+    // Cerrado y con la diferencia REGISTRADA, pero sin aplicar (0 aplicadas).
+    if (cerrar.ok) {
+      expect((cerrar.value as { estado: string }).estado).toBe("cerrado");
+      expect((cerrar.value as { diferencias: number }).diferencias).toBe(1);
+      expect((cerrar.value as { aplicadas: number }).aplicadas).toBe(0);
+    }
+    const q = await query(`${MODULO}.existencia`, { id: invId });
+    if (q.ok) expect((q.value as { stock: { disponible: number } }).stock.disponible).toBe(10); // stock intacto
   });
 });
 

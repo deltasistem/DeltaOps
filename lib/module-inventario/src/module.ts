@@ -54,7 +54,14 @@ import {
 import { crearBodega, crearUbicacion } from "./domain/bodega";
 import { crearLoteInventario, registrarSerie } from "./domain/lote-serie";
 import { crearReserva, liberarReserva } from "./domain/reserva";
-import { aplicarEstadoTransferencia, crearTransferencia } from "./domain/transferencia";
+import {
+  ACCIONES_TRANSFERENCIA,
+  accionAplicaRecepcion,
+  aplicarAccionTransferencia,
+  aplicarEstadoTransferencia,
+  crearTransferencia,
+  type Transferencia,
+} from "./domain/transferencia";
 import { aplicarEstadoAjuste, crearAjuste } from "./domain/ajuste";
 import { cerrarConteo, iniciarConteo, registrarConteo } from "./domain/conteo";
 import type { FamiliaMovimiento } from "./domain/stock";
@@ -1305,42 +1312,10 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             const cambio = aplicarEstadoTransferencia(t, "completada", ctx.principal.id, new Date());
             if (!cambio.ok) return cambio;
 
-            // Movimiento de ENTRADA (en tránsito → disponible) en destino.
-            for (const l of t.lineas) {
-              const ubic = await resolverUbicacionFisica(adapters, tenant.value, t.destino.bodegaId, t.destino.ubicacionId);
-              if (!ubic.ok) return ubic;
-              const inv = await obtenerOCrearExistencia(adapters, uow, tenant.value, {
-                itemId: l.itemId,
-                bodegaId: t.destino.bodegaId,
-                ubicacion: ubic.value,
-                loteCodigo: l.loteCodigo,
-                serieNumero: l.serieNumero,
-              });
-              if (!inv.ok) return inv;
-              // La entrada en destino repone `en-transito` que aún no existe en la
-              // existencia destino: se materializa como entrada directa a disponible.
-              const mov = aplicarMovimientoInventario(inv.value.inventario, {
-                movimientoId: crypto.randomUUID(),
-                tipo: "transferencia",
-                familia: "entrada",
-                cantidad: l.cantidad,
-                referencia: { tipo: "transferencia", id: input.id },
-                opId: input.opId ?? null,
-                actorId: ctx.principal.id,
-                ahora: new Date(),
-              });
-              if (!mov.ok) return mov;
-              const persisted = inv.value.creada
-                ? await adapters.inventario.insert(uow, mov.value.inventario)
-                : await adapters.inventario.update(uow, mov.value.inventario, inv.value.inventario.version);
-              if (!persisted.ok) return persisted;
-              const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
-              if (!ms.ok) return ms;
-              for (const ev of mov.value.eventos) {
-                const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
-                if (!_e.ok) return _e;
-              }
-            }
+            // Recepción: materializa la ENTRADA en destino y CONFIRMA la salida en
+            // origen (descarga el `en-tránsito`), conservando masa origen+destino.
+            const recepcion = await aplicarRecepcionTransferencia(adapters, ctx, uow, tenant.value, t, input.opId ?? null);
+            if (!recepcion.ok) return recepcion;
 
             const saved = await adapters.transferencias.update(uow, cambio.value.transferencia, input.expectedVersion);
             if (!saved.ok) return saved;
@@ -1353,6 +1328,67 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
 
             const resultado = { id: input.id, estado: "completada", version: cambio.value.transferencia.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.completar-transferencia`, input.opId, resultado, ctx.principal.id);
+            if (!rec.ok) return rec;
+            return ok({ ...resultado, idempotente: false });
+          },
+        };
+      },
+      /* --------------------- transicionar transferencia ------------------ */
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.transicionar-transferencia`,
+          inputSchema: z.object({
+            id: z.string().min(1),
+            accion: z.enum(ACCIONES_TRANSFERENCIA),
+            expectedVersion: z.number().int().positive(),
+            opId: z.string().optional(),
+            motivo: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.transfer`] },
+          async handle(ctx, input, uow) {
+            const tenant = tenantOf(ctx);
+            if (!tenant.ok) return tenant;
+            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.transicionar-transferencia`, input.opId);
+            if (previo) return ok({ ...previo, idempotente: true });
+
+            const found = await adapters.transferencias.findById(tenant.value, input.id);
+            if (!found.ok) return found;
+            if (!found.value) return fail(KernelErrors.notFound("inventario-transferencia", input.id));
+            const t = found.value;
+
+            const pol = evaluar(deps, ctx, POLICY_PUEDE_TRANSFERIR, { estado: t.estado });
+            if (!pol.ok) return pol;
+
+            // Gobierno REAL: la transición sólo procede si el Workflow Engine la
+            // autoriza. Se VERIFICA el Result del motor ANTES de cualquier efecto
+            // sobre stock/transferencia (lección DGP-011.1: no bypass).
+            const wf = exigirWorkflow(adapters, "transferencia");
+            if (!wf.ok) return wf;
+            const trans = await wf.value.transicionar(uow, tenant.value, t.workflow, input.accion, ctx.principal.id);
+            if (!trans.ok) return trans;
+
+            const cambio = aplicarAccionTransferencia(t, input.accion, ctx.principal.id, new Date());
+            if (!cambio.ok) return cambio;
+
+            // Efectos sobre stock: SÓLO recibir/completar aplican la entrada en
+            // destino; cancelar/rechazar liberan el `en-tránsito` al origen.
+            const efecto = accionAplicaRecepcion(input.accion)
+              ? await aplicarRecepcionTransferencia(adapters, ctx, uow, tenant.value, t, input.opId ?? null)
+              : await liberarTransitoTransferencia(adapters, ctx, uow, tenant.value, t, input.opId ?? null);
+            if (!efecto.ok) return efecto;
+
+            const saved = await adapters.transferencias.update(uow, cambio.value.transferencia, input.expectedVersion);
+            if (!saved.ok) return saved;
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "transicionar-transferencia", input.id, { accion: input.accion, motivo: input.motivo ?? null });
+            if (!audited.ok) return audited;
+            {
+              const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
+              if (!_e.ok) return _e;
+            }
+
+            const resultado = { id: input.id, estado: cambio.value.transferencia.estado, accion: input.accion, version: cambio.value.transferencia.version };
+            const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.transicionar-transferencia`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
             return ok({ ...resultado, idempotente: false });
           },
@@ -1505,7 +1541,12 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
 
             const def = await wf.value.asegurarDefinicion(uow, tenant.value, "conteo", ctx.principal.id);
             if (!def.ok) return def;
-            const ref: ReferenciaWorkflow = { proceso: "conteo", definicion: def.value.definicion, instanciaId: null, version: def.value.version };
+            const refInicial: ReferenciaWorkflow = { proceso: "conteo", definicion: def.value.definicion, instanciaId: null, version: def.value.version };
+            // Inicia la instancia REAL del motor (antes null): sin ella el ciclo
+            // no puede cerrarse por workflow. Se verifica el Result antes de crear.
+            const inicio = await wf.value.iniciar(uow, tenant.value, refInicial, ctx.principal.id);
+            if (!inicio.ok) return inicio;
+            const ref: ReferenciaWorkflow = { ...refInicial, instanciaId: inicio.value.instanciaId };
 
             const lineas = [];
             for (const l of input.lineas) {
@@ -1597,7 +1638,15 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
         conPolicies(deps);
         return {
           name: `${MODULO}.cerrar-conteo`,
-          inputSchema: z.object({ id: z.string().min(1), expectedVersion: z.number().int().positive(), opId: z.string().optional() }),
+          inputSchema: z.object({
+            id: z.string().min(1),
+            expectedVersion: z.number().int().positive(),
+            opId: z.string().optional(),
+            // AUTORITATIVO (011.3): si es `false` el conteo se cierra SIN mutar
+            // stock (las diferencias quedan registradas para un ajuste posterior);
+            // si es `true` concilia el stock en la etapa autorizada del workflow.
+            aplicarDiferencias: z.boolean(),
+          }),
           authorization: { permissions: [`${MODULO}.count`] },
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
@@ -1623,43 +1672,48 @@ export function inventarioModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!cambio.ok) return cambio;
             const diferencias = (cambio.value.evento.payload["diferencias"] as { inventarioId: string; contado: number }[]) ?? [];
 
-            // Ajustes posteriores: concilia disponible al valor contado.
-            for (const d of diferencias) {
-              const inv = await adapters.inventario.findById(tenant.value, d.inventarioId);
-              if (!inv.ok) return inv;
-              if (!inv.value) continue;
-              const mov = aplicarMovimientoInventario(inv.value, {
-                movimientoId: crypto.randomUUID(),
-                tipo: "conteo",
-                familia: "conteo",
-                cantidad: 0,
-                objetivo: d.contado,
-                referencia: { tipo: "conteo", id: input.id },
-                opId: input.opId ?? null,
-                actorId: ctx.principal.id,
-                ahora: new Date(),
-              });
-              if (!mov.ok) return mov;
-              const up = await adapters.inventario.update(uow, mov.value.inventario, inv.value.version);
-              if (!up.ok) return up;
-              const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
-              if (!ms.ok) return ms;
-              for (const ev of mov.value.eventos) {
-                const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
-                if (!_e.ok) return _e;
+            // Conciliación AUTORITATIVA: sólo si `aplicarDiferencias` es `true` se
+            // concilia el stock al valor contado (etapa autorizada). Si es `false`
+            // el conteo se cierra SIN mutar stock; las diferencias quedan
+            // registradas (evento `ConteoFinalizado`) para un ajuste posterior.
+            if (input.aplicarDiferencias) {
+              for (const d of diferencias) {
+                const inv = await adapters.inventario.findById(tenant.value, d.inventarioId);
+                if (!inv.ok) return inv;
+                if (!inv.value) continue;
+                const mov = aplicarMovimientoInventario(inv.value, {
+                  movimientoId: crypto.randomUUID(),
+                  tipo: "conteo",
+                  familia: "conteo",
+                  cantidad: 0,
+                  objetivo: d.contado,
+                  referencia: { tipo: "conteo", id: input.id },
+                  opId: input.opId ?? null,
+                  actorId: ctx.principal.id,
+                  ahora: new Date(),
+                });
+                if (!mov.ok) return mov;
+                const up = await adapters.inventario.update(uow, mov.value.inventario, inv.value.version);
+                if (!up.ok) return up;
+                const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
+                if (!ms.ok) return ms;
+                for (const ev of mov.value.eventos) {
+                  const _e = await emitirEvento(adapters, ctx, uow, tenant.value, ev);
+                  if (!_e.ok) return _e;
+                }
               }
             }
 
             const saved = await adapters.conteos.update(uow, cambio.value.conteo, input.expectedVersion);
             if (!saved.ok) return saved;
-            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "cerrar-conteo", input.id, { diferencias: diferencias.length });
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "cerrar-conteo", input.id, { diferencias: diferencias.length, aplicarDiferencias: input.aplicarDiferencias });
             if (!audited.ok) return audited;
             {
               const _e = await emitirEvento(adapters, ctx, uow, tenant.value, cambio.value.evento);
               if (!_e.ok) return _e;
             }
 
-            const resultado = { id: input.id, estado: "cerrado", diferencias: diferencias.length, version: cambio.value.conteo.version };
+            const resultado = { id: input.id, estado: "cerrado", diferencias: diferencias.length, aplicadas: input.aplicarDiferencias ? diferencias.length : 0, version: cambio.value.conteo.version };
             const rec = await sellarRecibo(adapters, uow, tenant.value, `${MODULO}.cerrar-conteo`, input.opId, resultado, ctx.principal.id);
             if (!rec.ok) return rec;
             return ok({ ...resultado, idempotente: false });
@@ -2005,4 +2059,124 @@ async function obtenerOCrearExistencia(
     ahora: new Date(),
   });
   return ok({ inventario: inv, creada: true });
+}
+
+/**
+ * Aplica un movimiento de inventario a una existencia RESUELTA (persistiéndola
+ * con la versión correcta) y emite sus eventos. Comparte la lógica de
+ * insert/update entre las etapas del ciclo de vida de transferencia.
+ */
+async function aplicarMovimientoAExistencia(
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
+  tenant: string,
+  existencia: { inventario: Inventario; creada: boolean },
+  datos: Parameters<typeof aplicarMovimientoInventario>[1],
+): Promise<Result<void, KernelError>> {
+  const mov = aplicarMovimientoInventario(existencia.inventario, datos);
+  if (!mov.ok) return mov;
+  const persisted = existencia.creada
+    ? await adapters.inventario.insert(uow, mov.value.inventario)
+    : await adapters.inventario.update(uow, mov.value.inventario, existencia.inventario.version);
+  if (!persisted.ok) return persisted;
+  const ms = await adapters.inventario.registrarMovimiento(uow, mov.value.movimiento);
+  if (!ms.ok) return ms;
+  for (const ev of mov.value.eventos) {
+    const _e = await emitirEvento(adapters, ctx, uow, tenant, ev);
+    if (!_e.ok) return _e;
+  }
+  return ok(undefined);
+}
+
+/**
+ * RECEPCIÓN (recibir/completar): materializa la ENTRADA en destino y CONFIRMA la
+ * salida en origen (descarga `en-tránsito`). Es la ÚNICA etapa que aplica stock
+ * de recepción. Conserva masa origen+destino: el origen perdió `disponible` al
+ * despachar; el destino lo gana ahora, y el `en-tránsito` del origen se salda.
+ */
+async function aplicarRecepcionTransferencia(
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
+  tenant: string,
+  t: Transferencia,
+  opId: string | null,
+): Promise<Result<void, KernelError>> {
+  for (const l of t.lineas) {
+    // Confirma la salida en ORIGEN: descarga el `en-tránsito` (sin devolverlo a
+    // disponible; su contraparte es la entrada en destino).
+    const ubicOrigen = await resolverUbicacionFisica(adapters, tenant, t.origen.bodegaId, t.origen.ubicacionId);
+    if (!ubicOrigen.ok) return ubicOrigen;
+    const invOrigen = await obtenerOCrearExistencia(adapters, uow, tenant, {
+      itemId: l.itemId, bodegaId: t.origen.bodegaId, ubicacion: ubicOrigen.value, loteCodigo: l.loteCodigo, serieNumero: l.serieNumero,
+    });
+    if (!invOrigen.ok) return invOrigen;
+    const conf = await aplicarMovimientoAExistencia(adapters, ctx, uow, tenant, invOrigen.value, {
+      movimientoId: crypto.randomUUID(),
+      tipo: "transferencia",
+      familia: "transferencia-confirmacion",
+      cantidad: l.cantidad,
+      referencia: { tipo: "transferencia", id: t.id },
+      opId,
+      actorId: ctx.principal.id,
+      ahora: new Date(),
+    });
+    if (!conf.ok) return conf;
+
+    // Materializa la ENTRADA en DESTINO (en-tránsito → disponible).
+    const ubicDestino = await resolverUbicacionFisica(adapters, tenant, t.destino.bodegaId, t.destino.ubicacionId);
+    if (!ubicDestino.ok) return ubicDestino;
+    const invDestino = await obtenerOCrearExistencia(adapters, uow, tenant, {
+      itemId: l.itemId, bodegaId: t.destino.bodegaId, ubicacion: ubicDestino.value, loteCodigo: l.loteCodigo, serieNumero: l.serieNumero,
+    });
+    if (!invDestino.ok) return invDestino;
+    const ent = await aplicarMovimientoAExistencia(adapters, ctx, uow, tenant, invDestino.value, {
+      movimientoId: crypto.randomUUID(),
+      tipo: "transferencia",
+      familia: "entrada",
+      cantidad: l.cantidad,
+      referencia: { tipo: "transferencia", id: t.id },
+      opId,
+      actorId: ctx.principal.id,
+      ahora: new Date(),
+    });
+    if (!ent.ok) return ent;
+  }
+  return ok(undefined);
+}
+
+/**
+ * ANULACIÓN (cancelar/rechazar): libera el `en-tránsito` de vuelta al ORIGEN
+ * (en-tránsito → disponible), restituyendo el stock que el despacho retuvo. NO
+ * toca el destino. Conserva masa (el origen recupera lo despachado).
+ */
+async function liberarTransitoTransferencia(
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
+  tenant: string,
+  t: Transferencia,
+  opId: string | null,
+): Promise<Result<void, KernelError>> {
+  for (const l of t.lineas) {
+    const ubic = await resolverUbicacionFisica(adapters, tenant, t.origen.bodegaId, t.origen.ubicacionId);
+    if (!ubic.ok) return ubic;
+    const inv = await obtenerOCrearExistencia(adapters, uow, tenant, {
+      itemId: l.itemId, bodegaId: t.origen.bodegaId, ubicacion: ubic.value, loteCodigo: l.loteCodigo, serieNumero: l.serieNumero,
+    });
+    if (!inv.ok) return inv;
+    const rev = await aplicarMovimientoAExistencia(adapters, ctx, uow, tenant, inv.value, {
+      movimientoId: crypto.randomUUID(),
+      tipo: "transferencia",
+      familia: "transferencia-entrada",
+      cantidad: l.cantidad,
+      referencia: { tipo: "transferencia", id: t.id },
+      opId,
+      actorId: ctx.principal.id,
+      ahora: new Date(),
+    });
+    if (!rev.ok) return rev;
+  }
+  return ok(undefined);
 }

@@ -40,13 +40,28 @@ const DEFINICIONES: Record<ProcesoWorkflow, DefinicionWorkflow> = {
     etiqueta: "Transferencia de inventario",
     // NOTA: el motor exige nombres de estado camelCase. El dominio (011.1) usa
     // `en-transito` (kebab); la traducción motor↔dominio ocurre en `aDominio`.
-    // El estado inicial es `enTransito` (despacho implícito al iniciar), lo que
-    // coincide con el estado inicial que el dominio de transferencias espera.
+    // El estado inicial es `enTransito` (despacho implícito al `transferir`), lo
+    // que coincide con el estado inicial que el dominio de transferencias espera.
+    //
+    // CICLO DE VIDA GOBERNADO (011.3): desde `enTransito` el motor autoriza las
+    // acciones de recepción (recibir/completar → materializan la ENTRADA en
+    // destino, única etapa que aplica stock de recepción) y de anulación
+    // (cancelar/rechazar → liberan el `en-tránsito` de vuelta al origen). Todos
+    // los estados de cierre son FINALES (inmutables).
     estados: [
       { nombre: "enTransito", inicial: true },
+      { nombre: "recibida", final: true },
       { nombre: "completada", final: true },
+      { nombre: "cancelada", final: true },
     ],
-    transiciones: [{ de: "enTransito", a: "completada", comando: "completada" }],
+    transiciones: [
+      { de: "enTransito", a: "recibida", comando: "recibir" },
+      { de: "enTransito", a: "completada", comando: "completar" },
+      // Compat: `completada` (comando histórico de `completar-transferencia`).
+      { de: "enTransito", a: "completada", comando: "completada" },
+      { de: "enTransito", a: "cancelada", comando: "cancelar" },
+      { de: "enTransito", a: "cancelada", comando: "rechazar" },
+    ],
   },
   ajuste: {
     clave: "ciclo-regularizacion",
@@ -68,6 +83,9 @@ const DEFINICIONES: Record<ProcesoWorkflow, DefinicionWorkflow> = {
     transiciones: [
       { de: "abierto", a: "contado", comando: "contado" },
       { de: "contado", a: "cerrado", comando: "cerrado" },
+      // El registro de lecturas NO transiciona el motor (el aggregate refleja
+      // `contado`); el cierre gobernado va directo `abierto`→`cerrado`.
+      { de: "abierto", a: "cerrado", comando: "cerrado" },
     ],
   },
 };

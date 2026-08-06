@@ -16,4 +16,5 @@
 - [Ecosistema DGP-010](deltaops-ecosistema-dgp010.md) — fases de integración = composición pura sin API nueva; un deep link no está terminado hasta que el destino consume el parámetro (test ruta→filtro).
 - [Inventario dominio DGP-011.1](deltaops-inventario-dominio-dgp011-1.md) — comandos gobernados exigen WorkflowPort explícito con fallo seguro; auto-aprobación solo en test; verificar Result de transicionar antes de efectos.
 - [Inventario persistencia DGP-011.2](deltaops-inventario-persistencia-dgp011-2.md) — timeline vía comandos es obligatorio en persistencia; drizzle push no detecta tablas nuevas (aplicar .sql con psql); estados de workflow camelCase con traducción.
+- [Experiencia Inventario DGP-011.3](deltaops-experiencia-inventario-dgp011-3.md) — acciones UI 1:1 con transiciones del motor; cambio de espejo Drizzle exige migración .sql; tenant demo delta-demo con seed:demo idempotente.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.
