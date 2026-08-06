@@ -19,4 +19,5 @@
 - [Experiencia Inventario DGP-011.3](deltaops-experiencia-inventario-dgp011-3.md) — acciones UI 1:1 con transiciones del motor; cambio de espejo Drizzle exige migración .sql; tenant demo delta-demo con seed:demo idempotente.
 - [Planes DGP-012](deltaops-planes-dgp012.md) — acciones offline = comandos oficiales del runtime (no rutas HTTP); vínculo orquestación→OT atómico con guarda; CQRS también en calendarios/historial.
 - [Abastecimiento DGP-013](deltaops-abastecimiento-dgp013.md) — motor de workflow multiplexa definiciones por clave (hotfix con excepción); QR literal vía platform.qr; costos en read model propio; commitear antes de revisar.
+- [Preventivo DGP-014](deltaops-preventivo-dgp014.md) — módulos de negocio componen motores congelados solo por exports públicos; corpus = lista taxativa lib/*; verificar contratos canónicos antes de integrar; UUIDv5 para ids de semillas largas.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.
