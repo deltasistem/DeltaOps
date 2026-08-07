@@ -64,7 +64,7 @@ import {
   type AccionIntervencion,
   type EstadoIntervencion,
 } from "./domain/intervencion";
-import { claveDedupOrden, crearGeneracionOrden, materializarGeneracion } from "./domain/orden-correctiva";
+import { claveDedupOrden, crearGeneracionOrden, materializarGeneracion, type EstadoGeneracion } from "./domain/orden-correctiva";
 import {
   crearClasificacion,
   crearCuadrilla,
@@ -817,11 +817,31 @@ export function correctivoModule(adapters: ModuleAdapters): PlatformServiceDefin
             if (!reserva.ok) return reserva;
             if (!reserva.value) return fail(KernelErrors.conflict(`Ya existe una generación de OT para la solicitud "${input.solicitudId}"`, { clave }));
 
-            const gen = crearGeneracionOrden({ id: genId, tenantId: tenant.value, solicitudId: input.solicitudId, activoId: solicitud.objeto.activoId, generadaPor: ctx.principal.id, ahora });
+            // GOBIERNO (sin bypass): asegura la definición `generacion` e INICIA la
+            // instancia (estado `pendiente`) ANTES de persistir la generación. Sin
+            // WorkflowPort aprobado ⇒ fallo seguro (KRN-CFL) SIN efectos.
+            const wf = exigirWorkflow(adapters, "generacion");
+            if (!wf.ok) return wf;
+            const def = await wf.value.asegurarDefinicion(uow, tenant.value, "generacion", ctx.principal.id);
+            if (!def.ok) return def;
+            const ref: ReferenciaWorkflow = { proceso: "generacion", definicion: def.value.definicion, instanciaId: null, version: def.value.version };
+            const inicio = await wf.value.iniciar(uow, tenant.value, ref, ctx.principal.id);
+            if (!inicio.ok) return inicio;
+            const workflow: ReferenciaWorkflow = { ...ref, instanciaId: inicio.value.instanciaId };
+
+            const gen = crearGeneracionOrden({ id: genId, tenantId: tenant.value, solicitudId: input.solicitudId, activoId: solicitud.objeto.activoId, workflow, estadoInicial: inicio.value.estado.estado as EstadoGeneracion, generadaPor: ctx.principal.id, ahora });
             if (!gen.ok) return gen;
             const savedGen = await adapters.generaciones.insert(uow, gen.value.generacion);
             if (!savedGen.ok) return savedGen;
             { const _e = await emitirEvento(adapters, ctx, uow, tenant.value, gen.value.evento); if (!_e.ok) return _e; }
+
+            // GOBIERNO (sin bypass): exige la transición `materializar` al motor
+            // ANTES de crear la OT, de vincular y de persistir el estado
+            // `materializada`. El Result del motor se verifica ANTES de cualquier
+            // efecto observable: si la DENIEGA, no se materializa ninguna OT ni
+            // vínculo (fail-safe) — sólo queda la generación `pendiente`.
+            const trans = await wf.value.transicionar(uow, tenant.value, workflow, "materializar", ctx.principal.id);
+            if (!trans.ok) return trans;
 
             // Orquestación fail-safe: crea la OT canónica "correctiva" (idempotente por opId=clave).
             // Ancla la plantilla del diagnóstico (si lo hay) como referencia sólo-lectura en la OT.
@@ -846,7 +866,7 @@ export function correctivoModule(adapters: ModuleAdapters): PlatformServiceDefin
             // Vínculo atómico generación → OT.
             const vinc = await adapters.dedup.vincular(uow, tenant.value, clave, mat.value.ordenTrabajoId);
             if (!vinc.ok) return vinc;
-            const materializado = materializarGeneracion(savedGen.value, mat.value.ordenTrabajoId, ahora);
+            const materializado = materializarGeneracion(savedGen.value, mat.value.ordenTrabajoId, ahora, trans.value.estado);
             if (!materializado.ok) return materializado;
             const savedMat = await adapters.generaciones.update(uow, materializado.value.generacion, savedGen.value.version);
             if (!savedMat.ok) return savedMat;

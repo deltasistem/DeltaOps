@@ -14,12 +14,15 @@ import {
   MODULO,
   crearCorrectivoRuntime,
   ActivosPruebaFaltantes,
+  ActivosPruebaComponentes,
   DynamicFormsPruebaNoPublicada,
   MaterializadorPrueba,
   InventarioPrueba,
   AbastecimientoPrueba,
   WorkflowPruebaRechazo,
   WorkflowPruebaRechazoTransicion,
+  WorkflowPruebaRechazoMaterializar,
+  WorkflowPruebaSinGeneracion,
   type CorrectivoRuntime,
 } from "..";
 
@@ -338,6 +341,73 @@ describe("generar-orden-correctiva (orquestación + anti-duplicado)", () => {
     const r2 = await generarOrden(id, { opId: "gen-1" });
     expect(r1.ok && r2.ok).toBe(true);
     if (r2.ok) expect((r2.value as { idempotente: boolean }).idempotente).toBe(true);
+  });
+  it("gobierno: flujo feliz deja la generación en estado 'materializada'", async () => {
+    const id = await solicitudAprobada();
+    const r = await generarOrden(id);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { estado: string }).estado).toBe("materializada");
+  });
+  it("gobierno: SIN workflow de generación configurado ⇒ rechazo sin OT", async () => {
+    // El motor no gobierna la apertura de la generación ⇒ fallo seguro, sin OT.
+    const mat = new MaterializadorPrueba();
+    rt = crearCorrectivoRuntime({ materializador: mat, workflow: new WorkflowPruebaSinGeneracion() });
+    const s = await crearSolicitud();
+    await aprobarSolicitud(s.id, s.version);
+    const r = await generarOrden(s.id);
+    expect(r.ok).toBe(false);
+    expect(mat.creadas).toBe(0);
+  });
+  it("gobierno: transición 'materializar' DENEGADA ⇒ ni OT ni vínculo", async () => {
+    const mat = new MaterializadorPrueba();
+    rt = crearCorrectivoRuntime({ materializador: mat, workflow: new WorkflowPruebaRechazoMaterializar() });
+    const s = await crearSolicitud();
+    const v = await aprobarSolicitud(s.id, s.version);
+    expect(v).toBeGreaterThan(s.version);
+    const r = await generarOrden(s.id);
+    // El motor deniega la transición ANTES de crear la OT: sin efecto observable
+    // (ni OT materializada ni vínculo generación→OT).
+    expect(r.ok).toBe(false);
+    expect(mat.creadas).toBe(0);
+  });
+  it("gobierno: idempotencia intacta tras materializar gobernado", async () => {
+    const id = await solicitudAprobada();
+    const r1 = await generarOrden(id, { opId: "gen-gob" });
+    const r2 = await generarOrden(id, { opId: "gen-gob" });
+    expect(r1.ok && r2.ok).toBe(true);
+    if (r1.ok && r2.ok) {
+      expect((r2.value as { idempotente: boolean }).idempotente).toBe(true);
+      expect((r1.value as { ordenTrabajoId: string }).ordenTrabajoId).toBe((r2.value as { ordenTrabajoId: string }).ordenTrabajoId);
+      expect((r2.value as { estado: string }).estado).toBe("materializada");
+    }
+  });
+});
+
+/* ========================================================================= */
+describe("validación de componentes (contrato real de Activos)", () => {
+  const OBJETO_COMP = (componenteId: string) => ({ activoId: "act-1", componenteId });
+  async function crearConComponente(componenteId: string) {
+    return exec(`${MODULO}.crear-solicitud`, {
+      titulo: "Falla en componente", origen: "operador", prioridad: "alta",
+      objeto: OBJETO_COMP(componenteId), sintomas: [{ texto: "ruido" }],
+    });
+  }
+
+  it("acepta un componente que PERTENECE al activo", async () => {
+    rt = crearCorrectivoRuntime({ activos: new ActivosPruebaComponentes({ "act-1": ["comp-a", "comp-b"] }) });
+    const r = await crearConComponente("comp-a");
+    expect(r.ok).toBe(true);
+  });
+  it("rechaza un componente INEXISTENTE", async () => {
+    rt = crearCorrectivoRuntime({ activos: new ActivosPruebaComponentes({ "act-1": ["comp-a"] }) });
+    const r = await crearConComponente("comp-fantasma");
+    expect(r.ok).toBe(false);
+  });
+  it("rechaza un componente que pertenece a OTRO activo", async () => {
+    // comp-x existe pero bajo act-2, no bajo el contenedor act-1 ⇒ rechazo.
+    rt = crearCorrectivoRuntime({ activos: new ActivosPruebaComponentes({ "act-1": ["comp-a"], "act-2": ["comp-x"] }) });
+    const r = await crearConComponente("comp-x");
+    expect(r.ok).toBe(false);
   });
 });
 

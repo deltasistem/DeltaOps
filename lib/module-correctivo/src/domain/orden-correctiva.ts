@@ -14,6 +14,7 @@
  */
 import { fail, KernelErrors, ok, type KernelError, type Result } from "@workspace/kernel";
 import { ORDEN_DECIDIDA, ORDEN_MATERIALIZADA } from "./events";
+import type { ReferenciaWorkflow } from "./workflow";
 
 /** Estado de materialización de una generación de OT correctiva. */
 export const ESTADOS_GENERACION = ["pendiente", "materializada"] as const;
@@ -39,6 +40,12 @@ export interface GeneracionOrdenCorrectiva {
   /** Id de la OT creada por la orquestación; null hasta materializar. */
   readonly ordenTrabajoId: string | null;
   readonly estado: EstadoGeneracion;
+  /**
+   * Referencia INMUTABLE al workflow que GOBIERNA la generación (proceso
+   * `generacion`, pendiente → materializada). El aggregate REFLEJA el estado que
+   * decide el motor; nunca transiciona por su cuenta.
+   */
+  readonly workflow: ReferenciaWorkflow;
   readonly generadaEn: string;
   readonly generadaPor: string;
   readonly version: number;
@@ -82,6 +89,10 @@ export interface CrearGeneracionInput {
   readonly tenantId: string;
   readonly solicitudId: string;
   readonly activoId: string;
+  /** Referencia de workflow (proceso `generacion`) ya INICIADA por el motor. */
+  readonly workflow: ReferenciaWorkflow;
+  /** Estado inicial NEUTRO que devolvió el motor al iniciar la instancia. */
+  readonly estadoInicial: EstadoGeneracion;
   readonly generadaPor: string;
   readonly ahora: string;
 }
@@ -96,7 +107,8 @@ export function crearGeneracionOrden(input: CrearGeneracionInput): Result<Cambio
     activoId: input.activoId,
     claveDedup: claveDedupOrden(input.solicitudId),
     ordenTrabajoId: null,
-    estado: "pendiente",
+    estado: input.estadoInicial,
+    workflow: input.workflow,
     generadaEn: input.ahora,
     generadaPor: input.generadaPor,
     version: 1,
@@ -109,12 +121,15 @@ export function crearGeneracionOrden(input: CrearGeneracionInput): Result<Cambio
 /**
  * Vincula ATÓMICAMENTE la generación con la OT creada por la orquestación. Sólo
  * transiciona `pendiente → materializada` una vez (idempotencia: reintentar con
- * el MISMO `ordenTrabajoId` es no-op; con OTRO es conflicto).
+ * el MISMO `ordenTrabajoId` es no-op; con OTRO es conflicto). El `estadoMotor`
+ * es el estado NEUTRO que devolvió el Workflow Engine al aprobar la transición
+ * `materializar`; el aggregate lo REFLEJA (no lo decide).
  */
 export function materializarGeneracion(
   g: GeneracionOrdenCorrectiva,
   ordenTrabajoId: string,
   ahora: string,
+  estadoMotor: string = "materializada",
 ): Result<CambioGeneracion, KernelError> {
   if (Number.isNaN(Date.parse(ahora))) return fail(KernelErrors.validation("La fecha 'ahora' no es ISO válida"));
   if (ordenTrabajoId.trim() === "") return fail(KernelErrors.validation("Se requiere el id de la orden de trabajo"));
@@ -127,7 +142,7 @@ export function materializarGeneracion(
   const actualizado: GeneracionOrdenCorrectiva = {
     ...g,
     ordenTrabajoId,
-    estado: "materializada",
+    estado: (estadoMotor as EstadoGeneracion) ?? "materializada",
     version: g.version + 1,
   };
   return ok({

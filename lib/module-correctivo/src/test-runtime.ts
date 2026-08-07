@@ -120,6 +120,44 @@ export class WorkflowPruebaRechazoTransicion extends WorkflowPruebaAprobado {
   }
 }
 
+/**
+ * APRUEBA todo el ciclo EXCEPTO la transición `materializar` del proceso
+ * `generacion`: permite aprobar la solicitud pero DENIEGA gobernar la
+ * materialización de la OT (verifica que sin autorización no hay OT ni vínculo).
+ * SOLO test.
+ */
+export class WorkflowPruebaRechazoMaterializar extends WorkflowPruebaAprobado {
+  override async transicionar(
+    uow: UnitOfWork,
+    tenant: string,
+    ref: ReferenciaWorkflow,
+    accion: string,
+  ): Promise<Result<EstadoWorkflow, KernelError>> {
+    if (ref.proceso === "generacion" && accion === "materializar") {
+      return fail(KernelErrors.forbidden("workflow.transicionar.materializar"));
+    }
+    return super.transicionar(uow, tenant, ref, accion);
+  }
+}
+
+/**
+ * APRUEBA todo EXCEPTO iniciar una instancia del proceso `generacion`: simula un
+ * Workflow Engine SIN la definición de generación disponible/autorizada. Verifica
+ * que sin gobierno de apertura la generación falla de forma segura (sin OT). SOLO test.
+ */
+export class WorkflowPruebaSinGeneracion extends WorkflowPruebaAprobado {
+  override async iniciar(
+    uow: UnitOfWork,
+    tenant: string,
+    ref: ReferenciaWorkflow,
+  ): Promise<Result<{ instanciaId: string | null; estado: EstadoWorkflow }, KernelError>> {
+    if (ref.proceso === "generacion") {
+      return fail(KernelErrors.conflict("El proceso de generación no está gobernado por Workflow"));
+    }
+    return super.iniciar(uow, tenant, ref);
+  }
+}
+
 /* ---------------------- Colaboradores de PRUEBA -------------------------- */
 
 /** ActivosPort de PRUEBA: todos los activos/componentes declarados existen. */
@@ -140,6 +178,30 @@ export class ActivosPruebaFaltantes implements ActivosPort {
   }
   async componentesExisten(_t: string, _a: string, ids: readonly string[]): Promise<Result<ValidacionActivo, KernelError>> {
     return ok({ inexistentes: ids.filter((i) => this.faltantes.includes(i)) });
+  }
+}
+
+/**
+ * ActivosPort de PRUEBA con TOPOLOGÍA de componentes: cada activo tiene un
+ * conjunto de componentes propios. Valida que cada componenteId EXISTA y
+ * PERTENEZCA al activo contenedor; un componente ajeno o inexistente se reporta
+ * como inexistente (rechazo). Modela el contrato real de Activos
+ * (`modulo.activos.componentes`). SOLO test.
+ */
+export class ActivosPruebaComponentes implements ActivosPort {
+  /** activoId → set de componenteIds que le pertenecen. */
+  private readonly topo: Map<string, Set<string>>;
+  constructor(topologia: Record<string, readonly string[]>) {
+    this.topo = new Map(Object.entries(topologia).map(([a, cs]) => [a, new Set(cs)]));
+  }
+  async existen(_t: string, ids: readonly string[]): Promise<Result<ValidacionActivo, KernelError>> {
+    const inexistentes = ids.filter((id) => !this.topo.has(id));
+    return ok({ inexistentes });
+  }
+  async componentesExisten(_t: string, activoId: string, ids: readonly string[]): Promise<Result<ValidacionActivo, KernelError>> {
+    const propios = this.topo.get(activoId) ?? new Set<string>();
+    const inexistentes = ids.filter((id) => !propios.has(id));
+    return ok({ inexistentes });
   }
 }
 
@@ -166,6 +228,10 @@ export class DynamicFormsPruebaNoPublicada implements DynamicFormsPort {
 /** Materializador de PRUEBA: crea una OT determinista por opId (idempotente). */
 export class MaterializadorPrueba implements MaterializadorOrdenes {
   private readonly ordenes = new Map<string, string>();
+  /** Nº de OTs realmente creadas (para verificar "ni OT" ante gobierno denegado). */
+  get creadas(): number {
+    return this.ordenes.size;
+  }
   async crearOrden(
     _t: string,
     _actor: string,

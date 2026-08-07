@@ -122,16 +122,24 @@ const activosPort: ActivosPort = {
     }
     return ok({ inexistentes });
   },
-  // Componentes: verificados por existencia del activo contenedor (mejor esfuerzo
-  // sin acceso a la estructura interna; ids opacos validados vía detalle).
+  // Componentes: valida contra el contrato público real de Activos
+  // (`modulo.activos.componentes`, relaciones `compuesto-por` salientes). Cada
+  // componenteId debe EXISTIR como componente que PERTENECE al activo contenedor;
+  // cualquier id ajeno o inexistente se reporta como inexistente (rechazo).
   async componentesExisten(tenantId, activoId, componenteIds): Promise<Result<ValidacionActivo, KernelError>> {
     const ctxA = contextForActivos("system", "lector", tenantId);
-    const r = await activosRuntime().platform.kernel.queries.execute(ctxA, "modulo.activos.detalle", { id: activoId });
+    const r = await activosRuntime().platform.kernel.queries.execute(ctxA, "modulo.activos.componentes", { id: activoId });
     if (!r.ok) {
-      if (r.error.code === "KRN-NOT-001") return ok({ inexistentes: componenteIds });
+      // Activo contenedor inexistente ⇒ ninguno de sus componentes existe.
+      if (r.error.code === "KRN-NOT-001") return ok({ inexistentes: [...componenteIds] });
       return r as Result<never, KernelError>;
     }
-    return ok({ inexistentes: [] });
+    // `componentes` son relaciones `compuesto-por` salientes: el componente es el
+    // destino (`destino.id`). Se acepta el componenteId sólo si figura ahí.
+    const rel = (r.value ?? {}) as { componentes?: { destino?: { id?: string } }[] };
+    const validos = new Set<string>((rel.componentes ?? []).map((c) => c.destino?.id ?? "").filter((id) => id !== ""));
+    const inexistentes = componenteIds.filter((id) => !validos.has(id));
+    return ok({ inexistentes });
   },
 };
 

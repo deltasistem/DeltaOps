@@ -210,6 +210,33 @@ suite("Módulo Enterprise Corrective Maintenance · PostgreSQL", () => {
     ]);
     expect(burst.some((r) => r.status === "fulfilled" && (r.value as { ok: boolean }).ok)).toBe(true);
     expect(otsCreadas).toBe(antes + 1);
+
+    // GOBIERNO auditable: la generación pasó por el Workflow Engine real. Su
+    // instancia (proceso `generacion`, definición `cor-generacion`) quedó
+    // PERSISTIDA en `platform_records` bajo el servicio del motor, con estado
+    // materializado (final). Prueba que la generación NO evade el gobierno.
+    const instancias = await conTenant<{ id: string; status: string; data: { proceso?: string; definicion?: string } }>(
+      T_A,
+      `SELECT id, status, data FROM deltaops.platform_records
+        WHERE tenant_id = $1 AND service = $2 AND record_type = 'instancia'
+          AND data->>'proceso' = 'generacion'`,
+      [T_A, "modulo.correctivo.workflow"],
+    );
+    expect(instancias.length).toBeGreaterThanOrEqual(1);
+    const inst = instancias.find((r) => r.data?.definicion === "cor-generacion");
+    expect(inst).toBeTruthy();
+    expect(inst?.status).toBe("materializada");
+
+    // La definición `cor-generacion` también está publicada y ACTIVA (auditable).
+    const defs = await conTenant<{ id: string; status: string }>(
+      T_A,
+      `SELECT id, status FROM deltaops.platform_records
+        WHERE tenant_id = $1 AND service = $2 AND record_type = 'definicion-workflow'
+          AND data->>'clave' = 'cor-generacion'`,
+      [T_A, "modulo.correctivo.workflow"],
+    );
+    expect(defs.length).toBeGreaterThanOrEqual(1);
+    expect(defs.some((d) => d.status === "activa")).toBe(true);
   });
 
   it("registra eventos de activo y detecta reincidencia (read model con flag)", async () => {
