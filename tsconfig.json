@@ -43,6 +43,9 @@
       "path": "./lib/module-preventivo"
     },
     {
+      "path": "./lib/module-correctivo"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

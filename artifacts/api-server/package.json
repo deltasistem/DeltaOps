@@ -14,6 +14,7 @@
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/dynamic-forms": "workspace:*",
     "@workspace/kernel": "workspace:*",
     "@workspace/module-reference": "workspace:*",
     "@workspace/module-activos": "workspace:*",
@@ -21,6 +22,7 @@
     "@workspace/module-inventario": "workspace:*",
     "@workspace/module-planes": "workspace:*",
     "@workspace/module-preventivo": "workspace:*",
+    "@workspace/module-correctivo": "workspace:*",
     "@workspace/module-ordenes": "workspace:*",
     "@workspace/platform": "workspace:*",
     "bcryptjs": "^3.0.3",

@@ -59,6 +59,13 @@ import PreventivoActividad from '@/pages/preventivo-actividad';
 import PreventivoCalendario from '@/pages/preventivo-calendario';
 import PreventivoEscanear from '@/pages/preventivo-escanear';
 import PreventivoSincronizacion from '@/pages/preventivo-sincronizacion';
+import CorrectivoSolicitudes from '@/pages/correctivo-solicitudes';
+import CorrectivoSolicitudNueva from '@/pages/correctivo-solicitud-nueva';
+import CorrectivoSolicitudFicha from '@/pages/correctivo-solicitud-ficha';
+import CorrectivoDiagnostico from '@/pages/correctivo-diagnostico';
+import CorrectivoIntervencion from '@/pages/correctivo-intervencion';
+import CorrectivoEscanear from '@/pages/correctivo-escanear';
+import CorrectivoSincronizacion from '@/pages/correctivo-sincronizacion';
 
 const queryClient = new QueryClient();
 
@@ -137,6 +144,13 @@ function Router() {
       <Route path="/preventivo/sincronizacion" component={PreventivoSincronizacion} />
       <Route path="/preventivo/programas/:id/actividad" component={PreventivoActividad} />
       <Route path="/preventivo/programas/:id" component={PreventivoProgramaFicha} />
+      <Route path="/correctivo/solicitudes" component={CorrectivoSolicitudes} />
+      <Route path="/correctivo/solicitudes/nueva" component={CorrectivoSolicitudNueva} />
+      <Route path="/correctivo/escanear" component={CorrectivoEscanear} />
+      <Route path="/correctivo/sincronizacion" component={CorrectivoSincronizacion} />
+      <Route path="/correctivo/solicitudes/:id/diagnostico" component={CorrectivoDiagnostico} />
+      <Route path="/correctivo/solicitudes/:id" component={CorrectivoSolicitudFicha} />
+      <Route path="/correctivo/intervenciones/:id" component={CorrectivoIntervencion} />
       <Route component={NotFound} />
     </Switch>
   );

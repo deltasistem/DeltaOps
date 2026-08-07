@@ -80,6 +80,12 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
       prvActividades: await contarPorTenant("prv_actividades_read", DEMO_TENANT),
       prvGeneraciones: await contarPorTenant("prv_generaciones_read", DEMO_TENANT),
       prvProgramaciones: await contarPorTenant("prv_programaciones_read", DEMO_TENANT),
+      corSolicitudes: await contarPorTenant("cor_solicitudes_read", DEMO_TENANT),
+      corDiagnosticos: await contarPorTenant("cor_diagnosticos_read", DEMO_TENANT),
+      corGeneraciones: await contarPorTenant("cor_generaciones_read", DEMO_TENANT),
+      corIntervenciones: await contarPorTenant("cor_intervenciones_read", DEMO_TENANT),
+      corConsumos: await contarPorTenant("cor_consumos_read", DEMO_TENANT),
+      corEventosActivo: await contarPorTenant("cor_eventos_activo_read", DEMO_TENANT),
     });
     const antes = await snapshot();
 
@@ -95,15 +101,17 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     // planes (orquestación `modulo.ordenes.crear`, dedup por claveDedup).
     expect(antes.activos).toBe(10);
     // Órdenes: 7 del ciclo de vida (seedOrdenes) + 7 preventivas del motor de
-    // Planes + 4 preventivas del módulo Preventivo (seedPreventivo, materializadas
-    // por el MaterializadorOrdenes vía orquestación oficial) = 18.
-    expect(antes.ordenes).toBe(18);
+    // Planes + 4 preventivas del módulo Preventivo (seedPreventivo) + 2
+    // CORRECTIVAS materializadas por Correctivo (seedCorrectivo, generar-orden
+    // -correctiva, tipo canónico "correctiva") = 20.
+    expect(antes.ordenes).toBe(20);
     expect(antes.items).toBe(12);
-    // Abastecimiento: 10 artículos, 4 proveedores, 3 solicitudes, 2 cotizaciones,
-    // 2 órdenes de compra, 2 recepciones.
+    // Abastecimiento: 10 artículos, 4 proveedores, 4 solicitudes (3 del seed de
+    // Abastecimiento + 1 AUTOMÁTICA generada por Correctivo ante faltante de stock,
+    // origen tipo "orden"), 2 cotizaciones, 2 órdenes de compra, 2 recepciones.
     expect(antes.absArticulos).toBe(10);
     expect(antes.absProveedores).toBe(4);
-    expect(antes.absSolicitudes).toBe(3);
+    expect(antes.absSolicitudes).toBe(4);
     expect(antes.absCotizaciones).toBe(2);
     expect(antes.absOrdenes).toBe(2);
     expect(antes.absRecepciones).toBe(2);
@@ -113,6 +121,15 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(antes.prvActividades).toBe(8);
     expect(antes.prvGeneraciones).toBe(4);
     expect(antes.prvProgramaciones).toBe(3);
+    // Correctivo (DGP-015): 4 solicitudes, 2 diagnósticos, 2 generaciones de OT,
+    // 1 intervención mayor, 4 hechos de repuestos (reserva/consumo/devolución/compra)
+    // y 7 eventos de activo (incluye 1 reincidencia).
+    expect(antes.corSolicitudes).toBe(4);
+    expect(antes.corDiagnosticos).toBe(2);
+    expect(antes.corGeneraciones).toBe(2);
+    expect(antes.corIntervenciones).toBe(1);
+    expect(antes.corConsumos).toBe(4);
+    expect(antes.corEventosActivo).toBe(7);
   }, 120_000);
 
   it("ABASTECIMIENTO · artículos ligados a Inventario, proveedores calificados y OC recibida", async () => {
@@ -368,6 +385,151 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(await contarPorTenant("prv_programas_read", "tenant-inexistente")).toBe(0);
     expect(await contarPorTenant("prv_generaciones_read", "tenant-inexistente")).toBe(0);
     expect(await contarPorTenant("prv_programaciones_read", "tenant-inexistente")).toBe(0);
+  });
+
+  it("CORRECTIVO · 4 solicitudes en estados variados (triage/diagnóstico/2×aprobada) por origen", async () => {
+    const estados = await pool.query(
+      `SELECT estado, count(*)::int AS n FROM deltaops.cor_solicitudes_read
+        WHERE tenant_id = $1 GROUP BY estado ORDER BY estado`,
+      [DEMO_TENANT],
+    );
+    const porEstado = Object.fromEntries(estados.rows.map((x: { estado: string; n: number }) => [x.estado, Number(x.n)]));
+    expect(porEstado["triage"]).toBe(1);
+    expect(porEstado["diagnostico"]).toBe(1);
+    expect(porEstado["aprobada"]).toBe(2);
+
+    // Orígenes variados (operador/producción/SST/calidad) sobre activos reales.
+    const origenes = await pool.query(
+      `SELECT DISTINCT origen FROM deltaops.cor_solicitudes_read WHERE tenant_id = $1 ORDER BY 1`,
+      [DEMO_TENANT],
+    );
+    const setOrigenes = origenes.rows.map((x: { origen: string }) => x.origen);
+    expect(setOrigenes).toEqual(expect.arrayContaining(["calidad", "operador", "produccion", "sst"]));
+
+    // Las solicitudes apuntan a activos REALES del DEMO (activo_id no nulo y existe).
+    const activosReales = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.cor_solicitudes_read s
+         JOIN deltaops.act_activos_read a ON a.id = s.activo_id AND a.tenant_id = s.tenant_id
+        WHERE s.tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    expect(Number(activosReales.rows[0]?.n ?? 0)).toBe(4);
+  });
+
+  it("CORRECTIVO · 2 diagnósticos anclados a Dynamic Forms con causa raíz", async () => {
+    const diag = await pool.query(
+      `SELECT count(*)::int AS total,
+              count(causa_raiz)::int AS con_raiz,
+              count(DISTINCT plantilla_id)::int AS plantillas
+         FROM deltaops.cor_diagnosticos_read WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    const row = diag.rows[0] as { total: number; con_raiz: number; plantillas: number };
+    expect(Number(row.total)).toBe(2);
+    expect(Number(row.con_raiz)).toBe(2);
+    // Ambos diagnósticos se anclan a la MISMA plantilla publicada de Dynamic Forms.
+    expect(Number(row.plantillas)).toBe(1);
+  });
+
+  it("CORRECTIVO · 2 OT correctivas materializadas, vinculadas y SIN duplicados", async () => {
+    const total = await contarPorTenant("cor_generaciones_read", DEMO_TENANT);
+    expect(total).toBe(2);
+
+    // claveDedup ÚNICA por generación (anti-duplicado determinista).
+    const dedup = await pool.query(
+      `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.cor_generaciones_read WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    expect(Number(dedup.rows[0]?.n ?? 0)).toBe(total);
+
+    // Cada generación enlaza una OT REAL de tipo "correctiva" en el módulo Órdenes.
+    const otReales = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.cor_generaciones_read g
+         JOIN deltaops.ord_ordenes o ON o.id = g.orden_trabajo_id AND o.tenant_id = g.tenant_id
+        WHERE g.tenant_id = $1 AND o.tipo = 'correctiva'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(otReales.rows[0]?.n ?? 0)).toBe(2);
+
+    // OT distintas (sin duplicar): cada generación materializada enlaza una OT única.
+    const otDistintas = await pool.query(
+      `SELECT count(DISTINCT orden_trabajo_id)::int AS n FROM deltaops.cor_generaciones_read
+        WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL`,
+      [DEMO_TENANT],
+    );
+    expect(Number(otDistintas.rows[0]?.n ?? 0)).toBe(2);
+  });
+
+  it("CORRECTIVO · 1 intervención MAYOR (multi-cuadrilla) con consumo y devolución de repuestos", async () => {
+    const interv = await pool.query(
+      `SELECT count(*)::int AS total, count(*) FILTER (WHERE mayor)::int AS mayores
+         FROM deltaops.cor_intervenciones_read WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    const row = interv.rows[0] as { total: number; mayores: number };
+    expect(Number(row.total)).toBe(1);
+    expect(Number(row.mayores)).toBe(1); // 2 cuadrillas ⇒ Correctivo Mayor
+
+    // Hechos de repuestos: reserva + consumo (parcial) + devolución + compra.
+    const tipos = await pool.query(
+      `SELECT DISTINCT tipo FROM deltaops.cor_consumos_read WHERE tenant_id = $1 ORDER BY 1`,
+      [DEMO_TENANT],
+    );
+    const setTipos = tipos.rows.map((x: { tipo: string }) => x.tipo);
+    expect(setTipos).toEqual(expect.arrayContaining(["compra", "consumo", "devolucion", "reserva"]));
+
+    // Evidencia REAL en Inventario: existe un movimiento de consumo referido a una OT.
+    const movsConsumo = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.inv_movimientos_read
+        WHERE tenant_id = $1 AND tipo = 'consumo'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(movsConsumo.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(1);
+  });
+
+  it("CORRECTIVO · el faltante de stock generó una solicitud de compra AUTOMÁTICA en Abastecimiento", async () => {
+    // La auto-solicitud de Correctivo nace con origen tipo "orden" y
+    // referenciaTipo "orden-correctiva" (la distingue de la solicitud de
+    // Abastecimiento con referencia "orden-trabajo").
+    const compra = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.abs_solicitudes_read
+        WHERE tenant_id = $1 AND origen_tipo = 'orden'
+          AND (datos->'origen'->>'referenciaTipo') = 'orden-correctiva'`,
+      [DEMO_TENANT],
+    );
+    expect(Number(compra.rows[0]?.n ?? 0)).toBe(1);
+  });
+
+  it("CORRECTIVO · eventos de activo con detección de REINCIDENCIA (mismo activo + modo)", async () => {
+    const total = await contarPorTenant("cor_eventos_activo_read", DEMO_TENANT);
+    expect(total).toBe(7);
+
+    // Cobertura de tipos de evento del historial de fallas (los canónicos con
+    // `tipo` proyectado; las reincidencias generan filas-marcador aparte).
+    const tipos = await pool.query(
+      `SELECT DISTINCT tipo FROM deltaops.cor_eventos_activo_read
+        WHERE tenant_id = $1 AND tipo <> '' ORDER BY 1`,
+      [DEMO_TENANT],
+    );
+    const setTipos = tipos.rows.map((x: { tipo: string }) => x.tipo);
+    expect(setTipos).toEqual(expect.arrayContaining([
+      "falla-reportada", "reparacion-iniciada", "reparacion-finalizada", "puesta-en-servicio",
+    ]));
+
+    // Al menos una REINCIDENCIA detectada (2 fallas del mismo modo en MON-001 dentro de ventana).
+    const reincidentes = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.cor_eventos_activo_read
+        WHERE tenant_id = $1 AND reincidente = true`,
+      [DEMO_TENANT],
+    );
+    expect(Number(reincidentes.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(1);
+  });
+
+  it("AISLAMIENTO CORRECTIVO · un tenant ajeno no ve datos del DEMO", async () => {
+    expect(await contarPorTenant("cor_solicitudes_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("cor_generaciones_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("cor_intervenciones_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("cor_eventos_activo_read", "tenant-inexistente")).toBe(0);
   });
 
   it("AISLAMIENTO · delta-demo y deltaops están particionados por tenant_id", async () => {

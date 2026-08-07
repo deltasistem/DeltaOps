@@ -43,6 +43,7 @@ import { TabComentarios } from "./ficha/tab-comentarios";
 import { TabOrdenes } from "./ficha/tab-ordenes";
 import { TabPlanes } from "./ficha/tab-planes";
 import { TabPreventivo } from "./ficha/tab-preventivo";
+import { TabCorrectivo } from "./ficha/tab-correctivo";
 import { leerParam } from "../lib/ecosistema/deep-links";
 
 export default function ActivosFichaPage() {
@@ -121,6 +122,7 @@ function Ficha({ id }: { id: string }) {
           { id: "ordenes", etiqueta: "Órdenes", contenido: <TabOrdenes activoId={id} activoNombre={a.nombre} /> },
           { id: "planes", etiqueta: "Planes", contenido: <TabPlanes activoId={id} activoNombre={a.nombre} /> },
           { id: "preventivo", etiqueta: "Preventivo", contenido: <TabPreventivo activoId={id} activoNombre={a.nombre} /> },
+          { id: "correctivo", etiqueta: "Correctivo", contenido: <TabCorrectivo activoId={id} activoNombre={a.nombre} /> },
           { id: "timeline", etiqueta: "Timeline", contenido: <TabTimeline id={id} /> },
           { id: "documentacion", etiqueta: "Documentación", contenido: <TabDocumentacion id={id} /> },
           { id: "relaciones", etiqueta: "Relaciones", contenido: <TabRelaciones id={id} nombre={a.nombre} onNavegar={(x) => navegar(`/activos/${x}`)} /> },

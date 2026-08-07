@@ -1,0 +1,255 @@
+DGP-015 · ENTERPRISE CORRECTIVE MAINTENANCE SYSTEM
+
+La Dirección del Programa autoriza el inicio de la fase DGP-015 — Enterprise Corrective Maintenance System.
+
+Esta fase deberá construirse siguiendo exactamente las mismas reglas arquitectónicas de todo el programa.
+
+Restricciones generales
+No modificar ningún paquete del corpus congelado.
+Toda nueva funcionalidad deberá implementarse por composición utilizando únicamente contratos públicos.
+Mantener Clean Architecture, DDD, CQRS, Event Driven, Offline First, Configuration First, Multiempresa y RLS.
+No introducir nuevas dependencias de UI distintas al Design System.
+No introducir nuevos motores si ya existe uno reutilizable.
+Objetivo
+
+Construir el Sistema Empresarial de Mantenimiento Correctivo como un nuevo módulo empresarial:
+
+@workspace/module-correctivo
+
+que reutilice por composición:
+
+Module Activos
+Module Órdenes
+Module Inventario
+Module Abastecimiento
+Workflow Engine
+Dynamic Forms
+Business Foundation
+Shared Platform
+Design System
+
+sin modificar ninguno de ellos.
+
+El módulo deberá permitir
+Solicitudes de mantenimiento
+
+Registrar solicitudes provenientes de:
+
+Operadores
+Supervisores
+Producción
+Calidad
+SST
+IoT (contrato preparado)
+APIs futuras
+
+Cada solicitud podrá asociarse a:
+
+activo
+ubicación
+componente
+prioridad
+criticidad
+síntomas
+evidencias
+fotografías
+videos referencia-only
+comentarios
+QR
+Diagnóstico
+
+Construir el ciclo completo de diagnóstico.
+
+Debe soportar:
+
+causa reportada
+causa encontrada
+causa raíz
+modo de falla
+efecto
+criticidad
+impacto
+recomendaciones
+
+todo mediante Dynamic Forms.
+
+Clasificación
+
+Catálogos por tenant para:
+
+tipo de falla
+modo de falla
+causa
+efecto
+prioridad
+severidad
+impacto
+origen
+
+sin enums.
+
+Flujo completo
+
+Solicitud
+
+↓
+
+Diagnóstico
+
+↓
+
+Validación
+
+↓
+
+Generación automática de OT Correctiva
+
+↓
+
+Asignación
+
+↓
+
+Ejecución
+
+↓
+
+Validación
+
+↓
+
+Cierre
+
+todo gobernado por Workflow Engine.
+
+Integración con Inventario
+
+Permitir:
+
+consumo directo desde reservas
+solicitud de repuestos
+validación de disponibilidad
+consumo parcial
+devolución
+
+sin romper Inventario.
+
+Integración con Abastecimiento
+
+Si no existe stock suficiente:
+
+generar automáticamente una solicitud de compra mediante el contrato oficial.
+
+Nunca acceder directamente a Compras.
+
+Integración con Activos
+
+Actualizar automáticamente:
+
+historial
+frecuencia de fallas
+MTBF preparado
+MTTR preparado
+reincidencias
+
+como eventos.
+
+No calcular KPIs.
+
+Solo registrar información.
+
+Correctivo Mayor
+
+Permitir:
+
+múltiples cuadrillas
+múltiples responsables
+múltiples recursos
+
+sobre una misma intervención.
+
+Evidencias
+
+Reutilizar:
+
+Attachment
+Timeline
+Comentarios
+
+No almacenar binarios.
+
+Offline First
+
+Toda captura deberá funcionar offline.
+
+Incluyendo:
+
+solicitud
+diagnóstico
+consumo
+comentarios
+evidencias
+cierre
+Tenant DEMO
+
+Ampliar el tenant DEMO con:
+
+solicitudes
+fallas
+diagnósticos
+órdenes correctivas
+consumos
+compras disparadas
+cierres
+
+sin duplicados.
+
+API
+
+Generar OpenAPI.
+
+Mantener Contract First.
+
+Drift Test obligatorio.
+
+Revisión arquitectónica
+
+Obligatoria.
+
+No podrá aprobarse la fase si existe:
+
+bypass del Workflow
+acceso directo a Inventario
+acceso directo a Compras
+duplicación de lógica de Activos
+lógica duplicada de Órdenes
+Pruebas
+
+Cobertura completa:
+
+dominio
+PostgreSQL
+RLS
+Offline
+Workflow
+Inventario
+Compras
+Replay
+OpenAPI
+CQRS
+Timeline
+Documentación
+
+Toda en español.
+
+Entrega
+
+Al finalizar, entregar exclusivamente:
+
+INFORME OFICIAL DE CIERRE — DGP-015 · ENTERPRISE CORRECTIVE MAINTENANCE SYSTEM
+
+siguiendo exactamente el formato oficial del programa.
+
+No iniciar DGP-016.
+
+Esperar instrucciones de la Dirección del Programa.

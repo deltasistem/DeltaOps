@@ -26,6 +26,7 @@ import { inventarioRuntime, principalInventario } from "../routes/deltaops/inven
 import { planesRuntime, principalPlanes } from "../routes/deltaops/planes-runtime";
 import { abastecimientoRuntime, principalAbastecimiento } from "../routes/deltaops/abastecimiento-runtime";
 import { preventivoRuntime, principalPreventivo } from "../routes/deltaops/preventivo-runtime";
+import { correctivoRuntime, principalCorrectivo, formulariosRuntime, contextForFormularios } from "../routes/deltaops/correctivo-runtime";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -294,7 +295,7 @@ interface InvContext {
   itemIds: Map<string, string>; invIds: Map<string, string>;
 }
 
-async function seedInventario(): Promise<void> {
+async function seedInventario(): Promise<Map<string, string>> {
   const rt = inventarioRuntime();
   const ctx = ctxCon(principalInventario("seed-demo", "admin"));
   const cmd = (n: string, i: unknown) => rt.platform.kernel.commands.execute(ctx, n, i);
@@ -411,6 +412,9 @@ async function seedInventario(): Promise<void> {
   await drain();
 
   log(`Inventario: ${ITEMS.length} items, ${Object.keys(lotesPorSku).length} lotes, 2 series, ${entradas.length} movimientos, 1 reserva, 1 transferencia, 1 conteo, 1 ajuste`);
+  // Devuelve los inventarioId por SKU (existencias reales) para que Correctivo
+  // pueda reservar/consumir/devolver repuestos sobre stock REAL del DEMO.
+  return c.invIds;
 }
 
 /* --------------- 6) Plataforma: comentarios, adjuntos, QR ---------------- */
@@ -1330,6 +1334,364 @@ async function seedPreventivo(activoIds: Map<string, string>): Promise<void> {
   await drain();
 }
 
+/* ------------------- 8) Correctivo (DGP-015.3): mantenimiento correctivo ---- */
+/**
+ * Enterprise Corrective Maintenance para el DEMO: catálogos configurables,
+ * solicitudes por origen/prioridad/criticidad con síntomas y evidencias, ciclo
+ * de vida gobernado por el Workflow REAL (triage/diagnóstico/validación/aprobada),
+ * diagnósticos anclados a Dynamic Forms, generación IDEMPOTENTE de OT correctivas
+ * (materializador oficial), intervención Mayor multi-cuadrilla con reserva/consumo
+ * parcial/devolución sobre inventario REAL, auto-solicitud de compra ante faltante
+ * (visible en Abastecimiento) y eventos de activo con detección de REINCIDENCIA.
+ * Todo por comandos oficiales, con `id`/`opId` deterministas (token `cor:`).
+ */
+
+/**
+ * ID determinista para entidades de correctivo. `idDet` muestrea el seed con
+ * `i % len` durante 32 iteraciones, por lo que dos seeds que comparten un prefijo
+ * largo y sólo difieren al final COLISIONAN (p. ej. "cor:solicitud:SOL-MAQ" vs
+ * "cor:solicitud:SOL-MON"). Para evitarlo invertimos los segmentos del token de
+ * modo que el fragmento MÁS discriminante quede al FRENTE, y namespaciamos con
+ * "cor" para no chocar con ids de otros módulos del seed.
+ */
+const corId = (token: string) => idDet(`${token.split(":").reverse().join(":")}:cor`);
+
+/** Catálogos correctivo (subconjunto representativo de los canónicos del módulo). */
+const CATALOGOS_COR: [string, string, string][] = [
+  ["tipos-falla", "mecanica", "Mecánica"], ["tipos-falla", "electrica", "Eléctrica"],
+  ["tipos-falla", "hidraulica", "Hidráulica"], ["tipos-falla", "electronica", "Electrónica"],
+  ["modos-falla", "desgaste", "Desgaste"], ["modos-falla", "fuga", "Fuga"],
+  ["modos-falla", "sobrecalentamiento", "Sobrecalentamiento"], ["modos-falla", "vibracion", "Vibración"],
+  ["modos-falla", "rotura", "Rotura"],
+  ["causas", "falta-mantenimiento", "Falta de mantenimiento"], ["causas", "fin-vida-util", "Fin de vida útil"],
+  ["causas", "error-operacion", "Error de operación"], ["causas", "material-defectuoso", "Material defectuoso"],
+  ["efectos", "parada-total", "Parada total"], ["efectos", "parada-parcial", "Parada parcial"],
+  ["efectos", "degradacion", "Degradación"], ["efectos", "riesgo-seguridad", "Riesgo de seguridad"],
+  ["prioridades", "baja", "Baja"], ["prioridades", "media", "Media"], ["prioridades", "alta", "Alta"],
+  ["prioridades", "critica", "Crítica"], ["prioridades", "emergencia", "Emergencia"],
+  ["severidades", "leve", "Leve"], ["severidades", "moderada", "Moderada"],
+  ["severidades", "grave", "Grave"], ["severidades", "critica", "Crítica"],
+  ["impactos", "produccion", "Producción"], ["impactos", "seguridad", "Seguridad"],
+  ["impactos", "calidad", "Calidad"], ["impactos", "economico", "Económico"],
+  ["origenes-solicitud", "operador", "Operador"], ["origenes-solicitud", "produccion", "Producción"],
+  ["origenes-solicitud", "sst", "SST"], ["origenes-solicitud", "calidad", "Calidad"],
+  ["origenes-solicitud", "supervisor", "Supervisor"],
+  ["criticidades", "baja", "Baja"], ["criticidades", "media", "Media"],
+  ["criticidades", "alta", "Alta"], ["criticidades", "critica", "Crítica"],
+  ["sintomas", "ruido-anormal", "Ruido anormal"], ["sintomas", "sobrecalienta", "Se sobrecalienta"],
+  ["sintomas", "fuga-fluido", "Fuga de fluido"], ["sintomas", "vibracion-excesiva", "Vibración excesiva"],
+  ["sintomas", "no-arranca", "No arranca"],
+  ["roles-personal", "tecnico", "Técnico"], ["roles-personal", "tecnico-lider", "Técnico líder"],
+  ["roles-personal", "especialista", "Especialista"], ["roles-personal", "supervisor", "Supervisor"],
+  ["tipos-recurso", "personal", "Personal"], ["tipos-recurso", "herramienta", "Herramienta"],
+  ["tipos-recurso", "repuesto", "Repuesto"], ["tipos-recurso", "equipo-apoyo", "Equipo de apoyo"],
+  ["unidades-tiempo", "horas", "Horas"], ["monedas", "usd", "USD"],
+];
+
+/** Clave y versión de la plantilla de diagnóstico (Dynamic Forms). */
+const DIAG_PLANTILLA_CLAVE = "diag-correctivo";
+const DIAG_PLANTILLA_VERSION = 1;
+
+async function seedCorrectivo(activoIds: Map<string, string>, invIds: Map<string, string>): Promise<void> {
+  const rt = correctivoRuntime();
+  const ctx = ctxCon(principalCorrectivo("seed-demo", "admin"));
+  const cmd = (n: string, i: unknown) => rt.platform.kernel.commands.execute(ctx, n, i);
+  const q = (n: string, i: unknown) => rt.platform.kernel.queries.execute(ctx, n, i);
+  const drain = () => drenarCompleto(rt.platform.kernel);
+
+  const activo = (code: string) => activoIds.get(code) ?? idDet(`activo:${code}`);
+  const articulo = (clave: string) => idDet(`${clave}:art:abs-procurement`);
+
+  // (0) Catálogos configurables del módulo (upsert idempotente por clave).
+  for (const [c, k, e] of CATALOGOS_COR) unwrap(await cmd("modulo.correctivo.catalogo-upsert", { catalogo: c, clave: k, etiqueta: e }), `catalogo.cor ${c}/${k}`);
+  await drain();
+  log(`Catálogos de correctivo habilitados (${CATALOGOS_COR.length})`);
+
+  // (1) Plantilla de diagnóstico en Dynamic Forms: crear BORRADOR + PUBLICAR
+  //     (idempotente por id de plantilla). Los diagnósticos se anclan a ella.
+  const fr = formulariosRuntime();
+  const ctxF = contextForFormularios("seed-demo", DEMO_TENANT);
+  const fcmd = (n: string, i: unknown) => fr.platform.kernel.commands.execute(ctxF, n, i);
+  const fq = (n: string, i: unknown) => fr.platform.kernel.queries.execute(ctxF, n, i);
+  const fdrain = () => drenarCompleto(fr.platform.kernel);
+  const plantillaId = corId("plantilla:diagnostico");
+  // ¿Ya publicada? (idempotencia): si existe la versión 1, se omite crear/publicar.
+  const yaPub = await fq("modulo.formularios.plantilla.obtener", { clave: DIAG_PLANTILLA_CLAVE, version: DIAG_PLANTILLA_VERSION });
+  if (!yaPub.ok || !yaPub.value) {
+    unwrap(await fcmd("modulo.formularios.plantilla.crear", {
+      id: plantillaId, opId: "seed:cor:plantilla:crear", clave: DIAG_PLANTILLA_CLAVE,
+      contenido: {
+        definicion: {
+          clave: DIAG_PLANTILLA_CLAVE, titulo: "Diagnóstico correctivo",
+          nodos: [
+            { clase: "campo", clave: "hallazgo", tipo: "texto", etiqueta: "Hallazgo principal", obligatorio: true },
+            { clase: "campo", clave: "causaProbable", tipo: "texto", etiqueta: "Causa probable", obligatorio: true },
+            { clase: "campo", clave: "requiereRepuestos", tipo: "booleano", etiqueta: "¿Requiere repuestos?" },
+            { clase: "campo", clave: "horasEstimadas", tipo: "numero", etiqueta: "Horas estimadas de reparación" },
+          ],
+        },
+      },
+    }), "cor.plantilla.crear");
+    await fdrain();
+    unwrap(await fcmd("modulo.formularios.plantilla.publicar", { id: plantillaId, opId: "seed:cor:plantilla:publicar" }), "cor.plantilla.publicar");
+    await fdrain();
+  }
+  log(`Plantilla de diagnóstico publicada (${DIAG_PLANTILLA_CLAVE} v${DIAG_PLANTILLA_VERSION})`);
+
+  // (2) Cuatro solicitudes sobre activos REALES con orígenes/prioridades variados.
+  //     Estado tras el seed: 1 en triage, 1 en diagnóstico, 2 aprobadas.
+  interface DefSolicitud {
+    key: string; activo: string; origen: string; prioridad: string; criticidad: string;
+    titulo: string; sintomas: { clave?: string; texto?: string }[]; conEvidencias?: boolean;
+    // Destino: "triage" | "diagnostico" | "aprobada". Las aprobadas registran diagnóstico.
+    destino: "triage" | "diagnostico" | "aprobada";
+    diag?: { causaReportada: string; causaEncontrada: string; causaRaiz: string; modoFalla: string; efecto: string; impacto: string; severidad: string; recomendaciones: string };
+  }
+  const SOLICITUDES: DefSolicitud[] = [
+    {
+      key: "SOL-MAQ", activo: "MAQ-001", origen: "operador", prioridad: "alta", criticidad: "alta",
+      titulo: "Excavadora con ruido anormal en tren de rodaje",
+      sintomas: [{ clave: "ruido-anormal" }, { texto: "Se percibe golpeteo al girar" }],
+      conEvidencias: true, destino: "triage",
+    },
+    {
+      key: "SOL-MON", activo: "MON-001", origen: "produccion", prioridad: "critica", criticidad: "critica",
+      titulo: "Montacargas no levanta carga nominal",
+      sintomas: [{ clave: "fuga-fluido" }, { texto: "Fuga en cilindro hidráulico" }],
+      destino: "diagnostico",
+    },
+    {
+      key: "SOL-BAN", activo: "BAN-001", origen: "sst", prioridad: "alta", criticidad: "alta",
+      titulo: "Banda transportadora con vibración excesiva",
+      sintomas: [{ clave: "vibracion-excesiva" }], destino: "aprobada",
+      diag: { causaReportada: "error-operacion", causaEncontrada: "material-defectuoso", causaRaiz: "fin-vida-util", modoFalla: "desgaste", efecto: "parada-parcial", impacto: "produccion", severidad: "grave", recomendaciones: "Reemplazar rodamientos y banda; alinear poleas." },
+    },
+    {
+      key: "SOL-EMP", activo: "EMP-001", origen: "calidad", prioridad: "media", criticidad: "media",
+      titulo: "Empacadora sobrecalienta el motor",
+      sintomas: [{ clave: "sobrecalienta" }], destino: "aprobada",
+      diag: { causaReportada: "falta-mantenimiento", causaEncontrada: "falta-mantenimiento", causaRaiz: "falta-mantenimiento", modoFalla: "sobrecalentamiento", efecto: "degradacion", impacto: "calidad", severidad: "moderada", recomendaciones: "Limpiar disipadores y sustituir lubricante." },
+    },
+  ];
+
+  const solIds = new Map<string, string>();
+  const otIds = new Map<string, string>();
+  // Estado actual de la solicitud (fuente de verdad para idempotencia).
+  const estadoSol = async (id: string): Promise<{ estado: string; version: number } | null> => {
+    const r = await q("modulo.correctivo.solicitud-detalle", { id });
+    if (!r.ok || !r.value) return null;
+    const v = r.value as { estado?: string; version?: number };
+    return { estado: v.estado ?? "registro", version: v.version ?? 1 };
+  };
+  // Transiciona idempotentemente respetando los estados de origen admisibles.
+  // Devuelve el estado/versión RESULTANTE leído del comando (no del read model,
+  // para no depender del timing de proyección del outbox). Si el estado actual no
+  // es transicionable desde `desde`, devuelve el estado leído sin mutar.
+  const transicionar = async (key: string, id: string, accion: string, desde: string[]): Promise<{ estado: string; version: number } | null> => {
+    const st = await estadoSol(id);
+    if (st && desde.includes(st.estado)) {
+      const r = unwrap(await cmd("modulo.correctivo.transicionar-solicitud", { id, accion, expectedVersion: st.version, opId: `seed:cor:sol:${key}:${accion}` }), `transicionar ${key}/${accion}`) as { estado?: string; version?: number };
+      await drain();
+      return { estado: r.estado ?? accion, version: r.version ?? st.version + 1 };
+    }
+    return st;
+  };
+
+  let creadas = 0;
+  for (const s of SOLICITUDES) {
+    const id = corId(`solicitud:${s.key}`);
+    solIds.set(s.key, id);
+    const r = unwrap(await cmd("modulo.correctivo.crear-solicitud", {
+      id, opId: `seed:cor:sol:${s.key}:crear`,
+      titulo: s.titulo, descripcion: `${s.titulo} — solicitud correctiva DEMO`,
+      origen: s.origen, objeto: { activoId: activo(s.activo) },
+      prioridad: s.prioridad, criticidad: s.criticidad, sintomas: s.sintomas,
+      ...(s.conEvidencias
+        ? { evidencias: [{ attachmentId: corId(`evid:${s.key}`), tipo: "foto", etiqueta: "Foto de la falla (referencia)" }] }
+        : {}),
+    }), `crear-solicitud ${s.key}`) as { idempotente?: boolean };
+    await drain();
+    if (r.idempotente !== true) creadas++;
+
+    // Comentarios (sólo en la solicitud con evidencias de referencia).
+    if (s.conEvidencias) {
+      unwrap(await cmd("modulo.correctivo.comentar-solicitud", { id, comentarioId: corId(`coment:${s.key}:1`), texto: "Operador reporta golpeteo intermitente al maniobrar." }), `comentar ${s.key}`);
+      await drain();
+    }
+
+    // Flujo por Workflow REAL hasta el destino.
+    if (s.destino === "triage") {
+      await transicionar(s.key, id, "enviarTriage", ["registro"]);
+    } else {
+      await transicionar(s.key, id, "enviarTriage", ["registro"]);
+      const trasDiag = await transicionar(s.key, id, "iniciarDiagnostico", ["triage"]);
+      // Las que llegan a "aprobada" registran su diagnóstico ANTES de validar.
+      if (s.diag) {
+        // Versión vigente tras iniciarDiagnostico; el diagnóstico la BUMPEA al
+        // anclar el diagnosticoId en la solicitud, así que threadeamos la versión
+        // RETORNADA por el comando (no el read model) para evitar conflictos.
+        let versionSol = trasDiag?.version ?? (await estadoSol(id))?.version ?? 1;
+        const estadoActual = trasDiag?.estado ?? (await estadoSol(id))?.estado;
+        // Idempotente: sólo si aún NO tiene diagnóstico anclado (estado diagnostico).
+        if (estadoActual === "diagnostico") {
+          const rd = unwrap(await cmd("modulo.correctivo.registrar-diagnostico", {
+            id: corId(`diagnostico:${s.key}`), opId: `seed:cor:diag:${s.key}`,
+            solicitudId: id, expectedVersion: versionSol,
+            plantilla: { plantillaId: DIAG_PLANTILLA_CLAVE, version: DIAG_PLANTILLA_VERSION },
+            respuestas: { hallazgo: s.titulo, causaProbable: s.diag.causaEncontrada, requiereRepuestos: true, horasEstimadas: 4 },
+            causaReportada: s.diag.causaReportada, causaEncontrada: s.diag.causaEncontrada, causaRaiz: s.diag.causaRaiz,
+            clasificacion: { modoFalla: s.diag.modoFalla, efecto: s.diag.efecto, impacto: s.diag.impacto, severidad: s.diag.severidad },
+            recomendaciones: s.diag.recomendaciones,
+          }), `registrar-diagnostico ${s.key}`) as { solicitudVersion?: number; idempotente?: boolean };
+          await drain();
+          if (typeof rd.solicitudVersion === "number") versionSol = rd.solicitudVersion;
+        }
+        // Transición version-explícita: usamos la versión THREADED (no el read
+        // model, que puede ir por detrás del bump del diagnóstico). Idempotente
+        // por opId: si ya se ejecutó, el recibo devuelve el estado sin conflicto.
+        const trans = async (accion: string, desdeVersion: number): Promise<number> => {
+          const r = await cmd("modulo.correctivo.transicionar-solicitud", { id, accion, expectedVersion: desdeVersion, opId: `seed:cor:sol:${s.key}:${accion}` });
+          await drain();
+          if (r.ok) return ((r.value as { version?: number }).version ?? desdeVersion + 1);
+          // Ya aplicada (re-seed): recuperamos la versión vigente del read model.
+          const cur = await estadoSol(id);
+          return cur?.version ?? desdeVersion;
+        };
+        versionSol = await trans("enviarValidacion", versionSol);
+        versionSol = await trans("aprobar", versionSol);
+      }
+    }
+  }
+  log(`Solicitudes correctivas creadas (${SOLICITUDES.length}; nuevas ${creadas}) — estados: triage/diagnóstico/2×aprobada`);
+
+  // (3) Generación IDEMPOTENTE de OT correctivas desde las 2 aprobadas (materializador
+  //     oficial). Drena Órdenes INMEDIATAMENTE para proyectar la OT real.
+  let otNuevas = 0; let otIdemp = 0;
+  for (const key of ["SOL-BAN", "SOL-EMP"]) {
+    const solId = solIds.get(key)!;
+    const st = await estadoSol(solId);
+    if (!st || st.estado !== "aprobada") continue;
+    const r = unwrap(await cmd("modulo.correctivo.generar-orden-correctiva", {
+      id: corId(`generacion:${key}`), opId: `seed:cor:gen:${key}`, solicitudId: solId,
+    }), `generar-orden ${key}`) as { ordenTrabajoId?: string; idempotente?: boolean };
+    await drain();
+    await drenarCompleto(ordenesRuntime().platform.kernel);
+    if (r.ordenTrabajoId) { otIds.set(key, r.ordenTrabajoId); if (r.idempotente === true) otIdemp++; else otNuevas++; }
+  }
+  await drenarCompleto(ordenesRuntime().platform.kernel);
+  log(`OT correctivas materializadas: ${otNuevas} nuevas, ${otIdemp} idempotentes (tipo canónico "correctiva")`);
+
+  // (4) Intervención MAYOR (2 cuadrillas) sobre la OT de SOL-BAN, avanzada a
+  //     ejecución, con reserva de repuestos REALES, 1 consumo parcial y 1 devolución.
+  const otBan = otIds.get("SOL-BAN");
+  if (otBan) {
+    const intId = corId("intervencion:SOL-BAN");
+    const ri = unwrap(await cmd("modulo.correctivo.crear-intervencion", {
+      id: intId, opId: "seed:cor:int:SOL-BAN", solicitudId: solIds.get("SOL-BAN")!, ordenTrabajoId: otBan,
+      cuadrillas: [
+        {
+          cuadrillaId: corId("cuadrilla:mecanica"), etiqueta: "Cuadrilla mecánica",
+          responsables: [{ responsableId: corId("resp:lider-mec"), rol: "tecnico-lider" }, { responsableId: corId("resp:tec-mec"), rol: "tecnico" }],
+          recursos: [{ tipo: "herramienta", referencia: { tipo: "item", id: invIds.get("HER-001") ?? corId("rec:her"), etiqueta: "Juego de llaves" } }],
+        },
+        {
+          cuadrillaId: corId("cuadrilla:electrica"), etiqueta: "Cuadrilla eléctrica",
+          responsables: [{ responsableId: corId("resp:esp-elec"), rol: "especialista" }],
+          recursos: [{ tipo: "equipo-apoyo", referencia: { tipo: "equipo", id: corId("rec:multimetro"), etiqueta: "Multímetro" } }],
+        },
+      ],
+    }), "crear-intervencion SOL-BAN") as { estado?: string; version?: number; mayor?: boolean };
+    await drain();
+
+    // Estado de la intervención (idempotencia de transiciones).
+    const estadoInt = async (): Promise<{ estado: string; version: number } | null> => {
+      const r = await q("modulo.correctivo.intervencion-detalle", { id: intId });
+      if (!r.ok || !r.value) return null;
+      const v = r.value as { estado?: string; version?: number };
+      return { estado: v.estado ?? "preparacion", version: v.version ?? 1 };
+    };
+    const transInt = async (accion: string, desde: string[]): Promise<void> => {
+      const st = await estadoInt();
+      if (st && desde.includes(st.estado)) {
+        unwrap(await cmd("modulo.correctivo.transicionar-intervencion", { id: intId, accion, expectedVersion: st.version, opId: `seed:cor:int:SOL-BAN:${accion}` }), `transicionar-intervencion ${accion}`);
+        await drain();
+      }
+    };
+    // preparacion → asignacion → ejecucion (permite consumo de inventario).
+    await transInt("asignar", ["preparacion"]);
+    await transInt("iniciarEjecucion", ["asignacion"]);
+
+    // (4a) Reserva de repuestos REALES: 1 con stock (HER-001, SIN lote → apto para
+    //      consumo/devolución directos) + 1 con FALTANTE (BND-001, se pide más del
+    //      disponible) ⇒ auto-solicitud de compra vía AbastecimientoPort.
+    const invHer = invIds.get("HER-001");
+    const invBnd = invIds.get("BND-001");
+    if (invHer && invBnd) {
+      unwrap(await cmd("modulo.correctivo.reservar-repuestos", {
+        intervencionId: intId, opId: "seed:cor:resv:SOL-BAN", prioridadCompra: "alta",
+        lineas: [
+          { inventarioId: invHer, articuloId: articulo("ART-HER"), cantidad: 4, unidad: "juego" },
+          { inventarioId: invBnd, articuloId: articulo("ART-BND"), cantidad: 999, unidad: "unidad" },
+        ],
+      }), "reservar-repuestos SOL-BAN");
+      await drain();
+      await drenarCompleto(abastecimientoRuntime().platform.kernel);
+    }
+
+    // (4b) Consumo PARCIAL de un repuesto con stock (HER-001): consume 2 de 4.
+    if (invHer) {
+      unwrap(await cmd("modulo.correctivo.consumir-repuesto", {
+        intervencionId: intId, opId: "seed:cor:cons:SOL-BAN:HER",
+        linea: { inventarioId: invHer, articuloId: articulo("ART-HER"), cantidad: 2, unidad: "juego" },
+      }), "consumir-repuesto SOL-BAN");
+      await drain();
+      await drenarCompleto(inventarioRuntime().platform.kernel);
+    }
+
+    // (4c) Devolución de un repuesto (registro de devolución a bodega).
+    if (invHer) {
+      unwrap(await cmd("modulo.correctivo.devolver-repuesto", {
+        intervencionId: intId, opId: "seed:cor:dev:SOL-BAN:HER",
+        linea: { inventarioId: invHer, articuloId: articulo("ART-HER"), cantidad: 1, unidad: "juego" },
+      }), "devolver-repuesto SOL-BAN");
+      await drain();
+      await drenarCompleto(inventarioRuntime().platform.kernel);
+    }
+    log(`Intervención MAYOR (${ri.mayor ? "2 cuadrillas" : "1 cuadrilla"}) en ejecución: reserva + 1 consumo parcial + 1 devolución; faltante ⇒ compra automática`);
+  }
+
+  // (5) Eventos de activo (historial de fallas) + REINCIDENCIA (mismo activo +
+  //     mismo modo dentro de la ventana). Append-only; idempotente por id.
+  const EVENTOS: { key: string; activo: string; tipo: string; modoFalla?: string; solKey?: string; otKey?: string; ocurridoEn: string; kpi?: Record<string, number> }[] = [
+    { key: "ev-ban-1", activo: "BAN-001", tipo: "falla-reportada", modoFalla: "desgaste", solKey: "SOL-BAN", ocurridoEn: "2026-01-05T08:00:00.000Z" },
+    { key: "ev-ban-2", activo: "BAN-001", tipo: "falla-confirmada", modoFalla: "desgaste", solKey: "SOL-BAN", ocurridoEn: "2026-01-05T10:00:00.000Z" },
+    { key: "ev-ban-3", activo: "BAN-001", tipo: "reparacion-iniciada", otKey: "SOL-BAN", ocurridoEn: "2026-01-06T08:00:00.000Z", kpi: { tiempoEntreFallasMin: 43200 } },
+    { key: "ev-ban-4", activo: "BAN-001", tipo: "reparacion-finalizada", otKey: "SOL-BAN", ocurridoEn: "2026-01-06T14:00:00.000Z", kpi: { tiempoReparacionMin: 360 } },
+    { key: "ev-ban-5", activo: "BAN-001", tipo: "puesta-en-servicio", ocurridoEn: "2026-01-06T15:00:00.000Z", kpi: { tiempoIndisponibleMin: 1620 } },
+    // REINCIDENCIA en MON-001: dos fallas con el MISMO modo ("desgaste") dentro de la ventana.
+    { key: "ev-mon-1", activo: "MON-001", tipo: "falla-reportada", modoFalla: "desgaste", ocurridoEn: "2026-01-10T08:00:00.000Z" },
+    { key: "ev-mon-2", activo: "MON-001", tipo: "falla-reportada", modoFalla: "desgaste", solKey: "SOL-MON", ocurridoEn: "2026-01-20T08:00:00.000Z" },
+  ];
+  let reincidencias = 0;
+  for (const e of EVENTOS) {
+    const r = unwrap(await cmd("modulo.correctivo.registrar-evento-activo", {
+      id: corId(`evento:${e.key}`), activoId: activo(e.activo), tipo: e.tipo,
+      ...(e.modoFalla ? { modoFalla: e.modoFalla } : {}),
+      ...(e.solKey ? { solicitudId: solIds.get(e.solKey) } : {}),
+      ...(e.otKey && otIds.get(e.otKey) ? { ordenTrabajoId: otIds.get(e.otKey) } : {}),
+      ocurridoEn: e.ocurridoEn, ...(e.kpi ? { insumosKpi: e.kpi } : {}),
+    }), `evento-activo ${e.key}`) as { reincidente?: boolean };
+    await drain();
+    if (r.reincidente === true) reincidencias++;
+  }
+  log(`Eventos de activo registrados (${EVENTOS.length}); reincidencias detectadas: ${reincidencias}`);
+
+  // (6) Reproyección FINAL desde la bitácora durable (equivalencia por replay) por
+  //     si el outbox COMPARTIDO fue reclamado por otro runtime sin sus handlers.
+  unwrap(await cmd("modulo.correctivo.reproyectar", {}), "reproyectar correctivo");
+  await drain();
+}
+
 /* ------------------------------- Orquestación ---------------------------- */
 
 export async function seedDeltaDemo(): Promise<void> {
@@ -1338,10 +1700,11 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedCatalogos();
   const activoIds = await seedActivos();
   await seedOrdenes();
-  await seedInventario();
+  const invIds = await seedInventario();
   await seedPlanes(activoIds);
   await seedAbastecimiento();
   await seedPreventivo(activoIds);
+  await seedCorrectivo(activoIds, invIds);
   await seedPlataforma(activoIds);
   console.log("Seed DEMO completado.\n");
 }

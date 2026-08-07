@@ -182,6 +182,11 @@ export default function Console() {
                 Preventivo
               </Button>
             </Link>
+            <Link href="/correctivo/solicitudes" data-testid="link-correctivo">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Correctivo
+              </Button>
+            </Link>
             {(user.rol === "admin" || user.rol === "platform_admin") && (
               <Link href="/consola-activos" data-testid="link-consola-activos">
                 <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
