@@ -21,4 +21,5 @@
 - [Abastecimiento DGP-013](deltaops-abastecimiento-dgp013.md) — motor de workflow multiplexa definiciones por clave (hotfix con excepción); QR literal vía platform.qr; costos en read model propio; commitear antes de revisar.
 - [Preventivo DGP-014](deltaops-preventivo-dgp014.md) — módulos de negocio componen motores congelados solo por exports públicos; corpus = lista taxativa lib/*; verificar contratos canónicos antes de integrar; UUIDv5 para ids de semillas largas.
 - [Correctivo DGP-015](deltaops-correctivo-dgp015.md) — claves de workflow globales por tenant (prefijar por módulo); todo tramo declarado debe gobernarse de verdad; puertos que validan con la query pública real; flakiness latente de pnpm -r con PG.
+- [Analytics DGP-016](deltaops-analytics-dgp016.md) — KPIs/dashboards como datos declarativos; toda fuente declarada debe registrarse; fan-out vía queries públicas es adaptador válido; OpenAPI+drift obligatorio aunque el builder no "vea" el patrón.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.
