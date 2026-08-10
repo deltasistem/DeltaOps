@@ -1,0 +1,940 @@
+DGP-017 — ENTERPRISE IDENTITY, TENANCY & SAAS FOUNDATION
+
+Programa DeltaOps
+
+INSTRUCCIÓN DE EJECUCIÓN
+
+Implementa DGP-017 como una fase formal del programa DeltaOps.
+
+ANTES DE ESCRIBIR CÓDIGO:
+1. Lee y comprende todo el corpus existente del proyecto.
+2. Respeta estrictamente ETS-001…012, Engineering Charter, ESI-001…010 y todos los DGP cerrados hasta DGP-016.
+3. Revisa especialmente Kernel, Shared Platform, Business Foundation, Workflow Engine, Dynamic Forms, Design System, API Server, Activos, Órdenes, Inventario, Planes, Abastecimiento, Preventivo, Correctivo, Ecosistema de Mantenimiento y Analytics.
+4. Identifica los contratos existentes de autenticación, sesión, tenant, autorización, capacidades, permisos, configuración, auditoría, notificaciones y usuarios antes de crear cualquier pieza nueva.
+5. NO reemplaces infraestructura existente si puede extenderse de forma compatible.
+6. NO modifiques contratos congelados salvo que sea estrictamente necesario y, en ese caso, la extensión debe ser aditiva, compatible y documentada.
+7. No inventes una segunda arquitectura de autenticación, autorización o multitenancy.
+8. No construyas módulos de negocio nuevos en esta fase.
+9. No construyas BI, IA, reportes ni analítica nueva.
+10. No introduzcas componentes visuales fuera del Design System DGP-005.
+
+OBJETIVO
+
+Convertir DeltaOps de una plataforma técnica con Tenant DEMO y usuarios de demostración en una verdadera base Enterprise SaaS multiempresa, preparada para operar como servicio para múltiples compañías independientes.
+
+La plataforma debe permitir:
+
+EMPRESA/TENANT
+→ configuración propia
+→ usuarios propios
+→ roles propios
+→ permisos/capacidades
+→ branding configurable
+→ acceso aislado
+→ módulos habilitados
+→ auditoría
+→ notificaciones
+→ administración
+
+La regla fundamental es:
+
+NINGÚN USUARIO DE UN TENANT PUEDE VER, CONSULTAR, MODIFICAR, BUSCAR, EXPORTAR, RECIBIR NI INFERIR INFORMACIÓN DE OTRO TENANT.
+
+El aislamiento debe existir en backend, sesión, autorización, consultas, escrituras, sincronización, cachés, almacenamiento lógico y experiencia.
+
+==================================================
+1. IDENTITY & AUTHENTICATION FOUNDATION
+==================================================
+
+Construye la base oficial de identidad de DeltaOps reutilizando la infraestructura existente siempre que sea posible.
+
+Debe existir:
+
+- Usuario
+- Identidad
+- Sesión
+- Tenant
+- Estado de usuario
+- Estado de sesión
+- fecha de creación
+- último acceso
+- configuración básica
+- auditoría
+
+Implementa autenticación segura y preparada para producción.
+
+El login debe permitir:
+
+- correo electrónico
+- contraseña
+- validación de credenciales
+- creación de sesión
+- expiración de sesión
+- cierre de sesión
+- renovación segura cuando corresponda
+- protección contra sesiones inválidas
+- aislamiento por tenant
+- manejo de usuario deshabilitado
+- manejo de tenant deshabilitado
+
+NO almacenar contraseñas en texto plano.
+
+Usar hash seguro existente en el stack; si no existe una implementación adecuada, incorporar una solución estándar y documentada.
+
+NO colocar credenciales reales en documentación, código fuente, fixtures ni repositorio.
+
+El usuario debe entrar únicamente al tenant al que pertenece según la relación oficial de identidad.
+
+==================================================
+2. LOGIN REAL DE DELTAOPS
+==================================================
+
+El login visual debe convertirse en una pantalla funcional de producción.
+
+Debe utilizar exclusivamente:
+
+- Design System DGP-005
+- tokens --do-*
+- branding oficial DELTA
+- componentes oficiales
+
+Debe incluir:
+
+- logo
+- correo
+- contraseña
+- mostrar/ocultar contraseña
+- recordar sesión si la arquitectura existente lo permite de forma segura
+- botón ingresar
+- estado de carga
+- error de credenciales
+- usuario deshabilitado
+- tenant deshabilitado
+- sesión expirada
+- recuperación de contraseña
+- accesibilidad AA
+- responsive desktop/tablet/mobile
+
+No inventar un nuevo estilo visual.
+
+La experiencia debe sentirse como una aplicación empresarial real, no como una pantalla técnica de desarrollo.
+
+==================================================
+3. PASSWORD RECOVERY
+==================================================
+
+Implementa recuperación de acceso preparada para producción.
+
+Flujo:
+
+Solicitar recuperación
+→ validar identidad
+→ generar token seguro y temporal
+→ enviar correo
+→ abrir enlace
+→ validar token
+→ establecer nueva contraseña
+→ invalidar token
+→ registrar auditoría
+
+El token:
+
+- debe ser de un solo uso
+- debe expirar
+- no debe almacenarse en texto plano si la arquitectura lo permite
+- debe estar asociado al usuario correcto
+- debe estar aislado por tenant
+- no debe permitir enumeración de usuarios
+
+La respuesta pública del endpoint debe evitar revelar si un correo existe o no.
+
+==================================================
+4. TENANTS / EMPRESAS
+==================================================
+
+Implementa el concepto formal de Tenant como primera clase empresarial.
+
+Cada tenant debe tener:
+
+- id
+- código
+- nombre comercial
+- razón social si aplica
+- identificación tributaria si aplica
+- estado
+- zona horaria
+- idioma
+- moneda
+- configuración
+- branding
+- fecha de creación
+- fecha de activación
+- fecha de suspensión
+
+Estados mínimos:
+
+ACTIVO
+SUSPENDIDO
+INACTIVO
+
+Un tenant suspendido no debe permitir operación normal.
+
+El sistema debe impedir acceso cruzado entre tenants.
+
+==================================================
+5. USUARIOS MULTIEMPRESA
+==================================================
+
+Modela correctamente la relación Usuario ↔ Tenant.
+
+No asumir que un usuario necesariamente debe pertenecer para siempre a un solo tenant si la arquitectura SaaS futura puede beneficiarse de una identidad global.
+
+Diseña la frontera de identidad de forma que pueda soportar:
+
+Usuario
+→ Identidad global
+→ Membresía Tenant
+→ Roles
+→ Permisos
+
+Sin embargo, la sesión activa debe tener siempre un tenant-context explícito.
+
+Si el usuario pertenece a múltiples tenants:
+
+- debe poder seleccionar el tenant al iniciar sesión
+- debe poder cambiar de tenant únicamente mediante un flujo seguro
+- cada cambio debe renovar/validar el contexto de autorización
+- nunca reutilizar permisos del tenant anterior
+- cachés y datos deben quedar aislados
+
+Si el usuario solo pertenece a un tenant, el acceso debe ser directo.
+
+==================================================
+6. ROLES
+==================================================
+
+Implementa RBAC empresarial compatible con el Kernel existente.
+
+Roles base sugeridos:
+
+SUPER_ADMIN
+TENANT_ADMIN
+SUPERVISOR
+PLANIFICADOR
+TECNICO
+CONSULTA
+
+IMPORTANTE:
+
+Estos roles deben ser configuración del sistema y no lógica de negocio dispersa.
+
+Los permisos reales deben seguir siendo los contratos del Kernel.
+
+El rol debe componer permisos/capacidades.
+
+No utilizar:
+
+if role === "admin"
+
+disperso por la aplicación.
+
+Usar AuthorizationRuntime / permisos / capacidades existentes.
+
+==================================================
+7. ADMINISTRACIÓN DE USUARIOS
+==================================================
+
+Crear una superficie administrativa para TENANT_ADMIN.
+
+Debe permitir:
+
+- listar usuarios
+- buscar
+- filtrar
+- crear/invitar usuario
+- editar usuario
+- activar
+- desactivar
+- asignar roles
+- retirar roles
+- consultar último acceso
+- reenviar invitación
+- forzar recuperación de acceso cuando corresponda
+- visualizar auditoría relevante
+
+No permitir que TENANT_ADMIN acceda a otros tenants.
+
+SUPER_ADMIN debe disponer de administración global únicamente si el modelo actual de Kernel lo soporta correctamente.
+
+No crear bypass de autorización.
+
+==================================================
+8. INVITACIONES
+==================================================
+
+Implementa invitaciones empresariales.
+
+Flujo:
+
+Administrador
+→ invita correo
+→ sistema genera invitación
+→ correo
+→ usuario abre enlace
+→ acepta
+→ establece contraseña
+→ cuenta activa
+→ membresía tenant creada
+→ auditoría
+
+La invitación debe:
+
+- expirar
+- ser de un solo uso
+- estar vinculada al tenant
+- estar vinculada al rol inicial
+- poder revocarse
+- ser idempotente
+- no permitir aceptación fuera del tenant correspondiente
+
+==================================================
+9. NOTIFICACIONES POR CORREO
+==================================================
+
+ESTA PARTE ES OBLIGATORIA.
+
+Construye la base oficial de notificaciones por correo de DeltaOps.
+
+NO implementar correos directamente desde cada módulo.
+
+Crear una abstracción/plataforma centralizada reutilizable.
+
+Debe soportar como mínimo:
+
+- bienvenida
+- invitación
+- recuperación de contraseña
+- cambio de contraseña
+- cuenta deshabilitada
+- cuenta habilitada
+- cambios importantes de seguridad
+
+Preparar el contrato para futuras notificaciones de negocio:
+
+- OT asignada
+- OT próxima a vencer
+- SLA en riesgo
+- aprobación pendiente
+- inventario bajo mínimo
+- transferencia pendiente
+- alertas operacionales
+
+PERO NO implementar todavía las reglas específicas de esos módulos.
+
+El objetivo de DGP-017 es dejar la infraestructura preparada.
+
+Los correos deben tener:
+
+- plantilla
+- asunto
+- destinatario
+- tenant
+- idioma
+- branding
+- metadata
+- estado
+- timestamp
+- identificador/idempotency key
+
+Evitar envío duplicado mediante idempotencia.
+
+Debe existir una abstracción tipo:
+
+NotificationPort
+EmailNotificationPort
+
+o equivalente compatible con la arquitectura existente.
+
+No acoplar módulos de negocio directamente al proveedor SMTP.
+
+==================================================
+10. SMTP / EMAIL PROVIDER
+==================================================
+
+Preparar configuración para SMTP/Microsoft 365 u otro proveedor compatible mediante configuración.
+
+NUNCA:
+
+- hardcodear servidor
+- hardcodear usuario
+- hardcodear contraseña
+- guardar secretos en git
+- incluir credenciales en documentación
+
+Utilizar variables de entorno / configuración segura existente.
+
+Debe existir un proveedor Fake para pruebas.
+
+Debe existir un proveedor real desacoplado mediante puerto.
+
+==================================================
+11. EMAIL TEMPLATES
+==================================================
+
+Crear sistema de plantillas de correo reutilizable.
+
+Debe soportar:
+
+- español inicialmente
+- branding del tenant
+- logo
+- nombre de empresa
+- colores permitidos por branding
+- footer
+- enlace de seguridad
+- fecha/hora
+- contexto del tenant
+
+NO permitir HTML arbitrario proveniente de usuarios.
+
+Separar:
+
+contenido
+presentación
+branding
+idioma
+
+Preparar i18n para idiomas futuros.
+
+==================================================
+12. TENANT BRANDING
+==================================================
+
+Cada empresa debe poder tener configuración visual propia sin romper el Brandbook DELTA ni el Design System.
+
+IMPORTANTE:
+
+Para DELTA, mantener la identidad oficial actual.
+
+Para tenants externos, permitir configuración controlada de:
+
+- nombre
+- logo permitido
+- logo alternativo
+- favicon
+- nombre de aplicación
+- color primario configurable
+- color secundario configurable
+
+Pero los componentes siempre deben utilizar tokens del Design System.
+
+No permitir que una empresa introduzca CSS arbitrario.
+
+El branding debe ser un conjunto de tokens/controladores seguros.
+
+Debe existir:
+
+BrandingProvider
+
+o equivalente compatible con el Design System.
+
+El Tenant DEMO debe conservar exactamente el branding oficial DELTA/DEMO existente.
+
+==================================================
+13. CONFIGURACIÓN POR TENANT
+==================================================
+
+Crear una superficie/configuración empresarial reutilizable.
+
+Configuraciones mínimas:
+
+- idioma
+- zona horaria
+- moneda
+- formato de fecha
+- formato numérico
+- branding
+- notificaciones
+- políticas de seguridad
+- módulos habilitados
+
+Usar Configuration First.
+
+No introducir configuraciones hardcodeadas.
+
+==================================================
+14. MODULE ENTITLEMENTS
+==================================================
+
+Preparar la capacidad de definir qué módulos tiene contratados/habilitados cada empresa.
+
+Ejemplo conceptual:
+
+Tenant A:
+Activos
+Órdenes
+Inventario
+Analytics
+
+Tenant B:
+Activos
+Órdenes
+
+Tenant C:
+Activos
+Inventario
+
+Esto NO debe modificar ni duplicar los módulos existentes.
+
+Debe existir una capa de entitlement/capabilities que controle si una superficie está habilitada para el tenant.
+
+El frontend debe ocultar módulos no contratados.
+
+El backend debe rechazarlos igualmente.
+
+Nunca confiar solamente en ocultar botones.
+
+==================================================
+15. SEGURIDAD Y MULTITENANCY
+==================================================
+
+Realiza una revisión profunda de aislamiento.
+
+Verificar:
+
+- RLS
+- tenant context
+- sesión
+- autorización
+- queries
+- comandos
+- read models
+- event logs
+- outbox
+- sync receipts
+- caché offline
+- búsqueda
+- timeline
+- comentarios
+- adjuntos
+- analytics
+- URLs firmadas
+- deep links
+
+Crear pruebas explícitas:
+
+Tenant A no puede leer Tenant B.
+
+Tenant A no puede modificar Tenant B.
+
+Tenant A no puede consultar IDs de Tenant B.
+
+Tenant A no puede recibir notificaciones de Tenant B.
+
+Tenant A no puede acceder a archivos de Tenant B.
+
+Tenant A no puede reutilizar una sesión de Tenant B.
+
+Tenant A no puede reutilizar un opId de Tenant B para producir efectos cruzados.
+
+Un cambio de tenant invalida cualquier contexto de autorización anterior.
+
+==================================================
+16. AUDITORÍA
+==================================================
+
+Toda operación sensible debe quedar auditada.
+
+Como mínimo:
+
+- login exitoso
+- login fallido
+- logout
+- recuperación de contraseña
+- cambio de contraseña
+- invitación
+- aceptación de invitación
+- creación de usuario
+- modificación de usuario
+- cambio de rol
+- activación/desactivación
+- cambio de tenant
+- cambio de configuración
+- cambio de branding
+
+Usar el mecanismo oficial de auditoría del programa.
+
+No crear un sistema paralelo si ya existe uno adecuado.
+
+==================================================
+17. SUPER ADMIN / ADMINISTRACIÓN GLOBAL
+==================================================
+
+Crear una superficie administrativa global solamente si la arquitectura existente permite soportarla correctamente.
+
+Debe permitir:
+
+- tenants
+- estado de tenant
+- usuarios
+- módulos habilitados
+- configuración
+- branding
+- auditoría
+- estado de notificaciones
+
+No permitir que esta superficie se convierta en un dashboard de negocio.
+
+Es administración SaaS, no Analytics.
+
+==================================================
+18. EXPERIENCIA DEL USUARIO
+==================================================
+
+Actualizar navegación y AppShell para que DeltaOps se sienta como una plataforma empresarial.
+
+Debe mostrar claramente:
+
+- empresa/tenant actual
+- usuario actual
+- rol/contexto
+- módulos disponibles
+- acceso a configuración
+- perfil
+- cerrar sesión
+
+Si el usuario tiene múltiples tenants:
+
+selector de empresa seguro.
+
+Todo debe utilizar exclusivamente:
+
+@workspace/design-system
+tokens --do-*
+ThemeProvider
+I18nProvider
+componentes existentes
+
+No crear un sistema visual paralelo.
+
+==================================================
+19. DEMO
+==================================================
+
+Conservar el Tenant DEMO existente.
+
+Actualizar el seed de forma idempotente para disponer de:
+
+Tenant DEMO
+Usuario administrador DEMO
+Usuarios de prueba por roles
+Módulos habilitados
+Branding
+Configuración
+Datos existentes
+
+Crear usuarios de prueba suficientes para demostrar:
+
+Administrador
+Supervisor
+Planificador
+Técnico
+Consulta
+
+IMPORTANTE:
+
+No publicar contraseñas en documentación.
+
+Las credenciales de demo deben vivir exclusivamente en configuración/seed segura de desarrollo.
+
+La documentación debe explicar cómo ejecutar el seed y cómo establecer las credenciales mediante variables de entorno.
+
+==================================================
+20. API CONTRACT-FIRST
+==================================================
+
+Toda nueva API debe:
+
+- utilizar Zod
+- generar OpenAPI determinísticamente
+- tener operationId
+- mapear errores Kernel → HTTP
+- documentar permisos
+- tener drift test
+- respetar sesión y tenant context
+
+Superficies mínimas:
+
+/auth/login
+/auth/logout
+/auth/session
+/auth/password/forgot
+/auth/password/reset
+/auth/invitations
+/users
+/roles
+/tenants
+/tenant/config
+/tenant/branding
+/tenant/modules
+/notifications
+/admin
+
+Ajusta las rutas al estándar existente si ya existe un contrato equivalente.
+
+No dupliques endpoints existentes.
+
+==================================================
+21. OFFLINE
+==================================================
+
+La identidad y seguridad deben ser conscientes de Offline First.
+
+No permitir operaciones offline que puedan saltarse:
+
+- sesión
+- tenant
+- autorización
+- expiración
+- permisos
+
+Las colas offline existentes deben incluir tenant context seguro.
+
+Un cambio de usuario o tenant debe invalidar las colas incompatibles.
+
+No reutilizar una cola offline de otro tenant.
+
+==================================================
+22. ACCESIBILIDAD
+==================================================
+
+Login, recuperación, invitaciones, administración de usuarios, selector de tenant y configuración deben cumplir AA.
+
+Keyboard navigation.
+Focus visible.
+ARIA correcto.
+Mensajes de error accesibles.
+Contraste.
+Responsive.
+
+==================================================
+23. REVISIÓN ARQUITECTÓNICA OBLIGATORIA
+==================================================
+
+Ejecutar al menos dos rondas independientes.
+
+La revisión debe buscar especialmente:
+
+- bypass de tenant
+- bypass de autorización
+- almacenamiento inseguro de contraseñas
+- secretos expuestos
+- sesiones incorrectas
+- cambio de tenant inseguro
+- invitaciones reutilizables
+- tokens no expirables
+- notificaciones cruzadas entre tenants
+- cachés cruzados
+- RLS incompleto
+- endpoints sin autorización
+- branding fuera del Design System
+- lógica de roles hardcodeada
+- duplicación de infraestructura existente
+- dependencia incorrecta entre módulos
+- credenciales en documentación
+- OpenAPI con drift
+
+NO cierres DGP-017 si existe un CRÍTICO o MAYOR abierto.
+
+==================================================
+24. PRUEBAS
+==================================================
+
+Implementar pruebas unitarias, integración y PostgreSQL real donde corresponda.
+
+Mínimos:
+
+- login correcto
+- login incorrecto
+- sesión válida
+- sesión expirada
+- logout
+- recuperación
+- cambio de contraseña
+- invitación
+- aceptación
+- usuario deshabilitado
+- tenant suspendido
+- RBAC
+- permisos
+- capabilities
+- cambio de tenant
+- aislamiento RLS
+- aislamiento de queries
+- aislamiento de comandos
+- aislamiento de caché
+- aislamiento de notificaciones
+- branding por tenant
+- módulos habilitados
+- idempotencia
+- auditoría
+- SMTP Fake
+- templates
+- OpenAPI drift
+- accesibilidad
+- responsive
+
+Crear pruebas negativas de seguridad, no únicamente casos felices.
+
+==================================================
+25. COMPATIBILIDAD
+==================================================
+
+Todos los módulos existentes deben continuar funcionando.
+
+Verificar:
+
+kernel
+platform
+business-foundation
+workflow-engine
+dynamic-forms
+design-system
+module-reference
+activos
+ordenes
+inventario
+planes
+abastecimiento
+preventivo
+correctivo
+deltaops
+analytics
+api-server
+
+Ejecutar typecheck completo.
+
+Ejecutar build completo.
+
+Ejecutar las suites existentes.
+
+No aceptar regresiones.
+
+==================================================
+26. DOCUMENTACIÓN
+==================================================
+
+Crear documentación completa en español:
+
+identity.md
+tenancy.md
+usuarios.md
+roles-permisos.md
+invitaciones.md
+password-recovery.md
+notificaciones.md
+email.md
+branding.md
+entitlements.md
+seguridad-multitenant.md
+api.md
+configuracion.md
+
+Documentar decisiones arquitectónicas.
+
+NO incluir credenciales reales.
+
+==================================================
+27. CRITERIOS DE ACEPTACIÓN
+==================================================
+
+DGP-017 solo puede cerrarse cuando:
+
+✔ existe login funcional real
+✔ existe logout
+✔ existe sesión segura
+✔ existe recuperación de contraseña
+✔ existe modelo Tenant
+✔ existe aislamiento multiempresa
+✔ existe RBAC compatible con Kernel
+✔ existe administración de usuarios
+✔ existen invitaciones
+✔ existe configuración por tenant
+✔ existe branding por tenant
+✔ existe habilitación de módulos por tenant
+✔ existe infraestructura de correo desacoplada
+✔ existen plantillas de correo
+✔ existen pruebas de aislamiento
+✔ existen pruebas de seguridad
+✔ existe OpenAPI sin drift
+✔ existe documentación
+✔ Tenant DEMO continúa funcionando
+✔ los módulos existentes continúan funcionando
+✔ typecheck limpio
+✔ build limpio
+✔ pruebas verdes
+✔ revisión arquitectónica PASS
+✔ cero credenciales expuestas
+
+==================================================
+28. REGLA FINAL DE LA FASE
+==================================================
+
+NO agregues DGP-018 ni propongas fases posteriores.
+
+No implementes oportunidades de mejora fuera del alcance.
+
+No implementes funcionalidades de negocio nuevas.
+
+No construyas BI, IA, reportes ni dashboards ejecutivos.
+
+No modifiques fases congeladas salvo extensiones estrictamente aditivas y justificadas.
+
+Si encuentras una deficiencia arquitectónica previa que impida cumplir DGP-017, documenta el hallazgo, corrígelo únicamente si la corrección es necesaria y aditiva, y verifica que no rompa el corpus congelado.
+
+Al terminar:
+
+1. Ejecuta todas las pruebas.
+2. Ejecuta typecheck.
+3. Ejecuta build de producción.
+4. Ejecuta pruebas PostgreSQL/RLS.
+5. Ejecuta pruebas de aislamiento multi-tenant.
+6. Ejecuta smoke HTTP real del login.
+7. Ejecuta smoke de recuperación/invitación usando proveedor Fake.
+8. Ejecuta smoke de cambio de tenant si aplica.
+9. Verifica que Tenant DEMO continúe funcionando.
+10. Ejecuta la revisión arquitectónica independiente.
+11. Corrige todos los hallazgos críticos y mayores.
+12. Reejecuta la batería completa.
+13. Genera el INFORME OFICIAL DE CIERRE — DGP-017.
+
+El informe final debe incluir:
+
+- objeto
+- alcance
+- arquitectura
+- identity
+- tenants
+- usuarios
+- roles
+- permisos
+- invitaciones
+- recuperación
+- notificaciones
+- email
+- branding
+- entitlements
+- seguridad
+- RLS
+- auditoría
+- API
+- pruebas
+- revisión arquitectónica
+- documentación
+- deuda técnica
+- oportunidades de mejora sin implementar
+- declaración formal de cierre
+
+NO escribas propuestas para DGP-018.
+
+DGP-017 debe quedar formalmente CERRADO únicamente cuando todo lo anterior esté verificado.

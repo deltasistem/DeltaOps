@@ -72,6 +72,14 @@ import AnalyticsIndicador from '@/pages/analytics-indicador';
 import AnalyticsSincronizacion from '@/pages/analytics-sincronizacion';
 import AnalyticsDashboardEditor from '@/pages/analytics-dashboard-editor';
 import AnalyticsDashboard from '@/pages/analytics-dashboard';
+import Recuperar from '@/pages/recuperar';
+import Restablecer from '@/pages/restablecer';
+import Invitacion from '@/pages/invitacion';
+import Perfil from '@/pages/perfil';
+import AdministracionUsuarios from '@/pages/administracion-usuarios';
+import AdministracionConfiguracion from '@/pages/administracion-configuracion';
+import AdministracionSaaS from '@/pages/administracion-saas';
+import { SesionProvider } from '@/lib/identidad/sesion';
 
 const queryClient = new QueryClient();
 
@@ -98,6 +106,14 @@ function Router() {
       <Route path="/referencia" component={Referencia} />
       <Route path="/referencia/:id" component={ReferenciaDetalle} />
       <Route path="/login" component={Login} />
+      <Route path="/recuperar" component={Recuperar} />
+      <Route path="/restablecer" component={Restablecer} />
+      <Route path="/invitacion" component={Invitacion} />
+      <Route path="/perfil" component={Perfil} />
+      <Route path="/perfil/contrasena" component={Perfil} />
+      <Route path="/administracion/usuarios" component={AdministracionUsuarios} />
+      <Route path="/administracion/configuracion" component={AdministracionConfiguracion} />
+      <Route path="/administracion/saas" component={AdministracionSaaS} />
       <Route path="/design-system" component={DesignSystem} />
       <Route path="/motores/playground" component={MotoresPlayground} />
       <Route path="/motores" component={Motores} />
@@ -173,7 +189,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-        <Router />
+        <SesionProvider>
+          <Router />
+        </SesionProvider>
       </WouterRouter>
       <Toaster />
     </QueryClientProvider>

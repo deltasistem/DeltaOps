@@ -13,4 +13,10 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
+/**
+ * DGP-017 (aditivo, solo tipos): cliente de conexión del pool, reexportado
+ * para que los artifacts tipen `withTenant(client => …)` sin depender de "pg".
+ */
+export type DbPoolClient = pg.PoolClient;
+
 export * from "./schema";

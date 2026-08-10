@@ -151,6 +151,71 @@ async function seedAdmin(): Promise<void> {
   log(`Admin demo creado (id=${ins?.id}): ${DEMO_ADMIN.email} — tenant ${DEMO_TENANT}`);
 }
 
+/* ----------------- 1b) Identidad Enterprise DEMO (DGP-017) --------------- */
+/**
+ * DGP-017 — Siembra idempotente del modelo Enterprise para el tenant DEMO:
+ *   - `ten_tenants`: tenant DEMO de primera clase con branding DELTA/DEMO oficial,
+ *     configuración y TODOS los módulos habilitados.
+ *   - `idn_roles`: roles del sistema por tenant.
+ *   - Identidades + membresías de prueba por rol (admin, supervisor, planificador,
+ *     técnico, consulta). Las CONTRASEÑAS provienen EXCLUSIVAMENTE de variables de
+ *     entorno con defaults de desarrollo (nunca en documentación ni git).
+ * El admin DEMO (`admin@delta.demo`) se promueve también a identidad/membresía.
+ */
+export const DEMO_BRANDING = {
+  nombre: "DELTA DEMO",
+  nombreApp: "DeltaOps",
+  colorPrimario: "#0B5FFF",
+  colorSecundario: "#0A2540",
+} as const;
+
+/** Usuarios de prueba por rol (credenciales SOLO por env con default dev). */
+export const DEMO_USUARIOS = [
+  { email: "admin@delta.demo", nombre: "Carlos Pacheco", rol: "TENANT_ADMIN", envPass: "DEMO_ADMIN_PASSWORD" },
+  { email: "supervisor@delta.demo", nombre: "María Fuentes", rol: "SUPERVISOR", envPass: "DEMO_SUPERVISOR_PASSWORD" },
+  { email: "planificador@delta.demo", nombre: "Jorge Rivas", rol: "PLANIFICADOR", envPass: "DEMO_PLANIFICADOR_PASSWORD" },
+  { email: "tecnico@delta.demo", nombre: "Ana Soto", rol: "TECNICO", envPass: "DEMO_TECNICO_PASSWORD" },
+  { email: "consulta@delta.demo", nombre: "Luis Vega", rol: "CONSULTA", envPass: "DEMO_CONSULTA_PASSWORD" },
+] as const;
+
+const DEV_DEFAULT_PASSWORD = "DeltaOps2026!";
+
+async function seedEnterpriseIdentity(): Promise<void> {
+  const { seedRolesDeTenant } = await import("../deltaops/identity/seed-roles");
+  const { crearTenant, crearIdentidad, crearMembresia } = await import("../deltaops/identity/service");
+  const { hashPassword } = await import("../deltaops/identity/crypto");
+
+  await crearTenant({
+    tenantId: DEMO_TENANT,
+    codigo: "DELTA-DEMO",
+    nombreComercial: DEMO_EMPRESA,
+    razonSocial: "Delta Demo S.A.",
+    idTributaria: "76.000.000-0",
+    zonaHoraria: "America/Santiago",
+    idioma: "es",
+    moneda: "CLP",
+    modulos: [
+      "referencia", "activos", "ordenes", "inventario", "planes",
+      "abastecimiento", "preventivo", "correctivo", "analytics",
+    ],
+    branding: { ...DEMO_BRANDING },
+    configuracion: { formatoFecha: "dd-MM-yyyy", formatoNumerico: "es-CL" },
+  });
+  await seedRolesDeTenant(DEMO_TENANT);
+
+  for (const u of DEMO_USUARIOS) {
+    const password = process.env[u.envPass] ?? DEV_DEFAULT_PASSWORD;
+    const identidad = await crearIdentidad({
+      email: u.email,
+      nombre: u.nombre,
+      passwordHash: await hashPassword(password),
+      estado: "ACTIVO",
+    });
+    await crearMembresia({ identityId: identidad.identityId, tenantId: DEMO_TENANT, rol: u.rol });
+  }
+  log(`Enterprise DEMO: tenant + ${DEMO_USUARIOS.length} identidades/membresías sembradas`);
+}
+
 /* -------------------------- 2) Catálogos base ---------------------------- */
 /**
  * Habilita en cada módulo los valores de catálogo que usa el dataset demo. Es
@@ -1808,6 +1873,7 @@ export async function seedDeltaDemo(): Promise<void> {
   console.log(`\nSeed DEMO oficial DGP-011.3 — tenant "${DEMO_TENANT}" (${DEMO_EMPRESA})`);
   await wipeDeltaDemo();
   await seedAdmin();
+  await seedEnterpriseIdentity();
   await seedCatalogos();
   const activoIds = await seedActivos();
   await seedOrdenes();

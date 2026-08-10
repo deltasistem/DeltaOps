@@ -1,146 +1,233 @@
-import { useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+/**
+ * DGP-017 · Login real de producción de DeltaOps.
+ *
+ * Pantalla empresarial construida SOLO con el Design System (tokens --do-*,
+ * ThemeProvider, Logo, Field, Input, PasswordInput, Button, Alert). Cubre:
+ * correo, contraseña con mostrar/ocultar, botón con estado de carga, errores
+ * accesibles diferenciados (credenciales, usuario deshabilitado, empresa no
+ * operativa, sesión expirada), enlace de recuperación y, si el backend responde
+ * 409 SELECT_TENANT, un paso de selección de empresa. AA + responsive.
+ *
+ * "Recordar sesión": la sesión se gestiona por cookie httpOnly del backend; el
+ * cliente no puede prolongarla de forma segura, por lo que se OMITE una casilla
+ * de "recordarme" (documentado en docs/identidad-experiencia.md) para no dar una
+ * falsa sensación de persistencia controlada por el frontend.
+ */
+import React, { useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Logo } from "@workspace/design-system";
+import {
+  ThemeProvider,
+  Logo,
+  Field,
+  Input,
+  PasswordInput,
+  Button,
+  Alert,
+} from "@workspace/design-system";
+import { login } from "@/lib/identidad/endpoints";
+import { IdentidadError, esFalloDeRed } from "@/lib/identidad/api";
+import { CLAVE_SESION } from "@/lib/identidad/sesion";
+import { nombreRol } from "@/lib/identidad/rbac";
+import type { MembresiaResumen, Sesion } from "@/lib/identidad/tipos";
 
-import { useDeltaopsLogin, getDeltaopsMeQueryKey } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+interface EstadoError {
+  readonly titulo: string;
+  readonly descripcion: string;
+}
 
-const loginSchema = z.object({
-  email: z.string().email("Correo electrónico inválido"),
-  password: z.string().min(1, "La contraseña es requerida"),
-});
+function traducirError(err: unknown): EstadoError {
+  if (esFalloDeRed(err)) {
+    return { titulo: "Sin conexión", descripcion: "No se pudo contactar el servidor. Verifica tu red e intenta de nuevo." };
+  }
+  if (err instanceof IdentidadError) {
+    if (err.code === "USER_DISABLED") {
+      return { titulo: "Usuario deshabilitado", descripcion: "Tu cuenta está deshabilitada. Contacta al administrador de tu empresa." };
+    }
+    if (err.code === "TENANT_NOT_OPERATIONAL") {
+      return { titulo: "Empresa no operativa", descripcion: "La empresa no está activa en este momento. Contacta a soporte." };
+    }
+    if (err.status === 401) {
+      return { titulo: "Credenciales inválidas", descripcion: "El correo o la contraseña no son correctos." };
+    }
+    return { titulo: "No se pudo iniciar sesión", descripcion: err.message };
+  }
+  return { titulo: "Error inesperado", descripcion: "Ocurrió un problema al iniciar sesión." };
+}
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
-  
-  const loginMutation = useDeltaopsLogin({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getDeltaopsMeQueryKey() });
-        setLocation("/");
-      },
-    },
-  });
+  const search = useSearch();
+  const qc = useQueryClient();
 
-  const form = useForm<z.infer<typeof loginSchema>>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<EstadoError | null>(null);
+  const [membresias, setMembresias] = useState<readonly MembresiaResumen[] | null>(null);
 
-  function onSubmit(values: z.infer<typeof loginSchema>) {
-    loginMutation.mutate({ data: values });
+  // Aviso de sesión expirada vía ?expirada=1 (lo pone el AppShell al 401).
+  const expirada = new URLSearchParams(search).get("expirada") === "1";
+
+  function establecerSesion(sesion: Sesion) {
+    qc.setQueryData(CLAVE_SESION, sesion);
+    setLocation("/");
+  }
+
+  async function ingresar(tenantId?: string) {
+    setCargando(true);
+    setError(null);
+    try {
+      const sesion = await login({ email, password, tenantId });
+      establecerSesion(sesion);
+    } catch (err) {
+      if (err instanceof IdentidadError && err.code === "SELECT_TENANT") {
+        setMembresias((err.datos.membresias as MembresiaResumen[]) ?? []);
+      } else {
+        setError(traducirError(err));
+      }
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void ingresar();
   }
 
   return (
-    <div className="min-h-screen w-full flex bg-background">
-      {/* Left side: branding/industrial texture */}
-      <div className="hidden lg:flex w-1/2 bg-sidebar flex-col justify-between p-12 border-r border-sidebar-border relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle at 2px 2px, white 1px, transparent 0)", backgroundSize: "32px 32px" }}></div>
-        
-        <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <Logo variant="imagotipo-oscuro" width={160} alt="DELTA" />
-          </div>
-          <p className="mt-4 text-sidebar-foreground/70 font-mono text-sm uppercase tracking-wider max-w-sm">
-            Control de Mantenimiento de Precisión // Plataforma EAM Grado Industrial
-          </p>
-        </div>
-
-        <div className="relative z-10 border border-sidebar-accent p-6 rounded-sm bg-sidebar/50 backdrop-blur-sm max-w-md">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-2 w-2 rounded-full bg-exito animate-pulse" />
-            <span className="text-exito text-xs font-mono uppercase tracking-widest">Sistemas Operativos</span>
-          </div>
-          <p className="text-sidebar-foreground/80 text-sm leading-relaxed">
-            Gestión centralizada de activos, seguimiento de costos y orquestación de operaciones para flotas de alta disponibilidad.
-          </p>
-        </div>
-      </div>
-
-      {/* Right side: Login form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm space-y-8">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Acceso Restringido</h1>
-            <p className="text-muted-foreground text-sm">
-              Ingrese sus credenciales de operador para acceder a la plataforma.
+    <ThemeProvider>
+      <div
+        className="do-root"
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "var(--do-bg)",
+          padding: "var(--do-sp-4)",
+        }}
+      >
+        <main
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--do-sp-6)",
+            background: "var(--do-surface)",
+            border: "1px solid var(--do-borde)",
+            borderRadius: "var(--do-radio-lg, 12px)",
+            padding: "var(--do-sp-8)",
+          }}
+        >
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "var(--do-sp-3)", alignItems: "center" }}>
+            <Logo variant="imagotipo" width={160} alt="DeltaOps" />
+            <h1 style={{ fontSize: "var(--do-text-xl)", margin: 0 }}>
+              {membresias ? "Selecciona tu empresa" : "Iniciar sesión"}
+            </h1>
+            <p style={{ color: "var(--do-texto-suave)", margin: 0, fontSize: "var(--do-text-sm)" }}>
+              {membresias
+                ? "Perteneces a varias empresas. Elige con cuál deseas ingresar."
+                : "Plataforma empresarial de gestión de mantenimiento."}
             </p>
           </div>
 
-          {loginMutation.isError && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                Credenciales inválidas o acceso denegado. Verifique e intente nuevamente.
-              </AlertDescription>
+          {expirada && !error && !membresias && (
+            <Alert variant="advertencia" titulo="Sesión expirada">
+              Tu sesión expiró por seguridad. Vuelve a iniciar sesión.
             </Alert>
           )}
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Correo Electrónico</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="operador@empresa.com"
-                        className="font-mono text-sm"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contraseña</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        className="font-mono text-sm"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                className="w-full font-bold uppercase tracking-wider"
-                disabled={loginMutation.isPending}
-              >
-                {loginMutation.isPending ? "Verificando..." : "Iniciar Sesión"}
-              </Button>
-            </form>
-          </Form>
-
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground font-mono">
-              DeltaOps System // v0.1.0-alpha
-            </p>
+          <div aria-live="assertive">
+            {error && (
+              <Alert variant="error" titulo={error.titulo} onClose={() => setError(null)}>
+                {error.descripcion}
+              </Alert>
+            )}
           </div>
-        </div>
+
+          {membresias ? (
+            <SelectorTenant
+              membresias={membresias}
+              cargando={cargando}
+              onElegir={(tenantId) => void ingresar(tenantId)}
+              onVolver={() => {
+                setMembresias(null);
+                setError(null);
+              }}
+            />
+          ) : (
+            <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-5)" }} noValidate>
+              <Field label="Correo electrónico" required>
+                <Input
+                  type="email"
+                  name="email"
+                  autoComplete="username"
+                  placeholder="nombre@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </Field>
+              <Field label="Contraseña" required>
+                <PasswordInput
+                  name="password"
+                  autoComplete="current-password"
+                  placeholder="Tu contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </Field>
+              <Button type="submit" variant="primario" disabled={cargando || !email || !password}>
+                {cargando ? "Ingresando…" : "Ingresar"}
+              </Button>
+              <div style={{ textAlign: "center" }}>
+                <Button variant="fantasma" size="sm" onClick={() => setLocation("/recuperar")} type="button">
+                  ¿Olvidaste tu contraseña?
+                </Button>
+              </div>
+            </form>
+          )}
+        </main>
       </div>
+    </ThemeProvider>
+  );
+}
+
+function SelectorTenant({
+  membresias,
+  cargando,
+  onElegir,
+  onVolver,
+}: {
+  membresias: readonly MembresiaResumen[];
+  cargando: boolean;
+  onElegir: (tenantId: string) => void;
+  onVolver: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--do-sp-2)" }}>
+        {membresias.map((m) => (
+          <li key={m.tenantId}>
+            <Button
+              variant="secundario"
+              onClick={() => onElegir(m.tenantId)}
+              disabled={cargando}
+              style={{ width: "100%", justifyContent: "space-between" }}
+            >
+              <span>{m.nombre}</span>
+              <span style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>{nombreRol(m.rol)}</span>
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Button variant="fantasma" size="sm" onClick={onVolver} disabled={cargando} type="button">
+        ← Volver
+      </Button>
     </div>
   );
 }
