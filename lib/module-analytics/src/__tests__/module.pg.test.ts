@@ -90,6 +90,16 @@ const FUENTES_PRUEBA: RegistroFuentes = {
       { id: "ev-5", activo: "act-2", tipo: "inspeccion", esFalla: false, reincidente: false, tiempoEntreFallasMin: 0, tiempoReparacionMin: 0 },
     ],
   }),
+  // Shared Timeline (SOLO LECTURA): entradas proyectadas del tenant. El adaptador
+  // real compone `platform.timeline.query`; aquí se emula con una serie fija.
+  timeline: new FuentePrueba({
+    entradas: [
+      { id: "tl-1", eventType: "modulo.ordenes.orden-creada", entityRef: "ot-1", actorId: "u1", fecha: "2026-01-02T08:00:00.000Z" },
+      { id: "tl-2", eventType: "modulo.correctivo.solicitud-creada", entityRef: "sol-1", actorId: "u2", fecha: "2026-01-03T08:00:00.000Z" },
+      { id: "tl-3", eventType: "modulo.inventario.movimiento-registrado", entityRef: "inv-1", actorId: "u1", fecha: "2026-01-04T08:00:00.000Z" },
+      { id: "tl-4", eventType: "modulo.activos.activo-creado", entityRef: "act-1", actorId: "u3", fecha: "2026-01-05T08:00:00.000Z" },
+    ],
+  }),
 };
 
 suite("Módulo Enterprise Analytics & KPI Platform · PostgreSQL", () => {
@@ -262,6 +272,39 @@ suite("Módulo Enterprise Analytics & KPI Platform · PostgreSQL", () => {
     const r = await query(ctx(T_A), `${MODULO}.indicador`, { clave: "desc-ind" });
     expect(r.ok).toBe(true);
     if (r.ok) expect((r.value as { descripcion?: string }).descripcion).toBe("Descripción de desc-ind");
+  });
+
+  it("evalúa el indicador canónico de Shared Timeline (fuente.modulo='timeline') sobre entradas reales", async () => {
+    // Indicador declarativo con fuente TIMELINE (SOLO LECTURA, read-only).
+    const r0 = await exec(ctx(T_A), `${MODULO}.definir-indicador`, {
+      clave: "tl-actividad", nombre: "Actividad timeline", descripcion: "Conteo de entradas de la línea de tiempo",
+      categoria: "actividad", fuente: { modulo: "timeline", dataset: "entradas" },
+      expresion: { tipo: "conteo" }, unidad: "conteo", formato: "entero",
+    });
+    if (!r0.ok) throw new Error(r0.error.message);
+    await reproyectar(T_A);
+
+    // Conteo de las 4 entradas del timeline de prueba.
+    const total = await query(ctx(T_A), `${MODULO}.evaluar`, { clave: "tl-actividad" });
+    expect(total.ok).toBe(true);
+    if (total.ok) expect((total.value as { valor: number }).valor).toBe(4);
+
+    // Filtro declarativo por actor (dimensión canónica `responsable` → campo `actorId`): 2 entradas de u1.
+    const porActor = await query(ctx(T_A), `${MODULO}.evaluar`, {
+      clave: "tl-actividad",
+      filtros: [{ dimension: "responsable", campo: "actorId", operador: "eq", valor: "u1" }],
+    });
+    expect(porActor.ok).toBe(true);
+    if (porActor.ok) expect((porActor.value as { valor: number }).valor).toBe(2);
+  });
+
+  it("FALLO SEGURO (timeline): sin la fuente timeline registrada, la evaluación es rechazada (KRN-CFL)", async () => {
+    // El runtime sin fuentes comparte el read model persistido; el indicador de
+    // timeline existe pero su fuente no está registrada ⇒ rechazo fail-safe.
+    const c = createExecutionContext({ principal: ADMIN, metadata: { tenantId: T_A } });
+    const r = await rtSinFuentes.platform.kernel.queries.execute(c, `${MODULO}.evaluar`, { clave: "tl-actividad" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code.startsWith("KRN-CFL")).toBe(true);
   });
 
   it("FALLO SEGURO: sin la fuente requerida, la evaluación es rechazada (KRN-CFL)", async () => {

@@ -1,0 +1,3018 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DeltaOps · Módulo Enterprise Analytics & KPI Platform (DGP-016)",
+    "version": "1.0.0",
+    "description": "Contrato OpenAPI generado (contract-first) desde los esquemas del módulo. Módulo de SOLO LECTURA: compone contratos públicos de Órdenes/Activos/Inventario/Correctivo/Preventivo/Abastecimiento/Planes y del Shared Timeline. Permisos: modulo.analytics.read (consultas/evaluación), modulo.analytics.dashboard (dashboards), modulo.analytics.admin (catálogos/indicadores/siembra/reproyección). Errores kernel→HTTP: AUTH→403, NF→404, CFL→409, VAL→400, INF→500."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "API DeltaOps"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Indicadores"
+    },
+    {
+      "name": "Evaluación"
+    },
+    {
+      "name": "Snapshots"
+    },
+    {
+      "name": "Dashboards"
+    },
+    {
+      "name": "Catálogos"
+    },
+    {
+      "name": "Administración"
+    },
+    {
+      "name": "Sincronización"
+    }
+  ],
+  "paths": {
+    "/api/deltaops/analytics/indicadores": {
+      "get": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "analytics.indicadores",
+        "summary": "Listar indicadores (read model CQRS). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "categoria",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por categoría"
+          },
+          {
+            "name": "habilitado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filtro por habilitado (true|false)"
+          },
+          {
+            "name": "delSistema",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filtro por indicadores del sistema (true|false)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "description": "Máximo de filas"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "analytics.definir-indicador",
+        "summary": "Definir indicador personalizado del tenant (COMO DATOS). Permiso: modulo.analytics.admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefinirIndicador"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Creado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/indicadores/{clave}/evaluar": {
+      "post": {
+        "tags": [
+          "Evaluación"
+        ],
+        "operationId": "analytics.evaluar",
+        "summary": "Evaluar indicador (lectura PURA sobre fuentes read-only fail-safe; incluye Shared Timeline). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clave del indicador"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluarIndicador"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoEvaluacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/indicadores/{clave}": {
+      "get": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "analytics.indicador",
+        "summary": "Detalle de indicador (read model CQRS, snapshot completo incl. descripción). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clave del indicador"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "analytics.actualizar-indicador",
+        "summary": "Actualizar indicador (control de versión optimista). Permiso: modulo.analytics.admin",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clave del indicador"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarIndicador"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/indicadores/{clave}/habilitar": {
+      "post": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "analytics.habilitar-indicador",
+        "summary": "Habilitar/deshabilitar indicador (control de versión optimista). Permiso: modulo.analytics.admin",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clave del indicador"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabilitarIndicador"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/indicadores/{clave}/snapshot": {
+      "post": {
+        "tags": [
+          "Snapshots"
+        ],
+        "operationId": "analytics.materializar-snapshot",
+        "summary": "Materializar snapshot del indicador contra datos REALES (idempotente por opId + clave determinista). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clave del indicador"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterializarSnapshot"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/snapshots": {
+      "get": {
+        "tags": [
+          "Snapshots"
+        ],
+        "operationId": "analytics.snapshots",
+        "summary": "Listar snapshots materializados por indicador (read model CQRS). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "targetClave",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Clave del indicador objetivo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/dashboards": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "operationId": "analytics.dashboards",
+        "summary": "Listar dashboards (del sistema + personalizados del propietario). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "delSistema",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filtro por dashboards del sistema (true|false)"
+          },
+          {
+            "name": "propietarioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por propietario"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "description": "Máximo de filas"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Dashboards"
+        ],
+        "operationId": "analytics.crear-dashboard",
+        "summary": "Crear dashboard personalizado. Permiso: modulo.analytics.dashboard",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearDashboard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Creado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/dashboards/{id}": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "operationId": "analytics.dashboard",
+        "summary": "Detalle de dashboard (read model CQRS). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dashboard"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Dashboards"
+        ],
+        "operationId": "analytics.actualizar-dashboard",
+        "summary": "Actualizar dashboard (control de versión optimista; sólo propietario/no-sistema). Permiso: modulo.analytics.dashboard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dashboard"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarDashboard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Dashboards"
+        ],
+        "operationId": "analytics.eliminar-dashboard",
+        "summary": "Eliminar dashboard (control de versión optimista; sólo propietario/no-sistema). Permiso: modulo.analytics.dashboard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dashboard"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EliminarDashboard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/dashboards/{id}/clonar": {
+      "post": {
+        "tags": [
+          "Dashboards"
+        ],
+        "operationId": "analytics.clonar-dashboard",
+        "summary": "Clonar dashboard (el {id} de ruta es el dashboard ORIGEN). Permiso: modulo.analytics.dashboard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dashboard ORIGEN a clonar"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClonarDashboard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Clonado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/catalogos/{catalogo}": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "operationId": "analytics.catalogo-opciones",
+        "summary": "Opciones habilitadas de un catálogo (con fallback a valores canónicos). Permiso: modulo.analytics.read",
+        "parameters": [
+          {
+            "name": "catalogo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "categorias-indicador|unidades|formatos|periodos-meta"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/catalogos": {
+      "post": {
+        "tags": [
+          "Catálogos"
+        ],
+        "operationId": "analytics.catalogo-upsert",
+        "summary": "Alta/edición de entrada de catálogo (jerárquica y ordenable). Permiso: modulo.analytics.admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogoUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/catalogos/habilitar": {
+      "post": {
+        "tags": [
+          "Catálogos"
+        ],
+        "operationId": "analytics.catalogo-habilitar",
+        "summary": "Habilitar/deshabilitar entrada de catálogo. Permiso: modulo.analytics.admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogoHabilitar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/sembrar": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "analytics.sembrar-sistema",
+        "summary": "Sembrar el catálogo del sistema (indicadores + dashboards canónicos; idempotente por clave). Permiso: modulo.analytics.admin",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoSembrar"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/eventos": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "analytics.eventos",
+        "summary": "Bitácora de eventos durable del tenant (replay). Permiso: modulo.analytics.read",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/reproyectar": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "analytics.reproyectar",
+        "summary": "Reproyección por replay del event log durable. Permiso: modulo.analytics.admin",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reproyectados": {
+                      "type": "integer"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/consola": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "analytics.consola",
+        "summary": "Consola técnica del outbox del módulo. Permiso: modulo.analytics.read",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Consola"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado/configuración (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/analytics/sync": {
+      "post": {
+        "tags": [
+          "Sincronización"
+        ],
+        "operationId": "analytics.sync",
+        "summary": "Sincronización offline por ORQUESTACIÓN (una UoW por operación real; idempotente por opId).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ColaSync"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenSync"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "KRN-VAL-001"
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "ResultadoComando": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "clave": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "idempotente": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Fuente": {
+        "type": "object",
+        "properties": {
+          "modulo": {
+            "type": "string",
+            "description": "ordenes|activos|inventario|correctivo|preventivo|abastecimiento|planes|timeline"
+          },
+          "dataset": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "modulo",
+          "dataset"
+        ],
+        "additionalProperties": false
+      },
+      "Filtro": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "string"
+          },
+          "campo": {
+            "type": "string",
+            "nullable": true
+          },
+          "operador": {
+            "type": "string",
+            "description": "eq|neq|in|gt|gte|lt|lte|exists"
+          },
+          "valor": {}
+        },
+        "required": [
+          "dimension",
+          "operador"
+        ],
+        "additionalProperties": false
+      },
+      "Ventana": {
+        "type": "object",
+        "properties": {
+          "campoFecha": {
+            "type": "string"
+          },
+          "ultimosDias": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "desde": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasta": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "campoFecha"
+        ],
+        "additionalProperties": false
+      },
+      "Expresion": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "conteo",
+              "suma",
+              "promedio",
+              "ratio",
+              "duracion-promedio",
+              "tasa",
+              "mtbf",
+              "mttr"
+            ]
+          },
+          "campo": {
+            "type": "string",
+            "nullable": true
+          },
+          "filtros": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string"
+                },
+                "campo": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "operador": {
+                  "type": "string",
+                  "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                },
+                "valor": {}
+              },
+              "required": [
+                "dimension",
+                "operador"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "filtrosDenominador": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string"
+                },
+                "campo": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "operador": {
+                  "type": "string",
+                  "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                },
+                "valor": {}
+              },
+              "required": [
+                "dimension",
+                "operador"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "factor": {
+            "type": "number",
+            "nullable": true
+          },
+          "ventana": {
+            "type": "object",
+            "properties": {
+              "campoFecha": {
+                "type": "string"
+              },
+              "ultimosDias": {
+                "type": "integer",
+                "minimum": 1,
+                "nullable": true
+              },
+              "desde": {
+                "type": "string",
+                "nullable": true
+              },
+              "hasta": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "campoFecha"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "agrupadores": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "campoTiempoOperativo": {
+            "type": "string",
+            "nullable": true
+          },
+          "campoTiempoReparacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "campoEsFalla": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "tipo"
+        ],
+        "additionalProperties": false
+      },
+      "Umbrales": {
+        "type": "object",
+        "properties": {
+          "mayorEsMejor": {
+            "type": "boolean"
+          },
+          "bueno": {
+            "type": "number"
+          },
+          "alerta": {
+            "type": "number"
+          },
+          "critico": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "mayorEsMejor",
+          "bueno",
+          "alerta",
+          "critico"
+        ],
+        "additionalProperties": false
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "periodo": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "periodo",
+          "valor"
+        ],
+        "additionalProperties": false
+      },
+      "Widget": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "card",
+              "line",
+              "bar",
+              "area",
+              "pie",
+              "donut",
+              "gauge",
+              "table",
+              "heatmap",
+              "timeline",
+              "calendar",
+              "ranking",
+              "comparativo"
+            ]
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "indicadorClave": {
+            "type": "string"
+          },
+          "filtros": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string"
+                },
+                "campo": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "operador": {
+                  "type": "string",
+                  "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                },
+                "valor": {}
+              },
+              "required": [
+                "dimension",
+                "operador"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "presentacion": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "ranking": {
+            "type": "object",
+            "properties": {
+              "modo": {
+                "type": "string",
+                "enum": [
+                  "topN",
+                  "bottomN"
+                ]
+              },
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "modo",
+              "n"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "posicion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "tipo",
+          "titulo",
+          "indicadorClave"
+        ],
+        "additionalProperties": false
+      },
+      "DefinirIndicador": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clave": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoria": {
+            "type": "string"
+          },
+          "fuente": {
+            "type": "object",
+            "properties": {
+              "modulo": {
+                "type": "string",
+                "description": "ordenes|activos|inventario|correctivo|preventivo|abastecimiento|planes|timeline"
+              },
+              "dataset": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "modulo",
+              "dataset"
+            ],
+            "additionalProperties": false
+          },
+          "expresion": {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "enum": [
+                  "conteo",
+                  "suma",
+                  "promedio",
+                  "ratio",
+                  "duracion-promedio",
+                  "tasa",
+                  "mtbf",
+                  "mttr"
+                ]
+              },
+              "campo": {
+                "type": "string",
+                "nullable": true
+              },
+              "filtros": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "dimension": {
+                      "type": "string"
+                    },
+                    "campo": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "operador": {
+                      "type": "string",
+                      "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                    },
+                    "valor": {}
+                  },
+                  "required": [
+                    "dimension",
+                    "operador"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "filtrosDenominador": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "dimension": {
+                      "type": "string"
+                    },
+                    "campo": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "operador": {
+                      "type": "string",
+                      "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                    },
+                    "valor": {}
+                  },
+                  "required": [
+                    "dimension",
+                    "operador"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "factor": {
+                "type": "number",
+                "nullable": true
+              },
+              "ventana": {
+                "type": "object",
+                "properties": {
+                  "campoFecha": {
+                    "type": "string"
+                  },
+                  "ultimosDias": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "nullable": true
+                  },
+                  "desde": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "hasta": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "campoFecha"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "agrupadores": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "campoTiempoOperativo": {
+                "type": "string",
+                "nullable": true
+              },
+              "campoTiempoReparacion": {
+                "type": "string",
+                "nullable": true
+              },
+              "campoEsFalla": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "tipo"
+            ],
+            "additionalProperties": false
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "formato": {
+            "type": "string"
+          },
+          "umbrales": {
+            "type": "object",
+            "properties": {
+              "mayorEsMejor": {
+                "type": "boolean"
+              },
+              "bueno": {
+                "type": "number"
+              },
+              "alerta": {
+                "type": "number"
+              },
+              "critico": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "mayorEsMejor",
+              "bueno",
+              "alerta",
+              "critico"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "metas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "periodo": {
+                  "type": "string"
+                },
+                "valor": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "periodo",
+                "valor"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "clave",
+          "nombre",
+          "categoria",
+          "fuente",
+          "expresion",
+          "unidad",
+          "formato"
+        ],
+        "additionalProperties": false
+      },
+      "ActualizarIndicador": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoria": {
+            "type": "string"
+          },
+          "fuente": {
+            "type": "object",
+            "properties": {
+              "modulo": {
+                "type": "string",
+                "description": "ordenes|activos|inventario|correctivo|preventivo|abastecimiento|planes|timeline"
+              },
+              "dataset": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "modulo",
+              "dataset"
+            ],
+            "additionalProperties": false
+          },
+          "expresion": {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "enum": [
+                  "conteo",
+                  "suma",
+                  "promedio",
+                  "ratio",
+                  "duracion-promedio",
+                  "tasa",
+                  "mtbf",
+                  "mttr"
+                ]
+              },
+              "campo": {
+                "type": "string",
+                "nullable": true
+              },
+              "filtros": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "dimension": {
+                      "type": "string"
+                    },
+                    "campo": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "operador": {
+                      "type": "string",
+                      "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                    },
+                    "valor": {}
+                  },
+                  "required": [
+                    "dimension",
+                    "operador"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "filtrosDenominador": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "dimension": {
+                      "type": "string"
+                    },
+                    "campo": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "operador": {
+                      "type": "string",
+                      "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                    },
+                    "valor": {}
+                  },
+                  "required": [
+                    "dimension",
+                    "operador"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "factor": {
+                "type": "number",
+                "nullable": true
+              },
+              "ventana": {
+                "type": "object",
+                "properties": {
+                  "campoFecha": {
+                    "type": "string"
+                  },
+                  "ultimosDias": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "nullable": true
+                  },
+                  "desde": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "hasta": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "campoFecha"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "agrupadores": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "campoTiempoOperativo": {
+                "type": "string",
+                "nullable": true
+              },
+              "campoTiempoReparacion": {
+                "type": "string",
+                "nullable": true
+              },
+              "campoEsFalla": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "tipo"
+            ],
+            "additionalProperties": false
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "formato": {
+            "type": "string"
+          },
+          "umbrales": {
+            "type": "object",
+            "properties": {
+              "mayorEsMejor": {
+                "type": "boolean"
+              },
+              "bueno": {
+                "type": "number"
+              },
+              "alerta": {
+                "type": "number"
+              },
+              "critico": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "mayorEsMejor",
+              "bueno",
+              "alerta",
+              "critico"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "metas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "periodo": {
+                  "type": "string"
+                },
+                "valor": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "periodo",
+                "valor"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "HabilitarIndicador": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "habilitado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "habilitado"
+        ],
+        "additionalProperties": false
+      },
+      "EvaluarIndicador": {
+        "type": "object",
+        "properties": {
+          "filtros": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string"
+                },
+                "campo": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "operador": {
+                  "type": "string",
+                  "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                },
+                "valor": {}
+              },
+              "required": [
+                "dimension",
+                "operador"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "periodo": {
+            "type": "string",
+            "nullable": true
+          },
+          "evaluadoEn": {
+            "type": "string",
+            "description": "ISO-8601",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResultadoEvaluacion": {
+        "type": "object",
+        "properties": {
+          "clave": {
+            "type": "string"
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "formato": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          },
+          "muestras": {
+            "type": "integer"
+          },
+          "grupos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          "semaforo": {
+            "type": "string",
+            "nullable": true
+          },
+          "cumplimiento": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "evaluadoEn": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MaterializarSnapshot": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string"
+          },
+          "filtros": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string"
+                },
+                "campo": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "operador": {
+                  "type": "string",
+                  "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                },
+                "valor": {}
+              },
+              "required": [
+                "dimension",
+                "operador"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "evaluadoEn": {
+            "type": "string",
+            "description": "ISO-8601",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResultadoSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "claveSnapshot": {
+            "type": "string"
+          },
+          "clave": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          },
+          "muestras": {
+            "type": "integer"
+          },
+          "idempotente": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CrearDashboard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clave": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "tipo": {
+                  "type": "string",
+                  "enum": [
+                    "card",
+                    "line",
+                    "bar",
+                    "area",
+                    "pie",
+                    "donut",
+                    "gauge",
+                    "table",
+                    "heatmap",
+                    "timeline",
+                    "calendar",
+                    "ranking",
+                    "comparativo"
+                  ]
+                },
+                "titulo": {
+                  "type": "string"
+                },
+                "indicadorClave": {
+                  "type": "string"
+                },
+                "filtros": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "dimension": {
+                        "type": "string"
+                      },
+                      "campo": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "operador": {
+                        "type": "string",
+                        "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                      },
+                      "valor": {}
+                    },
+                    "required": [
+                      "dimension",
+                      "operador"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "presentacion": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "ranking": {
+                  "type": "object",
+                  "properties": {
+                    "modo": {
+                      "type": "string",
+                      "enum": [
+                        "topN",
+                        "bottomN"
+                      ]
+                    },
+                    "n": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "modo",
+                    "n"
+                  ],
+                  "additionalProperties": false,
+                  "nullable": true
+                },
+                "posicion": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "tipo",
+                "titulo",
+                "indicadorClave"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "clave",
+          "nombre"
+        ],
+        "additionalProperties": false
+      },
+      "ActualizarDashboard": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "tipo": {
+                  "type": "string",
+                  "enum": [
+                    "card",
+                    "line",
+                    "bar",
+                    "area",
+                    "pie",
+                    "donut",
+                    "gauge",
+                    "table",
+                    "heatmap",
+                    "timeline",
+                    "calendar",
+                    "ranking",
+                    "comparativo"
+                  ]
+                },
+                "titulo": {
+                  "type": "string"
+                },
+                "indicadorClave": {
+                  "type": "string"
+                },
+                "filtros": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "dimension": {
+                        "type": "string"
+                      },
+                      "campo": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "operador": {
+                        "type": "string",
+                        "description": "eq|neq|in|gt|gte|lt|lte|exists"
+                      },
+                      "valor": {}
+                    },
+                    "required": [
+                      "dimension",
+                      "operador"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "presentacion": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "ranking": {
+                  "type": "object",
+                  "properties": {
+                    "modo": {
+                      "type": "string",
+                      "enum": [
+                        "topN",
+                        "bottomN"
+                      ]
+                    },
+                    "n": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "modo",
+                    "n"
+                  ],
+                  "additionalProperties": false,
+                  "nullable": true
+                },
+                "posicion": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "tipo",
+                "titulo",
+                "indicadorClave"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ClonarDashboard": {
+        "type": "object",
+        "properties": {
+          "origenId": {
+            "type": "string"
+          },
+          "clave": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "nombre"
+        ],
+        "additionalProperties": false
+      },
+      "EliminarDashboard": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ResultadoSembrar": {
+        "type": "object",
+        "properties": {
+          "indicadores": {
+            "type": "integer"
+          },
+          "dashboards": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "indicadores",
+          "dashboards"
+        ],
+        "additionalProperties": false
+      },
+      "CatalogoUpsert": {
+        "type": "object",
+        "properties": {
+          "catalogo": {
+            "type": "string",
+            "enum": [
+              "categorias-indicador",
+              "unidades",
+              "formatos",
+              "periodos-meta"
+            ]
+          },
+          "clave": {
+            "type": "string"
+          },
+          "etiqueta": {
+            "type": "string"
+          },
+          "posicion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "padre": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "catalogo",
+          "clave",
+          "etiqueta"
+        ],
+        "additionalProperties": false
+      },
+      "CatalogoHabilitar": {
+        "type": "object",
+        "properties": {
+          "catalogo": {
+            "type": "string",
+            "enum": [
+              "categorias-indicador",
+              "unidades",
+              "formatos",
+              "periodos-meta"
+            ]
+          },
+          "clave": {
+            "type": "string"
+          },
+          "habilitado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "catalogo",
+          "clave",
+          "habilitado"
+        ],
+        "additionalProperties": false
+      },
+      "OperacionSync": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string"
+          },
+          "comando": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "opId",
+          "comando",
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "ColaSync": {
+        "type": "object",
+        "properties": {
+          "operaciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperacionSync"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumenSync": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "aplicadas": {
+            "type": "integer"
+          },
+          "idempotentes": {
+            "type": "integer"
+          },
+          "conflictos": {
+            "type": "integer"
+          },
+          "reintentables": {
+            "type": "integer"
+          },
+          "rechazadas": {
+            "type": "integer"
+          },
+          "resultados": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Consola": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "eventos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          "tablasRLS": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

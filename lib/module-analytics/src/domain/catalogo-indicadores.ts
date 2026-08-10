@@ -371,6 +371,16 @@ export const CATALOGO_INDICADORES: readonly EspecIndicador[] = [
     formato: "porcentaje",
     umbrales: { mayorEsMejor: true, bueno: 90, alerta: 70, critico: 0 },
   },
+  {
+    clave: "actividad-timeline",
+    nombre: "Actividad (línea de tiempo)",
+    descripcion: "Cantidad de entradas registradas en la línea de tiempo compartida en el periodo",
+    categoria: "actividad",
+    fuente: { modulo: "timeline", dataset: "entradas" },
+    expresion: { tipo: "conteo" },
+    unidad: "conteo",
+    formato: "entero",
+  },
 ];
 
 /** Claves de todos los indicadores del sistema (para verificación). */

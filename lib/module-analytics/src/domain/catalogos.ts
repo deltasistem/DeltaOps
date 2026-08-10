@@ -57,6 +57,7 @@ export const CANONICOS_POR_CATALOGO: Partial<Record<NombreCatalogo, readonly str
     "carga",
     "fallas",
     "abastecimiento",
+    "actividad",
   ],
   "unidades": [
     "porcentaje",

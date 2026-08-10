@@ -1737,7 +1737,7 @@ async function seedCorrectivo(activoIds: Map<string, string>, invIds: Map<string
 
 /**
  * DGP-016 · Siembra la analítica del tenant DEMO SOLO con datos existentes (sin
- * datos falsos): (a) catálogo del sistema (29 indicadores + 8 dashboards
+ * datos falsos): (a) catálogo del sistema (30 indicadores + 8 dashboards
  * canónicos) vía `sembrar-sistema` (idempotente por clave); (b) 1 dashboard
  * PERSONALIZADO del usuario admin demo como ejemplo; (c) ~6 snapshots
  * representativos evaluados contra los datos REALES del tenant (MTBF/MTTR desde
@@ -1788,7 +1788,7 @@ async function seedAnalytics(): Promise<Record<string, number>> {
   // (c) Snapshots representativos evaluados contra datos REALES (idempotentes por
   //     opId + clave determinista). evaluadoEn fijo ⇒ reproducibilidad.
   const evaluadoEn = "2026-02-01T00:00:00.000Z";
-  const objetivo = ["disponibilidad", "mtbf", "mttr", "ot-abiertas", "costo-mantenimiento", "compras-generadas", "reincidencias", "consumo-inventario"];
+  const objetivo = ["disponibilidad", "mtbf", "mttr", "ot-abiertas", "costo-mantenimiento", "compras-generadas", "reincidencias", "consumo-inventario", "actividad-timeline"];
   const valores: Record<string, number> = {};
   for (const clave of objetivo) {
     const r = unwrap(

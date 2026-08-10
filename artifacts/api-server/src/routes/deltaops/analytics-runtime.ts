@@ -327,6 +327,46 @@ const fuentePlanes = new FuenteComposicion({
   },
 });
 
+/* ---------------------------- Shared Timeline ---------------------------- */
+// datasets: entradas
+// Compone el CONTRATO PÚBLICO de la línea de tiempo compartida
+// (`platform.timeline.query`) registrada en el MISMO kernel del runtime de
+// analytics. SOLO LECTURA, fail-safe: si el puerto no existe o falla, la
+// evaluación se rechaza (jamás inventa datos).
+
+const fuenteTimeline = new FuenteComposicion({
+  async entradas(tenantId, criterio) {
+    // El contrato de timeline es tenant-wide (`query`) con filtros opcionales.
+    const ctx = contextForAnalytics("system", "lector", tenantId);
+    const r = await analyticsRuntime().platform.kernel.queries.execute(ctx, "platform.timeline.query", {
+      ...(criterio.desde ? { desde: criterio.desde } : {}),
+      ...(criterio.hasta ? { hasta: criterio.hasta } : {}),
+      ...(criterio.limite ? { limit: criterio.limite } : {}),
+    });
+    if (!r.ok) return r as Result<never, KernelError>;
+    const rows = filasDe(r.value, "entradas", "items");
+    // Cada entrada de timeline expone su snapshot bajo `data`
+    // ({ eventType, entityRef, actorId, occurredAt, payload }). Se aplana a un
+    // hecho neutro con `fecha` canónica (occurredAt).
+    return ok(
+      rows.map((row) => {
+        const d = (row["data"] as Record<string, unknown> | undefined) ?? row;
+        return hecho(
+          {
+            id: row["id"] ?? d["id"] ?? null,
+            eventType: d["eventType"] ?? null,
+            entityRef: d["entityRef"] ?? null,
+            actorId: d["actorId"] ?? null,
+            estado: d["estado"] ?? null,
+            occurredAt: d["occurredAt"] ?? row["occurredAt"] ?? null,
+          },
+          ["occurredAt", "fecha", "createdAt"],
+        );
+      }),
+    );
+  },
+});
+
 /* -------------------------------- Registro ------------------------------- */
 
 const REGISTRO_FUENTES: RegistroFuentes = {
@@ -337,6 +377,7 @@ const REGISTRO_FUENTES: RegistroFuentes = {
   preventivo: fuentePreventivo,
   abastecimiento: fuenteAbastecimiento,
   planes: fuentePlanes,
+  timeline: fuenteTimeline,
 };
 
 export function analyticsRuntime(): AnalyticsRuntimeOperacional {

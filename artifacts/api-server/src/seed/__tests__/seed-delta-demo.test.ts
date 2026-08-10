@@ -532,9 +532,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(await contarPorTenant("cor_eventos_activo_read", "tenant-inexistente")).toBe(0);
   });
 
-  it("ANALYTICS · catálogo del sistema sembrado (29 indicadores + 8 dashboards + 1 personalizado)", async () => {
+  it("ANALYTICS · catálogo del sistema sembrado (30 indicadores + 8 dashboards + 1 personalizado)", async () => {
     const indicadores = await contarPorTenant("an_definiciones_read", DEMO_TENANT);
-    expect(indicadores).toBe(29);
+    expect(indicadores).toBe(30);
 
     const dashboards = await contarPorTenant("an_dashboards_read", DEMO_TENANT);
     // 8 dashboards del sistema + 1 personalizado del usuario demo.
@@ -555,12 +555,12 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
         WHERE tenant_id = $1 AND (datos->>'descripcion') IS NOT NULL AND (datos->>'descripcion') <> ''`,
       [DEMO_TENANT],
     );
-    expect(Number(conDesc.rows[0]?.n ?? 0)).toBe(29);
+    expect(Number(conDesc.rows[0]?.n ?? 0)).toBe(30);
   });
 
   it("ANALYTICS · snapshots representativos evaluados contra datos REALES (no todos cero)", async () => {
     const total = await contarPorTenant("an_snapshots_read", DEMO_TENANT);
-    expect(total).toBe(8); // 8 snapshots representativos materializados.
+    expect(total).toBe(9); // 9 snapshots representativos materializados (incl. actividad-timeline).
 
     // Valores materializados por clave del indicador objetivo.
     const rows = await pool.query(
