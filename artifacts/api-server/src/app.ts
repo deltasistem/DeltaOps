@@ -20,7 +20,7 @@ import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
 import { deltaopsMetricsMiddleware } from "./deltaops/metrics";
 import { deltaopsErrorHandler } from "./deltaops/errors";
-import { enforceEntitlements, resolveIdentitySoft } from "./deltaops/identity/middleware";
+import { enforceEntitlements, requireIdentityForModules } from "./deltaops/identity/middleware";
 
 const app: Express = express();
 const deltaopsConfig = loadDeltaopsConfig();
@@ -64,15 +64,18 @@ app.use("/api/deltaops", createDeltaopsSession(deltaopsConfig));
 app.use("/api", identityRouter);
 // Router de plataforma legacy (health/ready/info/metrics + `/auth/me` compat).
 app.use("/api", deltaopsRouter);
-// Resolver suave de identidad + enforcement de entitlements: se aplican a las
-// superficies de MÓDULO de negocio (rechazo backend de módulos no contratados).
-// El resolver es no-bloqueante si no hay contexto Enterprise (compat legacy).
-app.use("/api", resolveIdentitySoft);
-app.use("/api", enforceEntitlements);
-// El servido de URLs firmadas se monta ANTES de la consola de plataforma para
-// no quedar tras su middleware de admin (la firma HMAC es la autorización).
+// El servido de URLs firmadas se monta ANTES del guard estricto y de la consola
+// de plataforma: su autorización es la firma HMAC de la URL, no la sesión.
 app.use("/api", attachmentServeRouter);
+// La consola de plataforma tiene su propio guard de admin/super-admin.
 app.use("/api", platformConsoleRouter);
+// Guard ESTRICTO de identidad + enforcement de entitlements: se aplican SOLO a
+// las superficies de MÓDULO de negocio. Ya NO hay camino permisivo: toda sesión
+// de módulo debe tener identidad + membresía activa + tenant operativo + epoch
+// vigente, y su `deltaopsUserId` se re-fija a la fila espejo de ESTA sesión.
+// Un módulo no contratado por el tenant se rechaza con 403 en backend.
+app.use("/api", requireIdentityForModules);
+app.use("/api", enforceEntitlements);
 app.use("/api", referenceModuleRouter);
 app.use("/api", activosModuleRouter);
 app.use("/api", ordenesModuleRouter);

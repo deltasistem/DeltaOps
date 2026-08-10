@@ -154,6 +154,7 @@ export async function prepararCambioTenant(
 
 /** Reproyecta la fila legacy `deltaops.users` para el contexto de sesión. */
 export async function proyectarSesion(input: {
+  identityId: string;
   email: string;
   nombre: string;
   passwordHash: string;

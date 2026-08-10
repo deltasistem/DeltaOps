@@ -42,6 +42,12 @@ export const idnIdentitiesTable = deltaopsSchema.table("idn_identities", {
   nombre: text("nombre").notNull(),
   passwordHash: text("password_hash").notNull(),
   estado: text("estado").notNull().default("ACTIVO"),
+  /**
+   * Epoch de autorización: se incrementa en cada login/cambio de tenant. La
+   * sesión guarda el valor vigente en `authVersion`; el middleware exige que
+   * coincidan (sesión con epoch obsoleta ⇒ 401).
+   */
+  authEpoch: integer("auth_epoch").notNull().default(0),
   ultimoAcceso: timestamp("ultimo_acceso", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

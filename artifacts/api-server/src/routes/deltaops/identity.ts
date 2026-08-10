@@ -75,6 +75,7 @@ import {
   crearIdentidad,
   crearMembresia,
   crearTenant,
+  incrementarAuthEpoch,
   listarTenants,
   listarUsuariosDeTenant,
   obtenerIdentidad,
@@ -115,12 +116,17 @@ async function establecerSesion(
   },
 ): Promise<void> {
   const userId = await proyectarSesion({
+    identityId: datos.identityId,
     email: datos.email,
     nombre: datos.nombre,
     passwordHash: datos.passwordHash,
     rolCanonico: datos.rolCanonico,
     tenant: datos.tenantId,
   });
+  // Epoch AUTORITATIVO del servidor: se incrementa aquí y se sella en la sesión.
+  // Cualquier sesión previa de la MISMA identidad queda con epoch obsoleta y será
+  // rechazada (401) por el middleware, evitando que un contexto viejo persista.
+  const epoch = await incrementarAuthEpoch(datos.identityId);
   await new Promise<void>((resolve, reject) => {
     req.session.regenerate((err) => (err ? reject(err) : resolve()));
   });
@@ -128,7 +134,7 @@ async function establecerSesion(
   req.session.identityId = datos.identityId;
   req.session.tenantId = datos.tenantId;
   req.session.rolCanonico = datos.rolCanonico as never;
-  req.session.authVersion = (req.session.authVersion ?? 0) + 1;
+  req.session.authVersion = epoch;
 }
 
 /* ================================ AUTH =================================== */

@@ -35,6 +35,7 @@ export interface Identity {
   email: string;
   nombre: string;
   estado: "ACTIVO" | "DESHABILITADO" | "PENDIENTE";
+  authEpoch: number;
   ultimoAcceso: string | null;
 }
 
@@ -73,6 +74,7 @@ function mapIdentity(row: Record<string, any>): Identity {
     email: row.email,
     nombre: row.nombre,
     estado: row.estado,
+    authEpoch: typeof row.auth_epoch === "number" ? row.auth_epoch : Number(row.auth_epoch ?? 0),
     ultimoAcceso: row.ultimo_acceso ? (row.ultimo_acceso.toISOString?.() ?? String(row.ultimo_acceso)) : null,
   };
 }
@@ -308,6 +310,36 @@ export async function registrarAcceso(identityId: string, tenantId: string): Pro
        WHERE identity_id=$1 AND tenant_id=$2`,
       [identityId, tenantId],
     );
+  });
+}
+
+/**
+ * Incrementa atómicamente el epoch de autorización de la identidad y devuelve el
+ * NUEVO valor. Se invoca en cada login y cambio de tenant; la sesión guarda este
+ * valor en `authVersion` y el middleware exige que coincida con el vigente.
+ */
+export async function incrementarAuthEpoch(identityId: string): Promise<number> {
+  return withGlobal(async (client) => {
+    const r = await client.query(
+      `UPDATE deltaops.idn_identities
+         SET auth_epoch = auth_epoch + 1, updated_at = now()
+       WHERE identity_id = $1
+       RETURNING auth_epoch`,
+      [identityId],
+    );
+    return Number(r.rows[0]?.auth_epoch ?? 0);
+  });
+}
+
+/** Devuelve el epoch de autorización vigente de la identidad (o null si no existe). */
+export async function authEpochDe(identityId: string): Promise<number | null> {
+  return withGlobal(async (client) => {
+    const r = await client.query(
+      `SELECT auth_epoch FROM deltaops.idn_identities WHERE identity_id = $1`,
+      [identityId],
+    );
+    if (!r.rows[0]) return null;
+    return Number(r.rows[0].auth_epoch ?? 0);
   });
 }
 

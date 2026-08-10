@@ -11,11 +11,14 @@
  *
  * Ejecutar: pnpm --filter @workspace/api-server run seed:demo
  *
- * MANDATO OFICIAL: la contraseña inicial vive ÚNICAMENTE en este seed.
+ * CREDENCIALES: NO se escriben literales de contraseña en este archivo. Todas
+ * provienen de `credencialDemo(envKey)` (única fuente de defaults dev), que lee
+ * `process.env` y en producción EXIGE la variable.
  */
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { credencialDemo, CLAVES_ENV } from "./seed-credentials";
 import { db, pool, deltaopsUsersTable } from "@workspace/db";
 import type { ExecutionContext, KernelError, Principal, Result } from "@workspace/kernel";
 import { createExecutionContext } from "@workspace/kernel";
@@ -38,7 +41,6 @@ export const DEMO_ADMIN = {
   nombre: "Carlos Pacheco",
   cargo: "Director TIC",
   rol: "admin",
-  password: "DeltaOps2026!",
 } as const;
 
 /* ------------------------------ Utilidades ------------------------------- */
@@ -123,7 +125,7 @@ async function wipeDeltaDemo(): Promise<void> {
 /* --------------------------- 1) Usuario admin ---------------------------- */
 
 async function seedAdmin(): Promise<void> {
-  const passwordHash = await bcrypt.hash(DEMO_ADMIN.password, 10);
+  const passwordHash = await bcrypt.hash(credencialDemo(CLAVES_ENV.DEMO_ADMIN), 10);
   const [existente] = await db
     .select({ id: deltaopsUsersTable.id })
     .from(deltaopsUsersTable)
@@ -171,14 +173,12 @@ export const DEMO_BRANDING = {
 
 /** Usuarios de prueba por rol (credenciales SOLO por env con default dev). */
 export const DEMO_USUARIOS = [
-  { email: "admin@delta.demo", nombre: "Carlos Pacheco", rol: "TENANT_ADMIN", envPass: "DEMO_ADMIN_PASSWORD" },
-  { email: "supervisor@delta.demo", nombre: "María Fuentes", rol: "SUPERVISOR", envPass: "DEMO_SUPERVISOR_PASSWORD" },
-  { email: "planificador@delta.demo", nombre: "Jorge Rivas", rol: "PLANIFICADOR", envPass: "DEMO_PLANIFICADOR_PASSWORD" },
-  { email: "tecnico@delta.demo", nombre: "Ana Soto", rol: "TECNICO", envPass: "DEMO_TECNICO_PASSWORD" },
-  { email: "consulta@delta.demo", nombre: "Luis Vega", rol: "CONSULTA", envPass: "DEMO_CONSULTA_PASSWORD" },
+  { email: "admin@delta.demo", nombre: "Carlos Pacheco", rol: "TENANT_ADMIN", envPass: CLAVES_ENV.DEMO_ADMIN },
+  { email: "supervisor@delta.demo", nombre: "María Fuentes", rol: "SUPERVISOR", envPass: CLAVES_ENV.DEMO_SUPERVISOR },
+  { email: "planificador@delta.demo", nombre: "Jorge Rivas", rol: "PLANIFICADOR", envPass: CLAVES_ENV.DEMO_PLANIFICADOR },
+  { email: "tecnico@delta.demo", nombre: "Ana Soto", rol: "TECNICO", envPass: CLAVES_ENV.DEMO_TECNICO },
+  { email: "consulta@delta.demo", nombre: "Luis Vega", rol: "CONSULTA", envPass: CLAVES_ENV.DEMO_CONSULTA },
 ] as const;
-
-const DEV_DEFAULT_PASSWORD = "DeltaOps2026!";
 
 async function seedEnterpriseIdentity(): Promise<void> {
   const { seedRolesDeTenant } = await import("../deltaops/identity/seed-roles");
@@ -204,7 +204,7 @@ async function seedEnterpriseIdentity(): Promise<void> {
   await seedRolesDeTenant(DEMO_TENANT);
 
   for (const u of DEMO_USUARIOS) {
-    const password = process.env[u.envPass] ?? DEV_DEFAULT_PASSWORD;
+    const password = credencialDemo(u.envPass);
     const identidad = await crearIdentidad({
       email: u.email,
       nombre: u.nombre,
@@ -213,7 +213,36 @@ async function seedEnterpriseIdentity(): Promise<void> {
     });
     await crearMembresia({ identityId: identidad.identityId, tenantId: DEMO_TENANT, rol: u.rol });
   }
-  log(`Enterprise DEMO: tenant + ${DEMO_USUARIOS.length} identidades/membresías sembradas`);
+
+  // Administrador de PLATAFORMA (SUPER_ADMIN) del tenant principal `deltaops`.
+  // Garantiza que NINGUNA sesión válida carezca de identidad Enterprise: la fila
+  // legacy histórica (`admin@deltaops.dev`) se modela como identidad+membresía.
+  const platformPass = credencialDemo(CLAVES_ENV.PLATFORM_ADMIN);
+  const platformAdmin = await crearIdentidad({
+    email: "admin@deltaops.dev",
+    nombre: "Administrador de Plataforma",
+    passwordHash: await hashPassword(platformPass),
+    estado: "ACTIVO",
+  });
+  const { seedRolesDeTenant: seedRolesPlat } = await import("../deltaops/identity/seed-roles");
+  const { crearTenant: crearTenantPlat } = await import("../deltaops/identity/service");
+  await crearTenantPlat({
+    tenantId: "deltaops",
+    codigo: "DELTAOPS",
+    nombreComercial: "DeltaOps",
+    zonaHoraria: "America/Santiago",
+    idioma: "es",
+    moneda: "CLP",
+    modulos: [
+      "referencia", "activos", "ordenes", "inventario", "planes",
+      "abastecimiento", "preventivo", "correctivo", "analytics",
+    ],
+    branding: { nombre: "DeltaOps", nombreApp: "DeltaOps" },
+  });
+  await seedRolesPlat("deltaops");
+  await crearMembresia({ identityId: platformAdmin.identityId, tenantId: "deltaops", rol: "SUPER_ADMIN" });
+
+  log(`Enterprise DEMO: tenant + ${DEMO_USUARIOS.length} identidades/membresías + admin plataforma sembrados`);
 }
 
 /* -------------------------- 2) Catálogos base ---------------------------- */

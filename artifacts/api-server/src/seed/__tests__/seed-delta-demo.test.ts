@@ -18,6 +18,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { DELTAOPS_TENANT } from "../../routes/deltaops/reference-runtime";
 import { DEMO_ADMIN, DEMO_TENANT, seedDeltaDemo } from "../seed-delta-demo";
+import { credencialDemo, CLAVES_ENV } from "../seed-credentials";
 
 const sinDb = !process.env.DATABASE_URL;
 
@@ -59,7 +60,7 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(user).toBeTruthy();
     expect(user?.tenant).toBe(DEMO_TENANT);
     expect(user?.rol).toBe("admin");
-    expect(await bcrypt.compare(DEMO_ADMIN.password, user!.passwordHash)).toBe(true);
+    expect(await bcrypt.compare(credencialDemo(CLAVES_ENV.DEMO_ADMIN), user!.passwordHash)).toBe(true);
     expect(await bcrypt.compare("contraseña-incorrecta", user!.passwordHash)).toBe(false);
   });
 
