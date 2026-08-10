@@ -22,7 +22,9 @@ Las tablas de DeltaOps viven en el esquema PostgreSQL `deltaops`, aisladas de
 # Aplicar migraciones (desarrollo)
 psql "$DATABASE_URL" -f lib/db/migrations/deltaops/0001_deltaops_init.sql
 
-# Seed inicial (idempotente): crea admin@deltaops.dev / deltaops-dev-2026
+# Seed inicial (idempotente): crea admin@deltaops.dev
+# La contraseña se define con la variable de entorno DELTAOPS_ADMIN_PASSWORD
+# (obligatoria en producción; en desarrollo se usa un valor derivado no secreto).
 pnpm --filter @workspace/scripts run seed:deltaops
 ```
 

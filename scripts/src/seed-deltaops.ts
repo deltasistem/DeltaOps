@@ -12,8 +12,17 @@ const ADMIN = {
   email: "admin@deltaops.dev",
   nombre: "Administrador de Plataforma",
   rol: "platform_admin",
-  password: "deltaops-dev-2026",
 };
+
+/**
+ * Default de DESARROLLO derivado (no secreto), misma política que
+ * `seed-credentials.ts` de api-server: en producción es obligatorio proveer
+ * `DELTAOPS_ADMIN_PASSWORD`; en desarrollo se usa un valor derivado del nombre
+ * de la variable, sin literales de contraseña en el repositorio.
+ */
+function defaultDev(envKey: string): string {
+  return `dev-${envKey.toLowerCase().replace(/_/g, "-")}-0001!`;
+}
 
 const MODULOS_TODOS = [
   "referencia", "activos", "ordenes", "inventario", "planes",
@@ -97,7 +106,7 @@ async function main(): Promise<void> {
       "Seed en producción requiere DELTAOPS_ADMIN_PASSWORD (contraseña de arranque única). Abortado.",
     );
   }
-  const password = providedPassword ?? ADMIN.password;
+  const password = providedPassword ?? defaultDev("DELTAOPS_ADMIN_PASSWORD");
 
   const passwordHash = await bcrypt.hash(password, 10);
   const inserted = await db
