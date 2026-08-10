@@ -46,6 +46,9 @@
       "path": "./lib/module-correctivo"
     },
     {
+      "path": "./lib/module-analytics"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

@@ -187,6 +187,11 @@ export default function Console() {
                 Correctivo
               </Button>
             </Link>
+            <Link href="/analytics" data-testid="link-analytics">
+              <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">
+                Analytics
+              </Button>
+            </Link>
             {(user.rol === "admin" || user.rol === "platform_admin") && (
               <Link href="/consola-activos" data-testid="link-consola-activos">
                 <Button variant="outline" size="sm" className="gap-2 font-mono text-xs uppercase">

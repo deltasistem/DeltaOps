@@ -532,6 +532,65 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(await contarPorTenant("cor_eventos_activo_read", "tenant-inexistente")).toBe(0);
   });
 
+  it("ANALYTICS · catálogo del sistema sembrado (29 indicadores + 8 dashboards + 1 personalizado)", async () => {
+    const indicadores = await contarPorTenant("an_definiciones_read", DEMO_TENANT);
+    expect(indicadores).toBe(29);
+
+    const dashboards = await contarPorTenant("an_dashboards_read", DEMO_TENANT);
+    // 8 dashboards del sistema + 1 personalizado del usuario demo.
+    expect(dashboards).toBe(9);
+
+    // El dashboard personalizado del usuario demo existe y NO es del sistema.
+    const propio = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.an_dashboards_read
+        WHERE tenant_id = $1 AND (datos->>'delSistema')::boolean = false
+          AND (datos->>'propietarioId') IS NOT NULL`,
+      [DEMO_TENANT],
+    );
+    expect(Number(propio.rows[0]?.n ?? 0)).toBe(1);
+
+    // Los payloads proyectados incluyen `descripcion` (DGP-016 etapa 3).
+    const conDesc = await pool.query(
+      `SELECT count(*)::int AS n FROM deltaops.an_definiciones_read
+        WHERE tenant_id = $1 AND (datos->>'descripcion') IS NOT NULL AND (datos->>'descripcion') <> ''`,
+      [DEMO_TENANT],
+    );
+    expect(Number(conDesc.rows[0]?.n ?? 0)).toBe(29);
+  });
+
+  it("ANALYTICS · snapshots representativos evaluados contra datos REALES (no todos cero)", async () => {
+    const total = await contarPorTenant("an_snapshots_read", DEMO_TENANT);
+    expect(total).toBe(8); // 8 snapshots representativos materializados.
+
+    // Valores materializados por clave del indicador objetivo.
+    const rows = await pool.query(
+      `SELECT datos->>'targetClave' AS clave, (datos->>'valor')::numeric AS valor
+         FROM deltaops.an_snapshots_read WHERE tenant_id = $1`,
+      [DEMO_TENANT],
+    );
+    const porClave = Object.fromEntries(
+      rows.rows.map((r: { clave: string; valor: string }) => [r.clave, Number(r.valor)]),
+    );
+
+    // Al menos 4 snapshots con valor > 0 (evidencia funcional, sin datos falsos).
+    const noCero = Object.values(porClave).filter((v) => Number(v) > 0);
+    expect(noCero.length).toBeGreaterThanOrEqual(4);
+
+    // Indicadores con datos REALES en el DEMO: valores estables y no nulos.
+    expect(porClave["mtbf"]).toBeGreaterThan(0);
+    expect(porClave["mttr"]).toBe(360);
+    expect(porClave["ot-abiertas"]).toBe(3);
+    expect(porClave["compras-generadas"]).toBe(4);
+    expect(porClave["reincidencias"]).toBe(2);
+    expect(porClave["consumo-inventario"]).toBe(2);
+  });
+
+  it("AISLAMIENTO ANALYTICS · un tenant ajeno no ve datos del DEMO", async () => {
+    expect(await contarPorTenant("an_definiciones_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("an_dashboards_read", "tenant-inexistente")).toBe(0);
+    expect(await contarPorTenant("an_snapshots_read", "tenant-inexistente")).toBe(0);
+  });
+
   it("AISLAMIENTO · delta-demo y deltaops están particionados por tenant_id", async () => {
     // El DEMO tiene sus 10 activos bajo su propio tenant.
     const activosDemo = await contarPorTenant("act_activos_read", DEMO_TENANT);

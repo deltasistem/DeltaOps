@@ -23,6 +23,9 @@
     },
     {
       "path": "../../lib/module-activos"
+    },
+    {
+      "path": "../../lib/module-analytics"
     }
   ]
 }

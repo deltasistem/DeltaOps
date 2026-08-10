@@ -17,3 +17,4 @@ export * from "./deltaops-planes";
 export * from "./deltaops-abastecimiento";
 export * from "./deltaops-preventivo";
 export * from "./deltaops-correctivo";
+export * from "./deltaops-analytics";

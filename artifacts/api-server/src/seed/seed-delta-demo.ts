@@ -27,6 +27,7 @@ import { planesRuntime, principalPlanes } from "../routes/deltaops/planes-runtim
 import { abastecimientoRuntime, principalAbastecimiento } from "../routes/deltaops/abastecimiento-runtime";
 import { preventivoRuntime, principalPreventivo } from "../routes/deltaops/preventivo-runtime";
 import { correctivoRuntime, principalCorrectivo, formulariosRuntime, contextForFormularios } from "../routes/deltaops/correctivo-runtime";
+import { analyticsRuntime, principalAnalytics } from "../routes/deltaops/analytics-runtime";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -79,6 +80,44 @@ async function drenarCompleto(kernel: {
 function unwrap<T>(r: Result<T, KernelError>, ctx: string): T {
   if (!r.ok) throw new Error(`${ctx}: ${r.error.message}`);
   return r.value;
+}
+
+/* --------------------------- 0) Wipe idempotente ------------------------- */
+
+/**
+ * WIPE idempotente del tenant DEMO (patrón DGP-015): antes de re-sembrar,
+ * elimina TODO rastro de `delta-demo` para garantizar conteos deterministas
+ * aunque la base traiga estado desviado de fases anteriores. Se ejecuta en una
+ * transacción con `session_replication_role = replica` para omitir triggers/FK
+ * durante el borrado. NO toca otros tenants (borra sólo por `tenant_id`), ni el
+ * usuario admin (se reafirma idempotentemente en `seedAdmin`). El `kernel_outbox`
+ * global se acota por `payload->>'tenantId'`. Sólo actúa sobre la base real.
+ */
+async function wipeDeltaDemo(): Promise<void> {
+  const cliente = await pool.connect();
+  try {
+    await cliente.query("begin");
+    await cliente.query("set local session_replication_role = replica");
+    // Todas las tablas del esquema deltaops con columna tenant_id.
+    const { rows } = await cliente.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.columns
+        WHERE table_schema = 'deltaops' AND column_name = 'tenant_id'
+        GROUP BY table_name ORDER BY table_name`,
+    );
+    for (const { table_name } of rows) {
+      await cliente.query(`DELETE FROM deltaops.${table_name} WHERE tenant_id = $1`, [DEMO_TENANT]);
+    }
+    // Outbox/dead-letter globales: acotar por el tenant en el payload.
+    await cliente.query(`DELETE FROM deltaops.kernel_outbox WHERE payload->>'tenantId' = $1`, [DEMO_TENANT]);
+    await cliente.query(`DELETE FROM deltaops.kernel_dead_letter WHERE payload->>'tenantId' = $1`, [DEMO_TENANT]);
+    await cliente.query("commit");
+    log(`Wipe DEMO: ${rows.length} tablas purgadas para tenant ${DEMO_TENANT}`);
+  } catch (err) {
+    await cliente.query("rollback").catch(() => undefined);
+    throw err;
+  } finally {
+    cliente.release();
+  }
 }
 
 /* --------------------------- 1) Usuario admin ---------------------------- */
@@ -1694,8 +1733,80 @@ async function seedCorrectivo(activoIds: Map<string, string>, invIds: Map<string
 
 /* ------------------------------- Orquestación ---------------------------- */
 
+/* ----------------------- 10) Analytics & KPI Platform -------------------- */
+
+/**
+ * DGP-016 · Siembra la analítica del tenant DEMO SOLO con datos existentes (sin
+ * datos falsos): (a) catálogo del sistema (29 indicadores + 8 dashboards
+ * canónicos) vía `sembrar-sistema` (idempotente por clave); (b) 1 dashboard
+ * PERSONALIZADO del usuario admin demo como ejemplo; (c) ~6 snapshots
+ * representativos evaluados contra los datos REALES del tenant (MTBF/MTTR desde
+ * los eventos de activo con insumos crudos, OT abiertas, compras generadas,
+ * reincidencias, consumo de inventario). Los indicadores sin datos en el DEMO
+ * (disponibilidad, costos) NO se fuerzan: evalúan 0 legítimamente.
+ *
+ * Devuelve los valores materializados (para trazabilidad del seed).
+ */
+async function seedAnalytics(): Promise<Record<string, number>> {
+  const rt = analyticsRuntime();
+  const ctx = ctxCon(principalAnalytics(DEMO_ADMIN.email, "admin"));
+  const drain = () => drenarCompleto(rt.platform.kernel);
+
+  // (a) Catálogo del sistema (idempotente).
+  const sembrado = unwrap(
+    await rt.platform.kernel.commands.execute(ctx, "modulo.analytics.sembrar-sistema", {}),
+    "analytics.sembrar-sistema",
+  ) as { indicadores: number; dashboards: number };
+  await drain();
+  log(`Analytics: catálogo del sistema (indicadores nuevos=${sembrado.indicadores}, dashboards nuevos=${sembrado.dashboards})`);
+
+  // (b) Dashboard PERSONALIZADO del usuario admin demo (ejemplo). Idempotente
+  //     por id determinista + guarda de existencia.
+  const dashId = idDet("an:dash:demo-gerencia");
+  const existe = await rt.platform.kernel.queries.execute(ctx, "modulo.analytics.dashboard", { id: dashId });
+  if (!existe.ok) {
+    unwrap(
+      await rt.platform.kernel.commands.execute(ctx, "modulo.analytics.crear-dashboard", {
+        id: dashId,
+        clave: "demo-gerencia",
+        nombre: "Panel Gerencial DEMO",
+        descripcion: "Vista ejecutiva personalizada del usuario demo (confiabilidad + operación)",
+        widgets: [
+          { tipo: "card", titulo: "MTBF", indicadorClave: "mtbf", posicion: 0 },
+          { tipo: "card", titulo: "MTTR", indicadorClave: "mttr", posicion: 1 },
+          { tipo: "card", titulo: "OT abiertas", indicadorClave: "ot-abiertas", posicion: 2 },
+          { tipo: "bar", titulo: "Compras generadas", indicadorClave: "compras-generadas", posicion: 3 },
+          { tipo: "ranking", titulo: "Top activos con fallas", indicadorClave: "fallas-por-activo", ranking: { modo: "topN", n: 5 }, posicion: 4 },
+        ],
+      }),
+      "analytics.crear-dashboard demo-gerencia",
+    );
+    await drain();
+    log("Analytics: dashboard personalizado del usuario demo creado (Panel Gerencial DEMO)");
+  }
+
+  // (c) Snapshots representativos evaluados contra datos REALES (idempotentes por
+  //     opId + clave determinista). evaluadoEn fijo ⇒ reproducibilidad.
+  const evaluadoEn = "2026-02-01T00:00:00.000Z";
+  const objetivo = ["disponibilidad", "mtbf", "mttr", "ot-abiertas", "costo-mantenimiento", "compras-generadas", "reincidencias", "consumo-inventario"];
+  const valores: Record<string, number> = {};
+  for (const clave of objetivo) {
+    const r = unwrap(
+      await rt.platform.kernel.commands.execute(ctx, "modulo.analytics.materializar-snapshot", {
+        opId: `seed:an:snap:${clave}`, clave, evaluadoEn,
+      }),
+      `analytics.materializar-snapshot ${clave}`,
+    ) as { valor: number };
+    valores[clave] = r.valor;
+    await drain();
+  }
+  log(`Analytics: snapshots materializados → ${objetivo.map((k) => `${k}=${valores[k]}`).join(", ")}`);
+  return valores;
+}
+
 export async function seedDeltaDemo(): Promise<void> {
   console.log(`\nSeed DEMO oficial DGP-011.3 — tenant "${DEMO_TENANT}" (${DEMO_EMPRESA})`);
+  await wipeDeltaDemo();
   await seedAdmin();
   await seedCatalogos();
   const activoIds = await seedActivos();
@@ -1706,6 +1817,7 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedPreventivo(activoIds);
   await seedCorrectivo(activoIds, invIds);
   await seedPlataforma(activoIds);
+  await seedAnalytics();
   console.log("Seed DEMO completado.\n");
 }
 

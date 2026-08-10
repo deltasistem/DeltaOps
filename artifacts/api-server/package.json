@@ -23,6 +23,7 @@
     "@workspace/module-planes": "workspace:*",
     "@workspace/module-preventivo": "workspace:*",
     "@workspace/module-correctivo": "workspace:*",
+    "@workspace/module-analytics": "workspace:*",
     "@workspace/module-ordenes": "workspace:*",
     "@workspace/platform": "workspace:*",
     "bcryptjs": "^3.0.3",

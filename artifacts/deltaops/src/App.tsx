@@ -66,6 +66,12 @@ import CorrectivoDiagnostico from '@/pages/correctivo-diagnostico';
 import CorrectivoIntervencion from '@/pages/correctivo-intervencion';
 import CorrectivoEscanear from '@/pages/correctivo-escanear';
 import CorrectivoSincronizacion from '@/pages/correctivo-sincronizacion';
+import AnalyticsHome from '@/pages/analytics-home';
+import AnalyticsIndicadores from '@/pages/analytics-indicadores';
+import AnalyticsIndicador from '@/pages/analytics-indicador';
+import AnalyticsSincronizacion from '@/pages/analytics-sincronizacion';
+import AnalyticsDashboardEditor from '@/pages/analytics-dashboard-editor';
+import AnalyticsDashboard from '@/pages/analytics-dashboard';
 
 const queryClient = new QueryClient();
 
@@ -151,6 +157,13 @@ function Router() {
       <Route path="/correctivo/solicitudes/:id/diagnostico" component={CorrectivoDiagnostico} />
       <Route path="/correctivo/solicitudes/:id" component={CorrectivoSolicitudFicha} />
       <Route path="/correctivo/intervenciones/:id" component={CorrectivoIntervencion} />
+      <Route path="/analytics" component={AnalyticsHome} />
+      <Route path="/analytics/indicadores" component={AnalyticsIndicadores} />
+      <Route path="/analytics/indicadores/:clave" component={AnalyticsIndicador} />
+      <Route path="/analytics/sincronizacion" component={AnalyticsSincronizacion} />
+      <Route path="/analytics/dashboards/nuevo" component={AnalyticsDashboardEditor} />
+      <Route path="/analytics/dashboards/:id/editar" component={AnalyticsDashboardEditor} />
+      <Route path="/analytics/dashboards/:id" component={AnalyticsDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

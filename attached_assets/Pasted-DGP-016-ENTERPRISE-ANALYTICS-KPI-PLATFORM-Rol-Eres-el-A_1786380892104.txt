@@ -1,0 +1,411 @@
+DGP-016 · ENTERPRISE ANALYTICS & KPI PLATFORM
+
+Rol:
+Eres el Arquitecto Principal de DeltaOps y debes ejecutar exclusivamente la fase DGP-016 del programa.
+
+IMPORTANTE
+
+Esta fase NO puede modificar absolutamente ningún DGP anterior.
+
+Está completamente prohibido:
+
+- modificar Kernel
+- modificar Shared Platform
+- modificar Business Foundation
+- modificar Workflow Engine
+- modificar Dynamic Forms
+- modificar Design System
+- modificar Experience Foundation
+- modificar Module Activos
+- modificar Module Órdenes
+- modificar Module Inventario
+- modificar Module Planes
+- modificar Module Abastecimiento
+- modificar Module Preventivo
+- modificar Module Correctivo
+
+Todo deberá componerse únicamente mediante contratos públicos.
+
+Si detectas que falta algún contrato deberás crear un adaptador exclusivamente dentro del nuevo módulo.
+
+Nunca modificar módulos anteriores.
+
+----------------------------------------
+
+OBJETIVO
+
+Construir la Plataforma Empresarial de Indicadores y Analítica Operacional.
+
+NO es un sistema de BI.
+
+NO usa IA.
+
+NO genera reportes PDF.
+
+NO modifica datos.
+
+Consume únicamente información existente.
+
+Debe ser completamente reutilizable para cualquier módulo futuro.
+
+----------------------------------------
+
+NUEVO PAQUETE
+
+@workspace/module-analytics
+
+Servicio:
+
+modulo.analytics
+
+----------------------------------------
+
+ARQUITECTURA
+
+Hexagonal
+
+DDD
+
+CQRS
+
+Configuration First
+
+Offline First
+
+Contract First
+
+Multiempresa
+
+Event Driven
+
+RLS
+
+Event Log
+
+Replay
+
+Read Models
+
+OpenAPI
+
+Sin patrones nuevos.
+
+----------------------------------------
+
+FUENTES DE DATOS
+
+Debe consumir únicamente contratos públicos de:
+
+Module Activos
+
+Module Órdenes
+
+Module Inventario
+
+Module Planes
+
+Module Preventivo
+
+Module Correctivo
+
+Shared Timeline
+
+Workflow Engine
+
+Business Foundation
+
+----------------------------------------
+
+INDICADORES
+
+Debe soportar indicadores declarativos.
+
+Ejemplos:
+
+Disponibilidad
+
+Utilización
+
+Confiabilidad
+
+MTBF
+
+MTTR
+
+Tiempo promedio atención
+
+Tiempo promedio ejecución
+
+Tiempo promedio cierre
+
+OT abiertas
+
+OT vencidas
+
+OT críticas
+
+Costo mantenimiento
+
+Costo preventivo
+
+Costo correctivo
+
+Consumo inventario
+
+Rotación inventario
+
+Nivel servicio
+
+Cumplimiento SLA
+
+Backlog
+
+Carga técnicos
+
+Carga cuadrillas
+
+Reincidencias
+
+Fallas por activo
+
+Fallas por tipo
+
+Reservas
+
+Transferencias
+
+Compras generadas
+
+Todos declarativos.
+
+Nunca hardcodeados.
+
+----------------------------------------
+
+DASHBOARDS
+
+Motor declarativo.
+
+Widgets:
+
+Cards
+
+Charts
+
+Pie
+
+Donut
+
+Bar
+
+Line
+
+Area
+
+Gauge
+
+Tables
+
+Heatmap
+
+Timeline
+
+Calendars
+
+Ranking
+
+Top N
+
+Bottom N
+
+Comparativos
+
+Todos configurables.
+
+----------------------------------------
+
+FILTROS
+
+Empresa
+
+Proyecto
+
+Activo
+
+Ubicación
+
+Bodega
+
+Categoría
+
+Tipo
+
+Estado
+
+Prioridad
+
+Responsable
+
+Supervisor
+
+Cuadrilla
+
+Fecha
+
+Rango
+
+Tenant
+
+Todo reutilizable.
+
+----------------------------------------
+
+READ MODELS
+
+Crear read models exclusivos.
+
+Nunca consultar agregados.
+
+Replay completo.
+
+Idempotencia.
+
+----------------------------------------
+
+EVENT LOG
+
+Bitácora propia.
+
+Replay.
+
+Equivalencia.
+
+Reconstrucción.
+
+----------------------------------------
+
+EXPERIENCIA
+
+Nueva sección:
+
+Analytics
+
+Dashboard Ejecutivo
+
+Dashboard Operativo
+
+Dashboard Inventario
+
+Dashboard Activos
+
+Dashboard Órdenes
+
+Dashboard Correctivo
+
+Dashboard Preventivo
+
+Dashboard Compras
+
+Dashboard Personalizable
+
+Todo usando únicamente el Design System.
+
+----------------------------------------
+
+PERMISOS
+
+analytics.read
+
+analytics.admin
+
+analytics.dashboard
+
+analytics.export
+
+Capacidades correspondientes.
+
+----------------------------------------
+
+OFFLINE
+
+Consultas cacheables.
+
+Snapshots.
+
+Sincronización.
+
+----------------------------------------
+
+API
+
+OpenAPI.
+
+Drift Test.
+
+Contract First.
+
+----------------------------------------
+
+TENANT DEMO
+
+Generar dashboards funcionales utilizando exclusivamente los datos existentes.
+
+No crear datos falsos adicionales.
+
+----------------------------------------
+
+REVISIÓN ARQUITECTÓNICA
+
+Obligatoria.
+
+Hasta obtener PASS.
+
+----------------------------------------
+
+PRUEBAS
+
+Fake
+
+PostgreSQL
+
+RLS
+
+Replay
+
+CQRS
+
+Offline
+
+OpenAPI
+
+UI
+
+Accesibilidad
+
+Responsive
+
+Integración
+
+0 pruebas omitidas.
+
+----------------------------------------
+
+DOCUMENTACIÓN
+
+Español.
+
+Completa.
+
+----------------------------------------
+
+ENTREGA
+
+Únicamente entregar:
+
+INFORME OFICIAL DE CIERRE — DGP-016
+
+Siguiendo exactamente el formato utilizado durante todo el programa.
+
+No proponer DGP-017.
+
+Esperar instrucciones de la Dirección del Programa.
