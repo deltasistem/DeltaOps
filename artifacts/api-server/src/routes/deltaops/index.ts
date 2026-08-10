@@ -1,14 +1,11 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 import { db, pool, deltaopsUsersTable } from "@workspace/db";
 import {
   DeltaopsHealthResponse,
   DeltaopsReadyResponse,
   DeltaopsInfoResponse,
   DeltaopsMetricsResponse,
-  DeltaopsLoginBody,
-  DeltaopsLoginResponse,
   DeltaopsMeResponse,
 } from "@workspace/api-zod";
 import { DELTAOPS_PLATFORM } from "../../deltaops/config";
@@ -90,56 +87,22 @@ router.get("/deltaops/platform/metrics", (_req, res): void => {
 
 /* ----------------------------- Autenticación ---------------------------- */
 
-router.post("/deltaops/auth/login", async (req, res): Promise<void> => {
-  const parsed = DeltaopsLoginBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(401).json({ error: "Credenciales inválidas" });
-    return;
-  }
-
-  const [user] = await db
-    .select()
-    .from(deltaopsUsersTable)
-    .where(eq(deltaopsUsersTable.email, parsed.data.email.toLowerCase()));
-
-  const valid =
-    user != null &&
-    (await bcrypt.compare(parsed.data.password, user.passwordHash));
-
-  if (!valid || user == null) {
-    req.log.warn({ email: parsed.data.email }, "Login fallido");
-    res.status(401).json({ error: "Credenciales inválidas" });
-    return;
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    req.session.regenerate((err) => (err ? reject(err) : resolve()));
-  });
-  req.session.deltaopsUserId = user.id;
-
-  req.log.info({ userId: user.id }, "Sesión iniciada");
-  res.json(
-    DeltaopsLoginResponse.parse({
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-      rol: user.rol,
-    }),
-  );
-});
-
-router.post("/deltaops/auth/logout", async (req, res): Promise<void> => {
-  await new Promise<void>((resolve, reject) => {
-    req.session.destroy((err) => (err ? reject(err) : resolve()));
-  });
-  res.clearCookie("deltaops.sid");
-  res.sendStatus(204);
-});
-
+/**
+ * DGP-017: las rutas de autenticación (`/deltaops/auth/login|logout|session|
+ * switch-tenant|password/*|invitations`) las atiende AHORA de forma ÚNICA el
+ * router de identidad (`routes/deltaops/identity.ts`), montado antes que este
+ * router en `app.ts`. Se elimina aquí el login/logout legacy para que NO
+ * sombreen la superficie Enterprise (antes devolvían la forma legacy y creaban
+ * una sesión que el runtime de identidad no reconocía).
+ *
+ * `GET /deltaops/auth/me` se conserva por compatibilidad con clientes generados
+ * (orval) y delega en la MISMA sesión: devuelve el `SessionResponse` completo si
+ * hay contexto de identidad Enterprise; de lo contrario, la forma legacy.
+ */
 router.get("/deltaops/auth/me", async (req, res): Promise<void> => {
   const userId = req.session.deltaopsUserId;
   if (!userId) {
-    res.status(401).json({ error: "No autenticado" });
+    res.status(401).json({ error: "No autenticado", code: "AUTH_REQUIRED" });
     return;
   }
 
@@ -149,7 +112,7 @@ router.get("/deltaops/auth/me", async (req, res): Promise<void> => {
     .where(eq(deltaopsUsersTable.id, userId));
 
   if (!user) {
-    res.status(401).json({ error: "No autenticado" });
+    res.status(401).json({ error: "No autenticado", code: "AUTH_REQUIRED" });
     return;
   }
 

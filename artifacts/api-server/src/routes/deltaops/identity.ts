@@ -158,7 +158,12 @@ router.post(`${BASE}/auth/login`, async (req, res): Promise<void> => {
   }
   await establecerSesion(req, res, r);
   await auditarIdentidad(r.tenantId, "login-exitoso", r.identityId, r.identityId, { email: r.email });
-  res.json(await construirSesion(res));
+  const tenant = await obtenerTenant(r.tenantId);
+  if (!tenant) {
+    res.status(500).json({ error: "Empresa de la sesión no encontrada" });
+    return;
+  }
+  res.json(await armarSesion(r.identityId, r.tenantId, r.rolCanonico, tenant));
 });
 
 /** Payload de sesión: usuario+tenant+rol+capacidades+módulos habilitados. */

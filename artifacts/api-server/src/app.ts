@@ -55,11 +55,18 @@ app.use(express.urlencoded({ extended: true }));
 // DeltaOps (DGP-001): métricas, sesión y rutas de plataforma, aisladas bajo /api/deltaops
 app.use("/api/deltaops", deltaopsMetricsMiddleware);
 app.use("/api/deltaops", createDeltaopsSession(deltaopsConfig));
-app.use("/api", deltaopsRouter);
-// DGP-017: identidad, tenancy y SaaS. Se monta ANTES de los módulos de negocio
-// para que el resolver suave de identidad + enforcement de entitlements se
-// aplique a las superficies de módulo (rechazo backend de módulos no contratados).
+// DGP-017: identidad, tenancy y SaaS. Se monta como PRIMERA superficie para que
+// `/auth/login|logout|session|switch-tenant|password/*|invitations`, `/users`,
+// `/roles`, `/tenant/*` y `/admin/*` sean atendidos ÚNICAMENTE por el router de
+// identidad (el login legacy ya NO existe en `deltaopsRouter`, no puede
+// sombrear). La sesión que crea (misma cookie/store express-session) es
+// reconocida por el middleware de sesión legacy Y por el runtime de identidad.
 app.use("/api", identityRouter);
+// Router de plataforma legacy (health/ready/info/metrics + `/auth/me` compat).
+app.use("/api", deltaopsRouter);
+// Resolver suave de identidad + enforcement de entitlements: se aplican a las
+// superficies de MÓDULO de negocio (rechazo backend de módulos no contratados).
+// El resolver es no-bloqueante si no hay contexto Enterprise (compat legacy).
 app.use("/api", resolveIdentitySoft);
 app.use("/api", enforceEntitlements);
 // El servido de URLs firmadas se monta ANTES de la consola de plataforma para
