@@ -22,3 +22,12 @@ timeoutMs = 20000
 [nix]
 channel = "stable-25_05"
 packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "openjpeg", "swig", "tcl", "tk", "xcbuild", "zlib"]
+
+[userenv]
+
+[userenv.shared]
+M365_MAIL_ENABLED = "true"
+M365_SMTP_HOST = "smtp.outlook.com"
+M365_SMTP_PORT = "587"
+M365_SMTP_SECURE = "false"
+NOTIFICATION_PROVIDER = "m365"

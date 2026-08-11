@@ -1,0 +1,316 @@
+DIRECTIVA DEL PROGRAMA — PROVISIONAMIENTO REAL MICROSOFT 365 PARA DELTAOPS
+
+Programa DeltaOps
+Objetivo: provisionar y verificar la conexión real de DeltaOps con Microsoft 365 / Exchange Online mediante SMTP OAuth 2.0.
+
+IMPORTANTE:
+La arquitectura de notificaciones ya fue implementada y revisada en la Directiva Microsoft 365 Mail / SMTP OAuth.
+
+NO reconstruyas la integración.
+NO cambies NotificationPort.
+NO cambies EmailNotificationPort.
+NO modifiques ningún módulo de negocio.
+NO implementes login con Microsoft Entra ID.
+NO importes usuarios, grupos, roles ni permisos desde Microsoft.
+NO almacenes credenciales en código, archivos, documentación, seed, logs ni respuestas HTTP.
+
+DeltaOps mantiene completamente autónomos:
+- usuarios
+- roles
+- permisos
+- tenants
+- autorización
+- identidad de negocio
+
+Microsoft 365 será utilizado EXCLUSIVAMENTE como proveedor externo de envío de correo.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Quiero provisionar los valores reales necesarios para activar:
+
+NOTIFICATION_PROVIDER=m365
+
+y posteriormente ejecutar el smoke test real:
+
+pnpm --filter @workspace/api-server m365:smoke [destino]
+
+No ejecutes el smoke test hasta comprobar que todos los Secrets obligatorios están disponibles.
+
+==================================================
+2. SOLICITAR LOS SIGUIENTES SECRETS
+==================================================
+
+Configura/verifica en Replit Secrets las siguientes variables:
+
+M365_TENANT_ID
+M365_CLIENT_ID
+M365_CLIENT_SECRET
+M365_MAIL_FROM
+
+Y las siguientes variables de activación/configuración:
+
+M365_MAIL_ENABLED=true
+NOTIFICATION_PROVIDER=m365
+
+Configuración SMTP:
+
+M365_SMTP_HOST=smtp.outlook.com
+M365_SMTP_PORT=587
+M365_SMTP_SECURE=false
+
+IMPORTANTE:
+
+M365_CLIENT_SECRET es un secreto sensible.
+
+Nunca:
+- imprimirlo en consola
+- mostrarlo en logs
+- devolverlo por API
+- escribirlo en archivos
+- incluirlo en documentación
+- incluirlo en commits
+- incluirlo en capturas
+- incluirlo en el informe final
+
+Los demás identificadores tampoco deben exponerse innecesariamente en logs.
+
+==================================================
+3. INTERACCIÓN CON EL USUARIO
+==================================================
+
+Si alguno de los Secrets obligatorios no existe, DETENTE.
+
+Solicita al usuario que configure en Replit:
+
+1. M365_TENANT_ID
+2. M365_CLIENT_ID
+3. M365_CLIENT_SECRET
+4. M365_MAIL_FROM
+
+NO solicites que el usuario escriba el CLIENT_SECRET dentro del chat.
+
+Indica claramente que debe introducirlo directamente en Replit Secrets.
+
+Después de que los Secrets estén disponibles, continúa automáticamente con la validación.
+
+==================================================
+4. VALIDACIÓN PREVIA
+==================================================
+
+Antes del smoke test verifica solamente:
+
+- existencia de M365_TENANT_ID
+- existencia de M365_CLIENT_ID
+- existencia de M365_CLIENT_SECRET
+- existencia de M365_MAIL_FROM
+- M365_MAIL_ENABLED=true
+- NOTIFICATION_PROVIDER=m365
+- host smtp.outlook.com
+- puerto 587
+
+Nunca muestres el valor real de M365_CLIENT_SECRET.
+
+Para los demás valores sensibles o identificadores, utiliza representación redactada cuando aparezcan en logs.
+
+Ejemplo:
+
+M365_CLIENT_ID=********-****-****-****-************
+M365_TENANT_ID=********-****-****-****-************
+M365_CLIENT_SECRET=[REDACTED]
+M365_MAIL_FROM=n********@********.com
+
+==================================================
+5. VALIDACIÓN DE CONFIGURACIÓN DE EXCHANGE
+==================================================
+
+No modifiques automáticamente la configuración de Microsoft 365.
+
+Si el smoke test falla porque:
+- SMTP AUTH está deshabilitado
+- falta consentimiento administrativo
+- falta SMTP.SendAsApp
+- el buzón no está habilitado para SMTP AUTH
+- la aplicación no tiene autorización sobre el buzón
+- OAuth falla
+- credenciales inválidas
+- sender no autorizado
+
+NO intentes solucionar estos problemas inventando configuraciones.
+
+Devuelve el error exacto y explica qué configuración de Microsoft 365 debe revisarse.
+
+==================================================
+6. EJECUTAR SMOKE TEST
+==================================================
+
+Cuando los Secrets estén presentes:
+
+Ejecuta:
+
+pnpm --filter @workspace/api-server m365:smoke
+
+Si el comando requiere destinatario, NO inventes uno.
+
+Solicita al usuario una dirección de correo de prueba.
+
+El destinatario de prueba NO debe convertirse en configuración permanente.
+
+El smoke test debe verificar por etapas:
+
+1. Configuración
+2. OAuth 2.0
+3. Obtención del access token
+4. Conexión SMTP
+5. STARTTLS
+6. XOAUTH2
+7. Autenticación
+8. MAIL FROM
+9. RCPT TO
+10. envío del mensaje
+11. resultado final
+
+No muestres tokens OAuth ni secretos.
+
+==================================================
+7. PRUEBA DE CORREO
+==================================================
+
+El correo de prueba debe indicar claramente:
+
+Asunto:
+[DeltaOps] Prueba de conexión Microsoft 365
+
+Cuerpo:
+
+Prueba técnica de conexión Microsoft 365 ejecutada correctamente desde DeltaOps.
+
+Proveedor: Microsoft 365 / Exchange Online
+Transporte: SMTP OAuth 2.0
+Entorno: [environment]
+Fecha/hora: [timestamp]
+
+Este mensaje corresponde únicamente a una prueba técnica.
+
+NO incluir secretos, tokens ni información sensible.
+
+==================================================
+8. SEGURIDAD
+==================================================
+
+Mantener obligatoriamente:
+
+- OAuth 2.0
+- client_credentials
+- STARTTLS
+- SMTP sobre puerto 587
+- sin contraseña de buzón
+- sin secretos en código
+- sin secretos en Git
+- sin secretos en documentación
+- sin secretos en logs
+- sin secretos en respuestas HTTP
+
+Mantener además la arquitectura:
+
+DeltaOps
+→ NotificationPort
+→ EmailNotificationPort
+→ M365EmailProvider
+→ Exchange Online
+
+==================================================
+9. MULTITENANCY
+==================================================
+
+NO modificar el modelo de tenancy.
+
+M365_TENANT_ID representa el tenant de Microsoft 365 que proporciona el servicio de correo.
+
+NO debe confundirse con:
+
+tenantId de DeltaOps.
+
+Los usuarios, roles y permisos de DeltaOps continúan siendo completamente independientes de Microsoft 365.
+
+No implementar todavía configuración de correo independiente por tenant.
+
+La arquitectura debe permanecer preparada para ello en el futuro.
+
+==================================================
+10. NO HACER
+==================================================
+
+Queda expresamente prohibido:
+
+- implementar Microsoft Entra Login
+- usar User.Read
+- importar usuarios de Microsoft
+- importar grupos
+- importar roles
+- importar permisos
+- usar Microsoft Graph para identidad
+- usar Mail.Read
+- usar Mail.ReadWrite
+- cambiar autorización de DeltaOps
+- modificar módulos congelados
+- modificar DGP-017
+- crear una nueva arquitectura de notificaciones
+- almacenar secretos en PostgreSQL
+- almacenar secretos en el frontend
+- colocar secretos en .env versionado
+
+==================================================
+11. RESULTADO ESPERADO
+==================================================
+
+Al finalizar necesito un resultado inequívoco:
+
+M365 CONFIGURATION: PASS/FAIL
+OAuth: PASS/FAIL
+SMTP CONNECTION: PASS/FAIL
+SMTP AUTH: PASS/FAIL
+MAIL FROM: PASS/FAIL
+TEST EMAIL: PASS/FAIL
+
+Si todo está correcto:
+
+MICROSOFT 365 MAIL INTEGRATION: PASS
+
+Si algo falla:
+
+MICROSOFT 365 MAIL INTEGRATION: BLOCKED
+
+y especifica exactamente el punto que requiere intervención.
+
+==================================================
+12. CIERRE
+==================================================
+
+Si el smoke test resulta PASS:
+
+- no hagas cambios arquitectónicos adicionales
+- conserva la configuración actual
+- ejecuta las pruebas existentes
+- ejecuta typecheck
+- ejecuta build
+- verifica que no existan secretos en el repositorio
+- verifica que no haya regresiones
+- genera un informe técnico de cierre
+
+El informe debe indicar:
+
+- configuración validada
+- resultado del OAuth
+- resultado SMTP
+- resultado del correo de prueba
+- pruebas ejecutadas
+- typecheck
+- build
+- seguridad
+- confirmación de que DeltaOps continúa siendo autónomo respecto a identidad y autorización
+
+NO mostrar ningún secreto en el informe.
+
+FIN DE LA DIRECTIVA.
