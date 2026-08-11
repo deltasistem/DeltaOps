@@ -19,3 +19,9 @@ description: Lecciones de la fundación SaaS — contexto por sesión inmutable,
 - Lección de revisión: endpoints de estado/configuración GLOBAL deben ir en la superficie /admin Enterprise (SUPER_ADMIN canónico), nunca tras el guard de platform-console que acepta el rol legacy "admin" (= TENANT_ADMIN proyectado).
 - Pendiente consciente: /platform/logs y /platform/queues (consola técnica pre-DGP-017) exponen metadatos cross-tenant bajo admin legacy; endurecerlas requeriría directiva expresa.
 - Permisos Entra mínimos: SMTP.SendAsApp + Application Access Policy; sin Graph de lectura. Smoke real pendiente de M365_TENANT_ID/CLIENT_ID/CLIENT_SECRET/MAIL_FROM.
+
+## Migración a Microsoft Graph (proveedor de correo definitivo)
+- SMTP OAuth quedó BLOCKED (Exchange rechaza XOAUTH2 con 535 pese a SMTP.SendAsApp consentido); la Dirección migró a Graph: M365GraphEmailProvider (client_credentials scope graph.microsoft.com/.default, POST /users/{GRAPH_SENDER}/sendMail, 202=aceptado) tras el mismo EmailNotificationPort. Smoke real PASS con Secrets GRAPH_*.
+- NOTIFICATION_PROVIDER=fake|m365-graph; fake en producción ⇒ throw; SMTP/nodemailer eliminados por completo (código, dep, external de build, docs con nota Histórico).
+- Lección: los e2e de contrato de proveedor deben ser robustos al entorno (comparar contra proveedorSolicitado(process.env)), no listas literales — cambiar NOTIFICATION_PROVIDER rompió la suite.
+- Secrets GRAPH_* independientes de M365_* (legacy SMTP, ya sin uso). Pendiente recomendado del lado Microsoft: Exchange RBAC for Applications acotando Mail.Send al buzón GRAPH_SENDER (documentado, no ejecutable desde aquí).
