@@ -1,0 +1,85 @@
+DIRECTIVA — REVALIDACIÓN MICROSOFT 365 SMTP OAUTH
+
+La configuración de Entra ID para DELTAOPS ya fue completada.
+
+VERIFICACIÓN REALIZADA EN ENTRA ID:
+
+API:
+Office 365 Exchange Online
+
+Permiso de aplicación:
+SMTP.SendAsApp
+
+Estado:
+CONSENTIMIENTO DE ADMINISTRADOR CONCEDIDO
+
+La App Registration DELTAOPS ya tiene el permiso correcto para SMTP AUTH mediante OAuth 2.0.
+
+NO modifiques:
+- App Registration
+- Client ID
+- Client Secret
+- Tenant ID
+- NotificationPort
+- EmailNotificationPort
+- arquitectura de DGP-017
+- modelo de identidad/autorización de DeltaOps
+- multitenancy
+- ningún módulo congelado
+
+OBJETIVO
+
+Vuelve a ejecutar exclusivamente el diagnóstico/smoke test de Microsoft 365 SMTP OAuth utilizando los Secrets actualmente provisionados:
+
+M365_TENANT_ID
+M365_CLIENT_ID
+M365_CLIENT_SECRET
+M365_MAIL_FROM
+M365_MAIL_ENABLED=true
+M365_SMTP_HOST=smtp.outlook.com
+M365_SMTP_PORT=587
+M365_SMTP_SECURE=false
+NOTIFICATION_PROVIDER=m365
+
+No solicites nuevamente estos valores si ya están presentes en Secrets.
+
+EJECUTA:
+
+pnpm --filter @workspace/api-server m365:smoke
+
+Si el comando requiere destinatario, utiliza el parámetro correspondiente sin modificar código.
+
+IMPORTANTE:
+
+El permiso SMTP.SendAsApp ya está concedido en Entra ID.
+
+Por tanto, si OAuth continúa en PASS pero SMTP AUTH devuelve:
+
+535 5.7.3 Authentication unsuccessful
+
+NO intentes modificar código ni credenciales.
+
+Reporta específicamente:
+
+1. OAuth: PASS/FAIL
+2. SMTP Connection: PASS/FAIL
+3. SMTP AUTH: PASS/FAIL
+4. MAIL FROM: PASS/FAIL
+5. TEST EMAIL: PASS/FAIL
+6. Error exacto de Exchange Online
+7. Diagnóstico del punto de bloqueo
+
+Si SMTP AUTH continúa fallando, el siguiente paso será revisar la autorización del Service Principal sobre el buzón M365_MAIL_FROM y la configuración SMTP AUTH del buzón en Exchange Online.
+
+NO inventes ni cambies valores.
+
+NO muestres secretos en logs ni en el informe.
+
+Si todo resulta PASS, realiza una prueba real de envío y confirma:
+- mensaje aceptado por Exchange
+- destinatario
+- remitente
+- Message-ID si está disponible
+- resultado de entrega
+
+Al finalizar, entrega un informe breve y preciso del smoke test.
