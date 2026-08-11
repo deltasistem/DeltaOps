@@ -21,6 +21,20 @@ import type { Sesion } from "./tipos";
 
 export const CLAVE_SESION = ["identidad", "sesion"] as const;
 
+/**
+ * Descarta TODO el estado de React Query EXCEPTO la consulta de sesión. Se usa
+ * al iniciar/cerrar sesión y al cambiar de empresa: hay que invalidar los datos
+ * derivados del usuario/tenant anterior SIN romper la suscripción del observador
+ * de sesión. `qc.clear()` NO sirve para esto: destruye también la sesión y deja
+ * al observador sin recibir el `setQueryData` posterior (datos stale). Por eso
+ * se siembra primero la sesión y luego se elimina el resto por predicado.
+ */
+export function purgarCacheExceptoSesion(qc: ReturnType<typeof useQueryClient>) {
+  qc.removeQueries({
+    predicate: (q) => !(q.queryKey[0] === CLAVE_SESION[0] && q.queryKey[1] === CLAVE_SESION[1]),
+  });
+}
+
 interface SesionCtx {
   readonly sesion: Sesion | null;
   readonly cargando: boolean;
@@ -59,18 +73,27 @@ export function SesionProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiLogout();
     } finally {
-      // Limpieza total: ningún dato del usuario/tenant sobrevive al logout.
-      qc.clear();
+      // Cancelar cualquier consulta de sesión en vuelo para que NO reescriba el
+      // estado tras el logout (evita una carrera con un refetch en segundo plano).
+      await qc.cancelQueries({ queryKey: CLAVE_SESION });
+      // Fijar la sesión a "no autenticada" (null) para que TODO consumidor
+      // montado reaccione al instante y aterrice en /login, SIN romper la
+      // suscripción del observador (por eso no se usa qc.clear()).
+      qc.setQueryData<Sesion | null>(CLAVE_SESION, null);
+      // Descartar el resto del estado: ningún dato del usuario/tenant sobrevive.
+      purgarCacheExceptoSesion(qc);
     }
   }, [qc]);
 
   const cambiarEmpresa = useCallback(
     async (tenantId: string) => {
       const nueva = await switchTenant(tenantId);
-      // INVALIDAR todo el estado local: el contexto de autorización cambió.
-      qc.clear();
-      // Sembrar la nueva sesión para evitar un parpadeo a "no autenticado".
+      await qc.cancelQueries({ queryKey: CLAVE_SESION });
+      // Sembrar la nueva sesión PRIMERO (evita parpadeo a "no autenticado" y
+      // mantiene la suscripción del observador) y luego invalidar el resto del
+      // estado local: el contexto de autorización cambió.
       qc.setQueryData(CLAVE_SESION, nueva);
+      purgarCacheExceptoSesion(qc);
       guardarTenantActivo(nueva.tenant.id, nueva.identityId);
       purgarColasDeOtrosTenants(nueva.tenant.id);
     },

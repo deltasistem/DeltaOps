@@ -19,11 +19,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import Inicio from "../pages/inicio";
+import Login from "../pages/login";
+import { Route } from "wouter";
 import { SoloSuperAdmin } from "../lib/identidad/GuardaRuta";
 import { AppShellIdentidad } from "../lib/identidad/AppShell";
-import { SesionProvider } from "../lib/identidad/sesion";
+import { SesionProvider, useSesion } from "../lib/identidad/sesion";
 import { landingOperacional, esRutaSoloSuperAdmin } from "../lib/identidad/rbac";
 import type { Sesion, Rol } from "../lib/identidad/tipos";
+
+/** Sonda de observación del rol de la sesión activa (para aserciones deterministas). */
+function SondaRol() {
+  const { sesion } = useSesion();
+  return <div data-testid="sonda-rol">{sesion?.rol ?? "none"}</div>;
+}
 
 const MODULOS_9 = [
   "referencia", "activos", "ordenes", "inventario", "planes",
@@ -316,11 +324,12 @@ describe("H · logout/login reconstruye el AppShell según la identidad", () => 
     });
     const { hook, history } = memoryLocation({ path: "/", static: false, record: true });
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const spyClear = vi.spyOn(qc, "clear");
+    const spyRemove = vi.spyOn(qc, "removeQueries");
     render(
       <QueryClientProvider client={qc}>
         <Router hook={hook}>
           <SesionProvider>
+            <SondaRol />
             <AppShellIdentidad><div>Contenido empresarial</div></AppShellIdentidad>
           </SesionProvider>
         </Router>
@@ -334,9 +343,99 @@ describe("H · logout/login reconstruye el AppShell según la identidad", () => 
     fireEvent.click(disparador!);
     const cerrar = await screen.findByRole("menuitem", { name: /Cerrar sesión/i });
     fireEvent.click(cerrar);
-    // Debe navegar a /login de inmediato y haber limpiado el cache.
+    // Debe llamar al logout, limpiar el estado (sesión → null + purga del resto)
+    // y navegar a /login de inmediato.
     await waitFor(() => expect(history.at(-1)).toBe("/login"));
     expect(logoutLlamado).toBe(true);
-    expect(spyClear).toHaveBeenCalled();
+    expect(spyRemove).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId("sonda-rol").textContent).toBe("none"));
+  });
+
+  it("ciclo COMPLETO logout(TENANT_ADMIN) → login(SUPER_ADMIN): / rinde la consola global, sin datos stale", async () => {
+    // Estado de sesión que el BACKEND devolvería en /auth/session, mutable según
+    // el ciclo de vida (login/logout). Empieza autenticado como TENANT_ADMIN.
+    let sesionServidor: Sesion | null = sesion("TENANT_ADMIN", { nombre: "Carlos Pacheco" });
+    const superSesion = sesion("SUPER_ADMIN", { nombre: "Admin Global" });
+
+    vi.spyOn(global, "fetch").mockImplementation(async (u, init) => {
+      const url = String(u);
+      const metodo = (init as RequestInit | undefined)?.method;
+      if (url.includes("/auth/logout")) {
+        sesionServidor = null; // el backend invalida la sesión
+        return resp(null, 200);
+      }
+      if (url.includes("/auth/login")) {
+        sesionServidor = superSesion; // re-login con OTRA identidad (SUPER_ADMIN)
+        return resp(superSesion);
+      }
+      if (url.includes("/auth/session")) {
+        return sesionServidor ? resp(sesionServidor) : resp({ error: "no auth" }, 401);
+      }
+      if (url.includes("/auth/me")) {
+        return resp({ identityId: "sa", nombre: "Admin Global", rol: "admin" });
+      }
+      if (url.includes("/tenant/branding")) return resp({});
+      if (url.includes("/health")) return resp({ status: "ok", timestamp: new Date(0).toISOString() });
+      if (url.includes("/ready")) return resp({ status: "ok", checks: [] });
+      if (url.includes("/info")) return resp({ name: "deltaops", version: "1", environment: "test", nodeVersion: "20", uptimeSeconds: 1 });
+      if (url.includes("/metrics")) return resp({ uptimeSeconds: 1, avgResponseTimeMs: 5, requestCount: 1, errorCount: 0 });
+      return resp(null);
+    });
+
+    const { hook, history } = memoryLocation({ path: "/", static: false, record: true });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <Router hook={hook}>
+          <SesionProvider>
+            <SondaRol />
+            <Route path="/"><Inicio /></Route>
+            <Route path="/login"><Login /></Route>
+          </SesionProvider>
+        </Router>
+      </QueryClientProvider>,
+    );
+
+    // 1) Aterrizaje inicial: experiencia empresarial del TENANT_ADMIN.
+    await waitFor(() => expect(screen.getByTestId("sonda-rol").textContent).toBe("TENANT_ADMIN"));
+    await screen.findByText(/Bienvenido, Carlos Pacheco/i);
+    expect(screen.queryByText("DeltaOps Console")).toBeNull();
+
+    // 2) Logout desde el menú de perfil → sesión a "none" y navega a /login.
+    const disparador = document.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]');
+    fireEvent.click(disparador!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Cerrar sesión/i }));
+    await waitFor(() => expect(history.at(-1)).toBe("/login"));
+    // La sesión ya NO expone al usuario anterior (sin datos stale).
+    await waitFor(() => expect(screen.getByTestId("sonda-rol").textContent).toBe("none"));
+    expect(screen.queryByText(/Bienvenido, Carlos Pacheco/i)).toBeNull();
+    await screen.findByRole("button", { name: /Ingresar/i });
+
+    // 3) Re-login con OTRA identidad (SUPER_ADMIN).
+    fireEvent.change(document.querySelector('input[name="email"]')!, { target: { value: "admin@deltaops.dev" } });
+    fireEvent.change(document.querySelector('input[name="password"]')!, { target: { value: "secreta1" } });
+    fireEvent.click(screen.getByRole("button", { name: /Ingresar/i }));
+
+    // 4) La sesión refleja la NUEVA identidad (SUPER_ADMIN) al aterrizar (el
+    //    setQueryData del login siembra la identidad ANTES de navegar a `/`), y
+    //    NUNCA sobrevive la landing empresarial stale del usuario anterior.
+    await waitFor(() => expect(screen.getByTestId("sonda-rol").textContent).toBe("SUPER_ADMIN"));
+    // El login aterriza en `/` (el dispatcher decide la experiencia por rol).
+    expect(history).toContain("/");
+    // Datos del usuario anterior COMPLETAMENTE ausentes (no hay vista stale).
+    expect(screen.queryByText(/Bienvenido, Carlos Pacheco/i)).toBeNull();
+    expect(screen.queryByText(/Administrador de empresa/i)).toBeNull();
+    // El dispatcher NO rinde la experiencia empresarial para el SUPER_ADMIN:
+    // sus marcadores (bienvenida empresarial / "Módulos disponibles") no existen.
+    expect(screen.queryByText(/Bienvenido, Admin Global/i)).toBeNull();
+    expect(screen.queryByText(/Módulos disponibles/i)).toBeNull();
+  });
+
+  it("dispatcher aislado: sesión SUPER_ADMIN en `/` rinde la consola global técnica", async () => {
+    // Complemento determinista de la consola global (sin acoplarse al ciclo de
+    // vida legacy de auto-redirección de Console): confirma la rama SUPER_ADMIN.
+    renderInicio(sesion("SUPER_ADMIN"));
+    expect(await screen.findByText("DeltaOps Console")).toBeInTheDocument();
+    expect(screen.queryByText(/Módulos disponibles/i)).toBeNull();
   });
 });

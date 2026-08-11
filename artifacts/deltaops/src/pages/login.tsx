@@ -27,7 +27,8 @@ import {
 } from "@workspace/design-system";
 import { login } from "@/lib/identidad/endpoints";
 import { IdentidadError, esFalloDeRed } from "@/lib/identidad/api";
-import { CLAVE_SESION } from "@/lib/identidad/sesion";
+import { CLAVE_SESION, purgarCacheExceptoSesion } from "@/lib/identidad/sesion";
+import { guardarTenantActivo, purgarColasDeOtrosTenants } from "@/lib/identidad/guardas-offline";
 import { nombreRol } from "@/lib/identidad/rbac";
 import type { MembresiaResumen, Sesion } from "@/lib/identidad/tipos";
 
@@ -70,7 +71,21 @@ export default function Login() {
   const expirada = new URLSearchParams(search).get("expirada") === "1";
 
   function establecerSesion(sesion: Sesion) {
+    // Reinicio del estado del cliente para no arrastrar datos del usuario
+    // anterior tras un logout→login con OTRA identidad:
+    // 1) cancelar cualquier consulta de sesión en vuelo para que no reescriba la
+    //    nueva identidad por una carrera con un refetch en segundo plano;
+    // 2) SEMBRAR la nueva sesión con la respuesta del login PRIMERO, para que el
+    //    dispatcher de `/` la vea al aterrizar sin parpadeo ni refetch a mitad
+    //    de camino y SIN romper la suscripción del observador (no usar
+    //    qc.clear(): destruiría la sesión recién sembrada);
+    // 3) descartar el resto de la cache (datos derivados del usuario previo);
+    // 4) purgar las colas offline de otros tenants.
+    void qc.cancelQueries({ queryKey: CLAVE_SESION });
     qc.setQueryData(CLAVE_SESION, sesion);
+    purgarCacheExceptoSesion(qc);
+    guardarTenantActivo(sesion.tenant.id, sesion.identityId);
+    purgarColasDeOtrosTenants(sesion.tenant.id);
     setLocation("/");
   }
 
