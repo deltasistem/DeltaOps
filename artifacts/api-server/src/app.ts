@@ -21,9 +21,16 @@ import { createDeltaopsSession } from "./deltaops/session";
 import { deltaopsMetricsMiddleware } from "./deltaops/metrics";
 import { deltaopsErrorHandler } from "./deltaops/errors";
 import { enforceEntitlements, requireIdentityForModules } from "./deltaops/identity/middleware";
+import { instalarProveedorNotificaciones } from "./deltaops/identity/notification-provider";
 
 const app: Express = express();
 const deltaopsConfig = loadDeltaopsConfig();
+
+// DeltaOps · Notificaciones por correo: instala el proveedor configurado
+// (fake|m365) como singleton usado por `enqueueEmail`. En producción con
+// NOTIFICATION_PROVIDER=m365 y config inválida, esto FALLA al arrancar
+// (sin fallback silencioso), conforme a la directiva M365.
+instalarProveedorNotificaciones({ logger });
 
 // Detrás del proxy de la plataforma (terminación TLS): necesario para que
 // express-session emita cookies "secure" en producción.

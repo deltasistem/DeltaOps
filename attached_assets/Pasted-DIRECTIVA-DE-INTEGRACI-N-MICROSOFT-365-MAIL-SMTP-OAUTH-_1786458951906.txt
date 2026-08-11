@@ -1,0 +1,333 @@
+DIRECTIVA DE INTEGRACIÓN — MICROSOFT 365 MAIL / SMTP OAUTH PARA DELTAOPS
+
+La Dirección del Programa autoriza iniciar la integración empresarial de Microsoft 365 exclusivamente para el servicio de notificaciones por correo electrónico de DeltaOps.
+
+IMPORTANTE:
+Esta fase NO convierte Microsoft 365 en la fuente de verdad de usuarios, roles, permisos, tenants, membresías ni capacidades de DeltaOps.
+
+DeltaOps debe seguir siendo completamente autónomo respecto a su modelo de identidad y autorización.
+
+Microsoft 365 será únicamente un proveedor externo de infraestructura para el envío de correo electrónico.
+
+OBJETIVO
+
+Preparar DeltaOps para enviar notificaciones transaccionales utilizando Microsoft 365 / Exchange Online, preferiblemente mediante autenticación moderna OAuth 2.0.
+
+La integración debe respetar la arquitectura ya existente en DGP-017:
+
+Identity / Domain
+    ↓
+NotificationPort
+    ↓
+EmailNotificationPort
+    ↓
+Proveedor concreto de correo
+
+El proveedor Microsoft 365 debe ser un adaptador reemplazable y no puede contaminar el dominio ni los módulos de negocio.
+
+NO implementar todavía login con Microsoft Entra ID.
+NO importar usuarios de Microsoft 365.
+NO importar grupos de Microsoft 365.
+NO importar roles de Microsoft 365.
+NO importar permisos desde Entra ID.
+NO modificar el modelo de autorización de DeltaOps.
+NO sustituir el IdentityService de DeltaOps.
+
+ALCANCE
+
+1. Crear el adaptador empresarial para Microsoft 365 / Exchange Online.
+
+2. Mantener la interfaz existente EmailNotificationPort y conectar el nuevo proveedor a dicha abstracción.
+
+3. Implementar la integración de forma compatible con OAuth 2.0 / Modern Authentication.
+
+4. Preparar soporte para:
+
+SMTP host:
+smtp.outlook.com
+
+Puerto:
+587
+
+TLS/STARTTLS:
+habilitado
+
+Autenticación:
+OAuth 2.0 / Modern Authentication
+
+NO almacenar ni implementar contraseñas de buzones como mecanismo permanente de autenticación.
+
+5. La configuración debe ser exclusivamente mediante variables de entorno / configuración segura.
+
+Como mínimo contemplar:
+
+M365_MAIL_ENABLED
+M365_TENANT_ID
+M365_CLIENT_ID
+M365_CLIENT_SECRET
+M365_MAIL_FROM
+M365_SMTP_HOST
+M365_SMTP_PORT
+M365_SMTP_SECURE
+
+Si la implementación elegida requiere otros valores OAuth, agregarlos siguiendo Configuration First.
+
+Ningún secreto puede quedar en:
+- código fuente
+- documentación
+- tests
+- seed
+- commits
+- logs
+- respuestas HTTP
+- UI
+- archivos .env versionados
+
+6. Crear proveedor Fake/Test independiente del proveedor Microsoft 365 para que las pruebas continúen siendo deterministas y no dependan de Internet ni de Microsoft.
+
+7. Implementar una prueba de conexión/envío controlada.
+
+Debe existir una forma segura de verificar:
+
+- configuración válida
+- autenticación OAuth correcta
+- conexión con Exchange Online
+- envío de correo
+- manejo de errores
+- timeout
+- reintento cuando corresponda
+- idempotencia
+- logging sin secretos
+
+8. Los errores del proveedor externo NO deben romper el dominio.
+
+El dominio únicamente debe conocer NotificationPort / EmailNotificationPort.
+
+9. Mantener las capacidades existentes de notificación:
+
+- destinatario
+- remitente
+- asunto
+- plantilla
+- idioma
+- tenant
+- metadata
+- idempotencyKey
+- correlación
+- prioridad cuando aplique
+
+10. Las plantillas de DeltaOps deben continuar siendo propiedad de DeltaOps.
+
+Microsoft 365 NO debe contener la lógica de las plantillas.
+
+La arquitectura debe permitir:
+
+DeltaOps Template
+    ↓
+Notification Service
+    ↓
+Microsoft 365 Provider
+    ↓
+Exchange Online
+    ↓
+Destinatario
+
+11. Preparar el proveedor para futuras notificaciones de negocio, pero NO implementar todavía todas las reglas de notificación de Activos, Órdenes, Inventario, SLA, mantenimiento preventivo, etc.
+
+Esta directiva solamente prepara y verifica el canal de correo.
+
+12. Crear una configuración clara para distinguir:
+
+- Fake
+- SMTP/OAuth Microsoft 365
+- futuro proveedor externo
+
+Por ejemplo:
+
+NOTIFICATION_PROVIDER=fake
+NOTIFICATION_PROVIDER=m365
+
+La solución debe permitir cambiar de proveedor sin modificar módulos de negocio.
+
+SEGURIDAD
+
+Aplicar mínimo privilegio.
+
+No conceder permisos de Microsoft 365 innecesarios.
+
+Si el mecanismo elegido utiliza Microsoft Entra App Registration, documentar exactamente qué permisos necesita la aplicación y por qué.
+
+La aplicación no debe solicitar permisos de lectura de correo, calendario, OneDrive, SharePoint, Teams ni otros recursos que no sean necesarios para enviar correo.
+
+No utilizar Microsoft Graph para lectura de información de usuarios ni para autorización de DeltaOps.
+
+Si se utiliza SMTP AUTH con OAuth, documentar el alcance requerido y mantenerlo limitado al buzón de envío.
+
+La implementación debe ser compatible con las recomendaciones actuales de Microsoft para autenticación moderna.
+
+CONFIGURACIÓN POR ENTORNO
+
+Development:
+- Fake provider por defecto.
+- No depender de Microsoft 365 para ejecutar tests.
+
+Staging:
+- posibilidad de activar Microsoft 365 mediante variables seguras.
+
+Production:
+- Microsoft 365 configurable mediante secrets del entorno.
+
+Nunca incluir credenciales reales en el repositorio.
+
+TENANT
+
+El tenant de DeltaOps debe seguir siendo independiente del tenant de Microsoft 365.
+
+No asumir que:
+
+Microsoft tenant == DeltaOps tenant
+
+La relación debe ser:
+
+DeltaOps Tenant
+      ↓
+Notification Configuration
+      ↓
+Microsoft 365 Mail Provider
+
+Esto es fundamental porque DeltaOps será posteriormente un SaaS multiempresa.
+
+ARQUITECTURA MULTITENANT
+
+Preparar el contrato para que cada tenant de DeltaOps pueda tener configuración de correo propia en una fase futura.
+
+Sin embargo, NO implementar todavía una consola completa de administración de correo por tenant salvo que sea estrictamente necesaria para probar el contrato.
+
+No introducir configuración hardcodeada para DELTA.
+
+DEMO
+
+El tenant delta-demo podrá utilizar temporalmente el proveedor Fake o Microsoft 365 según configuración del entorno.
+
+No modificar ni eliminar los datos DEMO existentes.
+
+No romper el usuario administrador DEMO.
+
+NO MODIFICAR
+
+Queda expresamente prohibido modificar:
+
+- Kernel
+- Shared Platform
+- Business Foundation
+- Workflow Engine
+- Dynamic Forms
+- Design System
+- Module Activos
+- Module Órdenes
+- Module Inventario
+- DGP-017 Identity
+- modelo de roles
+- modelo de permisos
+- modelo de tenants
+
+Solo realizar extensiones aditivas necesarias para conectar el proveedor de correo.
+
+PRUEBAS
+
+Agregar pruebas para:
+
+1. Provider Fake.
+2. Provider Microsoft 365 con transporte mock.
+3. OAuth/token handling sin secretos reales.
+4. Construcción correcta del mensaje.
+5. TLS.
+6. Configuración inválida.
+7. Timeout.
+8. Error de autenticación.
+9. Error temporal de Exchange.
+10. Idempotencia.
+11. No exposición de secretos en logs.
+12. Aislamiento por tenant.
+13. Selección correcta del proveedor.
+14. Fallback controlado al Fake únicamente en desarrollo/test, nunca silencioso en producción.
+15. Typecheck.
+16. Build.
+17. Regresión de todas las suites existentes.
+
+PRUEBA REAL
+
+Si las credenciales y secretos de Microsoft 365 están disponibles mediante el entorno seguro de Replit, realizar un smoke test real de envío hacia una dirección autorizada.
+
+NO mostrar ningún secreto en el informe.
+
+El informe debe indicar únicamente:
+
+M365 connection: PASS/FAIL
+OAuth: PASS/FAIL
+SMTP/Exchange: PASS/FAIL
+Test email: PASS/FAIL
+
+Si no existen todavía los secretos o permisos de Microsoft 365, NO inventarlos y NO crear valores falsos que parezcan reales.
+
+En ese caso dejar la integración preparada y documentar exactamente qué variables y permisos faltan.
+
+DOCUMENTACIÓN
+
+Crear documentación técnica en español que explique:
+
+- arquitectura
+- proveedor
+- variables de entorno
+- OAuth
+- permisos requeridos
+- configuración de Exchange Online
+- seguridad
+- pruebas
+- troubleshooting
+- configuración por entorno
+- cómo cambiar de Fake a Microsoft 365
+- cómo sustituir Microsoft 365 por otro proveedor
+
+Nunca escribir secretos reales.
+
+REVISIÓN ARQUITECTÓNICA
+
+Antes del cierre realizar revisión independiente verificando:
+
+- desacoplamiento
+- Clean Architecture
+- Dependency Rule
+- Configuration First
+- Multitenancy
+- seguridad
+- mínimo privilegio
+- OAuth/Modern Auth
+- ausencia de credenciales hardcodeadas
+- compatibilidad SaaS
+- preservación de DGP-017
+- no dependencia del dominio respecto de Microsoft 365
+
+Si aparece un hallazgo crítico o mayor, corregirlo antes del cierre.
+
+CRITERIO DE CIERRE
+
+La fase solamente podrá cerrarse cuando:
+
+- EmailNotificationPort continúe estable.
+- Microsoft 365 sea un adaptador reemplazable.
+- OAuth/Modern Auth esté correctamente preparado.
+- Fake provider continúe funcionando.
+- No existan secretos en código.
+- Typecheck esté limpio.
+- Build esté verde.
+- Todas las pruebas estén verdes.
+- No se haya modificado la autonomía de identidad de DeltaOps.
+- No se hayan importado roles/permisos desde Microsoft 365.
+- La arquitectura quede preparada para producción.
+
+Al finalizar NO propongas automáticamente el siguiente DGP.
+
+Entrega únicamente el INFORME OFICIAL DE CIERRE de esta fase, incluyendo alcance, arquitectura, archivos modificados, configuración, permisos requeridos, pruebas, smoke test, revisión arquitectónica, riesgos, deuda técnica y estado final.
+
+Esta directiva tiene prioridad sobre cualquier implementación que implique convertir Microsoft 365 en la fuente de verdad de DeltaOps.
