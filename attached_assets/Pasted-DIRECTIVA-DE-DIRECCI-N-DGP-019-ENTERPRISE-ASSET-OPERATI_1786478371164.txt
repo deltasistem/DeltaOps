@@ -1,0 +1,401 @@
+DIRECTIVA DE DIRECCIÓN — DGP-019
+ENTERPRISE ASSET OPERATIONS & UTILIZATION FOUNDATION
+
+Programa DeltaOps
+
+ESTADO
+
+DGP-018 y la Directiva de Consistencia Visual Global están oficialmente cerrados y aprobados.
+
+Antes de implementar código, realizar un descubrimiento arquitectónico completo del corpus existente y presentar el diseño propuesto a la Dirección.
+
+OBJETIVO
+
+Construir la base operacional para que DeltaOps pueda registrar, relacionar y consultar información de utilización y operación de activos físicos, especialmente maquinaria amarilla, vehículos y equipos industriales.
+
+La finalidad es que DeltaOps pueda responder posteriormente, con datos reales:
+
+- ¿Cuántas horas ha trabajado una máquina?
+- ¿Cuánto combustible ha consumido?
+- ¿Cuánto cuesta operar una hora ese equipo?
+- ¿Cuál equipo consume más combustible?
+- ¿Cuál tiene mayor utilización?
+- ¿Cuál tiene menor disponibilidad?
+- ¿Cuál presenta comportamientos anormales de consumo?
+- ¿Cuánto tiempo permanece detenido o en mantenimiento?
+- ¿Cómo se relaciona la operación del activo con sus órdenes de trabajo y mantenimiento?
+
+IMPORTANTE
+
+DGP-019 NO es todavía un proyecto de BI.
+
+NO construir dashboards ejecutivos complejos como objetivo principal.
+
+Primero construir correctamente la fundación de datos y los contratos necesarios.
+
+PRINCIPIO ARQUITECTÓNICO
+
+La fuente de verdad debe permanecer en el dominio correspondiente.
+
+No duplicar activos.
+
+No duplicar órdenes.
+
+No duplicar mantenimiento.
+
+No crear un segundo sistema de identidad.
+
+No crear un segundo sistema de tenancy.
+
+No crear un segundo sistema de eventos.
+
+Reutilizar los contratos públicos existentes de:
+
+- Module Activos
+- Module Órdenes
+- Module Planes
+- Module Preventivo
+- Module Correctivo
+- Module Inventario
+- Business Foundation
+- Workflow Engine
+- Dynamic Forms
+- Shared Timeline
+- Identity / Tenancy
+
+DGP-019 debe COMPOSICIONAR sobre estos contratos.
+
+FASE 1 — DESCUBRIMIENTO
+
+Antes de modificar código:
+
+1. Auditar el módulo Activos.
+2. Auditar cómo actualmente se almacenan:
+   - horómetro;
+   - kilometraje;
+   - características del activo;
+   - estado;
+   - ubicación;
+   - responsable;
+   - historial.
+3. Auditar Órdenes y determinar qué información puede relacionarse con:
+   - activo;
+   - técnico;
+   - duración;
+   - estado;
+   - mantenimiento.
+4. Auditar Planes/Preventivo/Correctivo.
+5. Auditar Timeline.
+6. Auditar identidad y tenancy.
+7. Identificar si ya existen conceptos de:
+   - mediciones;
+   - lecturas;
+   - consumo;
+   - combustible;
+   - costos;
+   - utilización.
+8. Identificar contratos reutilizables.
+9. Identificar gaps reales.
+
+NO inventar endpoints ni tablas durante esta fase.
+
+FASE 2 — MODELO OPERACIONAL PROPUESTO
+
+Diseñar, sin implementar todavía, la capacidad para registrar MEDIDORES.
+
+Como mínimo evaluar:
+
+- horómetro;
+- odómetro;
+- kilometraje;
+- medidores personalizados futuros.
+
+Cada lectura debe poder conservar:
+
+- activo;
+- tipo de medidor;
+- valor;
+- unidad;
+- fecha/hora;
+- usuario;
+- tenant;
+- origen;
+- observación/evidencia cuando aplique.
+
+Debe existir historial.
+
+Debe ser posible detectar lecturas inconsistentes, por ejemplo:
+
+lectura actual < lectura anterior.
+
+La política exacta debe quedar documentada antes de implementar.
+
+FASE 3 — COMBUSTIBLE
+
+Diseñar la capacidad operacional para registrar consumos/tanqueos.
+
+Como mínimo evaluar:
+
+- activo;
+- fecha/hora;
+- litros;
+- tipo de combustible;
+- precio unitario;
+- costo total;
+- horómetro/odómetro en el momento;
+- operador;
+- proyecto/centro de costo;
+- proveedor/estación;
+- observación;
+- evidencia si aplica.
+
+El modelo debe permitir calcular posteriormente:
+
+L/h
+
+L/100 km
+
+costo por hora
+
+costo por km
+
+según el tipo de activo y medidor disponible.
+
+NO asumir que todos los activos utilizan el mismo indicador.
+
+Una excavadora puede utilizar L/h.
+
+Un camión puede utilizar L/100 km.
+
+Un equipo estático puede requerir otro tipo de métrica.
+
+FASE 4 — UTILIZACIÓN
+
+Diseñar la capacidad de relacionar:
+
+Activo
++
+Medición
++
+Operación
++
+Mantenimiento
++
+Orden de trabajo
+
+para poder obtener posteriormente:
+
+- horas trabajadas;
+- tiempo disponible;
+- tiempo en mantenimiento;
+- tiempo detenido;
+- utilización;
+- disponibilidad.
+
+No inventar horas.
+
+No inferir horas trabajadas si no existe una fuente confiable.
+
+Cuando un indicador no tenga datos suficientes, debe aparecer como "sin datos" y no como cero.
+
+FASE 5 — COSTOS
+
+Diseñar la base para relacionar costos operacionales con el activo.
+
+Evaluar integración con:
+
+- combustible;
+- repuestos;
+- órdenes;
+- mantenimiento;
+- mano de obra;
+- otros costos ya existentes.
+
+Objetivo futuro:
+
+COSTO OPERATIVO / HORA
+
+Pero NO implementar todavía un cálculo financiero completo si los contratos actuales no proporcionan información suficiente.
+
+Documentar los gaps.
+
+FASE 6 — HISTORIAL DEL ACTIVO
+
+El activo deberá poder presentar posteriormente una línea de tiempo operacional compuesta por eventos existentes:
+
+- tanqueos;
+- lecturas;
+- órdenes;
+- mantenimientos;
+- preventivos;
+- correctivos;
+- cambios de estado;
+- movimientos;
+- eventos relevantes.
+
+Reutilizar Shared Timeline.
+
+No crear una segunda línea de tiempo.
+
+FASE 7 — ALERTAS FUTURAS
+
+Identificar los eventos que permitirían posteriormente:
+
+- consumo anormal;
+- lectura inconsistente;
+- vencimiento de mantenimiento;
+- exceso de horas;
+- bajo rendimiento;
+- equipo fuera de servicio.
+
+NO implementar inteligencia predictiva ni IA en DGP-019.
+
+Solamente dejar correctamente definidos los eventos/contratos necesarios si realmente tienen soporte arquitectónico.
+
+FASE 8 — EXPERIENCIA
+
+La interfaz deberá seguir la política visual global de DeltaOps establecida en la directiva anterior:
+
+- Claro
+- Oscuro
+- Automático
+
+No crear otro Design System.
+
+No crear una experiencia visual aislada.
+
+La experiencia deberá sentirse parte de DeltaOps.
+
+Para esta fase priorizar:
+
+- ficha operacional del activo;
+- captura de medición;
+- registro de combustible;
+- historial;
+- indicadores básicos del activo.
+
+No construir todavía un dashboard ejecutivo complejo.
+
+FASE 9 — RESPONSIVE
+
+La captura de información debe funcionar correctamente en:
+
+- desktop;
+- tablet;
+- móvil ~390px.
+
+Especialmente:
+
+- registro de horómetro;
+- registro de kilometraje;
+- tanqueo;
+- consulta del activo.
+
+FASE 10 — SEGURIDAD
+
+Mantener:
+
+- aislamiento por tenant;
+- RLS;
+- identidad canónica;
+- autorización backend;
+- capacidades existentes.
+
+Un usuario nunca puede registrar o consultar información de otro tenant.
+
+No confiar en filtros exclusivamente frontend.
+
+FASE 11 — OFFLINE
+
+Evaluar qué operaciones de DGP-019 deben soportar Offline First.
+
+Como mínimo estudiar:
+
+- lectura de medidores;
+- registro de combustible;
+- captura operacional en campo.
+
+Reutilizar el framework offline existente.
+
+No crear una cola paralela.
+
+FASE 12 — QR
+
+Evaluar integración con el flujo QR existente:
+
+Escanear activo
+→ abrir ficha
+→ registrar horómetro
+→ registrar combustible
+→ consultar órdenes
+→ consultar mantenimiento.
+
+No duplicar el resolutor QR.
+
+FASE 13 — CRITERIO FUNDAMENTAL
+
+DeltaOps debe poder evolucionar hacia:
+
+ACTIVO
+↓
+UTILIZACIÓN
+↓
+COMBUSTIBLE
+↓
+MANTENIMIENTO
+↓
+COSTOS
+↓
+DISPONIBILIDAD
+↓
+INDICADORES
+
+Pero cada dato debe tener una fuente de verdad clara.
+
+No crear indicadores que no puedan ser respaldados por datos reales.
+
+FASE 14 — REVISIÓN ARQUITECTÓNICA OBLIGATORIA
+
+Antes de implementar:
+
+Presentar un informe de descubrimiento con:
+
+1. Qué existe actualmente.
+2. Qué puede reutilizarse.
+3. Qué falta.
+4. Qué contratos deben extenderse.
+5. Qué tablas/read models serían necesarias, si realmente lo son.
+6. Qué módulos deben participar.
+7. Cómo se preserva CQRS.
+8. Cómo se preserva multitenancy.
+9. Cómo se preserva Offline First.
+10. Cómo se integra Timeline.
+11. Cómo se integra QR.
+12. Cómo se integran las órdenes y mantenimiento.
+13. Riesgos.
+14. Deuda técnica.
+15. Propuesta de fases internas.
+
+NO implementar cambios estructurales hasta que la Dirección apruebe el diseño.
+
+REGLA DE GOBIERNO
+
+No modificar ningún contrato congelado ni ningún módulo congelado sin autorización explícita.
+
+Si existe un gap que requiera modificar un contrato congelado, declararlo como GAP y detenerse.
+
+NO buscar atajos.
+
+NO duplicar dominios.
+
+NO crear soluciones paralelas.
+
+RESULTADO ESPERADO DE ESTA PRIMERA ETAPA
+
+El DGP-019 comienza con DISCOVERY + ARCHITECTURE REVIEW.
+
+No se considera aprobado implementar hasta que la Dirección revise el informe de descubrimiento.
+
+La prioridad es construir una base de datos operacional sólida para maquinaria y equipos, no simplemente agregar nuevas pantallas.
+
+Quedo a la espera del resultado de la revisión arquitectónica antes de implementar.
