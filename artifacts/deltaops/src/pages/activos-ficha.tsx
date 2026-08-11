@@ -174,11 +174,11 @@ function DatosGenerales({ a }: { a: ActivoRow }) {
   };
   return (
     <Section titulo="Datos del activo">
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
         <Card>
           <CardHeader><strong>General</strong></CardHeader>
           <CardContent>
-            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))" }}>
               <Dato etiqueta="Código">{a.codigoEmpresarial}</Dato>
               <Dato etiqueta="Tipo">{a.tipo}</Dato>
               <Dato etiqueta="Categoría">{g("categoria")}</Dato>
@@ -191,7 +191,7 @@ function DatosGenerales({ a }: { a: ActivoRow }) {
         <Card>
           <CardHeader><strong>Especificaciones</strong></CardHeader>
           <CardContent>
-            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))" }}>
               <Dato etiqueta="Fabricante">{g("fabricante")}</Dato>
               <Dato etiqueta="Modelo">{g("modelo")}</Dato>
               <Dato etiqueta="Serie">{g("serie")}</Dato>
@@ -203,7 +203,7 @@ function DatosGenerales({ a }: { a: ActivoRow }) {
         <Card>
           <CardHeader><strong>Medidores</strong></CardHeader>
           <CardContent>
-            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))" }}>
               <Dato etiqueta="Horómetro">{g("horometro")}</Dato>
               <Dato etiqueta="Odómetro">{g("odometro")}</Dato>
             </div>
@@ -212,13 +212,13 @@ function DatosGenerales({ a }: { a: ActivoRow }) {
         <Card>
           <CardHeader><strong>Ubicación y responsable</strong></CardHeader>
           <CardContent>
-            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))" }}>
               <Dato etiqueta="Ubicación">{a.ubicacionId ?? g("ubicacion")}</Dato>
               <Dato etiqueta="Responsable">{g("responsable")}</Dato>
               <Dato etiqueta="Supervisor">{g("supervisor")}</Dato>
             </div>
             <hr style={{ border: "none", borderTop: "1px solid var(--do-borde)", margin: "var(--do-sp-3) 0" }} />
-            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))" }}>
               <Dato etiqueta="Fecha compra">{g("fechaCompra")}</Dato>
               <Dato etiqueta="Puesta servicio">{g("fechaPuestaServicio")}</Dato>
               <Dato etiqueta="Proveedor">{g("proveedor")}</Dato>

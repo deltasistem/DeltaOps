@@ -138,7 +138,7 @@ function Listado() {
     <>
       {cabecera}
 
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))" }}>
         <KpiCard titulo="Total de activos" valor={String(resumen.total)} />
         <KpiCard titulo="Operativos" valor={String(resumen.porEstado["OPERATIVO"] ?? 0)} />
         <KpiCard titulo="En mantenimiento" valor={String(resumen.porEstado["MANTENIMIENTO"] ?? 0)} />
@@ -244,7 +244,7 @@ function TablaActivos({ filas, onAbrir }: { filas: ActivoRow[]; onAbrir: (id: st
 
 function TarjetasActivos({ filas, onAbrir }: { filas: ActivoRow[]; onAbrir: (id: string) => void }) {
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))" }}>
       {filas.map((a) => (
         <Card key={a.id}>
           <CardContent>

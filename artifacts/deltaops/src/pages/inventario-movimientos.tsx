@@ -74,7 +74,7 @@ function Contenido() {
       <PageHeader titulo="Movimientos" descripcion="Ledger de movimientos de stock por item." />
       <Section titulo="Filtro">
         <Card><CardContent>
-          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))" }}>
             <Field label="Item">
               <Select value={itemId} onChange={(e) => setItemId(e.target.value)}>
                 <option value="">Selecciona un item…</option>

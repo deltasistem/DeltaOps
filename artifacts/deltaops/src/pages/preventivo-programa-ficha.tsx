@@ -250,7 +250,7 @@ function TabActividades({ programa, onNavegar }: { programa: ProgramaRow; onNave
             </CardHeader>
             <CardContent>
               {a.descripcion && <p style={{ marginTop: 0 }}>{a.descripcion}</p>}
-              <div style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+              <div style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fill, minmax(min(220px, 100%), 1fr))" }}>
                 <div><strong>Checklist</strong><div style={{ fontSize: "var(--do-text-sm)" }}>{a.checklist ? `${a.checklist.nombre ?? a.checklist.plantillaId} · v${a.checklist.version}` : "—"}</div></div>
                 <div><strong>Dependencias</strong><div style={{ fontSize: "var(--do-text-sm)" }}>{(a.dependencias ?? []).length === 0 ? "—" : (a.dependencias ?? []).map((d) => nombrePorId.get(d) ?? d).join(", ")}</div></div>
                 <div><strong>Personal</strong><div style={{ fontSize: "var(--do-text-sm)" }}>{(rec.personal ?? []).length === 0 ? "—" : (rec.personal ?? []).map((p) => `${p.rol}${p.cantidad ? ` ×${p.cantidad}` : ""}`).join(", ")}</div></div>

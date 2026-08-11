@@ -109,7 +109,7 @@ export function TabDocumentacionOrden({ orden, onCambio }: { orden: OrdenRow; on
           <Card key={cat}>
             <CardHeader><strong>{etiquetaCat(cat)}</strong> <Badge variant="neutro">{items.length}</Badge></CardHeader>
             <CardContent>
-              <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+              <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))" }}>
                 {items.map((it, i) => <TarjetaAdjunto key={it.attachmentId || i} id={id} doc={it} />)}
               </div>
             </CardContent>

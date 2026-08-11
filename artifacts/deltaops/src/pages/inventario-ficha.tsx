@@ -109,7 +109,7 @@ function TabGeneral({ item }: { item: ItemRow }) {
     <Section titulo="Información general">
       <Card>
         <CardContent>
-          <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))" }}>
             <Dato etiqueta="SKU" valor={<code>{item.sku}</code>} />
             <Dato etiqueta="Nombre" valor={item.nombre} />
             <Dato etiqueta="Estado" valor={<BadgeEstadoItem estado={item.estado} />} />

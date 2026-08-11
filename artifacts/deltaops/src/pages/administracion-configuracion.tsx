@@ -171,7 +171,7 @@ function PanelBranding() {
         {aviso && <Alert variant="exito" titulo="Guardado" onClose={() => setAviso(null)}>{aviso}</Alert>}
         {err && <Alert variant="error" titulo="No se pudo guardar" onClose={() => setErr(null)}>{err}</Alert>}
       </div>
-      <div style={{ display: "grid", gap: "var(--do-sp-6)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: "var(--do-sp-4)" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-6)", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", marginTop: "var(--do-sp-4)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
           <Field label="Nombre de la aplicación">
             <Input value={nombreApp} onChange={(e) => setNombreApp(e.target.value)} placeholder="DeltaOps" />

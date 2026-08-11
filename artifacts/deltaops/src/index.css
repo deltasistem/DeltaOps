@@ -107,3 +107,56 @@
   .do-solo-movil { display: none; }
   .do-solo-desktop { display: block; }
 }
+
+/* =====================================================================
+ * DIRECTIVA CONSISTENCIA VISUAL · Req 8 — Sin desbordamiento horizontal.
+ *
+ * CAUSA RAÍZ del scroll horizontal de página en móvil (~390px):
+ *   1. contenidos anchos (tablas de 6+ columnas) NO podían encogerse dentro
+ *      de su envoltura scrollable porque los hijos de flex/grid tienen
+ *      `min-width: auto` por defecto → la envoltura crecía al ancho intrínseco
+ *      del contenido y empujaba la página (el `overflow-x:auto` de la tabla
+ *      nunca llegaba a activarse);
+ *   2. rejillas `minmax(NNNpx, 1fr)` sin `min()` forzaban pistas más anchas
+ *      que el viewport (corregido en las páginas con `minmax(min(NNNpx,100%),…)`).
+ *
+ * Estas reglas garantizan que TODO contenido ancho se desplace DENTRO de su
+ * propio contenedor y nunca desborde la página, en todos los módulos y el
+ * Centro. No introducen colores ni contratos: sólo contención de layout.
+ * ===================================================================== */
+
+/* La raíz de cada superficie nunca provoca scroll horizontal de página. */
+.do-root {
+  max-width: 100%;
+  overflow-x: clip; /* recorta desbordes accidentales sin ocultar scrolls internos */
+}
+
+/* Los hijos directos de contenedores flex/grid dentro de una superficie deben
+ * poder encogerse por debajo de su tamaño intrínseco (min-width:auto → 0), de
+ * modo que las envolturas scrollables (tablas) activen su propio overflow en
+ * lugar de empujar el ancho de la página. */
+.do-root :where(main, section, article, .do-card, .do-tarjeta) > * {
+  min-width: 0;
+}
+
+/* La envoltura de tabla del DS se contiene y desplaza internamente. */
+.do-root .do-tabla__envoltura {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Tablas shadcn (consola/plataforma/referencia): su contenedor scrollable
+ * (`.relative.w-full.overflow-auto`) también debe poder encogerse. */
+.do-root .overflow-auto,
+.do-root .overflow-x-auto {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Medios naturalmente anchos nunca exceden su contenedor. NB: se excluye
+ * `table` a propósito — las tablas conservan su ancho intrínseco y se desplazan
+ * dentro de su envoltura scrollable (`.do-tabla__envoltura` / `.overflow-auto`),
+ * no se comprimen. */
+.do-root :where(img, svg, video, canvas, pre) {
+  max-width: 100%;
+}

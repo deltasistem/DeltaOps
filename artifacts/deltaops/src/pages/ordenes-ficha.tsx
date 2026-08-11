@@ -145,7 +145,7 @@ function TabResumen({ orden }: { orden: OrdenRow }) {
   const descripcion = (orden.datos?.descripcion as string | undefined) ?? "";
   const observaciones = (orden.datos?.observaciones as string | undefined) ?? "";
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
       <Card>
         <CardHeader><strong>Datos generales</strong></CardHeader>
         <CardContent>

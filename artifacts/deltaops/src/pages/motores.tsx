@@ -108,7 +108,7 @@ function GaleriaWorkflow() {
         interpreta; aquí se renderizan solo como documentación.
       </p>
 
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", marginBottom: "var(--do-sp-4)" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", marginBottom: "var(--do-sp-4)" }}>
         {wf.estados.map((e) => (
           <Card key={e.nombre}>
             <CardHeader>
@@ -300,7 +300,7 @@ function GaleriaCampos() {
         (firma, ubicación, QR, barras, NFC) no tienen widget nativo: se representan con el
         componente DS más cercano y una marca <Badge variant="advertencia">captura especializada</Badge>.
       </p>
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
         {CATALOGO_TIPOS.map((c) => (
           <Card key={c.tipo}>
             <CardHeader>

@@ -219,7 +219,7 @@ function NavegacionContextual({ activoId, onReiniciar }: { activoId: string; onR
               <p style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>
                 {abiertas.length} abiertas · {ordenes.length} en total (historial)
               </p>
-              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", marginTop: "var(--do-sp-2)" }}>
+              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", marginTop: "var(--do-sp-2)" }}>
                 {ordenes.map((o) => <TarjetaOrden key={o.id} orden={o} />)}
               </div>
             </>

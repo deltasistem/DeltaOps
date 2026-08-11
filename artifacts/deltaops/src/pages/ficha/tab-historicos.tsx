@@ -24,7 +24,7 @@ export function TabHistoricos({ id }: { id: string }) {
   const resp = useHistoricoResponsables(id);
 
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
       <TablaHistorico titulo="Histórico de ubicaciones" estado={ubic} campos={["ubicacionId", "etiqueta"]} />
       <TablaHistorico titulo="Histórico de responsables" estado={resp} campos={["responsable", "supervisor"]} />
     </div>

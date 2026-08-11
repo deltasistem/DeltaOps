@@ -146,7 +146,7 @@ export function Listado() {
             {vista === "tabla" ? (
               <TablaSolicitudes solicitudes={visibles} orden={orden} asc={asc} onOrden={cambiarOrden} />
             ) : (
-              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))" }}>
                 {visibles.map((s) => <TarjetaSolicitud key={s.id} solicitud={s} />)}
               </div>
             )}

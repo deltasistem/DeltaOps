@@ -166,7 +166,7 @@ export function Gauge({ valor, max = 100, label, colorArco = "var(--do-primario)
 export function Heatmap({ puntos, label }: { puntos: readonly PuntoSerie[]; label: string }) {
   const max = maxValor(puntos);
   return (
-    <div role="img" aria-label={label} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: "var(--do-sp-2)" }}>
+    <div role="img" aria-label={label} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(72px, 100%), 1fr))", gap: "var(--do-sp-2)" }}>
       {puntos.map((p, i) => {
         const intensidad = p.valor / max;
         return (

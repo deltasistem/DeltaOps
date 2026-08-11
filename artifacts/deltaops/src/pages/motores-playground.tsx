@@ -237,7 +237,7 @@ function CampoDinamico({ campo, ctx }: { campo: CampoFormulario; ctx: RenderCtx 
 
 function NodosDinamicos({ nodos, ctx }: { nodos: readonly NodoFormulario[]; ctx: RenderCtx }) {
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))" }}>
       {nodos.map((n) => (
         <div key={n.clave} style={{ gridColumn: n.clase === "contenedor" ? "1 / -1" : undefined }}>
           {n.clase === "campo"
@@ -341,7 +341,7 @@ function PanelFormulario() {
   };
 
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-5)", gridTemplateColumns: "minmax(320px, 1fr) minmax(360px, 1.2fr)" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-5)", gridTemplateColumns: "minmax(min(320px, 100%), 1fr) minmax(min(360px, 100%), 1.2fr)" }}>
       <Card>
         <CardHeader>
           <span style={{ fontWeight: "var(--do-peso-semibold)" }}>Editor de definición (JSON)</span>
@@ -420,7 +420,7 @@ function PanelWorkflow() {
   const pasosStepper = wf.estados.map((e) => ({ id: e.nombre, etiqueta: e.etiqueta ?? e.nombre }));
 
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-5)", gridTemplateColumns: "minmax(320px, 1fr) minmax(360px, 1.2fr)" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-5)", gridTemplateColumns: "minmax(min(320px, 100%), 1fr) minmax(min(360px, 100%), 1.2fr)" }}>
       <Card>
         <CardHeader>
           <span style={{ fontWeight: "var(--do-peso-semibold)" }}>Estado e payload (en memoria)</span>

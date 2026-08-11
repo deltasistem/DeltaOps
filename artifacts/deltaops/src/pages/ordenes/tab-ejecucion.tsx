@@ -78,7 +78,7 @@ export function TabEjecucion({ orden, onCambio }: { orden: OrdenRow; onCambio: (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
       <ChecklistFormulario orden={orden} onCambio={onCambio} />
       <BitacoraRapida orden={orden} onCambio={onCambio} />
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))" }}>
         <RegistroHoras orden={orden} onCambio={onCambio} />
         <RegistroRecurso orden={orden} onCambio={onCambio} />
         <Observaciones orden={orden} onCambio={onCambio} />
@@ -124,7 +124,7 @@ function CapturaCampo({ orden, onCambio }: { orden: OrdenRow; onCambio: () => vo
     <Card>
       <CardHeader><strong>Captura de terreno</strong></CardHeader>
       <CardContent>
-        <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }} aria-busy={ocupado}>
+        <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))" }} aria-busy={ocupado}>
           <CapturaFoto onCapturar={(a) => void subir(a, "fotografia")} />
           <CapturaFirma onFirmar={(a) => void subir(a, "firma")} />
           <CapturaGeolocalizacion geo={geo} />

@@ -70,7 +70,7 @@ export function TabActivoOrden({ orden }: { orden: OrdenRow }) {
               Se muestra la referencia ({activoId}); el detalle completo se verá al recuperar conexión.
             </Alert>
           ) : (
-            <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--do-sp-3)", margin: 0 }}>
+            <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: "var(--do-sp-3)", margin: 0 }}>
               <Campo etiqueta="Código" valor={activo.codigoEmpresarial} />
               <Campo etiqueta="Estado" valor={<Badge variant="info">{activo.estado}</Badge>} />
               <Campo etiqueta="Referencia" valor={<span style={{ wordBreak: "break-all" }}>{activoId}</span>} />

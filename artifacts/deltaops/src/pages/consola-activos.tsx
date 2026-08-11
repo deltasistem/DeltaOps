@@ -298,7 +298,7 @@ function ConsolaContenido({ datos }: { datos: ConsolaResp }) {
         style={{
           display: "grid",
           gap: "var(--do-sp-4)",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))",
         }}
       >
         <KpiCard titulo="Activos en read model" valor={String(totalRm)} />
@@ -442,7 +442,7 @@ function SeccionModulo({ datos }: { datos: ConsolaResp }) {
             style={{
               display: "grid",
               gap: "var(--do-sp-4)",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))",
             }}
           >
             <CampoDato etiqueta="Servicio">{datos.modulo}</CampoDato>
@@ -574,7 +574,7 @@ function SeccionOutbox({ datos }: { datos: ConsolaResp }) {
               style={{
                 display: "grid",
                 gap: "var(--do-sp-4)",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))",
               }}
             >
               <CampoDato etiqueta="Eventos pendientes">{pendientes}</CampoDato>
@@ -797,7 +797,7 @@ function SeccionColaboracion({ datos }: { datos: ConsolaResp }) {
               style={{
                 display: "grid",
                 gap: "var(--do-sp-4)",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))",
               }}
             >
               <CampoDato etiqueta="Entradas de timeline (módulo)">{timelineModulo}</CampoDato>
@@ -827,7 +827,7 @@ function SeccionEventos({ datos }: { datos: ConsolaResp }) {
 
   return (
     <Section titulo="Eventos de dominio y políticas de autorización">
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
         <Card>
           <CardHeader>
             <span style={{ fontWeight: "var(--do-peso-semibold)" }}>Eventos de dominio ({datos.eventos.length})</span>
@@ -891,7 +891,7 @@ function SeccionCatalogos({ datos }: { datos: ConsolaResp }) {
   const config = Object.entries(datos.configuracion);
   return (
     <Section titulo="Catálogos y configuración operativa">
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
         <Card>
           <CardHeader>
             <span style={{ fontWeight: "var(--do-peso-semibold)" }}>Catálogos configurables ({datos.catalogos.length})</span>

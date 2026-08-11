@@ -142,7 +142,7 @@ export function Listado() {
             {vista === "tabla" ? (
               <TablaProgramas programas={visibles} orden={orden} asc={asc} onOrden={cambiarOrden} />
             ) : (
-              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))" }}>
                 {visibles.map((p) => <TarjetaPrograma key={p.id} programa={p} />)}
               </div>
             )}

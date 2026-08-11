@@ -50,7 +50,7 @@ export function MenuAccionesEscaneo({ activoId }: { activoId: string }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div role="group" aria-label="Acciones del activo escaneado" style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+        <div role="group" aria-label="Acciones del activo escaneado" style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))" }}>
           <Link href={urlActivo(activoId)}><Button variant="secundario" size="lg" style={{ width: "100%", minHeight: "var(--do-sp-12)" }}>Abrir activo</Button></Link>
           <Link href={urlActivoTab(activoId, "historial")}><Button variant="secundario" size="lg" style={{ width: "100%", minHeight: "var(--do-sp-12)" }}>Ver historial</Button></Link>
           <Link href={urlOrdenesDeActivo(activoId)}><Button variant="secundario" size="lg" style={{ width: "100%", minHeight: "var(--do-sp-12)" }}>Ver órdenes</Button></Link>

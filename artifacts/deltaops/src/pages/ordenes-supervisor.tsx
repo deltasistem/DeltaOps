@@ -66,7 +66,7 @@ function Supervisor() {
     <>
       <PageHeader titulo="Centro del Supervisor" descripcion="Asignación, validación, carga de trabajo y SLA — gestión in-place sin cambiar de contexto." />
 
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))" }}>
         <KpiCard titulo="Activas" valor={String(activas.length)} />
         <KpiCard titulo="En validación" valor={String(enValidacion.length)} />
         <KpiCard titulo="Sin asignar" valor={String(sinAsignar.length)} />
@@ -78,7 +78,7 @@ function Supervisor() {
         {enValidacion.length === 0 ? (
           <Card><CardContent><EmptyState titulo="Nada por validar" /></CardContent></Card>
         ) : (
-          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))" }}>
             {enValidacion.map((o) => <TarjetaValidacion key={o.id} orden={o} onCambio={recargar} onAbrir={setPanelId} />)}
           </div>
         )}
@@ -112,7 +112,7 @@ function Supervisor() {
         {sinAsignar.length === 0 ? (
           <Card><CardContent><EmptyState titulo="Todo asignado" descripcion="No hay órdenes activas sin responsable." /></CardContent></Card>
         ) : (
-          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))" }}>
             {sinAsignar.map((o) => <TarjetaAsignacion key={o.id} orden={o} onCambio={recargar} onAbrir={setPanelId} />)}
           </div>
         )}

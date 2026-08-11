@@ -164,7 +164,7 @@ export function Calendario({ dias, entradas, ahoraMs, onCambio }: { dias: Date[]
       </Section>
 
       <Section titulo="Semana">
-        <div style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+        <div style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))" }}>
           {dias.map((d) => {
             const iso = ymd(d);
             const items = porDia.get(iso) ?? [];
@@ -184,7 +184,7 @@ export function Calendario({ dias, entradas, ahoraMs, onCambio }: { dias: Date[]
 
       {sinFecha.length > 0 && (
         <Section titulo="Sin fecha planificada">
-          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))" }}>
             {sinFecha.map((e) => <TarjetaEntrada key={e.id} entrada={e} onReprogramar={setReprogramar} />)}
           </div>
         </Section>

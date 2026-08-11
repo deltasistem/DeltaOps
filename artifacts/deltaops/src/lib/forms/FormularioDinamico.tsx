@@ -43,7 +43,7 @@ function Nodos({
   grid?: boolean;
 }) {
   const estilo: React.CSSProperties = grid
-    ? { display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }
+    ? { display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))" }
     : { display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" };
   return (
     <div style={estilo}>

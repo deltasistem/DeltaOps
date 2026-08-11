@@ -167,7 +167,7 @@ function TabCostos({ articulo }: { articulo: ArticuloRow }) {
   const moneda = datos.moneda ?? articulo.moneda;
   return (
     <Section titulo="Costos">
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))" }}>
         <Card><CardContent><span style={{ color: "var(--do-texto-suave)" }}>Promedio</span><div style={{ fontSize: "var(--do-text-xl)" }}>{montoMoneda(datos.promedio, moneda)}</div></CardContent></Card>
         <Card><CardContent><span style={{ color: "var(--do-texto-suave)" }}>Último</span><div style={{ fontSize: "var(--do-text-xl)" }}>{montoMoneda(datos.ultimo, moneda)}</div></CardContent></Card>
         <Card><CardContent><span style={{ color: "var(--do-texto-suave)" }}>Estándar</span><div style={{ fontSize: "var(--do-text-xl)" }}>{montoMoneda(datos.estandar ?? articulo.costoEstandar, moneda)}</div></CardContent></Card>

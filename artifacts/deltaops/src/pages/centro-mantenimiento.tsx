@@ -118,7 +118,7 @@ function Indicadores({ abiertas, criticas, vencidas, enRiesgo, tecnicos }: {
     { etiqueta: "Técnicos activos", valor: tecnicos, tono: "neutro" as const },
   ];
   return (
-    <div role="list" aria-label="Indicadores operativos" style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+    <div role="list" aria-label="Indicadores operativos" style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))" }}>
       {items.map((i) => (
         <Card key={i.etiqueta}>
           <CardContent>
@@ -248,7 +248,7 @@ function VistaTecnicos({ porTecnico }: { porTecnico: Map<string, OrdenRow[]> }) 
   const filas = [...porTecnico.entries()].sort((a, b) => b[1].length - a[1].length);
   if (filas.length === 0) return <Card><CardContent><EmptyState titulo="Sin técnicos con carga" /></CardContent></Card>;
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
       {filas.map(([tecnico, ords]) => (
         <Card key={tecnico}>
           <CardHeader>
@@ -283,7 +283,7 @@ function VistaActivos({ ordenes }: { ordenes: OrdenRow[] }) {
   const filas = [...porActivo.entries()].sort((a, b) => b[1].length - a[1].length);
   if (filas.length === 0) return <Card><CardContent><EmptyState titulo="Sin activos con órdenes abiertas" /></CardContent></Card>;
   return (
-    <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+    <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
       {filas.map(([activoId, ords]) => (
         <Card key={activoId}>
           <CardHeader>

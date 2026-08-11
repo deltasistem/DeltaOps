@@ -55,7 +55,7 @@ export function FiltrosGlobalesPanel({ valor, onCambio, dimensiones = DIMENSIONE
         </div>
       </CardHeader>
       <CardContent>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "var(--do-sp-3)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px, 100%), 1fr))", gap: "var(--do-sp-3)" }}>
           {dimensiones.map((dim) => (
             <ControlDimension key={dim} dim={dim} valor={valor[dim] ?? ""} onCambio={(v) => set(dim, v)} />
           ))}

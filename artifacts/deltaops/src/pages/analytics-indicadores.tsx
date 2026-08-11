@@ -85,7 +85,7 @@ function Catalogo() {
 
       {[...porCategoria.entries()].map(([cat, inds]) => (
         <Section key={cat} titulo={cat}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "var(--do-sp-4)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: "var(--do-sp-4)" }}>
             {inds.map((ind) => (
               <Card key={ind.clave} interactiva role="group" aria-label={`Indicador ${ind.nombre}`}>
                 <CardHeader>

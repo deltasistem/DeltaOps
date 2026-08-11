@@ -584,7 +584,7 @@ export function TabAdjuntos({ itemId }: { itemId: string }) {
         : error ? <Marco><ErrorState titulo="No se pudieron cargar los adjuntos" descripcion={error.message} onReintentar={recargar} /></Marco>
         : (datos ?? []).length === 0 ? <Marco><EmptyState titulo="Sin adjuntos" descripcion="No hay adjuntos registrados." /></Marco>
         : (
-          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))" }}>
             {(datos ?? []).map((a) => (
               <Card key={a.attachmentId}><CardHeader><strong>{a.nombreArchivo ?? a.attachmentId}</strong> {a.categoria && <Badge variant="neutro">{a.categoria}</Badge>}</CardHeader>
                 <CardContent>

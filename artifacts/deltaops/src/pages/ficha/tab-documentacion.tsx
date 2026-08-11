@@ -78,7 +78,7 @@ export function TabDocumentacion({ id }: { id: string }) {
           <Card key={cat}>
             <CardHeader><strong>{ETIQUETA_CAT[cat] ?? cat}</strong> <Badge variant="neutro">{items.length}</Badge></CardHeader>
             <CardContent>
-              <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+              <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))" }}>
                 {items.map((it, i) => <TarjetaAdjunto key={it.id ?? it.attachmentId ?? i} id={id} adjunto={it} />)}
               </div>
             </CardContent>

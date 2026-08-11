@@ -224,7 +224,7 @@ function Editor() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "var(--do-sp-3)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px, 100%), 1fr))", gap: "var(--do-sp-3)" }}>
                     <label style={campo}>
                       <span style={etiqueta}>Título</span>
                       <Input value={w.titulo} onChange={(e) => editar(w.id, { titulo: e.target.value })} />

@@ -154,7 +154,7 @@ function Bandeja({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
           <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>{filtradas.length} orden(es)</span>
-          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))" }}>
             {filtradas.map((o) => (
               <FilaOrden key={o.id} orden={o} onCambio={recargar} />
             ))}

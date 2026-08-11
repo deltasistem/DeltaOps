@@ -176,7 +176,7 @@ function Galeria() {
         </Muestra>
 
         <Section titulo="Formularios">
-          <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+          <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))" }}>
             <Field label="Correo electrónico" description="Usaremos su correo corporativo." required>
               <Input placeholder="operador@empresa.com" />
             </Field>
@@ -260,7 +260,7 @@ function Galeria() {
                 { id: "a2", encabezado: "¿Cómo sincronizo?", contenido: "La sincronización es automática al recuperar conexión." },
               ]}
             />
-            <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+            <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))" }}>
               <KpiCard titulo="Órdenes abiertas" valor="128" delta={{ valor: "+12%", tendencia: "positiva" }} />
               <KpiCard titulo="Tiempo medio de reparación" valor="4,2 h" delta={{ valor: "-8%", tendencia: "negativa" }} />
               <KpiCard titulo="Activos monitoreados" valor="1.024" />
@@ -287,7 +287,7 @@ function Galeria() {
                 { titulo: "Cerrada", hora: "14:05", tono: "exito" },
               ]}
             />
-            <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+            <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))" }}>
               <EmptyState titulo="Sin resultados" descripcion="No se encontraron elementos con los filtros aplicados." accion={{ label: "Limpiar filtros", onClick: () => undefined }} />
               <ErrorState titulo="Error de carga" descripcion="No fue posible obtener los datos." onReintentar={() => undefined} />
             </div>

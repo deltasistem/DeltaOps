@@ -51,7 +51,7 @@ function Contenido() {
     <>
       <PageHeader titulo="Bodegas y ubicaciones" descripcion="Árbol jerárquico de bodegas, ubicaciones, capacidad y disponibilidad."
         acciones={<Button variant="primario" onClick={() => setCrearBod(true)}>Nueva bodega</Button>} />
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "minmax(240px, 1fr) 2fr" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "minmax(min(240px, 100%), 1fr) 2fr" }}>
         <Section titulo="Bodegas">
           {cargando ? <Card><CardContent><div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div></CardContent></Card>
             : error ? <Card><CardContent><ErrorState titulo="No se pudieron cargar las bodegas" descripcion={error.message} onReintentar={recargar} /></CardContent></Card>

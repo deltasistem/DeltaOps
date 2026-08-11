@@ -68,7 +68,7 @@ function Panel() {
         }
       />
 
-      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+      <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))" }}>
         <KpiCard titulo="En cola" valor={String(operaciones.length)} />
         <KpiCard titulo="Pendientes" valor={String(pendientes)} />
         <KpiCard titulo="Conflictos" valor={String(conflictos.length)} />

@@ -115,7 +115,7 @@ export function Listado() {
             {vista === "tabla" ? (
               <TablaProveedores proveedores={visibles} />
             ) : (
-              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+              <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))" }}>
                 {visibles.map((p) => <TarjetaProveedor key={p.id} proveedor={p} />)}
               </div>
             )}
