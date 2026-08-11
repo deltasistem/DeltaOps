@@ -25,3 +25,4 @@
 - [Identity & Tenancy DGP-017](deltaops-identity-dgp017.md) — contexto de autorización solo desde la sesión (epoch validado); rutas legacy pueden sombrear las nuevas (e2e app completa); cero credenciales literales incluye seeds legacy y docs; login demo con contraseñas derivadas por env.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.
 - [Separación de experiencias por rol](deltaops-separacion-experiencias-rol.md) — landing por rol canónico vía dispatcher; Redirect real en guards; jamás qc.clear() sobre la query de sesión (observador roto ⇒ identidad stale).
+- [Experiencia operacional DGP-018](deltaops-experiencia-operacional-dgp018.md) — composición pura sobre read models; atribución "mis OTs" solo con match estricto de identidad (fallo cerrado); ToastProvider del DS en raíz; seed debe reafirmar hashes demo.
