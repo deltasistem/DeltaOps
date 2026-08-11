@@ -10,6 +10,7 @@ import { db, deltaopsUsersTable } from "@workspace/db";
 import type { ExecutionContext, KernelError, Result } from "@workspace/kernel";
 import { ColaSyncSchema, MODULO } from "@workspace/module-utilizacion";
 import { utilizacionRuntime, contextForUtilizacion } from "./utilizacion-runtime";
+import { aRolCanonico } from "../../deltaops/identity/rbac";
 
 const router: IRouter = Router();
 const BASE = "/deltaops/utilizacion";
@@ -30,8 +31,15 @@ router.use(BASE, async (req, res, next): Promise<void> => {
     res.status(401).json({ error: "Sesión inválida" });
     return;
   }
-  res.locals.ctx = contextForUtilizacion(String(user.id), user.rol, user.tenant);
-  res.locals.user = user;
+  // El RBAC del módulo distingue SUPERVISOR/PLANIFICADOR/TECNICO/CONSULTA, que
+  // el rol LEGACY del espejo (`deltaops.users.rol`: admin/operador/lector)
+  // colapsa (p. ej. TECNICO→operador). Usamos el rol CANÓNICO de la sesión
+  // (fuente autoritativa por membresía, preservada por el login), cayendo al
+  // rol del espejo normalizado a canónico como respaldo. Así la derivación usa
+  // exactamente la fuente canónica del sistema de identidad.
+  const rolCanonico = req.session?.rolCanonico ?? aRolCanonico(user.rol);
+  res.locals.ctx = contextForUtilizacion(String(user.id), rolCanonico, user.tenant);
+  res.locals.user = { ...user, rolCanonico };
   next();
 });
 

@@ -184,10 +184,14 @@ export const DEMO_USUARIOS = [
 
 async function seedEnterpriseIdentity(): Promise<void> {
   const { seedRolesDeTenant } = await import("../deltaops/identity/seed-roles");
-  const { crearTenant, crearIdentidad, crearMembresia, actualizarPassword } =
+  const { crearTenant, crearIdentidad, crearMembresia, actualizarPassword, actualizarModulos } =
     await import("../deltaops/identity/service");
   const { hashPassword } = await import("../deltaops/identity/crypto");
 
+  const modulosDemo = [
+    "referencia", "activos", "ordenes", "inventario", "planes",
+    "abastecimiento", "preventivo", "correctivo", "analytics", "utilizacion",
+  ];
   await crearTenant({
     tenantId: DEMO_TENANT,
     codigo: "DELTA-DEMO",
@@ -197,13 +201,15 @@ async function seedEnterpriseIdentity(): Promise<void> {
     zonaHoraria: "America/Santiago",
     idioma: "es",
     moneda: "CLP",
-    modulos: [
-      "referencia", "activos", "ordenes", "inventario", "planes",
-      "abastecimiento", "preventivo", "correctivo", "analytics", "utilizacion",
-    ],
+    modulos: modulosDemo,
     branding: { ...DEMO_BRANDING },
     configuracion: { formatoFecha: "dd-MM-yyyy", formatoNumerico: "es-CL" },
   });
+  // `crearTenant` (ON CONFLICT DO UPDATE) NO refresca `modulos` de un tenant
+  // preexistente; reafirmamos explícitamente la lista de módulos habilitados
+  // para que un tenant creado antes de añadir un módulo (p. ej. `utilizacion`)
+  // quede correctamente entitled tras re-sembrar (idempotente).
+  await actualizarModulos(DEMO_TENANT, modulosDemo);
   await seedRolesDeTenant(DEMO_TENANT);
 
   for (const u of DEMO_USUARIOS) {
@@ -233,7 +239,8 @@ async function seedEnterpriseIdentity(): Promise<void> {
     estado: "ACTIVO",
   });
   const { seedRolesDeTenant: seedRolesPlat } = await import("../deltaops/identity/seed-roles");
-  const { crearTenant: crearTenantPlat } = await import("../deltaops/identity/service");
+  const { crearTenant: crearTenantPlat, actualizarModulos: actualizarModulosPlat } =
+    await import("../deltaops/identity/service");
   await crearTenantPlat({
     tenantId: "deltaops",
     codigo: "DELTAOPS",
@@ -241,12 +248,11 @@ async function seedEnterpriseIdentity(): Promise<void> {
     zonaHoraria: "America/Santiago",
     idioma: "es",
     moneda: "CLP",
-    modulos: [
-      "referencia", "activos", "ordenes", "inventario", "planes",
-      "abastecimiento", "preventivo", "correctivo", "analytics", "utilizacion",
-    ],
+    modulos: modulosDemo,
     branding: { nombre: "DeltaOps", nombreApp: "DeltaOps" },
   });
+  // Reafirma módulos habilitados del tenant de plataforma (ver nota arriba).
+  await actualizarModulosPlat("deltaops", modulosDemo);
   await seedRolesPlat("deltaops");
   await crearMembresia({ identityId: platformAdmin.identityId, tenantId: "deltaops", rol: "SUPER_ADMIN" });
 

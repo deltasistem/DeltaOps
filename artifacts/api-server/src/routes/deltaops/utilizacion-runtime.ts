@@ -36,6 +36,7 @@ import {
 } from "@workspace/module-utilizacion";
 import { DELTAOPS_TENANT } from "./reference-runtime";
 import { activosRuntime, contextForActivos } from "./activos-runtime";
+import { aRolCanonico } from "../../deltaops/identity/rbac";
 
 let runtime: UtilizacionRuntimeOperacional | null = null;
 
@@ -133,17 +134,24 @@ const P_TANQ_ANULAR = `${MODULO}.tanqueos.anular`;
 const P_REGULARIZAR = `${MODULO}.medidores.regularizar`;
 
 /**
- * Mapa rol → permisos (RBAC del mandato):
- *  - TENANT_ADMIN / admin / platform_admin: TODO.
- *  - SUPERVISOR: leer + registrar/anular (ambos) + regularizar.
- *  - PLANIFICADOR: sólo leer.
- *  - TECNICO: leer + registrar (lecturas y tanqueos).
- *  - CONSULTA / lector: sólo leer.
+ * Mapa rol → permisos (RBAC del mandato). El rol se NORMALIZA al canónico del
+ * sistema de identidad (`aRolCanonico`), la MISMA fuente/normalización que usan
+ * las demás superficies; así acepta tanto el literal canónico de la membresía
+ * (SUPERVISOR/PLANIFICADOR/TECNICO/CONSULTA/TENANT_ADMIN/SUPER_ADMIN) como el
+ * rol legacy del espejo (admin/operador/lector), sin ambigüedades.
+ *  - TENANT_ADMIN / SUPER_ADMIN: TODO.
+ *  - SUPERVISOR: leer + registrar/anular (lecturas y tanqueos) + regularizar.
+ *  - TECNICO: leer + registrar (lecturas y tanqueos); SIN anular ni regularizar.
+ *  - PLANIFICADOR / CONSULTA: sólo leer.
+ *
+ * NOTA sobre el colapso legacy: `operador` (espejo) mapea a canónico SUPERVISOR;
+ * por eso el router usa el rol CANÓNICO de la sesión cuando está disponible, que
+ * preserva la distinción TECNICO≠SUPERVISOR (ver utilizacion-module.ts).
  */
 export function principalUtilizacion(userId: string, rol: string): Principal {
-  const r = rol.toUpperCase();
+  const r = aRolCanonico(rol);
   const platformLectura = ["platform.timeline.read", "platform.config.read"];
-  if (r === "TENANT_ADMIN" || r === "ADMIN" || r === "PLATFORM_ADMIN") {
+  if (r === "TENANT_ADMIN" || r === "SUPER_ADMIN") {
     return {
       id: userId,
       rol,
@@ -170,7 +178,7 @@ export function principalUtilizacion(userId: string, rol: string): Principal {
       capacidades: ["leer", "lecturas.registrar", "tanqueos.registrar"],
     };
   }
-  // PLANIFICADOR, CONSULTA, lector y cualquier otro: sólo lectura.
+  // PLANIFICADOR, CONSULTA y cualquier otro: sólo lectura.
   return {
     id: userId,
     rol,
