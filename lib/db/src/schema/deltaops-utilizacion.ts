@@ -4,11 +4,13 @@
  *   - lib/db/migrations/deltaops/0035_utilizacion_module.sql
  *   - lib/db/migrations/deltaops/0036_utilizacion_cqrs.sql
  *   - lib/db/migrations/deltaops/0037_utilizacion_soporte.sql
+ *   - lib/db/migrations/deltaops/0038_utilizacion_idempotencia.sql
  * Este espejo existe para tooling/typecheck. drizzle-kit push NO detecta tablas
  * nuevas: los .sql se aplican con psql (fuente de verdad); la RLS la aplican los
  * .sql oficiales.
  */
-import { boolean, index, integer, jsonb, numeric, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, index, integer, jsonb, numeric, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 const deltaops = pgSchema("deltaops");
 
@@ -38,6 +40,8 @@ export const utlLecturasTable = deltaops.table(
   (t) => [
     primaryKey({ columns: [t.tenantId, t.id] }),
     index("idx_utl_lecturas_medidor_drizzle").on(t.tenantId, t.activoId, t.tipoMedidor),
+    // Cinturón de idempotencia: un op_id ⇒ a lo sumo un hecho por tenant.
+    uniqueIndex("uq_utl_lecturas_opid").on(t.tenantId, t.opId).where(sql`op_id IS NOT NULL`),
   ],
 );
 
@@ -66,6 +70,7 @@ export const utlTanqueosTable = deltaops.table(
   (t) => [
     primaryKey({ columns: [t.tenantId, t.id] }),
     index("idx_utl_tanqueos_activo_drizzle").on(t.tenantId, t.activoId),
+    uniqueIndex("uq_utl_tanqueos_opid").on(t.tenantId, t.opId).where(sql`op_id IS NOT NULL`),
   ],
 );
 
@@ -157,7 +162,10 @@ export const utlRecibosTable = deltaops.table(
     opId: text("op_id").notNull(),
     resultado: jsonb("resultado").notNull().default({}),
     actorId: text("actor_id").notNull(),
+    // Claim durable de comando: 'pendiente' (reclamado, sin finalizar) | 'sellado'.
+    estado: text("estado").notNull().default("sellado"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.comando, t.opId] })],
 );

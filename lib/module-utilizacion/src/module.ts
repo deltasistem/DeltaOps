@@ -191,10 +191,40 @@ function registrarEnTimeline() {
 
 /* --------------------------- Idempotencia offline ------------------------ */
 
-async function reciboPrevio(adapters: ModuleAdapters, tenant: string, comando: string, opId: string | undefined): Promise<Record<string, unknown> | null> {
-  if (!opId) return null;
-  const previo = await adapters.recibos.buscar(tenant, comando, opId);
-  return previo.ok && previo.value ? previo.value.resultado : null;
+/**
+ * RECLAMACIÓN atómica del opId en la MISMA UoW del comando (claim durable),
+ * ANTES de ejecutar cualquier efecto. Devuelve:
+ *  - `{ duenio: true }`: este llamador debe ejecutar el efecto y luego sellar.
+ *  - `{ corto: <resultado idempotente> }`: el opId ya fue sellado por el dueño;
+ *    el comando debe devolver ese resultado marcado `idempotente`.
+ *  - Sin opId ⇒ siempre dueño (sin protección de idempotencia).
+ *
+ * Nota de concurrencia: dos POST simultáneos con el mismo (tenant, comando,
+ * opId) compiten por el INSERT del claim; el perdedor se bloquea hasta el commit
+ * del ganador y luego observa el conflicto, obteniendo el resultado sellado. Si
+ * el ganador aún no finaliza (raro; misma UoW por diseño), se rechaza como
+ * conflicto reintentable en lugar de crear un segundo hecho.
+ */
+type ReclamoComando =
+  | { readonly duenio: true }
+  | { readonly corto: Record<string, unknown> }
+  | { readonly conflicto: KernelError };
+
+async function reclamarComando(
+  adapters: ModuleAdapters,
+  uow: UnitOfWork,
+  tenant: string,
+  comando: string,
+  opId: string | undefined,
+  actorId: string,
+): Promise<Result<ReclamoComando, KernelError>> {
+  if (!opId) return ok({ duenio: true });
+  const claim = await adapters.recibos.reclamar(uow, tenant, comando, opId, actorId);
+  if (!claim.ok) return claim as Result<never, KernelError>;
+  if (claim.value.duenio) return ok({ duenio: true });
+  if (claim.value.resultado !== undefined) return ok({ corto: claim.value.resultado });
+  // Reclamado por otro y todavía sin sellar: no fabricamos un segundo hecho.
+  return ok({ conflicto: KernelErrors.conflict(`Operación ${opId} en curso (reclamada, aún no finaliza)`) });
 }
 
 async function sellarRecibo(adapters: ModuleAdapters, uow: UnitOfWork, tenant: string, comando: string, opId: string | undefined, resultado: Record<string, unknown>, actorId: string): Promise<Result<void, KernelError>> {
@@ -295,8 +325,10 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
             const comando = `${MODULO}.registrar-lectura`;
-            const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const claim = await reclamarComando(adapters, uow, tenant.value, comando, input.opId, ctx.principal.id);
+            if (!claim.ok) return claim;
+            if ("corto" in claim.value) return ok({ ...claim.value.corto, idempotente: true });
+            if ("conflicto" in claim.value) return fail(claim.value.conflicto);
 
             const pol = evaluar(deps, ctx, POLICY_PUEDE_REGISTRAR_LECTURA, {});
             if (!pol.ok) return pol;
@@ -390,8 +422,10 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
             const comando = `${MODULO}.anular-lectura`;
-            const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const claim = await reclamarComando(adapters, uow, tenant.value, comando, input.opId, ctx.principal.id);
+            if (!claim.ok) return claim;
+            if ("corto" in claim.value) return ok({ ...claim.value.corto, idempotente: true });
+            if ("conflicto" in claim.value) return fail(claim.value.conflicto);
 
             const pol = evaluar(deps, ctx, POLICY_PUEDE_ANULAR_LECTURA, {});
             if (!pol.ok) return pol;
@@ -440,8 +474,10 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
           const comando = `${MODULO}.reintentar-sincronizacion`;
-          const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-          if (previo) return ok({ ...previo, idempotente: true });
+          const claim = await reclamarComando(adapters, uow, tenant.value, comando, input.opId, ctx.principal.id);
+          if (!claim.ok) return claim;
+          if ("corto" in claim.value) return ok({ ...claim.value.corto, idempotente: true });
+          if ("conflicto" in claim.value) return fail(claim.value.conflicto);
 
           const found = await adapters.lecturas.findById(tenant.value, input.id);
           if (!found.ok) return found;
@@ -499,8 +535,10 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
             const comando = `${MODULO}.reinicio-medidor`;
-            const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const claim = await reclamarComando(adapters, uow, tenant.value, comando, input.opId, ctx.principal.id);
+            if (!claim.ok) return claim;
+            if ("corto" in claim.value) return ok({ ...claim.value.corto, idempotente: true });
+            if ("conflicto" in claim.value) return fail(claim.value.conflicto);
 
             const pol = evaluar(deps, ctx, POLICY_PUEDE_REGULARIZAR, { motivo: input.motivo });
             if (!pol.ok) return pol;
@@ -588,8 +626,10 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
             const comando = `${MODULO}.registrar-tanqueo`;
-            const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const claim = await reclamarComando(adapters, uow, tenant.value, comando, input.opId, ctx.principal.id);
+            if (!claim.ok) return claim;
+            if ("corto" in claim.value) return ok({ ...claim.value.corto, idempotente: true });
+            if ("conflicto" in claim.value) return fail(claim.value.conflicto);
 
             const pol = evaluar(deps, ctx, POLICY_PUEDE_REGISTRAR_TANQUEO, {});
             if (!pol.ok) return pol;
@@ -656,8 +696,10 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
             const comando = `${MODULO}.anular-tanqueo`;
-            const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const claim = await reclamarComando(adapters, uow, tenant.value, comando, input.opId, ctx.principal.id);
+            if (!claim.ok) return claim;
+            if ("corto" in claim.value) return ok({ ...claim.value.corto, idempotente: true });
+            if ("conflicto" in claim.value) return fail(claim.value.conflicto);
 
             const pol = evaluar(deps, ctx, POLICY_PUEDE_ANULAR_TANQUEO, {});
             if (!pol.ok) return pol;

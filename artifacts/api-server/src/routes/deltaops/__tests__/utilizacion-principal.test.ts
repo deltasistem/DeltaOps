@@ -14,7 +14,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { MODULO } from "@workspace/module-utilizacion";
-import { principalUtilizacion } from "../utilizacion-runtime";
+import {
+  ACTOR_SERVICIO_SYNC,
+  PERMISOS_SERVICIO_SYNC,
+  contextForActivosServicioSync,
+  principalUtilizacion,
+} from "../utilizacion-runtime";
 
 const P = {
   leer: `${MODULO}.leer`,
@@ -108,5 +113,43 @@ describe("API Server · principalUtilizacion (literales REALES: canónico y lega
     expect(p.permisos).not.toContain(P.lectAnular);
     expect(p.permisos).not.toContain(P.tanqAnular);
     expect(p.permisos).not.toContain(P.regularizar);
+  });
+});
+
+/**
+ * Hallazgo CRÍTICO de arquitectura: la propagación a Activos NO debe fabricar el
+ * rol `admin` del usuario. La sincronización usa un PRINCIPAL DE SERVICIO de
+ * mínimo privilegio (`system:utilizacion-sync`) autorizado EXCLUSIVAMENTE para
+ * `modulo.activos.operar` (el único permiso que exigen actualizar-horometro y
+ * actualizar-odometro), con el actor originador como METADATO de auditoría.
+ * NINGÚN rol de Utilización (ni siquiera TENANT_ADMIN) concede permisos de
+ * Activos: un técnico jamás puede invocar los comandos de Activos directamente.
+ */
+describe("API Server · principal de SERVICIO de sincronización (sin escalada de privilegios)", () => {
+  it("el principal de servicio tiene EXACTAMENTE modulo.activos.operar (mínimo privilegio)", () => {
+    const ctx = contextForActivosServicioSync("delta-demo", "tecnico-originador");
+    expect(ctx.principal.id).toBe(ACTOR_SERVICIO_SYNC);
+    expect(ctx.principal.rol).toBe("system");
+    expect([...ctx.principal.permisos]).toEqual([...PERMISOS_SERVICIO_SYNC]);
+    expect([...ctx.principal.permisos]).toEqual(["modulo.activos.operar"]);
+  });
+
+  it("el actor originador viaja como METADATO de auditoría, no como principal", () => {
+    const ctx = contextForActivosServicioSync("delta-demo", "u-tecnico-99");
+    // Atribución: el efecto es de la sincronización de Utilización, con
+    // trazabilidad al usuario originador (metadato), NUNCA como identidad activa.
+    expect(ctx.principal.id).not.toBe("u-tecnico-99");
+    expect(ctx.metadata["originadorActorId"]).toBe("u-tecnico-99");
+    expect(ctx.metadata["origen"]).toBe(MODULO);
+    expect(ctx.metadata["motivo"]).toBe("sincronizacion-utilizacion-activos");
+  });
+
+  it("NINGÚN rol de Utilización otorga permisos de Activos (no hay puente de escalada)", () => {
+    for (const rol of ["TENANT_ADMIN", "SUPERVISOR", "TECNICO", "PLANIFICADOR", "CONSULTA"]) {
+      const p = principalUtilizacion("u", rol);
+      expect(p.permisos).not.toContain("modulo.activos.operar");
+      expect(p.permisos).not.toContain("modulo.activos.write");
+      expect(p.permisos).not.toContain("modulo.activos.admin");
+    }
   });
 });

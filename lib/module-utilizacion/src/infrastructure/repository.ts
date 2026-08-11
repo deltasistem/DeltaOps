@@ -25,6 +25,7 @@ import type {
   LecturaRepository,
   OpcionCatalogo,
   Recibo,
+  ReciboClaim,
   ReciboPort,
   TanqueoFiltro,
   TanqueoRepository,
@@ -291,7 +292,7 @@ export class PgReciboStore implements ReciboPort {
   async buscar(tenantId: TenantId, comando: string, opId: string): Promise<Result<Recibo | null, KernelError>> {
     try {
       const res = await withTenantRead(this.pool, tenantId, (c) =>
-        c.query(`SELECT op_id, comando, resultado FROM deltaops.utl_recibos WHERE tenant_id=$1 AND comando=$2 AND op_id=$3`, [tenantId, comando, opId]),
+        c.query(`SELECT op_id, comando, resultado FROM deltaops.utl_recibos WHERE tenant_id=$1 AND comando=$2 AND op_id=$3 AND estado='sellado'`, [tenantId, comando, opId]),
       );
       if (!res.rows[0]) return ok(null);
       const r = res.rows[0];
@@ -300,12 +301,47 @@ export class PgReciboStore implements ReciboPort {
       return fail(KernelErrors.infrastructure("recibo buscar falló", err));
     }
   }
+  async reclamar(uow: UnitOfWork, tenantId: TenantId, comando: string, opId: string, actorId: string): Promise<Result<ReciboClaim, KernelError>> {
+    try {
+      await setTenant(uow, tenantId);
+      const c = pgSessionOf(uow);
+      // Claim atómico: si nadie lo tenía, insertamos 'pendiente' y somos dueños.
+      // Un intento concurrente con el mismo (tenant, comando, op_id) se BLOQUEA
+      // en la fila hasta que esta transacción confirme; entonces observa el
+      // conflicto (DO NOTHING ⇒ 0 filas) y NO es dueño.
+      const ins = await c.query(
+        `INSERT INTO deltaops.utl_recibos (tenant_id, comando, op_id, resultado, actor_id, estado)
+         VALUES ($1,$2,$3,'{}'::jsonb,$4,'pendiente')
+         ON CONFLICT (tenant_id, comando, op_id) DO NOTHING
+         RETURNING (xmax = 0) AS inserted`,
+        [tenantId, comando, opId, actorId],
+      );
+      if (ins.rows[0]?.["inserted"] === true) return ok({ duenio: true });
+      // Ya reclamado (por otro): leemos el estado/resultado ya COMMITTED.
+      const ex = await c.query(
+        `SELECT estado, resultado FROM deltaops.utl_recibos WHERE tenant_id=$1 AND comando=$2 AND op_id=$3`,
+        [tenantId, comando, opId],
+      );
+      const row = ex.rows[0];
+      if (row && String(row["estado"]) === "sellado") {
+        return ok({ duenio: false, resultado: parseDatos<Record<string, unknown>>(row["resultado"]) });
+      }
+      return ok({ duenio: false, pendiente: true });
+    } catch (err) {
+      return fail(KernelErrors.infrastructure("recibo reclamar falló", err));
+    }
+  }
   async sellar(uow: UnitOfWork, tenantId: TenantId, recibo: Recibo, actorId: string): Promise<Result<void, KernelError>> {
     try {
       await setTenant(uow, tenantId);
+      // Finaliza el recibo reclamado: pendiente → sellado con resultado. Si por
+      // compatibilidad no existía la fila (recibo legado sin claim), la crea.
       await pgSessionOf(uow).query(
-        `INSERT INTO deltaops.utl_recibos (tenant_id, comando, op_id, resultado, actor_id)
-         VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tenant_id, comando, op_id) DO NOTHING`,
+        `INSERT INTO deltaops.utl_recibos (tenant_id, comando, op_id, resultado, actor_id, estado, updated_at)
+         VALUES ($1,$2,$3,$4,$5,'sellado',now())
+         ON CONFLICT (tenant_id, comando, op_id) DO UPDATE SET
+           resultado=EXCLUDED.resultado, estado='sellado', updated_at=now()
+           WHERE deltaops.utl_recibos.estado <> 'sellado'`,
         [tenantId, recibo.comando, recibo.opId, JSON.stringify(recibo.resultado), actorId],
       );
       return ok(undefined);

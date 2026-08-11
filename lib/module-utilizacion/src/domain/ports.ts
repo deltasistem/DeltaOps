@@ -77,8 +77,30 @@ export interface Recibo {
   readonly resultado: Record<string, unknown>;
 }
 
+/**
+ * Resultado de una RECLAMACIÓN atómica de opId (claim). `duenio=true` cuando ESTE
+ * llamador insertó el recibo pendiente (debe ejecutar y luego sellar). Si
+ * `duenio=false`, la operación ya fue reclamada: `resultado` trae el resultado
+ * sellado por el dueño cuando existe (`estado='sellado'`), o `undefined` si el
+ * dueño aún no finaliza (`estado='pendiente'`).
+ */
+export interface ReciboClaim {
+  readonly duenio: boolean;
+  readonly resultado?: Record<string, unknown>;
+  readonly pendiente?: boolean;
+}
+
 export interface ReciboPort {
   buscar(tenantId: TenantId, comando: string, opId: string): Promise<Result<Recibo | null, KernelError>>;
+  /**
+   * Reclama el opId de forma ATÓMICA dentro de la MISMA UoW del comando: inserta
+   * un recibo `pendiente` con `INSERT ... ON CONFLICT DO NOTHING`. Un segundo
+   * intento concurrente con el mismo `(tenant, comando, opId)` se bloquea en la
+   * fila hasta que la primera transacción confirma y entonces observa el
+   * conflicto (mutua exclusión durable, igual que `utl_sync_receipts`).
+   */
+  reclamar(uow: UnitOfWork, tenantId: TenantId, comando: string, opId: string, actorId: string): Promise<Result<ReciboClaim, KernelError>>;
+  /** Finaliza el recibo reclamado: lo pasa a `sellado` con el resultado. */
   sellar(uow: UnitOfWork, tenantId: TenantId, recibo: Recibo, actorId: string): Promise<Result<void, KernelError>>;
 }
 

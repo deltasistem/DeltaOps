@@ -14,6 +14,7 @@ import type {
   LecturaRepository,
   OpcionCatalogo,
   Recibo,
+  ReciboClaim,
   ReciboPort,
   TanqueoFiltro,
   TanqueoRepository,
@@ -128,12 +129,25 @@ export class FakeCatalogoStore implements CatalogoPort {
 }
 
 export class FakeRecibos implements ReciboPort {
-  private readonly rows = new Map<string, Recibo>();
+  private readonly rows = new Map<string, { recibo: Recibo; estado: "pendiente" | "sellado" }>();
   private k(t: string, comando: string, opId: string) { return `${t}::${comando}::${opId}`; }
-  async buscar(t: TenantId, comando: string, opId: string) { return ok(this.rows.get(this.k(t, comando, opId)) ?? null); }
+  async buscar(t: TenantId, comando: string, opId: string) {
+    const r = this.rows.get(this.k(t, comando, opId));
+    return ok(r && r.estado === "sellado" ? r.recibo : null);
+  }
+  async reclamar(_uow: UnitOfWork, t: TenantId, comando: string, opId: string, _actor: string): Promise<Result<ReciboClaim, KernelError>> {
+    const k = this.k(t, comando, opId);
+    const existente = this.rows.get(k);
+    if (!existente) {
+      this.rows.set(k, { recibo: { opId, comando, resultado: {} }, estado: "pendiente" });
+      return ok({ duenio: true });
+    }
+    if (existente.estado === "sellado") return ok({ duenio: false, resultado: existente.recibo.resultado });
+    return ok({ duenio: false, pendiente: true });
+  }
   async sellar(_uow: UnitOfWork, t: TenantId, recibo: Recibo, _actor: string) {
     const k = this.k(t, recibo.comando, recibo.opId);
-    if (!this.rows.has(k)) this.rows.set(k, recibo);
+    this.rows.set(k, { recibo, estado: "sellado" });
     return ok(undefined);
   }
 }

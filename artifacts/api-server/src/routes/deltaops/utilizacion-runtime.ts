@@ -94,6 +94,41 @@ const activosPort: ActivosPort = {
   actualizarOdometro: (tenantId, actorId, input) => actualizarMedidor(tenantId, actorId, "actualizar-odometro", input),
 };
 
+/**
+ * Principal de SERVICIO de la sincronización de Utilización → Activos, de MÍNIMO
+ * PRIVILEGIO y AUDITABLE. No es un usuario ni fabrica el rol `admin`: es un actor
+ * de sistema (`system:utilizacion-sync`) autorizado EXCLUSIVAMENTE para el único
+ * permiso que exigen los comandos oficiales `actualizar-horometro/odometro`
+ * (`modulo.activos.operar`). Así, un TÉCNICO que registra una lectura provoca la
+ * propagación vía este principal de sistema y NUNCA obtiene autorización para
+ * invocar los comandos de Activos directamente (no hay escalada de privilegios).
+ */
+export const ACTOR_SERVICIO_SYNC = "system:utilizacion-sync";
+
+/** Permisos de SERVICIO de mínimo privilegio (exactamente los de la operación). */
+export const PERMISOS_SERVICIO_SYNC = ["modulo.activos.operar"] as const;
+
+export function contextForActivosServicioSync(tenantId: string, originadorActorId: string): ExecutionContext {
+  return createExecutionContext({
+    principal: {
+      id: ACTOR_SERVICIO_SYNC,
+      rol: "system",
+      // Mínimo privilegio: sólo lo que requieren actualizar-horometro/odometro.
+      permisos: [...PERMISOS_SERVICIO_SYNC],
+      capacidades: ["gestionar-activos"],
+    },
+    // El actor originador (p. ej. el técnico) viaja como METADATO de auditoría,
+    // NUNCA como principal: la mutación se atribuye a la sincronización de
+    // Utilización, con trazabilidad al usuario que originó la lectura.
+    metadata: {
+      tenantId,
+      origen: MODULO,
+      originadorActorId,
+      motivo: "sincronizacion-utilizacion-activos",
+    },
+  });
+}
+
 /** Compone el comando oficial de Activos y drena su outbox tras el efecto. */
 async function actualizarMedidor(
   tenantId: string,
@@ -101,7 +136,9 @@ async function actualizarMedidor(
   comando: "actualizar-horometro" | "actualizar-odometro",
   input: ActualizarMedidorInput,
 ): Promise<Result<ResultadoActualizacionActivo, KernelError>> {
-  const ctxA = contextForActivos(actorId, "admin", tenantId);
+  // Autorización de SERVICIO de mínimo privilegio (NO el rol del usuario). El
+  // `actorId` originador se conserva sólo como metadato de auditoría.
+  const ctxA = contextForActivosServicioSync(tenantId, actorId);
   const r = await activosRuntime().platform.kernel.commands.execute(ctxA, `modulo.activos.${comando}`, {
     id: input.activoId,
     expectedVersion: input.expectedVersion,
