@@ -62,11 +62,50 @@ describe("capacidades · mapeo por rol (réplica del backend)", () => {
     expect(Object.values(c).every(Boolean)).toBe(true);
   });
 
-  it("una señal explícita de permisos en la sesión tiene prioridad sobre el rol", () => {
+  it("una señal explícita del módulo utilización tiene prioridad sobre el rol", () => {
     const s = { ...sesion("CONSULTA"), permisos: ["modulo.utilizacion.leer", "modulo.utilizacion.lecturas.registrar"] };
     const c = capacidadesUtilizacion(s);
     expect(c.registrarLectura).toBe(true);
     expect(c.anularLectura).toBe(false);
+  });
+
+  it(
+    "REGRESIÓN E2E · la sesión REAL de TENANT_ADMIN (capacidades/permisos de " +
+      "referencia, SIN ninguna de utilización) puede registrar y regularizar",
+    () => {
+      // Forma exacta observada en GET /auth/login para admin@delta.demo:
+      // capacidades y permisos NO vacíos pero ajenos al módulo utilización.
+      // Estos NO deben suprimir el mapeo por rol (bug corregido).
+      const s = {
+        rol: "TENANT_ADMIN",
+        capacidades: ["gestionar-elementos-referencia", "consultar-elementos-referencia"],
+        permisos: [
+          "platform.config.write",
+          "platform.attachment.read",
+          "modulo.referencia.read",
+          "modulo.referencia.write",
+        ],
+      } as unknown as Sesion;
+      const c = capacidadesUtilizacion(s);
+      expect(c.leer).toBe(true);
+      expect(c.registrarLectura).toBe(true);
+      expect(c.registrarTanqueo).toBe(true);
+      expect(c.anularLectura).toBe(true);
+      expect(c.anularTanqueo).toBe(true);
+      expect(c.regularizarMedidor).toBe(true);
+    },
+  );
+
+  it("REGRESIÓN · un TECNICO con permisos de referencia (sin utilización) NO anula", () => {
+    const s = {
+      rol: "TECNICO",
+      capacidades: ["consultar-elementos-referencia"],
+      permisos: ["platform.attachment.read", "modulo.referencia.read"],
+    } as unknown as Sesion;
+    const c = capacidadesUtilizacion(s);
+    expect(c.registrarLectura).toBe(true);
+    expect(c.anularLectura).toBe(false);
+    expect(c.regularizarMedidor).toBe(false);
   });
 });
 

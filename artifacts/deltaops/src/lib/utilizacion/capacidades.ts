@@ -11,9 +11,12 @@
  *   - TECNICO: leer + registrar (lecturas y tanqueos).
  *   - PLANIFICADOR / CONSULTA / otros: sólo leer.
  *
- * Además, si el payload de sesión llegara a exponer `capacidades`/`permisos`
- * del módulo (namespace `modulo.utilizacion.*`), se HONRA como fuente de verdad
- * preferente (a prueba de futuro), degradando al mapeo por rol en su ausencia.
+ * El rol es la fuente primaria (igual que el backend, que deriva las
+ * capacidades del rol vía `principalUtilizacion`). Sólo si el payload de sesión
+ * expusiera capacidades/permisos ESPECÍFICOS del módulo (namespace
+ * `modulo.utilizacion.*`) se honran como override (a prueba de futuro); los
+ * permisos de plataforma/referencia/otros módulos de la sesión NO afectan el
+ * gating de utilización.
  */
 import type { Sesion } from "../identidad/tipos";
 import { MODULO } from "./constantes";
@@ -43,14 +46,33 @@ const CAP = {
   regularizarMedidor: "medidores.regularizar",
 } as const;
 
-/** ¿La sesión declara explícitamente esta capacidad del módulo? */
+/**
+ * ¿La sesión declara explícitamente esta capacidad DEL MÓDULO Utilización?
+ *
+ * Sólo se considera "señal" si el payload contiene permisos/capacidades del
+ * namespace `modulo.utilizacion.*` (o un comodín de módulo). El resto de
+ * permisos/capacidades de la sesión (plataforma, referencia, otros módulos) es
+ * IRRELEVANTE y NO debe suprimir el mapeo por rol: la sesión real de un
+ * TENANT_ADMIN trae capacidades/permisos de referencia pero NINGUNO de
+ * utilización, por lo que aquí debe devolverse `undefined` (usar el rol), no
+ * `false`. En su ausencia total de señal del módulo, el rol es la fuente.
+ */
 function declara(sesion: Pick<Sesion, "capacidades" | "permisos">, sufijo: string): boolean | undefined {
   const permisoLargo = `${MODULO}.${sufijo}`; // p.ej. modulo.utilizacion.leer
+  const prefijo = `${MODULO}.`; // modulo.utilizacion.
   const caps = sesion.capacidades ?? [];
   const perms = sesion.permisos ?? [];
-  if (caps.length === 0 && perms.length === 0) return undefined; // sin señal: usa el rol
-  const tieneAdmin = perms.includes("*") || caps.includes("*");
-  if (tieneAdmin) return true;
+
+  // Comodines globales / de módulo → concede todo.
+  if (perms.includes("*") || caps.includes("*") || perms.includes(`${MODULO}.*`) || caps.includes(`${MODULO}.*`)) {
+    return true;
+  }
+
+  // ¿Hay ALGUNA señal específica del módulo utilización? Si no, delega al rol.
+  const haySenalModulo =
+    perms.some((p) => p.startsWith(prefijo)) || caps.some((c) => c === sufijo || c.startsWith(prefijo));
+  if (!haySenalModulo) return undefined;
+
   return caps.includes(sufijo) || caps.includes(permisoLargo) || perms.includes(permisoLargo);
 }
 
