@@ -24,3 +24,4 @@
 - [Analytics DGP-016](deltaops-analytics-dgp016.md) — KPIs/dashboards como datos declarativos; toda fuente declarada debe registrarse; fan-out vía queries públicas es adaptador válido; OpenAPI+drift obligatorio aunque el builder no "vea" el patrón.
 - [Identity & Tenancy DGP-017](deltaops-identity-dgp017.md) — contexto de autorización solo desde la sesión (epoch validado); rutas legacy pueden sombrear las nuevas (e2e app completa); cero credenciales literales incluye seeds legacy y docs; login demo con contraseñas derivadas por env.
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.
+- [Separación de experiencias por rol](deltaops-separacion-experiencias-rol.md) — landing por rol canónico vía dispatcher; Redirect real en guards; jamás qc.clear() sobre la query de sesión (observador roto ⇒ identidad stale).
