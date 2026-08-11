@@ -146,6 +146,12 @@ router.post(`${BASE}/lecturas/:id/anular`, async (req, res) => {
   send(res, await exec(ctxOf(res), `${MODULO}.anular-lectura`, { ...req.body, id: req.params.id }));
   await drain();
 });
+// Reintento idempotente de la sincronización con Activos de una lectura cuya
+// propagación quedó `fallida`: re-encola `sincronizar-activo` y drena el outbox.
+router.post(`${BASE}/lecturas/:id/reintentar-sincronizacion`, async (req, res) => {
+  send(res, await exec(ctxOf(res), `${MODULO}.reintentar-sincronizacion`, { ...req.body, id: req.params.id }));
+  await drain();
+});
 router.post(`${BASE}/reinicio-medidor`, async (req, res) => {
   send(res, await exec(ctxOf(res), `${MODULO}.reinicio-medidor`, req.body));
   await drain();

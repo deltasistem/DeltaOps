@@ -68,6 +68,14 @@ const activosPort: ActivosPort = {
   },
   async detalle(tenantId, activoId): Promise<Result<DetalleActivo | null, KernelError>> {
     const ctxA = contextForActivos("system", "lector", tenantId);
+    // El comando de Activos aplica control optimista contra la versión del
+    // MODELO DE ESCRITURA (`act_activos.version`), mientras que `detalle` lee
+    // la versión del MODELO DE LECTURA (`act_activos_read.version`), que se
+    // proyecta de forma asíncrona vía outbox. Si la proyección va atrasada, el
+    // `expectedVersion` sale desactualizado ⇒ KRN-CFL-001. Drenamos el outbox
+    // ANTES de leer para que la versión de lectura converja con la de escritura
+    // (§4.1: releer la versión vigente y fresca antes de propagar). Idempotente.
+    await activosRuntime().platform.kernel.outboxProcessor.processPending();
     const r = await activosRuntime().platform.kernel.queries.execute(ctxA, "modulo.activos.detalle", { id: activoId });
     if (!r.ok) {
       if (r.error.code === "KRN-NF-001") return ok(null);

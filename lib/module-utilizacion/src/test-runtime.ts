@@ -94,6 +94,60 @@ export class ActivosPruebaConflicto implements ActivosPort {
   async actualizarOdometro(): Promise<Result<ResultadoActualizacionActivo, KernelError>> { return fail(KernelErrors.conflict("conflicto persistente")); }
 }
 
+/**
+ * Simula el BUG de producción: entre el registro de la lectura y su propagación,
+ * la versión del ACTIVO avanza (control optimista contra el modelo de escritura).
+ * El PRIMER `detalle` devuelve una versión desactualizada (proyección atrasada)
+ * ⇒ el comando responde 409 (KRN-CFL-001). El handler de sincronización debe
+ * RELEER `detalle` (que ahora devuelve la versión fresca) y reintentar ⇒ confirma.
+ * Cuenta los conflictos e intentos para aserciones.
+ */
+export class ActivosPruebaVersionAvanzada implements ActivosPort {
+  private readonly horo = new Map<string, MedicionActivo>();
+  private readonly odo = new Map<string, MedicionActivo>();
+  /** Versión REAL del modelo de escritura (contra la que valida el comando). */
+  private versionEscritura: number;
+  /** Nº de veces que se leyó `detalle` (para simular proyección atrasada). */
+  public lecturasDetalle = 0;
+  public conflictos = 0;
+  public intentos = 0;
+
+  constructor(versionEscrituraInicial = 3) {
+    this.versionEscritura = versionEscrituraInicial;
+  }
+
+  async existen(): Promise<Result<{ inexistentes: readonly string[] }, KernelError>> {
+    return ok({ inexistentes: [] });
+  }
+  async detalle(_t: string, id: string): Promise<Result<DetalleActivo | null, KernelError>> {
+    this.lecturasDetalle++;
+    // La PRIMERA lectura entrega la versión atrasada (proyección rezagada); las
+    // siguientes ya reflejan el modelo de escritura (tras drenar el outbox).
+    const versionVista = this.lecturasDetalle === 1 ? this.versionEscritura - 1 : this.versionEscritura;
+    return ok({ version: versionVista, horometro: this.horo.get(id) ?? null, odometro: this.odo.get(id) ?? null });
+  }
+  async actualizarHorometro(_t: string, _a: string, input: ActualizarMedidorInput): Promise<Result<ResultadoActualizacionActivo, KernelError>> {
+    return this.aplicar(this.horo, input, "h");
+  }
+  async actualizarOdometro(_t: string, _a: string, input: ActualizarMedidorInput): Promise<Result<ResultadoActualizacionActivo, KernelError>> {
+    return this.aplicar(this.odo, input, "km");
+  }
+  private aplicar(m: Map<string, MedicionActivo>, input: ActualizarMedidorInput, unidad: string): Result<ResultadoActualizacionActivo, KernelError> {
+    this.intentos++;
+    // Control optimista contra la versión de ESCRITURA (como Activos real).
+    if (input.expectedVersion !== this.versionEscritura) {
+      this.conflictos++;
+      return fail(KernelErrors.conflict(`Conflicto de concurrencia (esperada v${this.versionEscritura}, recibida v${input.expectedVersion})`));
+    }
+    m.set(input.activoId, { valor: input.valor, unidad, medidoAt: input.fecha });
+    this.versionEscritura++;
+    return ok({ version: this.versionEscritura });
+  }
+  medicion(id: string, tipo: string): MedicionActivo | null {
+    return (tipo === TIPO_HOROMETRO ? this.horo : this.odo).get(id) ?? null;
+  }
+}
+
 /* ------------------------------- Harness --------------------------------- */
 
 export interface UtilizacionRuntime {
@@ -105,6 +159,8 @@ export interface UtilizacionRuntime {
   readonly activos: ActivosPort | null;
   ctx(tenantId: string, principal?: Principal): ExecutionContext;
   drenar(): Promise<void>;
+  /** Sustituye en caliente el `ActivosPort` (p. ej. simular Activos recuperado). */
+  setActivos(activos: ActivosPort): void;
   sincronizar(ctx: ExecutionContext, operaciones: readonly OperacionSync[]): Promise<ResumenSync>;
 }
 
@@ -148,6 +204,11 @@ export function crearUtilizacionRuntime(opts: CrearRuntimeOpts = {}): Utilizacio
     },
     async drenar() {
       await platform.kernel.outboxProcessor.processPending();
+    },
+    setActivos(nuevo: ActivosPort) {
+      // El módulo capturó `adapters` por referencia; mutar `activos` en su lugar
+      // hace que los próximos comandos/handlers usen el puerto recuperado.
+      (adapters as { activos?: ActivosPort }).activos = nuevo;
     },
     sincronizar(ctx, operaciones) {
       return procesarCola(platform, adapters, ctx, operaciones);

@@ -201,6 +201,12 @@ export function construirOpenApi(): Record<string, unknown> {
     parameters: [idParam], requestBody: jsonBody(ref("AnularLectura")),
     responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
   });
+  add(`${BASE}/lecturas/{id}/reintentar-sincronizacion`, "post", {
+    tags: ["Lecturas"], operationId: "utilizacion.reintentar-sincronizacion",
+    summary: "Reintentar (idempotente) la propagación a Activos de una lectura con sincronización fallida",
+    parameters: [idParam], requestBody: jsonBody(obj({ opId: str() }, [])),
+    responses: { "200": jsonOk(obj({ id: str(), reintentado: bool(), sincronizacionActivo: str() }, ["id"])), ...errores("400", "401", "403", "404", "409") },
+  });
   add(`${BASE}/ultima-lectura`, "get", {
     tags: ["Lecturas"], operationId: "utilizacion.ultima-lectura", summary: "Última lectura VÁLIDA por medidor (read model CQRS)",
     parameters: [queryParam("activoId", "Identificador del activo"), queryParam("tipoMedidor", "horometro|odometro")],

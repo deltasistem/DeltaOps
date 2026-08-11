@@ -39,6 +39,7 @@ export {
   ActivosPruebaTodos,
   ActivosPruebaFaltantes,
   ActivosPruebaConflicto,
+  ActivosPruebaVersionAvanzada,
   type UtilizacionRuntime,
   type CrearRuntimeOpts,
 } from "./test-runtime";

@@ -8,6 +8,7 @@ import {
   ActivosPruebaConflicto,
   ActivosPruebaFaltantes,
   ActivosPruebaTodos,
+  ActivosPruebaVersionAvanzada,
   crearUtilizacionRuntime,
   MODULO,
   type UtilizacionRuntime,
@@ -268,5 +269,58 @@ describe("R · Aislamiento por tenant en read models", () => {
     await rt.drenar();
     const otro = await qry(rt, rt.ctx("tenant-b"), "lecturas", { activoId: A });
     expect((otro as { value: unknown[] }).value.length).toBe(0);
+  });
+});
+
+describe("S · Versión de Activos avanzada entre registro y propagación (bug real)", () => {
+  it("el 1er intento choca 409 (versión atrasada) ⇒ RELEE versión fresca y CONFIRMA", async () => {
+    const activos = new ActivosPruebaVersionAvanzada(3);
+    rt = crearUtilizacionRuntime({ activos });
+    const ctx = rt.ctx(T);
+    const r = await cmd(rt, ctx, "registrar-lectura", { activoId: A, tipoMedidor: "horometro", valor: 1360, unidad: "h", fechaHora: "2026-08-11T21:29:00Z" });
+    expect(r.ok).toBe(true);
+    const id = (r as { value: { id: string } }).value.id;
+    await rt.drenar();
+
+    const det = await qry(rt, ctx, "lectura-detalle", { id });
+    expect((det as { value: { sincronizacionActivo: string } }).value.sincronizacionActivo).toBe("confirmada");
+    // Hubo exactamente 1 conflicto (1er intento) y el medidor quedó actualizado.
+    expect(activos.conflictos).toBe(1);
+    expect(activos.medicion(A, "horometro")?.valor).toBe(1360);
+    // NO se emitió evento de fallo (el reintento se recuperó).
+    const eventos = await qry(rt, rt.ctx(T), "eventos", {});
+    const tipos = (eventos as { value: { tipo: string }[] }).value.map((e) => e.tipo);
+    expect(tipos).not.toContain(`${MODULO}.sincronizacion-fallida`);
+  });
+});
+
+describe("T · Reintento seguro de una sincronización FALLIDA", () => {
+  it("reintentar-sincronizacion recupera una lectura fallida ⇒ confirmada (idempotente)", async () => {
+    // 1) Fuerza una FALLIDA con un puerto que siempre da 409.
+    const conflicto = new ActivosPruebaConflicto();
+    rt = crearUtilizacionRuntime({ activos: conflicto });
+    const ctx = rt.ctx(T);
+    const r = await cmd(rt, ctx, "registrar-lectura", { activoId: A, tipoMedidor: "horometro", valor: 500, unidad: "h", fechaHora: "2026-08-11T10:00:00Z" });
+    const id = (r as { value: { id: string } }).value.id;
+    await rt.drenar();
+    let det = await qry(rt, ctx, "lectura-detalle", { id });
+    expect((det as { value: { sincronizacionActivo: string } }).value.sincronizacionActivo).toBe("fallida");
+
+    // 2) Cambia el puerto a uno sano (Activos recuperado) y reintenta.
+    const sano = new ActivosPruebaTodos();
+    rt.setActivos(sano);
+    const rr = await cmd(rt, ctx, "reintentar-sincronizacion", { id, opId: "retry-1" });
+    expect(rr.ok).toBe(true);
+    expect((rr as { value: { reintentado: boolean } }).value.reintentado).toBe(true);
+    await rt.drenar();
+
+    det = await qry(rt, ctx, "lectura-detalle", { id });
+    expect((det as { value: { sincronizacionActivo: string } }).value.sincronizacionActivo).toBe("confirmada");
+    expect(sano.medicion(A, "horometro")?.valor).toBe(500);
+
+    // 3) Idempotencia por opId: repetir el reintento NO reprocesa.
+    const rr2 = await cmd(rt, ctx, "reintentar-sincronizacion", { id, opId: "retry-1" });
+    expect(rr2.ok).toBe(true);
+    expect((rr2 as { value: { idempotente?: boolean } }).value.idempotente).toBe(true);
   });
 });

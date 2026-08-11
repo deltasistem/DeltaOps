@@ -424,6 +424,60 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
         };
       },
 
+      /* ------------- reintentar sincronización con Activos -------------- */
+      // Reintento seguro e idempotente de una lectura cuya propagación a Activos
+      // quedó marcada `fallida` (p. ej. por una carrera de versión optimista).
+      // NO muta la lectura: sólo re-encola el evento de dominio
+      // `sincronizar-activo` en la MISMA UoW (outbox del Kernel); el handler de
+      // sincronización releerá la versión vigente de Activos y reintentará.
+      // Idempotente: si la lectura ya no está `fallida` (o no es vigente), es un
+      // no-op silencioso. El recibo por `opId` evita reprocesos duplicados.
+      (deps) => ({
+        name: `${MODULO}.reintentar-sincronizacion`,
+        inputSchema: z.object({ opId: z.string().optional(), id: z.string().min(1) }),
+        authorization: { permissions: [CAP_LECT_REGISTRAR] },
+        async handle(ctx, input, uow) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const comando = `${MODULO}.reintentar-sincronizacion`;
+          const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
+          if (previo) return ok({ ...previo, idempotente: true });
+
+          const found = await adapters.lecturas.findById(tenant.value, input.id);
+          if (!found.ok) return found;
+          if (!found.value) return fail(KernelErrors.notFound("lectura", input.id));
+          const lect = found.value;
+
+          // Sólo re-encola si tiene sentido: lectura VÁLIDA cuya sincronización
+          // no está confirmada (fallida, o sin intentar). En cualquier otro
+          // caso, es un no-op idempotente (no se fuerza un reintento inútil).
+          const reintentable =
+            lect.estado === "vigente" &&
+            !lect.inconsistente &&
+            lect.sincronizacionActivo !== SINC_CONFIRMADA &&
+            lect.sincronizacionActivo !== SINC_NO_APLICA;
+
+          if (reintentable) {
+            uow.registerEvent(
+              createDomainEvent(
+                `${MODULO}.sincronizar-activo`,
+                { tenantId: tenant.value, activoId: lect.activoId, tipoMedidor: lect.tipoMedidor, lecturaId: lect.id, actorId: ctx.principal.id },
+                ctx.correlationId,
+              ),
+            );
+            const a = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "reintentar-sincronizacion", lect.id, {
+              activoId: lect.activoId, sincronizacionPrevia: lect.sincronizacionActivo,
+            });
+            if (!a.ok) return a;
+          }
+
+          const resultado = { id: lect.id, reintentado: reintentable, sincronizacionActivo: lect.sincronizacionActivo };
+          const sello = await sellarRecibo(adapters, uow, tenant.value, comando, input.opId, resultado, ctx.principal.id);
+          if (!sello.ok) return sello;
+          return ok(resultado);
+        },
+      }),
+
       /* ------------------------- reinicio medidor ----------------------- */
       (deps) => {
         conPolicies(deps);
