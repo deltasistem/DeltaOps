@@ -26,3 +26,4 @@
 - [Design System DGP-005](deltaops-design-system-dgp005.md) — marca DELTA normativa: solo tokens --do-*, logos vía componente Logo, decisiones conservadoras en ANALISIS-BRANDBOOK.md.
 - [Separación de experiencias por rol](deltaops-separacion-experiencias-rol.md) — landing por rol canónico vía dispatcher; Redirect real en guards; jamás qc.clear() sobre la query de sesión (observador roto ⇒ identidad stale).
 - [Experiencia operacional DGP-018](deltaops-experiencia-operacional-dgp018.md) — composición pura sobre read models; atribución "mis OTs" solo con match estricto de identidad (fallo cerrado); ToastProvider del DS en raíz; seed debe reafirmar hashes demo.
+- [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.
