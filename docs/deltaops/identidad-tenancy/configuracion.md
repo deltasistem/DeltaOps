@@ -5,10 +5,17 @@
 ### Base de datos
 - `DATABASE_URL` — cadena de conexión PostgreSQL (ya usada por la plataforma).
 
-### Correo SMTP (opcional; sin ellas se usa el proveedor Fake)
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`.
+### Correo — Microsoft Graph (proveedor de producción)
+- `NOTIFICATION_PROVIDER` — `fake | m365-graph` (default `fake` en dev/test).
+- `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, `GRAPH_SENDER`
+  (obligatorias con `m365-graph`).
+- Opcionales: `GRAPH_OAUTH_TOKEN_ENDPOINT`, `GRAPH_OAUTH_SCOPE`, `GRAPH_BASE_URL`,
+  `GRAPH_TIMEOUT_MS`, `GRAPH_MAX_REINTENTOS`.
 
-Ver `email.md` para el detalle.
+Ver `email-m365-graph.md` (detalle Graph) y `email.md` (puertos/proveedores).
+
+> **Histórico:** las variables `SMTP_*` fueron retiradas junto con el proveedor
+> SMTP/nodemailer; ya no se usan.
 
 ### Seed del administrador de plataforma (`scripts/seed-deltaops.ts`)
 - `DELTAOPS_ADMIN_PASSWORD` — **obligatoria en producción** (contraseña de

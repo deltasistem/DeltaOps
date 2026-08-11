@@ -2,7 +2,7 @@
  * DeltaOps · DGP-017 — Plataforma centralizada de notificaciones por correo.
  *
  * NotificationPort / EmailNotificationPort: abstracción desacoplada del
- * proveedor. Ningún módulo de negocio se acopla al SMTP directamente; encolan
+ * proveedor. Ningún módulo de negocio se acopla al proveedor concreto; encolan
  * a través de `enqueueEmail`, que persiste en `deltaops.ntf_email_outbox` con
  * IDEMPOTENCIA (idempotency_key único por tenant → sin duplicados) y luego se
  * entrega vía el puerto configurado.
@@ -10,7 +10,7 @@
  * - Plantillas en ES con separación contenido/presentación/branding/idioma.
  * - Placeholders `{{var}}` escapados (sin HTML arbitrario de usuarios).
  * - i18n preparado (columna idioma; catálogo por clave+idioma).
- * - Proveedor Fake (tests) + proveedor SMTP real (SOLO por variables de entorno).
+ * - Proveedor Fake (tests) + proveedor Microsoft Graph real (por Secrets GRAPH_*).
  *
  * Tipos mínimos: bienvenida, invitacion, recuperacion, cambio-password,
  * cuenta-deshabilitada, cuenta-habilitada, seguridad. El CONTRATO admite tipos

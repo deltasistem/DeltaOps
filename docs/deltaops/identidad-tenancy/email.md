@@ -8,25 +8,22 @@ con dos proveedores.
 - **Fake** (`FakeEmailProvider`): acumula los envíos en memoria; **no** sale a
   la red. Es el proveedor por defecto en desarrollo y pruebas: permite
   inspeccionar los correos generados sin infraestructura.
-- **SMTP** (`SmtpEmailProvider`): entrega real. Carga `nodemailer` de forma
-  **perezosa** (dependencia opcional; instálela solo en despliegues con SMTP).
-  Se configura **exclusivamente** por variables de entorno (ver abajo).
+- **Microsoft Graph** (`M365GraphEmailProvider`): entrega real vía Microsoft
+  Graph API (OAuth 2.0 client_credentials + permiso de aplicación `Mail.Send`).
+  Es el **único proveedor de producción**. Se configura **exclusivamente** por
+  Secrets `GRAPH_*`. Ver
+  [email-m365-graph.md](./email-m365-graph.md) para el detalle completo.
+
+> **Histórico:** el proveedor SMTP (`SmtpEmailProvider`/nodemailer/
+> `smtp.outlook.com`) fue **retirado**. Ya no existen variables `SMTP_*`.
 
 ## Selección del proveedor
 
-Si están definidas las variables SMTP, se usa el proveedor SMTP; en caso
-contrario, el proveedor Fake. Nunca se configuran credenciales en código o git.
-
-## Variables de entorno (SMTP)
-
-| Variable | Descripción |
-|----------|-------------|
-| `SMTP_HOST` | Host del servidor SMTP. |
-| `SMTP_PORT` | Puerto (p. ej. 587). |
-| `SMTP_SECURE` | `true` para TLS implícito. |
-| `SMTP_USER` | Usuario de autenticación. |
-| `SMTP_PASS` | Contraseña de autenticación. |
-| `SMTP_FROM` | Remitente por defecto. |
+`NOTIFICATION_PROVIDER=fake | m365-graph` (default `fake` en dev/test). El
+proveedor de producción es Microsoft Graph; en producción con `m365-graph` y
+config incompleta el arranque falla (fail fast). Nunca se configuran
+credenciales en código o git. Detalle en
+[email-m365-graph.md](./email-m365-graph.md).
 
 ## Plantillas
 

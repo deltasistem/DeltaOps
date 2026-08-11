@@ -23,6 +23,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import app from "../../../app";
+import { proveedorSolicitado } from "../notification-provider";
 import { hashPassword } from "../crypto";
 import {
   crearTenant,
@@ -243,7 +244,11 @@ describe("E2E · estado global del proveedor de correo exige SUPER_ADMIN", () =>
     expect(login.json.rol).toBe("SUPER_ADMIN");
     const r = await c.req("GET", RUTA);
     expect(r.status).toBe(200);
-    expect(["fake", "m365"]).toContain(r.json.proveedor);
+    // Contrato Graph: proveedor válido es fake | m365-graph. Robusto al valor
+    // del entorno (NOTIFICATION_PROVIDER), reflejando lo que resuelve el server.
+    expect(["fake", "m365-graph"]).toContain(r.json.proveedor);
+    const esperado = proveedorSolicitado(process.env);
+    expect(r.json.proveedor).toBe(esperado);
     // Nunca expone secretos: sin client_secret ni access_token en el payload.
     const s = JSON.stringify(r.json);
     expect(s).not.toMatch(/secret|token|password/i);
