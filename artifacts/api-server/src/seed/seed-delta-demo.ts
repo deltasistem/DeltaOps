@@ -182,7 +182,8 @@ export const DEMO_USUARIOS = [
 
 async function seedEnterpriseIdentity(): Promise<void> {
   const { seedRolesDeTenant } = await import("../deltaops/identity/seed-roles");
-  const { crearTenant, crearIdentidad, crearMembresia } = await import("../deltaops/identity/service");
+  const { crearTenant, crearIdentidad, crearMembresia, actualizarPassword } =
+    await import("../deltaops/identity/service");
   const { hashPassword } = await import("../deltaops/identity/crypto");
 
   await crearTenant({
@@ -205,12 +206,17 @@ async function seedEnterpriseIdentity(): Promise<void> {
 
   for (const u of DEMO_USUARIOS) {
     const password = credencialDemo(u.envPass);
+    const passwordHash = await hashPassword(password);
     const identidad = await crearIdentidad({
       email: u.email,
       nombre: u.nombre,
-      passwordHash: await hashPassword(password),
+      passwordHash,
       estado: "ACTIVO",
     });
+    // `crearIdentidad` es idempotente por email y NO actualiza el hash de una
+    // identidad existente; se reafirma la credencial DEMO para que el seed sea
+    // reproducible también en credenciales (única fuente: credencialDemo).
+    await actualizarPassword(identidad.identityId, passwordHash);
     await crearMembresia({ identityId: identidad.identityId, tenantId: DEMO_TENANT, rol: u.rol });
   }
 
