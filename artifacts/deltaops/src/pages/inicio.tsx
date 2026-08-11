@@ -14,7 +14,7 @@
  * La autorización real permanece en el backend; esto sólo enruta/compone la UI.
  */
 import React from "react";
-import { useLocation } from "wouter";
+import { Redirect } from "wouter";
 import { ThemeProvider, Spinner } from "@workspace/design-system";
 import { useSesion } from "@/lib/identidad/sesion";
 import { esConsolaGlobal } from "@/lib/identidad/rbac";
@@ -36,16 +36,10 @@ function PantallaCargando() {
 
 export default function Inicio() {
   const { sesion, cargando, error } = useSesion();
-  const [, setLocation] = useLocation();
-
-  React.useEffect(() => {
-    if (!cargando && (error || !sesion)) {
-      setLocation("/login");
-    }
-  }, [cargando, error, sesion, setLocation]);
 
   if (cargando) return <PantallaCargando />;
-  if (!sesion) return null; // redirigiendo a /login
+  // Sin sesión (o 401/error) → login con redirección real de URL.
+  if (error || !sesion) return <Redirect to="/login" replace />;
 
   // SUPER_ADMIN conserva la consola global técnica (infraestructura / plataforma).
   if (esConsolaGlobal(sesion.rol)) return <Console />;

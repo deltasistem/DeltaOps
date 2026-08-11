@@ -145,7 +145,14 @@ function MenuPerfil({ sesion }: { sesion: Sesion }) {
   if (esSuperAdmin(sesion.rol)) {
     items.push({ etiqueta: "Administración SaaS", onSelect: () => setLocation("/administracion/saas") });
   }
-  items.push({ etiqueta: "Cerrar sesión", onSelect: () => void cerrarSesion() });
+  items.push({
+    etiqueta: "Cerrar sesión",
+    onSelect: () => {
+      // Limpiar caches y navegar a /login de inmediato: no dejar vista stale
+      // aunque la sesión del backend ya esté invalidada (401).
+      void cerrarSesion().finally(() => setLocation("/login"));
+    },
+  });
 
   return (
     <Dropdown

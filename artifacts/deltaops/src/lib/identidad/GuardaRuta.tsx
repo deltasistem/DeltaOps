@@ -8,7 +8,7 @@
  * corresponde y lo llevan a su propia experiencia.
  */
 import React from "react";
-import { useLocation } from "wouter";
+import { Redirect } from "wouter";
 import { ThemeProvider, Spinner } from "@workspace/design-system";
 import { useSesion } from "./sesion";
 import { esConsolaGlobal } from "./rbac";
@@ -33,21 +33,13 @@ function Cargando() {
  */
 export function SoloSuperAdmin({ children }: { children: React.ReactNode }) {
   const { sesion, cargando, error } = useSesion();
-  const [, setLocation] = useLocation();
-
-  React.useEffect(() => {
-    if (cargando) return;
-    if (error || !sesion) {
-      setLocation("/login");
-      return;
-    }
-    if (!esConsolaGlobal(sesion.rol)) {
-      // Un rol no global no debe aterrizar aquí: se le devuelve a su inicio.
-      setLocation("/");
-    }
-  }, [cargando, error, sesion, setLocation]);
 
   if (cargando) return <Cargando />;
-  if (!sesion || !esConsolaGlobal(sesion.rol)) return null; // redirigiendo
+  // Sin sesión (o 401/error) → login. `Redirect` cambia la URL real (respeta el
+  // base path del router), no sólo el render.
+  if (error || !sesion) return <Redirect to="/login" replace />;
+  // Un rol no global no debe aterrizar aquí: se le devuelve a su inicio (`/`),
+  // de modo que la barra de direcciones NUNCA se quede en la ruta prohibida.
+  if (!esConsolaGlobal(sesion.rol)) return <Redirect to="/" replace />;
   return <>{children}</>;
 }

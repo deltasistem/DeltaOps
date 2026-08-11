@@ -14,12 +14,13 @@
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import Inicio from "../pages/inicio";
 import { SoloSuperAdmin } from "../lib/identidad/GuardaRuta";
+import { AppShellIdentidad } from "../lib/identidad/AppShell";
 import { SesionProvider } from "../lib/identidad/sesion";
 import { landingOperacional, esRutaSoloSuperAdmin } from "../lib/identidad/rbac";
 import type { Sesion, Rol } from "../lib/identidad/tipos";
@@ -184,7 +185,7 @@ describe("F · aislamiento por URL a superficies SUPER_ADMIN", () => {
     expect(esRutaSoloSuperAdmin("/ordenes")).toBe(false);
   });
 
-  it("TENANT_ADMIN que navega a /administracion/saas es redirigido a su inicio", async () => {
+  it("TENANT_ADMIN en /administracion/saas: la URL cambia a / (no queda en la ruta prohibida)", async () => {
     backend(sesion("TENANT_ADMIN"));
     const { hook, history } = memoryLocation({ path: "/administracion/saas", static: false, record: true });
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -197,7 +198,32 @@ describe("F · aislamiento por URL a superficies SUPER_ADMIN", () => {
         </Router>
       </QueryClientProvider>,
     );
+    // La redirección debe ser REAL de URL: la barra de direcciones termina en "/",
+    // nunca en la ruta prohibida.
     await waitFor(() => expect(history.at(-1)).toBe("/"));
+    expect(history.at(-1)).not.toBe("/administracion/saas");
+    expect(screen.queryByText("Superficie global")).toBeNull();
+  });
+
+  it("bajo un base path, el destino se resuelve con el prefijo del router (URL real = base + /)", async () => {
+    backend(sesion("TENANT_ADMIN"));
+    // memoryLocation modela el historial REAL del navegador: la ruta inicial y
+    // los destinos incluyen el prefijo /deltaops. El Router usa ese base.
+    const { hook, history } = memoryLocation({ path: "/deltaops/administracion/saas", static: false, record: true });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <Router base="/deltaops" hook={hook}>
+          <SesionProvider>
+            <SoloSuperAdmin><div>Superficie global</div></SoloSuperAdmin>
+          </SesionProvider>
+        </Router>
+      </QueryClientProvider>,
+    );
+    // La redirección a "/" (relativa al router) produce la URL real /deltaops/,
+    // nunca se queda en la ruta prohibida con prefijo.
+    await waitFor(() => expect(history.at(-1)).toBe("/deltaops/"));
+    expect(history.at(-1)).not.toBe("/deltaops/administracion/saas");
     expect(screen.queryByText("Superficie global")).toBeNull();
   });
 
@@ -269,5 +295,48 @@ describe("H · logout/login reconstruye el AppShell según la identidad", () => 
     renderInicio(sesion("TENANT_ADMIN"));
     await screen.findByText(/Bienvenido, Admin Demo/i);
     expect(screen.queryByText("DeltaOps Console")).toBeNull();
+  });
+
+  it("cerrar sesión desde el menú de perfil limpia caches y navega a /login de inmediato", async () => {
+    const ses = sesion("TENANT_ADMIN");
+    let logoutLlamado = false;
+    const contador = { session: 0 };
+    vi.spyOn(global, "fetch").mockImplementation(async (u, init) => {
+      const url = String(u);
+      if (url.includes("/auth/logout") || (init && (init as RequestInit).method === "POST" && url.includes("/auth/"))) {
+        logoutLlamado = true;
+        return resp(null, 200);
+      }
+      if (url.includes("/auth/session")) {
+        contador.session += 1;
+        return resp(ses);
+      }
+      if (url.includes("/tenant/branding")) return resp(ses.tenant.branding ?? {});
+      return resp(null);
+    });
+    const { hook, history } = memoryLocation({ path: "/", static: false, record: true });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const spyClear = vi.spyOn(qc, "clear");
+    render(
+      <QueryClientProvider client={qc}>
+        <Router hook={hook}>
+          <SesionProvider>
+            <AppShellIdentidad><div>Contenido empresarial</div></AppShellIdentidad>
+          </SesionProvider>
+        </Router>
+      </QueryClientProvider>,
+    );
+    // Abrir el menú de perfil (disparador con aria-haspopup="menu") y ejecutar
+    // "Cerrar sesión".
+    await screen.findByText("Contenido empresarial");
+    const disparador = document.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]');
+    expect(disparador).not.toBeNull();
+    fireEvent.click(disparador!);
+    const cerrar = await screen.findByRole("menuitem", { name: /Cerrar sesión/i });
+    fireEvent.click(cerrar);
+    // Debe navegar a /login de inmediato y haber limpiado el cache.
+    await waitFor(() => expect(history.at(-1)).toBe("/login"));
+    expect(logoutLlamado).toBe(true);
+    expect(spyClear).toHaveBeenCalled();
   });
 });
