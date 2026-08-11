@@ -26,8 +26,4 @@ packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libimagequant
 [userenv]
 
 [userenv.shared]
-M365_MAIL_ENABLED = "true"
-M365_SMTP_HOST = "smtp.outlook.com"
-M365_SMTP_PORT = "587"
-M365_SMTP_SECURE = "false"
-NOTIFICATION_PROVIDER = "m365"
+NOTIFICATION_PROVIDER = "m365-graph"

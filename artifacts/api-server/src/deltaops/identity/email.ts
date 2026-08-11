@@ -74,75 +74,15 @@ export class FakeEmailProvider implements EmailNotificationPort {
   }
 }
 
-/**
- * Proveedor SMTP real, desacoplado. Se configura EXCLUSIVAMENTE por variables
- * de entorno (documentadas en docs/email.md); jamás por código o git. Carga
- * `nodemailer` de forma perezosa para no exigir la dependencia en tests.
- */
-export class SmtpEmailProvider implements EmailNotificationPort {
-  readonly nombre = "smtp";
-  constructor(
-    private readonly cfg: {
-      host: string;
-      port: number;
-      secure: boolean;
-      user: string;
-      pass: string;
-      from: string;
-    },
-  ) {}
-
-  async send(message: EmailMessage): Promise<void> {
-    // Import perezoso: solo se requiere en despliegues con SMTP real.
-    // `nodemailer` es una dependencia OPCIONAL (no listada en package.json para
-    // no pesar en tests); se resuelve en runtime cuando SMTP está configurado.
-    const especificador = "nodemailer";
-    const mod = (await import(/* @vite-ignore */ especificador).catch(() => null)) as
-      | { createTransport: (o: unknown) => { sendMail: (m: unknown) => Promise<unknown> } }
-      | null;
-    if (!mod) {
-      throw new Error(
-        "SMTP configurado pero 'nodemailer' no está instalado; instálelo para entrega real.",
-      );
-    }
-    const transport = mod.createTransport({
-      host: this.cfg.host,
-      port: this.cfg.port,
-      secure: this.cfg.secure,
-      auth: { user: this.cfg.user, pass: this.cfg.pass },
-    });
-    await transport.sendMail({
-      from: this.cfg.from,
-      to: message.destinatario,
-      subject: message.asunto,
-      text: message.cuerpo,
-    });
-  }
-}
-
-/**
- * Selección del proveedor por configuración de entorno. Si `SMTP_HOST` (y las
- * credenciales) están definidas, se usa SMTP; en otro caso, Fake (dev/test).
- */
-export function resolverEmailProvider(
-  env: NodeJS.ProcessEnv = process.env,
-): EmailNotificationPort {
-  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
-    return new SmtpEmailProvider({
-      host: env.SMTP_HOST,
-      port: Number(env.SMTP_PORT ?? "587"),
-      secure: env.SMTP_SECURE === "true",
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
-      from: env.SMTP_FROM ?? env.SMTP_USER,
-    });
-  }
-  return new FakeEmailProvider();
-}
+// El adaptador concreto de producción es Microsoft Graph
+// (`M365GraphEmailProvider`), resuelto por `notification-provider.ts` e
+// instalado al arrancar (`app.ts`). Ya NO existe proveedor SMTP/nodemailer.
 
 let providerSingleton: EmailNotificationPort | null = null;
 export function emailProvider(): EmailNotificationPort {
-  if (!providerSingleton) providerSingleton = resolverEmailProvider();
+  // Default perezoso: FakeEmailProvider. El proveedor real (Graph) se instala
+  // explícitamente en el arranque vía `instalarProveedorNotificaciones`.
+  if (!providerSingleton) providerSingleton = new FakeEmailProvider();
   return providerSingleton;
 }
 /** Inyecta un proveedor (usado por tests para el Fake). */

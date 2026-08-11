@@ -5,16 +5,17 @@
  * eligen proveedor; dependen solo de `EmailNotificationPort`. Aquí se resuelve
  * el adaptador concreto según `NOTIFICATION_PROVIDER`:
  *
- *   NOTIFICATION_PROVIDER=fake   → FakeEmailProvider (default dev/test).
- *   NOTIFICATION_PROVIDER=m365   → M365EmailProvider (SMTP + OAuth2).
- *   (futuro)                     → otro adaptador tras el mismo puerto.
+ *   NOTIFICATION_PROVIDER=fake        → FakeEmailProvider (solo dev/test).
+ *   NOTIFICATION_PROVIDER=m365-graph  → M365GraphEmailProvider (Microsoft Graph).
+ *   (futuro)                          → otro adaptador tras el mismo puerto.
+ *
+ * El proveedor de PRODUCCIÓN es Microsoft Graph. Ya NO existe adaptador SMTP.
  *
  * Reglas de seguridad (mandato):
- *   - En PRODUCCIÓN, si se pide `m365` y la config es inválida/incompleta ⇒
- *     FALLO EXPLÍCITO (throw). NUNCA fallback silencioso a fake.
- *   - Fallback a fake SOLO en development/test y SIEMPRE logueado.
- *   - Cero secretos en logs (se registran nombres de variables faltantes, nunca
- *     sus valores).
+ *   - En PRODUCCIÓN, si se pide `m365-graph` y la config es inválida/incompleta
+ *     ⇒ FAIL FAST (throw al arrancar). NUNCA fallback silencioso a fake.
+ *   - Fake SOLO explícito en development/test.
+ *   - Cero secretos en logs (solo nombres de variables faltantes).
  */
 import {
   FakeEmailProvider,
@@ -22,15 +23,15 @@ import {
   type EmailNotificationPort,
 } from "./email";
 import {
-  M365EmailProvider,
-  M365OAuthClient,
-  resolverConfigM365,
-  type ConfigM365,
+  GraphOAuthClient,
+  M365GraphEmailProvider,
+  resolverConfigGraph,
+  type ConfigGraph,
   type FetchLike,
   type RelojMs,
-} from "./m365-email";
+} from "./m365-graph-email";
 
-export type NombreProveedor = "fake" | "m365";
+export type NombreProveedor = "fake" | "m365-graph";
 
 export interface LoggerLike {
   info: (o: unknown, m?: string) => void;
@@ -47,21 +48,16 @@ const consoleLogger: LoggerLike = {
 export interface ResolverProviderDeps {
   env?: NodeJS.ProcessEnv;
   logger?: LoggerLike;
-  /** `fetch` para el cliente OAuth (default: global fetch). */
+  /** `fetch` para OAuth y para Graph (default: global fetch). */
   fetch?: FetchLike;
   /** reloj para caché de token (default: Date.now). */
   now?: RelojMs;
 }
 
-/** `true` si el proveedor solicitado por entorno es m365. */
+/** Proveedor solicitado por entorno. Default `fake` (dev/test). */
 export function proveedorSolicitado(env: NodeJS.ProcessEnv = process.env): NombreProveedor {
   const v = (env.NOTIFICATION_PROVIDER ?? "").trim().toLowerCase();
-  // M365_MAIL_ENABLED=true también activa m365 (compatibilidad de nombres)
-  // cuando NOTIFICATION_PROVIDER no está explícito.
-  if (v === "m365") return "m365";
-  if (v === "" && (env.M365_MAIL_ENABLED ?? "").trim().toLowerCase() === "true") {
-    return "m365";
-  }
+  if (v === "m365-graph" || v === "graph") return "m365-graph";
   return "fake";
 }
 
@@ -70,19 +66,21 @@ const defaultFetch: FetchLike = (url, init) =>
   (globalThis.fetch as unknown as FetchLike)(url, init);
 
 /**
- * Construye el M365EmailProvider a partir de una config validada (fábrica
- * reutilizada por el resolver y por la prueba de conexión).
+ * Construye el M365GraphEmailProvider a partir de una config validada (fábrica
+ * reutilizada por el resolver y por la prueba de conexión/smoke).
  */
-export function construirProveedorM365(
-  config: ConfigM365,
+export function construirProveedorGraph(
+  config: ConfigGraph,
   deps: ResolverProviderDeps = {},
-): { provider: M365EmailProvider; oauth: M365OAuthClient } {
-  const oauth = new M365OAuthClient(config, {
-    fetch: deps.fetch ?? defaultFetch,
+): { provider: M365GraphEmailProvider; oauth: GraphOAuthClient } {
+  const fetch = deps.fetch ?? defaultFetch;
+  const oauth = new GraphOAuthClient(config, {
+    fetch,
     now: deps.now ?? (() => Date.now()),
   });
-  const provider = new M365EmailProvider(config, {
+  const provider = new M365GraphEmailProvider(config, {
     oauth,
+    fetch,
     logger: deps.logger ?? consoleLogger,
   });
   return { provider, oauth };
@@ -90,9 +88,9 @@ export function construirProveedorM365(
 
 /**
  * Resuelve el proveedor de correo según configuración y entorno.
- * - fake: devuelve FakeEmailProvider.
- * - m365: valida config; si falla, en producción THROW, en dev/test fallback
- *   a fake (logueado).
+ * - fake: FakeEmailProvider (solo dev/test explícito).
+ * - m365-graph: valida config; si falla, en producción THROW (fail fast), en
+ *   dev/test fallback a fake (logueado).
  */
 export function resolverProveedorNotificaciones(
   deps: ResolverProviderDeps = {},
@@ -103,40 +101,47 @@ export function resolverProveedorNotificaciones(
   const solicitado = proveedorSolicitado(env);
 
   if (solicitado === "fake") {
+    if (esProduccion) {
+      // El proveedor de producción debe ser Graph: fake explícito en prod es un
+      // error de configuración, no un modo de operación válido.
+      throw new Error(
+        "NOTIFICATION_PROVIDER=fake no es válido en producción. " +
+          "El proveedor de producción es Microsoft Graph (m365-graph).",
+      );
+    }
     return new FakeEmailProvider();
   }
 
-  // Solicitado m365.
-  const cfg = resolverConfigM365(env);
+  // Solicitado m365-graph.
+  const cfg = resolverConfigGraph(env);
   if (!cfg.ok) {
     const campos = cfg.issues.map((i) => i.campo).join(", ");
     if (esProduccion) {
-      // Fallo explícito: NUNCA fallback silencioso en producción.
+      // FAIL FAST: NUNCA fallback silencioso en producción.
       throw new Error(
-        `NOTIFICATION_PROVIDER=m365 en producción con configuración inválida. ` +
+        `NOTIFICATION_PROVIDER=m365-graph en producción con configuración inválida. ` +
           `Variables inválidas/ausentes: ${campos}`,
       );
     }
-    // dev/test: fallback controlado y LOGUEADO (sin valores, solo nombres).
     logger.warn(
-      { proveedorSolicitado: "m365", fallback: "fake", variablesFaltantes: campos },
-      "M365 mal configurado en dev/test: usando FakeEmailProvider",
+      { proveedorSolicitado: "m365-graph", fallback: "fake", variablesFaltantes: campos },
+      "Microsoft Graph mal configurado en dev/test: usando FakeEmailProvider",
     );
     return new FakeEmailProvider();
   }
 
-  const { provider } = construirProveedorM365(cfg.config, deps);
+  const { provider } = construirProveedorGraph(cfg.config, deps);
   logger.info(
-    { proveedor: "m365", smtpHost: cfg.config.smtpHost, smtpPort: cfg.config.smtpPort },
-    "Proveedor de notificaciones: Microsoft 365",
+    { proveedor: "m365-graph", graphBaseUrl: cfg.config.graphBaseUrl },
+    "Proveedor de notificaciones: Microsoft Graph",
   );
   return provider;
 }
 
 /**
  * Instala el proveedor resuelto como singleton usado por `enqueueEmail`.
- * Se invoca en el arranque (`app.ts`). En producción con m365 mal configurado,
- * lanza aquí (fallo al arrancar), conforme al mandato.
+ * Se invoca en el arranque (`app.ts`). En producción con Graph mal configurado,
+ * lanza aquí (FAIL FAST al arrancar), conforme al mandato.
  */
 export function instalarProveedorNotificaciones(
   deps: ResolverProviderDeps = {},

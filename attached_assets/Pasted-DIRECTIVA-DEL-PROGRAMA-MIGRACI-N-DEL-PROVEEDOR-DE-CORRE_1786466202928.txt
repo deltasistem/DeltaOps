@@ -1,0 +1,543 @@
+DIRECTIVA DEL PROGRAMA — MIGRACIÓN DEL PROVEEDOR DE CORREO A MICROSOFT GRAPH
+
+Como Dirección del Programa se determina que DeltaOps NO utilizará SMTP para el envío de notificaciones Microsoft 365.
+
+El proveedor oficial de correo será:
+
+MICROSOFT GRAPH API
+OAuth 2.0 Client Credentials
+Application Permission: Mail.Send
+
+La decisión es arquitectónica y debe implementarse respetando el diseño de DGP-017.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Reemplazar exclusivamente el adaptador concreto de correo Microsoft 365 basado en SMTP por un adaptador basado en Microsoft Graph.
+
+NO modificar:
+
+- NotificationPort
+- EmailNotificationPort
+- dominio de notificaciones
+- contratos de los módulos
+- identidad de DeltaOps
+- autorización propia de DeltaOps
+- multitenancy
+- roles
+- permisos
+- usuarios
+- tenants
+- Workflow
+- Activos
+- Órdenes
+- Inventario
+- Dynamic Forms
+- módulos congelados
+
+La plataforma DeltaOps continúa siendo completamente autónoma.
+
+Microsoft 365 será ÚNICAMENTE proveedor externo de transporte de correo.
+
+==================================================
+2. ARQUITECTURA OBLIGATORIA
+==================================================
+
+Mantener:
+
+Dominio/Módulos
+    ↓
+NotificationPort
+    ↓
+EmailNotificationPort
+    ↓
+proveedor concreto
+    ↓
+Microsoft Graph
+    ↓
+Exchange Online
+
+El dominio NO debe importar Microsoft Graph.
+
+Los módulos NO deben conocer:
+
+- Graph
+- OAuth
+- Client ID
+- Client Secret
+- Tenant ID
+- Exchange
+- Microsoft 365
+
+Toda la integración debe permanecer detrás del proveedor concreto.
+
+==================================================
+3. AUTENTICACIÓN
+==================================================
+
+Utilizar exclusivamente:
+
+OAuth 2.0 Client Credentials
+
+Token endpoint:
+
+POST
+https://login.microsoftonline.com/{GRAPH_TENANT_ID}/oauth2/v2.0/token
+
+Content-Type:
+
+application/x-www-form-urlencoded
+
+Parámetros:
+
+grant_type=client_credentials
+client_id={GRAPH_CLIENT_ID}
+client_secret={GRAPH_CLIENT_SECRET}
+scope=https://graph.microsoft.com/.default
+
+Cachear el access token hasta su expiración y renovarlo cuando corresponda.
+
+Nunca solicitar un token por cada correo.
+
+Nunca almacenar tokens persistentemente.
+
+Nunca escribir tokens o secretos en logs.
+
+==================================================
+4. VARIABLES / SECRETS
+==================================================
+
+Utilizar Secrets del entorno:
+
+GRAPH_TENANT_ID
+GRAPH_CLIENT_ID
+GRAPH_CLIENT_SECRET
+GRAPH_SENDER
+
+GRAPH_SENDER representa exclusivamente el buzón remitente autorizado.
+
+NO pedir contraseña del buzón.
+
+NO crear:
+
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASS
+
+NO utilizar SMTP.
+
+Si ya existen variables M365_* correspondientes al proveedor SMTP, no las reutilices para Graph.
+
+Puedes conservarlas temporalmente para compatibilidad si el código lo requiere, pero el proveedor activo de producción debe ser Graph y no SMTP.
+
+==================================================
+5. PERMISO MICROSOFT 365
+==================================================
+
+El permiso requerido para este proveedor es:
+
+Microsoft Graph
+Application permissions
+
+Mail.Send
+
+Requiere consentimiento de administrador.
+
+NO utilizar:
+
+Mail.Read
+Mail.ReadWrite
+Mail.ReadWrite.Shared
+Calendars.*
+User.Read
+
+para la funcionalidad de envío.
+
+Si la aplicación actualmente tiene permisos adicionales que no son utilizados por DeltaOps, NO los elimines automáticamente.
+
+Repórtalos como candidatos a limpieza posterior.
+
+La Dirección del Programa prioriza mínimo privilegio.
+
+==================================================
+6. ENVÍO
+==================================================
+
+Utilizar:
+
+POST
+https://graph.microsoft.com/v1.0/users/{GRAPH_SENDER}/sendMail
+
+Headers:
+
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+Body:
+
+{
+  "message": {
+    "subject": "<subject>",
+    "body": {
+      "contentType": "HTML",
+      "content": "<html>...</html>"
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "address": "<recipient>"
+        }
+      }
+    ]
+  },
+  "saveToSentItems": true
+}
+
+El proveedor debe soportar:
+
+- destinatarios
+- asunto
+- HTML
+- texto cuando corresponda
+- CC
+- BCC
+- metadata/correlationId
+- idempotencyKey
+- tenant DeltaOps
+
+Si el contrato actual del EmailNotificationPort soporta adjuntos, conservar el contrato y mapearlo correctamente a Microsoft Graph.
+
+No modificar el contrato únicamente para acomodar Graph.
+
+==================================================
+7. RESPUESTAS
+==================================================
+
+Considerar:
+
+202 Accepted = envío aceptado correctamente por Microsoft Graph.
+
+No asumir que 202 significa que el destinatario ya recibió el correo.
+
+Registrar el resultado operacional correspondiente sin exponer información sensible.
+
+Errores:
+
+401:
+problema de autenticación/token.
+
+403:
+permiso Mail.Send, consentimiento o autorización de acceso al buzón.
+
+404:
+buzón GRAPH_SENDER inexistente/no accesible.
+
+429:
+throttling de Microsoft Graph.
+
+5xx:
+error temporal del servicio.
+
+Aplicar reintentos únicamente cuando sean seguros y de acuerdo con el mecanismo de outbox/idempotencia existente.
+
+No crear un sistema paralelo de reintentos si DGP-017 ya posee uno.
+
+==================================================
+8. MULTITENANCY
+==================================================
+
+IMPORTANTE:
+
+Microsoft 365 NO determina el tenant DeltaOps.
+
+Deben permanecer separados:
+
+DeltaOps tenant
+≠
+Microsoft Entra tenant
+
+El correo debe conservar el tenant DeltaOps en:
+
+- plantilla
+- metadata
+- correlationId
+- idempotencyKey
+- auditoría
+- outbox
+
+El proveedor Microsoft Graph solamente transporta el mensaje.
+
+NO importar usuarios de Entra.
+
+NO importar grupos de Entra.
+
+NO importar roles de Entra.
+
+NO usar Microsoft 365 como fuente de identidad de DeltaOps.
+
+==================================================
+9. SEGURIDAD
+==================================================
+
+No mostrar jamás:
+
+GRAPH_CLIENT_SECRET
+access_token
+client credentials
+headers Authorization
+
+en:
+
+- logs
+- errores HTTP
+- documentación
+- pruebas
+- respuestas API
+- consola técnica
+- seeds
+- commits
+
+Implementar redacción de secretos.
+
+Validar configuración al arrancar.
+
+En production:
+
+si el proveedor Graph está habilitado y faltan variables requeridas:
+
+FAIL FAST
+
+No hacer fallback silencioso a Fake.
+
+El Fake solamente puede utilizarse explícitamente en development/test.
+
+==================================================
+10. RBAC DE EXCHANGE
+==================================================
+
+La Dirección del Programa quiere que el acceso de la aplicación al correo quede restringido al buzón remitente cuando sea posible.
+
+NO implementes todavía comandos destructivos ni cambies la configuración de Exchange.
+
+Inspecciona/documenta si la aplicación tiene configurado:
+
+Exchange Online RBAC for Applications
+
+con el rol:
+
+Application Mail.Send
+
+y un scope limitado al buzón GRAPH_SENDER.
+
+Microsoft está orientando el control de acceso de aplicaciones de Exchange hacia RBAC para aplicaciones.
+
+Si actualmente el tenant ya tiene configurada una restricción equivalente para la aplicación, reutilízala.
+
+Si no existe:
+
+NO inventes valores.
+
+NO ejecutes PowerShell contra Exchange.
+
+Reporta exactamente qué configuración falta para limitar Mail.Send al buzón remitente.
+
+==================================================
+11. MIGRACIÓN DEL PROVEEDOR
+==================================================
+
+Eliminar la dependencia operacional de:
+
+SMTP
+STARTTLS
+XOAUTH2 SMTP
+smtp.outlook.com
+nodemailer
+
+si dejan de ser necesarios después de la migración.
+
+Antes de eliminar código:
+
+- identifica dependencias
+- verifica que ningún módulo las utilice directamente
+- confirma que las pruebas puedan migrarse
+- conserva únicamente lo necesario para compatibilidad si existe una razón técnica
+
+No romper el NotificationPort.
+
+La implementación final debe tener:
+
+FakeEmailProvider
+M365GraphEmailProvider
+
+y selección por configuración.
+
+==================================================
+12. PRUEBAS
+==================================================
+
+Agregar pruebas deterministas sin depender de Internet:
+
+- token correcto
+- token expirado
+- renovación de token
+- error de autenticación
+- construcción correcta de sendMail
+- HTML
+- destinatarios
+- CC/BCC
+- 202 Accepted
+- 401
+- 403
+- 404
+- 429
+- 5xx
+- timeout
+- retry seguro
+- idempotencia
+- aislamiento por tenant
+- no exposición de secretos
+- provider selection
+- Fake provider
+- Graph provider
+
+No ejecutar llamadas reales a Microsoft Graph dentro de la suite unitaria.
+
+==================================================
+13. SMOKE REAL
+==================================================
+
+Crear o reutilizar un comando equivalente a:
+
+m365:graph:smoke
+
+Debe ejecutar:
+
+1. lectura de configuración
+2. obtención de token
+3. validación del token
+4. conexión con Microsoft Graph
+5. envío de correo real
+6. resultado final
+
+El destinatario de prueba debe poder especificarse como argumento.
+
+Ejemplo conceptual:
+
+pnpm --filter @workspace/api-server m365:graph:smoke destino@dominio.com
+
+No mostrar secretos.
+
+Resultado esperado:
+
+GRAPH CONFIGURATION: PASS
+OAUTH: PASS
+GRAPH CONNECTION: PASS
+MAIL.SEND: PASS
+TEST EMAIL: ACCEPTED
+MICROSOFT 365 GRAPH INTEGRATION: PASS
+
+Si falla:
+
+reportar exactamente:
+
+- etapa
+- HTTP status
+- error de Microsoft Graph
+- diagnóstico
+- siguiente acción recomendada
+
+==================================================
+14. DOCUMENTACIÓN
+==================================================
+
+Actualizar documentación en español explicando:
+
+- arquitectura
+- OAuth Client Credentials
+- variables requeridas
+- Mail.Send
+- configuración del buzón
+- seguridad
+- multitenancy
+- smoke test
+- troubleshooting
+- diferencia entre identidad DeltaOps y Microsoft Entra
+- proveedor Fake vs Microsoft Graph
+
+No incluir valores reales de secrets.
+
+==================================================
+15. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Antes de declarar terminado:
+
+realizar revisión independiente verificando:
+
+- Dependency Rule
+- mínimo privilegio
+- multitenancy
+- seguridad
+- no dependencia de Entra para identidad DeltaOps
+- no dependencia de SMTP
+- NotificationPort intacto
+- outbox/idempotencia
+- aislamiento por tenant
+- no secretos
+- Contract First
+- no modificación del corpus congelado
+
+Si existe cualquier violación:
+
+CORREGIR ANTES DEL CIERRE.
+
+==================================================
+16. CRITERIO DE CIERRE
+==================================================
+
+La tarea solamente puede considerarse TERMINADA cuando:
+
+- Graph OAuth funciona
+- Mail.Send está correctamente utilizado
+- correo real enviado con HTTP 202
+- proveedor Graph funciona
+- Fake sigue funcionando
+- NotificationPort permanece intacto
+- no existe dependencia funcional de SMTP
+- secretos protegidos
+- multitenancy preservado
+- pruebas verdes
+- typecheck verde
+- build verde
+- documentación actualizada
+- revisión arquitectónica PASS
+
+IMPORTANTE:
+
+NO inventes valores.
+
+NO modifiques Microsoft Entra.
+
+NO modifiques Exchange.
+
+NO solicites nuevamente credenciales que ya existan como Secrets.
+
+Si falta una configuración del tenant, detente y reporta exactamente cuál es.
+
+Al finalizar entrega un INFORME OFICIAL DE CIERRE con:
+
+1. objeto
+2. alcance
+3. arquitectura
+4. cambios
+5. variables
+6. permisos
+7. pruebas
+8. smoke real
+9. revisión arquitectónica
+10. deuda técnica
+11. documentación
+12. estado final
+13. oportunidades de mejora

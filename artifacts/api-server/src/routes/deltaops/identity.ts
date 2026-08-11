@@ -87,7 +87,7 @@ import {
 } from "../../deltaops/identity/service";
 import { seedRolesDeTenant } from "../../deltaops/identity/seed-roles";
 import { proveedorSolicitado } from "../../deltaops/identity/notification-provider";
-import { resolverConfigM365 } from "../../deltaops/identity/m365-email";
+import { resolverConfigGraph } from "../../deltaops/identity/m365-graph-email";
 import { principalFor } from "./reference-runtime";
 
 const router: IRouter = Router();
@@ -777,19 +777,19 @@ router.get(`${BASE}/admin/tenants/:id/notifications`, requireIdentity, requireSu
 });
 
 /**
- * Estado GLOBAL del proveedor de notificaciones por correo (fake|m365).
+ * Estado GLOBAL del proveedor de notificaciones por correo (fake|m365-graph).
  * Superficie de administración SaaS: exige contexto Enterprise estricto
  * (requireIdentity) + SUPER_ADMIN. NUNCA acepta el rol legacy "admin"/
- * TENANT_ADMIN, ya que expone configuración global (host/puerto/scope y
+ * TENANT_ADMIN, ya que expone configuración global (endpoint de Graph, scope y
  * NOMBRES de variables ausentes). No expone secretos ni dispara envío.
  */
 router.get(`${BASE}/admin/notifications/provider-status`, requireIdentity, requireSuperAdmin, (_req, res): void => {
   const proveedor = proveedorSolicitado(process.env);
-  if (proveedor !== "m365") {
+  if (proveedor !== "m365-graph") {
     res.json({ proveedor, configurado: true, detalle: "Proveedor Fake (dev/test)" });
     return;
   }
-  const cfg = resolverConfigM365(process.env);
+  const cfg = resolverConfigGraph(process.env);
   if (!cfg.ok) {
     res.json({
       proveedor,
@@ -802,10 +802,9 @@ router.get(`${BASE}/admin/notifications/provider-status`, requireIdentity, requi
   res.json({
     proveedor,
     configurado: true,
-    smtpHost: cfg.config.smtpHost,
-    smtpPort: cfg.config.smtpPort,
-    smtpSecure: cfg.config.smtpSecure,
+    graphBaseUrl: cfg.config.graphBaseUrl,
     scope: cfg.config.scope,
+    // Ni el secret ni el token ni el sender se exponen.
   });
 });
 
