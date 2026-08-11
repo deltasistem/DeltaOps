@@ -154,8 +154,11 @@ mockeados) — `src/deltaops/identity/__tests__/m365-email.test.ts`:
 
 ## 9. Prueba de conexión / smoke test
 
-- **Endpoint** (admin de plataforma): `GET /api/deltaops/platform/notifications/status`
-  — reporta el proveedor configurado y, para m365, la validez de configuración
+- **Endpoint** (SUPER_ADMIN, superficie SaaS de identidad):
+  `GET /api/deltaops/admin/notifications/provider-status` — protegido con
+  `requireIdentity + requireSuperAdmin` (contexto Enterprise estricto; NO acepta
+  el rol legacy "admin"/TENANT_ADMIN, ya que expone configuración GLOBAL).
+  Reporta el proveedor configurado y, para m365, la validez de configuración
   (sin secretos; solo nombres de variables faltantes). No dispara envío.
 - **CLI**: `tsx artifacts/api-server/scripts/m365-smoke.ts [destino]` — ejecuta
   las etapas reales configuración → OAuth → SMTP → correo de prueba y reporta

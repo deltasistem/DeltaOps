@@ -15,6 +15,7 @@
  *   Notif:  GET /notifications
  *   Admin:  GET/POST /admin/tenants · POST /admin/tenants/:id/status
  *           PATCH /admin/tenants/:id/modules · GET /admin/tenants/:id/notifications
+ *           GET /admin/notifications/provider-status  (SUPER_ADMIN)
  *
  * Reglas de seguridad: sesión con tenant-context explícito; aislamiento por
  * tenant; anti-enumeración en recuperación; tokens de un solo uso; cambio de
@@ -85,6 +86,8 @@ import {
   type Tenant,
 } from "../../deltaops/identity/service";
 import { seedRolesDeTenant } from "../../deltaops/identity/seed-roles";
+import { proveedorSolicitado } from "../../deltaops/identity/notification-provider";
+import { resolverConfigM365 } from "../../deltaops/identity/m365-email";
 import { principalFor } from "./reference-runtime";
 
 const router: IRouter = Router();
@@ -771,6 +774,39 @@ router.patch(`${BASE}/admin/tenants/:id/modules`, requireIdentity, requireSuperA
 
 router.get(`${BASE}/admin/tenants/:id/notifications`, requireIdentity, requireSuperAdmin, async (req, res): Promise<void> => {
   res.json(await listarCorreos(pid(req), 200));
+});
+
+/**
+ * Estado GLOBAL del proveedor de notificaciones por correo (fake|m365).
+ * Superficie de administración SaaS: exige contexto Enterprise estricto
+ * (requireIdentity) + SUPER_ADMIN. NUNCA acepta el rol legacy "admin"/
+ * TENANT_ADMIN, ya que expone configuración global (host/puerto/scope y
+ * NOMBRES de variables ausentes). No expone secretos ni dispara envío.
+ */
+router.get(`${BASE}/admin/notifications/provider-status`, requireIdentity, requireSuperAdmin, (_req, res): void => {
+  const proveedor = proveedorSolicitado(process.env);
+  if (proveedor !== "m365") {
+    res.json({ proveedor, configurado: true, detalle: "Proveedor Fake (dev/test)" });
+    return;
+  }
+  const cfg = resolverConfigM365(process.env);
+  if (!cfg.ok) {
+    res.json({
+      proveedor,
+      configurado: false,
+      // Solo NOMBRES de variables, nunca valores.
+      variablesFaltantes: cfg.issues.map((i) => i.campo),
+    });
+    return;
+  }
+  res.json({
+    proveedor,
+    configurado: true,
+    smtpHost: cfg.config.smtpHost,
+    smtpPort: cfg.config.smtpPort,
+    smtpSecure: cfg.config.smtpSecure,
+    scope: cfg.config.scope,
+  });
 });
 
 /* ------------------------------- Utilidad -------------------------------- */

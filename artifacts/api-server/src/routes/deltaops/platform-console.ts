@@ -9,8 +9,6 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import type { PlatformRuntime } from "@workspace/platform";
 import { deltaopsRuntime } from "./reference-runtime";
-import { proveedorSolicitado } from "../../deltaops/identity/notification-provider";
-import { resolverConfigM365 } from "../../deltaops/identity/m365-email";
 
 const router: IRouter = Router();
 
@@ -138,39 +136,6 @@ router.get("/deltaops/platform/storage", async (req, res): Promise<void> => {
 /** Configuración: defaults declarados por servicio. */
 router.get("/deltaops/platform/config-defaults", (_req, res): void => {
   res.json(platform().tenantConfig.listDefaults());
-});
-
-/**
- * Estado del canal de notificaciones por correo. Reporta el proveedor
- * configurado y, para m365, un resumen de VALIDEZ de configuración por etapa
- * SIN exponer secretos (solo nombres de variables faltantes). No dispara envío.
- * Reservado a administradores de plataforma (guard de este router).
- */
-router.get("/deltaops/platform/notifications/status", (_req, res): void => {
-  const proveedor = proveedorSolicitado(process.env);
-  if (proveedor !== "m365") {
-    res.json({ proveedor, configurado: true, detalle: "Proveedor Fake (dev/test)" });
-    return;
-  }
-  const cfg = resolverConfigM365(process.env);
-  if (!cfg.ok) {
-    res.json({
-      proveedor,
-      configurado: false,
-      // Solo NOMBRES de variables, nunca valores.
-      variablesFaltantes: cfg.issues.map((i) => i.campo),
-    });
-    return;
-  }
-  res.json({
-    proveedor,
-    configurado: true,
-    smtpHost: cfg.config.smtpHost,
-    smtpPort: cfg.config.smtpPort,
-    smtpSecure: cfg.config.smtpSecure,
-    // remitente NO es secreto, pero se omite para minimizar superficie de datos.
-    scope: cfg.config.scope,
-  });
 });
 
 export default router;

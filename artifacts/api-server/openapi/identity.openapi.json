@@ -1868,6 +1868,51 @@
           }
         }
       }
+    },
+    "/api/deltaops/admin/notifications/provider-status": {
+      "get": {
+        "operationId": "identity.admin.notificationsProviderStatus",
+        "summary": "Estado global del proveedor de correo (sin secretos)",
+        "tags": [
+          "Admin"
+        ],
+        "description": "Autorización: SUPER_ADMIN.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Solicitud inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Prohibido / sin permiso / tenant no operativo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

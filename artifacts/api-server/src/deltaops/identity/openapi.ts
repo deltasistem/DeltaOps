@@ -134,6 +134,7 @@ const OPS: OpSpec[] = [
   { method: "post", path: "/admin/tenants/{id}/status", operationId: "identity.admin.tenantStatus", summary: "Cambiar estado de empresa", tag: "Admin", auth: "SUPER_ADMIN", body: "EstadoTenantBody", ok: { code: "200", schema: "Tenant" } },
   { method: "patch", path: "/admin/tenants/{id}/modules", operationId: "identity.admin.tenantModules", summary: "Actualizar módulos de empresa", tag: "Admin", auth: "SUPER_ADMIN", body: "ActualizarModulosBody", ok: { code: "200" } },
   { method: "get", path: "/admin/tenants/{id}/notifications", operationId: "identity.admin.tenantNotifications", summary: "Buzón de una empresa", tag: "Admin", auth: "SUPER_ADMIN", ok: { code: "200", schema: "Notificacion" } },
+  { method: "get", path: "/admin/notifications/provider-status", operationId: "identity.admin.notificationsProviderStatus", summary: "Estado global del proveedor de correo (sin secretos)", tag: "Admin", auth: "SUPER_ADMIN", ok: { code: "200" } },
 ];
 
 function paramsDeRuta(path: string): Schema[] {

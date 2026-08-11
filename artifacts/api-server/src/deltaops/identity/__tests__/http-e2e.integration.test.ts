@@ -213,6 +213,43 @@ describe("E2E · entitlements de módulo (rechazo backend)", () => {
   });
 });
 
+describe("E2E · estado global del proveedor de correo exige SUPER_ADMIN", () => {
+  const RUTA = "/deltaops/admin/notifications/provider-status";
+
+  it("sin sesión ⇒ 401", async () => {
+    const c = crearCliente();
+    const r = await c.req("GET", RUTA);
+    expect(r.status).toBe(401);
+  });
+
+  it("TENANT_ADMIN (admin@delta.demo) ⇒ 403 (NO acepta 'admin' legacy)", async () => {
+    const c = crearCliente();
+    const login = await c.req("POST", "/deltaops/auth/login", {
+      email: "admin@delta.demo", password: PASS_DEMO, tenantId: "delta-demo",
+    });
+    expect(login.status).toBe(200);
+    expect(login.json.rol).toBe("TENANT_ADMIN");
+    const r = await c.req("GET", RUTA);
+    expect(r.status).toBe(403);
+    expect(r.json.code).toBe("FORBIDDEN");
+  });
+
+  it("SUPER_ADMIN (admin@deltaops.dev) ⇒ 200 con payload redactado (sin secretos)", async () => {
+    const c = crearCliente();
+    const login = await c.req("POST", "/deltaops/auth/login", {
+      email: "admin@deltaops.dev", password: PASS_PLAT, tenantId: "deltaops",
+    });
+    expect(login.status).toBe(200);
+    expect(login.json.rol).toBe("SUPER_ADMIN");
+    const r = await c.req("GET", RUTA);
+    expect(r.status).toBe(200);
+    expect(["fake", "m365"]).toContain(r.json.proveedor);
+    // Nunca expone secretos: sin client_secret ni access_token en el payload.
+    const s = JSON.stringify(r.json);
+    expect(s).not.toMatch(/secret|token|password/i);
+  });
+});
+
 describe("E2E · AISLAMIENTO CRÍTICO de sesiones concurrentes A/B (misma identidad)", () => {
   it("A no adopta el tenant/rol de B ni tras login/switch-tenant en B", async () => {
     // Sesión A: identidad `ab@delta.test` en tenant A (delta-demo) como TENANT_ADMIN.
