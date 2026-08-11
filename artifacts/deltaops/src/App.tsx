@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ToastProvider } from '@workspace/design-system';
+import { ThemeProvider, ToastProvider } from '@workspace/design-system';
 import { Toaster } from '@/components/ui/toaster';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import Login from '@/pages/login';
@@ -201,20 +201,29 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {/*
-        ToastProvider del Design System a nivel raíz: los `useToast` de las
-        páginas (órdenes, escaneo, etc.) consumen un único provider de ancestro.
-        La región de toasts usa `position: fixed` y tokens `--do-*` globales
-        (`:root`), por lo que funciona fuera de cada `do-root` sin duplicar el
-        provider en cada Shell. Convive con el `<Toaster />` shadcn local.
+        DIRECTIVA CONSISTENCIA VISUAL · ThemeProvider del DS a nivel RAÍZ: única
+        autoridad de la preferencia de apariencia (Claro/Oscuro/Automático) para
+        TODA la plataforma. Aplica `data-do-theme` + clase `dark` sobre
+        `document.documentElement`, por lo que rige en todos los módulos y en la
+        consola SUPER_ADMIN (shadcn responde a `.dark`). Persiste en
+        `localStorage["do-tema"]`. Los ThemeProvider de cada Shell quedan
+        subordinados a esta preferencia (comparten el mismo almacenamiento y el
+        mismo `<html>`), sin crear un segundo sistema de tema.
+
+        ToastProvider del DS a nivel raíz: los `useToast` de las páginas consumen
+        un único provider de ancestro. La región de toasts usa `position: fixed`
+        y tokens `--do-*` globales (`:root`). Convive con el `<Toaster />` shadcn.
       */}
-      <ToastProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <SesionProvider>
-            <Router />
-          </SesionProvider>
-        </WouterRouter>
-        <Toaster />
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <SesionProvider>
+              <Router />
+            </SesionProvider>
+          </WouterRouter>
+          <Toaster />
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

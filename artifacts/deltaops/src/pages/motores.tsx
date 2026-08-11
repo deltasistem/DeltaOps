@@ -340,7 +340,7 @@ function contarCampos() {
 export default function MotoresPage() {
   return (
     <ThemeProvider>
-      <div className="do-root" data-do-theme="light" style={{ minHeight: "100vh", background: "var(--do-bg)", padding: "var(--do-sp-6)" }}>
+      <div className="do-root" style={{ minHeight: "100vh", background: "var(--do-bg)", padding: "var(--do-sp-6)" }}>
         <div style={{ maxWidth: "var(--do-max-ancho)", margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--do-sp-5)" }}>
           <PageHeader
             titulo="Motores · Workflow & Dynamic Forms"

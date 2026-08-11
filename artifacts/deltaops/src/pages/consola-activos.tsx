@@ -114,7 +114,6 @@ export default function ConsolaActivosPage() {
     <ThemeProvider>
       <div
         className="do-root"
-        data-do-theme="light"
         style={{ minHeight: "100vh", background: "var(--do-bg)", padding: "var(--do-sp-6)" }}
       >
         <div

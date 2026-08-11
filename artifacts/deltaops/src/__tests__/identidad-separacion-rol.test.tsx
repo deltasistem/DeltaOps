@@ -16,6 +16,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "@workspace/design-system";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import Inicio from "../pages/inicio";
@@ -89,11 +90,13 @@ function renderInicio(ses: Sesion, contador?: { session: number }, ruta = "/") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <Router hook={hook}>
-        <SesionProvider>
-          <Inicio />
-        </SesionProvider>
-      </Router>
+      <ThemeProvider>
+        <Router hook={hook}>
+          <SesionProvider>
+            <Inicio />
+          </SesionProvider>
+        </Router>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
   return { history, qc };

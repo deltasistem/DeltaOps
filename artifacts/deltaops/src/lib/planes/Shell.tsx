@@ -75,7 +75,7 @@ export function ShellPlanes({ children, activo }: ShellPlanesProps) {
   if (isLoading) {
     return (
       <ThemeProvider>
-        <div className="do-root" data-do-theme="light" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--do-bg)" }}>
+        <div className="do-root" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--do-bg)" }}>
           <Spinner />
         </div>
       </ThemeProvider>
@@ -88,7 +88,7 @@ export function ShellPlanes({ children, activo }: ShellPlanesProps) {
   return (
     <ThemeProvider>
       <OfflineProvider tenant={TENANT} modulo={MODULO_OFFLINE} syncUrl={SYNC_URL}>
-        <div className="do-root" data-do-theme="light" style={{ minHeight: "100vh", background: "var(--do-bg)" }}>
+        <div className="do-root" style={{ minHeight: "100vh", background: "var(--do-bg)" }}>
           <BannerOffline />
           <nav
             aria-label="Navegación de planes"

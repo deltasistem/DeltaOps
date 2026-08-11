@@ -1,0 +1,238 @@
+DIRECTIVA DE DIRECCIÓN — CONSISTENCIA VISUAL GLOBAL Y PREFERENCIA DE TEMA DELTAOPS
+
+Programa DeltaOps
+
+Antes de iniciar cualquier nuevo DGP funcional, la Dirección solicita corregir una inconsistencia de experiencia detectada durante la revisión visual de DGP-018.
+
+OBJETIVO
+
+DeltaOps debe percibirse como UNA SOLA PLATAFORMA EMPRESARIAL.
+
+Actualmente el Centro Operacional / landing empresarial utiliza una experiencia visual oscura, mientras que al ingresar a determinados módulos, especialmente Órdenes, la interfaz cambia a una experiencia clara con navegación y jerarquía visual diferentes.
+
+Esto no es aceptable como experiencia final.
+
+La solución NO debe consistir simplemente en cambiar colores de una pantalla. Debe existir una política global de apariencia para toda la experiencia DeltaOps.
+
+REQUISITO 1 — TEMA GLOBAL
+
+Implementar una preferencia de apariencia global para el usuario:
+
+- Claro
+- Oscuro
+- Automático / según preferencia del sistema
+
+La preferencia debe mantenerse durante toda la navegación de DeltaOps.
+
+Al cambiar entre:
+
+Centro Operacional
+Activos
+Órdenes
+Inventario
+Planes
+Abastecimiento
+Preventivo
+Correctivo
+Analytics
+Referencia
+
+el tema seleccionado NO debe cambiar.
+
+REQUISITO 2 — PERSISTENCIA
+
+La preferencia debe persistir entre:
+
+- navegación entre módulos;
+- refresh de la página;
+- cierre y reapertura de sesión, si la arquitectura actual permite persistirla por identidad;
+- dispositivos/navegadores únicamente si ya existe un mecanismo apropiado para preferencias de usuario.
+
+No crear un sistema de identidad paralelo.
+
+Si actualmente no existe un contrato persistente de preferencias de usuario, usar inicialmente una solución segura del lado cliente (por ejemplo localStorage) y documentar que la persistencia server-side queda como evolución futura.
+
+NO modificar identidad, tenancy, roles ni autorización.
+
+REQUISITO 3 — UNIFICACIÓN VISUAL
+
+Auditar las superficies empresariales existentes y eliminar las diferencias visuales accidentales entre módulos.
+
+Especialmente revisar:
+
+- navegación;
+- encabezados;
+- tipografía;
+- botones;
+- tabs;
+- formularios;
+- tablas;
+- tarjetas;
+- modales;
+- estados vacío/loading/error;
+- badges;
+- inputs;
+- paginación;
+- iconografía;
+- espaciado;
+- bordes;
+- sombras;
+- colores semánticos;
+- responsive;
+- estados offline.
+
+La experiencia debe utilizar el Design System y tokens existentes.
+
+NO crear un segundo Design System.
+
+NO duplicar componentes si ya existen componentes equivalentes.
+
+REQUISITO 4 — ÓRDENES COMO CASO PRIORITARIO
+
+Auditar especialmente el módulo Órdenes, porque actualmente presenta una ruptura visual evidente respecto al Centro Operacional.
+
+La pantalla de Órdenes debe conservar todas sus capacidades funcionales actuales, pero debe adoptar el mismo lenguaje visual global de DeltaOps.
+
+IMPORTANTE:
+
+No eliminar funcionalidades existentes.
+
+No modificar contratos backend.
+
+No modificar Workflow Engine.
+
+No modificar permisos.
+
+No modificar RLS.
+
+No modificar módulos congelados fuera de artifacts/deltaops salvo que exista una necesidad técnica estrictamente demostrable.
+
+REQUISITO 5 — SELECTOR DE TEMA
+
+El usuario debe poder cambiar el tema desde una ubicación coherente y fácil de encontrar.
+
+Preferencia propuesta:
+
+Perfil de usuario
+→ Preferencias
+→ Apariencia
+
+Opciones:
+
+○ Claro
+○ Oscuro
+○ Automático
+
+El cambio debe aplicarse inmediatamente sin requerir logout.
+
+El selector debe ser accesible y funcionar correctamente en desktop, tablet y móvil.
+
+REQUISITO 6 — SUPER_ADMIN
+
+La consola técnica de SUPER_ADMIN también debe respetar la preferencia global cuando corresponda, pero NO se debe eliminar ni rediseñar su función técnica.
+
+Mantener la separación establecida en la directiva de separación de experiencias por rol:
+
+SUPER_ADMIN
+→ consola técnica/global
+
+TENANT_ADMIN / SUPERVISOR / PLANIFICADOR / TECNICO / CONSULTA
+→ experiencia empresarial.
+
+REQUISITO 7 — NO INVENTAR DATOS
+
+Esta directiva es exclusivamente visual y de experiencia.
+
+No agregar métricas ficticias.
+
+No agregar endpoints innecesarios.
+
+No crear nuevos modelos de negocio.
+
+No introducir BI, IA, analytics adicionales ni funcionalidades de mantenimiento nuevas.
+
+REQUISITO 8 — RESPONSIVE
+
+Verificar como mínimo:
+
+- desktop;
+- tablet;
+- móvil ~390px.
+
+El cambio de tema no debe producir overflow horizontal ni pérdida de contraste.
+
+REQUISITO 9 — ACCESIBILIDAD
+
+Mantener WCAG AA donde aplique:
+
+- contraste;
+- foco visible;
+- navegación por teclado;
+- labels;
+- targets táctiles;
+- estados disabled;
+- lectura semántica.
+
+REQUISITO 10 — VALIDACIÓN OBLIGATORIA
+
+Antes de cerrar la directiva, realizar pruebas visuales/e2e reales con al menos:
+
+1. TENANT_ADMIN
+2. SUPERVISOR
+3. PLANIFICADOR
+4. TECNICO
+5. CONSULTA
+6. SUPER_ADMIN
+
+Para TENANT_ADMIN verificar:
+
+Centro Operacional
+→ Activos
+→ Órdenes
+→ Inventario
+→ Planes
+→ Abastecimiento
+→ Preventivo
+→ Correctivo
+
+y confirmar que el tema seleccionado permanece consistente.
+
+Probar:
+
+Claro → navegar por todos los módulos → permanece claro.
+
+Oscuro → navegar por todos los módulos → permanece oscuro.
+
+Automático → respeta la preferencia del sistema.
+
+Refresh → conserva la preferencia.
+
+Logout → login nuevamente → conservar la preferencia si la solución implementada lo permite.
+
+REQUISITO 11 — CRITERIO DE ACEPTACIÓN VISUAL
+
+La Dirección NO considerará cerrada esta directiva únicamente porque las pruebas automatizadas pasen.
+
+Debe realizarse una revisión visual real de las principales superficies.
+
+La experiencia debe dejar de parecer una colección de aplicaciones independientes y debe percibirse como una única plataforma DeltaOps.
+
+ENTREGABLE
+
+Al finalizar entregar informe indicando:
+
+- causa de las diferencias visuales encontradas;
+- superficies corregidas;
+- estrategia de tema implementada;
+- dónde está ubicado el selector;
+- cómo se persiste la preferencia;
+- módulos auditados;
+- pruebas ejecutadas;
+- resultado de desktop/tablet/mobile;
+- resultado de claro/oscuro/automático;
+- pruebas por rol;
+- cualquier deuda técnica que quede.
+
+NO iniciar DGP-019 como parte de esta tarea.
+
+Esta directiva debe cerrarse primero y quedar lista para revisión visual de la Dirección.

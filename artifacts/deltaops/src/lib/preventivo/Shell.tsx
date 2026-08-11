@@ -76,7 +76,7 @@ export function ShellPreventivo({ children, activo }: ShellPreventivoProps) {
   if (isLoading) {
     return (
       <ThemeProvider>
-        <div className="do-root" data-do-theme="light" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--do-bg)" }}>
+        <div className="do-root" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--do-bg)" }}>
           <Spinner />
         </div>
       </ThemeProvider>
@@ -89,7 +89,7 @@ export function ShellPreventivo({ children, activo }: ShellPreventivoProps) {
   return (
     <ThemeProvider>
       <OfflineProvider tenant={TENANT} modulo={MODULO_OFFLINE} syncUrl={SYNC_URL}>
-        <div className="do-root" data-do-theme="light" style={{ minHeight: "100vh", background: "var(--do-bg)" }}>
+        <div className="do-root" style={{ minHeight: "100vh", background: "var(--do-bg)" }}>
           <BannerOffline />
           <nav
             aria-label="Navegación de preventivo"

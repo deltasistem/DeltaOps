@@ -24,8 +24,9 @@ import {
   AppShell,
   type DropdownItem,
 } from "@workspace/design-system";
-import { Building2, UserCircle } from "lucide-react";
+import { Building2, UserCircle, Palette } from "lucide-react";
 import { useSesion } from "./sesion";
+import { OpcionesApariencia } from "./SelectorApariencia";
 import { BrandingProvider, useBranding } from "./branding";
 import { esAdminEmpresa, esSuperAdmin, modulosVisibles, nombreRol } from "./rbac";
 import type { Sesion } from "./tipos";
@@ -133,10 +134,14 @@ function SelectorEmpresa({ sesion }: { sesion: Sesion }) {
 function MenuPerfil({ sesion }: { sesion: Sesion }) {
   const { cerrarSesion } = useSesion();
   const [, setLocation] = useLocation();
+  // Estado del modal de apariencia (Perfil → Preferencias → Apariencia). Vive
+  // fuera del Dropdown para poder abrirse tras cerrarse el menú.
+  const [aparienciaAbierta, setAparienciaAbierta] = useState(false);
 
   const items: DropdownItem[] = [
     { etiqueta: "Mi perfil", onSelect: () => setLocation("/perfil") },
     { etiqueta: "Cambiar contraseña", onSelect: () => setLocation("/perfil/contrasena") },
+    { etiqueta: "Apariencia", icono: Palette, onSelect: () => setAparienciaAbierta(true) },
   ];
   if (esAdminEmpresa(sesion.rol)) {
     items.push({ etiqueta: "Configuración de empresa", onSelect: () => setLocation("/administracion/configuracion") });
@@ -155,21 +160,40 @@ function MenuPerfil({ sesion }: { sesion: Sesion }) {
   });
 
   return (
-    <Dropdown
-      etiquetaMenu={`Menú de ${sesion.nombre}`}
-      disparador={
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--do-sp-2)" }}>
-          <UserCircle size={20} aria-hidden="true" />
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
-            <span style={{ fontSize: "var(--do-text-sm)", fontWeight: 600 }}>{sesion.nombre}</span>
-            <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>
-              {nombreRol(sesion.rol)}
+    <>
+      <Dropdown
+        etiquetaMenu={`Menú de ${sesion.nombre}`}
+        disparador={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--do-sp-2)" }}>
+            <UserCircle size={20} aria-hidden="true" />
+            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
+              <span style={{ fontSize: "var(--do-text-sm)", fontWeight: 600 }}>{sesion.nombre}</span>
+              <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>
+                {nombreRol(sesion.rol)}
+              </span>
             </span>
           </span>
-        </span>
-      }
-      items={items}
-    />
+        }
+        items={items}
+      />
+      <Modal
+        abierto={aparienciaAbierta}
+        onClose={() => setAparienciaAbierta(false)}
+        titulo="Apariencia"
+        size="sm"
+        pie={
+          <Button variant="primario" size="md" style={{ minHeight: 48 }} onClick={() => setAparienciaAbierta(false)}>
+            Listo
+          </Button>
+        }
+      >
+        <p style={{ margin: "0 0 var(--do-sp-3)", color: "var(--do-texto-suave)", fontSize: "var(--do-text-sm)" }}>
+          Elige cómo se ve DeltaOps. La preferencia se mantiene en toda la
+          plataforma y se recuerda en este dispositivo.
+        </p>
+        <OpcionesApariencia />
+      </Modal>
+    </>
   );
 }
 

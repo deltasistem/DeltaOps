@@ -17,6 +17,7 @@ import {
 
 import { Activity, Server, Clock, ActivitySquare, AlertTriangle, ShieldCheck, Power, Shield, Activity as ActivityIcon, CheckCircle2, XCircle } from "lucide-react";
 import { Logo } from "@workspace/design-system";
+import { SelectorApariencia } from "@/lib/identidad/SelectorApariencia";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -203,6 +204,8 @@ export default function Console() {
               <p className="text-sm font-semibold">{user.nombre}</p>
               <p className="text-xs text-muted-foreground font-mono">{user.rol}</p>
             </div>
+            {/* Req 6: la consola técnica respeta la preferencia global de apariencia. */}
+            <SelectorApariencia variante="compacto" />
             <Button 
               variant="outline" 
               size="sm" 

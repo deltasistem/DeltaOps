@@ -104,11 +104,13 @@ function renderInicio(ses: Sesion, ordenes: OrdenRow[] = [], base?: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <Router base={base} hook={hook}>
-        <SesionProvider>
-          <Inicio />
-        </SesionProvider>
-      </Router>
+      <ThemeProvider>
+        <Router base={base} hook={hook}>
+          <SesionProvider>
+            <Inicio />
+          </SesionProvider>
+        </Router>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }
