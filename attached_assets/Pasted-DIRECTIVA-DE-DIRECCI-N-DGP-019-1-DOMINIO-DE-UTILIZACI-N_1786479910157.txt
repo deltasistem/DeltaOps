@@ -1,0 +1,673 @@
+DIRECTIVA DE DIRECCIÓN — DGP-019.1
+DOMINIO DE UTILIZACIÓN, MEDIDORES Y COMBUSTIBLE
+
+Programa DeltaOps
+
+ESTADO
+
+DGP-019 FASE DE DESCUBRIMIENTO Y REVISIÓN ARQUITECTÓNICA:
+
+APROBADO.
+
+El informe DGP-019-DESCUBRIMIENTO.md fue revisado y aprobado por la Dirección.
+
+A partir de este momento se autoriza implementar únicamente DGP-019.1.
+
+NO implementar todavía DGP-019.2 ni DGP-019.3.
+
+==================================================
+OBJETIVO
+==================================================
+
+Crear el nuevo módulo:
+
+module-utilizacion
+
+Su responsabilidad será proporcionar la fundación operacional para registrar:
+
+1. Lecturas históricas de medidores.
+2. Horómetro.
+3. Odómetro/kilometraje.
+4. Tanqueos/combustible.
+5. Eventos operacionales relacionados con utilización cuando exista una fuente real.
+
+El módulo debe quedar preparado para que posteriormente DeltaOps pueda calcular:
+
+- consumo;
+- L/h;
+- L/100 km;
+- costo por hora;
+- costo por km;
+- utilización;
+- disponibilidad;
+- tendencias;
+- comportamiento histórico.
+
+NO construir todavía dashboards ejecutivos.
+
+NO implementar inteligencia predictiva.
+
+NO implementar IA.
+
+==================================================
+REGLA ARQUITECTÓNICA PRINCIPAL
+==================================================
+
+El módulo debe seguir exactamente el patrón arquitectónico canónico de DeltaOps.
+
+Reutilizar:
+
+- Record Store
+- CQRS
+- RLS
+- Outbox
+- Workflow existente cuando corresponda
+- Dynamic Forms
+- Offline First
+- Shared Timeline
+- platform.qr
+- Identity/Tenancy
+- capacidades/RBAC
+- OpenAPI
+- Design System
+- tokens --do-*
+- observabilidad existente
+
+NO crear:
+
+- nuevo sistema de autenticación;
+- nuevo sistema de tenancy;
+- nueva cola offline;
+- nueva timeline;
+- nuevo sistema QR;
+- nuevo Design System;
+- segundo sistema de eventos;
+- segundo sistema de outbox.
+
+==================================================
+1. MEDIDORES
+==================================================
+
+Implementar una entidad de historial de lecturas de medidores.
+
+Como mínimo:
+
+- id
+- tenantId
+- activoId
+- tipoMedidor
+- valor
+- unidad
+- fechaHora
+- identityId / usuario
+- origen
+- evidencia si el contrato existente lo permite
+- opId
+- estado
+- createdAt
+
+Tipos iniciales:
+
+HOROMETRO
+ODOMETRO
+
+No crear todavía tipos arbitrarios configurables.
+
+==================================================
+2. HISTORIAL APPEND-ONLY
+==================================================
+
+Las lecturas deben ser históricas y auditables.
+
+NO permitir UPDATE destructivo de una lectura histórica.
+
+Si una lectura debe corregirse:
+
+- conservar la lectura original;
+- registrar la corrección/anulación;
+- mantener trazabilidad;
+- conservar quién realizó la operación;
+- conservar fecha/hora;
+- mantener opId/idempotencia.
+
+La historia nunca debe desaparecer silenciosamente.
+
+==================================================
+3. VALIDACIÓN DE LECTURAS
+==================================================
+
+Implementar la política encontrada durante Discovery:
+
+Si:
+
+lectura actual < lectura anterior
+
+NO eliminar ni alterar la lectura.
+
+Debe conservarse marcada como inconsistente.
+
+La inconsistencia no debe propagarse automáticamente al último valor válido de Activos.
+
+El estado debe ser visible para operación/auditoría.
+
+No inventar reglas adicionales.
+
+==================================================
+4. REINICIO DE MEDIDOR
+==================================================
+
+Implementar un mecanismo explícito para:
+
+REINICIO_MEDIDOR
+
+Debe requerir una capacidad/permisión específica.
+
+Debe quedar auditado.
+
+Debe registrar:
+
+- motivo;
+- usuario;
+- fecha;
+- valor anterior;
+- valor nuevo;
+- activo;
+- tipo de medidor.
+
+NO asumir que una lectura menor representa automáticamente un reinicio.
+
+==================================================
+5. SINCRONIZACIÓN CON ACTIVOS
+==================================================
+
+Este punto es CRÍTICO.
+
+Actualmente Activos conserva el último:
+
+- horómetro;
+- odómetro.
+
+El nuevo módulo conservará el historial.
+
+Por tanto:
+
+HISTORIAL → module-utilizacion
+
+ÚLTIMO VALOR OPERACIONAL → Activos
+
+No duplicar fuentes de verdad.
+
+Cuando se registre una lectura válida que corresponda al último valor operacional:
+
+- actualizar el último valor en Activos mediante la UoW/outbox existente;
+- hacerlo de forma durable;
+- serializar por medidor;
+- releer la versión cuando corresponda;
+- aplicar la regla "gana la lectura más reciente";
+- mantener estado de sincronización.
+
+Si la propagación falla:
+
+- NO perder la lectura histórica;
+- NO ocultar el error;
+- registrar el fallo mediante los mecanismos existentes;
+- permitir reintento seguro.
+
+NO modificar el contrato de Activos salvo que sea estrictamente necesario.
+
+Si se determina que es necesario modificar un contrato congelado:
+
+DETENER IMPLEMENTACIÓN
+y reportar el GAP a la Dirección.
+
+==================================================
+6. TANQUEOS / COMBUSTIBLE
+==================================================
+
+Crear la entidad operacional de tanqueo.
+
+Debe estar relacionada con:
+
+- tenantId
+- activoId
+- fechaHora
+- litros
+- tipoCombustible
+- precioUnitario
+- costoTotal
+- lectura del medidor en el momento
+- operador/usuario
+- proveedor/estación cuando pueda reutilizarse Abastecimiento
+- observación
+- opId
+- evidencia si existe soporte contractual
+
+El tanqueo debe poder relacionarse con:
+
+HOROMETRO
+
+o
+
+ODOMETRO
+
+según el tipo de activo.
+
+No asumir que todos los equipos consumen combustible de la misma manera.
+
+Ejemplos:
+
+Maquinaria amarilla:
+L/h
+
+Vehículo:
+L/100 km
+
+Equipo estático:
+puede utilizar otra métrica futura.
+
+==================================================
+7. CÁLCULOS
+==================================================
+
+En esta fase NO construir un sistema avanzado de indicadores.
+
+Solamente preparar los datos y, cuando sea seguro hacerlo, funciones puras para calcular:
+
+- delta de horómetro;
+- delta de odómetro;
+- litros por hora;
+- litros por 100 km;
+- costo por hora;
+- costo por km.
+
+REGLA:
+
+Si faltan datos suficientes:
+
+NO devolver 0.
+
+Debe devolverse:
+
+SIN_DATOS
+
+o el equivalente contractual existente.
+
+Ejemplo:
+
+Sin horómetro válido:
+consumo L/h = SIN DATOS
+
+No:
+
+consumo L/h = 0
+
+==================================================
+8. UTILIZACIÓN
+==================================================
+
+No implementar todavía el cálculo definitivo de utilización.
+
+Preparar únicamente las estructuras/read models necesarias para que posteriormente podamos derivar:
+
+- horas trabajadas;
+- horas disponibles;
+- tiempo detenido;
+- tiempo en mantenimiento.
+
+IMPORTANTE:
+
+No inventar horas trabajadas.
+
+No convertir automáticamente uptime del servidor, duración de sesión o cualquier otro dato técnico en horas de operación del equipo.
+
+==================================================
+9. COSTOS
+==================================================
+
+NO implementar todavía costo operativo completo.
+
+El Discovery determinó que actualmente no existe atribución suficiente para:
+
+- mano de obra;
+- repuestos por activo/OT;
+- duración real de OT.
+
+Por tanto:
+
+NO calcular todavía:
+
+COSTO OPERATIVO TOTAL / HORA
+
+si los datos no existen.
+
+Dejar el GAP documentado.
+
+Combustible sí debe conservar:
+
+- precio unitario;
+- litros;
+- costo total.
+
+==================================================
+10. MULTITENANCY
+==================================================
+
+Todas las entidades nuevas deben pertenecer explícitamente al tenant.
+
+RLS obligatorio.
+
+No confiar exclusivamente en filtros frontend.
+
+Verificar:
+
+Tenant A no puede:
+
+- leer lecturas de Tenant B;
+- registrar tanqueos para Tenant B;
+- modificar información de Tenant B.
+
+==================================================
+11. IDENTIDAD Y AUDITORÍA
+==================================================
+
+Registrar identidad de quien ejecuta operaciones.
+
+Utilizar el sistema canónico de identidad.
+
+No crear usuarios dentro de module-utilizacion.
+
+Registrar auditoría para:
+
+- lectura;
+- corrección/anulación;
+- reinicio;
+- tanqueo;
+- sincronización relevante.
+
+==================================================
+12. OFFLINE FIRST
+==================================================
+
+Integrar lectura de medidores y tanqueos con el framework Offline First EXISTENTE.
+
+NO crear una cola paralela.
+
+Las operaciones deben ser idempotentes.
+
+Utilizar:
+
+opId
+
+y los mecanismos existentes.
+
+En caso de conflicto:
+
+- conservar la operación;
+- no sobrescribir silenciosamente;
+- aplicar las reglas de consistencia definidas.
+
+==================================================
+13. QR
+==================================================
+
+NO implementar todavía una experiencia nueva de QR.
+
+Únicamente preparar los contratos necesarios para que DGP-019.2 pueda hacer:
+
+Escanear activo
+→ abrir activo
+→ registrar horómetro
+→ registrar odómetro
+→ registrar tanqueo.
+
+Reutilizar:
+
+platform.qr
+
+No crear un resolutor QR nuevo.
+
+==================================================
+14. TIMELINE
+==================================================
+
+Preparar eventos para que posteriormente puedan aparecer en Shared Timeline:
+
+- lectura de horómetro;
+- lectura de odómetro;
+- tanqueo;
+- reinicio de medidor;
+- corrección/anulación.
+
+NO crear otra timeline.
+
+==================================================
+15. DYNAMIC FORMS
+==================================================
+
+Los formularios deberán poder ser consumidos posteriormente mediante Dynamic Forms.
+
+No crear un sistema de formularios alternativo.
+
+Si el contrato actual permite composición dinámica:
+
+utilizarlo.
+
+Si no lo permite:
+
+reportar el GAP.
+
+==================================================
+16. READ MODELS
+==================================================
+
+Crear los read models estrictamente necesarios.
+
+Como mínimo evaluar:
+
+- historial por activo;
+- última lectura por medidor;
+- tanqueos por activo;
+- resumen operacional básico del activo.
+
+Los read models deben ser:
+
+- tenant-scoped;
+- eficientes;
+- de solo lectura;
+- compatibles con CQRS;
+- preparados para Analytics futuro.
+
+No crear todavía un modelo BI.
+
+==================================================
+17. API / CONTRATOS
+==================================================
+
+Toda nueva API debe seguir el estándar actual de DeltaOps.
+
+Debe quedar documentada en OpenAPI.
+
+Aplicar:
+
+- autorización;
+- tenant scope;
+- validación;
+- idempotencia;
+- errores contractuales;
+- observabilidad.
+
+No modificar APIs existentes innecesariamente.
+
+==================================================
+18. FRONTEND
+==================================================
+
+En DGP-019.1 NO construir todavía la experiencia final completa.
+
+Solamente crear las superficies mínimas necesarias para validar el dominio:
+
+- consulta de lecturas;
+- registro de lectura;
+- consulta de tanqueos;
+- registro de tanqueo.
+
+Debe utilizar el Design System existente.
+
+Debe heredar:
+
+Claro / Oscuro / Automático.
+
+Debe funcionar en:
+
+desktop;
+tablet;
+390px móvil.
+
+==================================================
+19. PERMISOS
+==================================================
+
+Definir capacidades nuevas únicamente si son necesarias.
+
+Como mínimo evaluar:
+
+- ver utilización;
+- registrar lectura;
+- registrar tanqueo;
+- corregir/anular lectura;
+- reiniciar medidor.
+
+No asignar automáticamente capacidades nuevas a todos los roles.
+
+Mapearlas de acuerdo con el modelo RBAC existente.
+
+Si el modelo actual permite composición sin modificar contratos congelados, utilizarlo.
+
+==================================================
+20. PRUEBAS OBLIGATORIAS
+==================================================
+
+Crear pruebas para:
+
+A. crear lectura;
+B. consultar historial;
+C. aislamiento por tenant;
+D. idempotencia;
+E. lectura decreciente;
+F. corrección/anulación;
+G. reinicio autorizado;
+H. reinicio no autorizado;
+I. sincronización con Activos;
+J. fallo de sincronización;
+K. tanqueo;
+L. cálculo L/h;
+M. cálculo L/100 km;
+N. falta de datos;
+O. offline;
+P. replay;
+Q. Timeline;
+R. permisos;
+S. refresh;
+T. logout/re-login.
+
+Pruebas e2e con al menos:
+
+TENANT_ADMIN
+TECNICO
+CONSULTA
+
+Verificar que CONSULTA no pueda ejecutar operaciones de escritura.
+
+==================================================
+21. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Al finalizar:
+
+Ejecutar revisión independiente.
+
+Debe verificar:
+
+- Dependency Rule;
+- CQRS;
+- RLS;
+- multitenancy;
+- idempotencia;
+- offline;
+- seguridad;
+- contratos;
+- no duplicación de dominios;
+- sincronización con Activos;
+- ausencia de secretos;
+- ausencia de bypass frontend.
+
+==================================================
+22. CRITERIO DE CIERRE
+==================================================
+
+DGP-019.1 solamente queda cerrado si:
+
+- module-utilizacion implementado;
+- typecheck PASS;
+- build PASS;
+- OpenAPI sin drift;
+- tests completos PASS;
+- e2e PASS;
+- RLS PASS;
+- revisión arquitectónica PASS;
+- sincronización con Activos validada;
+- offline validado;
+- ninguna modificación no autorizada al corpus congelado.
+
+==================================================
+REGLA FINAL DE DIRECCIÓN
+==================================================
+
+NO implementar DGP-019.2.
+
+NO implementar dashboard ejecutivo.
+
+NO implementar Analytics avanzado.
+
+NO implementar IA.
+
+NO modificar el contrato de Órdenes.
+
+NO inventar duración real de mantenimiento.
+
+NO inventar costos de mano de obra.
+
+NO crear un sistema paralelo de eventos, offline, timeline, QR, identidad o tenancy.
+
+Si aparece cualquier dependencia que requiera romper una de estas reglas:
+
+DETENERSE.
+
+DOCUMENTAR EL GAP.
+
+ESPERAR INSTRUCCIONES DE LA DIRECCIÓN.
+
+Al finalizar entregar:
+
+INFORME OFICIAL DE CIERRE — DGP-019.1
+
+incluyendo:
+
+- cambios realizados;
+- archivos;
+- contratos;
+- entidades;
+- read models;
+- endpoints;
+- permisos;
+- offline;
+- Timeline;
+- sincronización con Activos;
+- pruebas;
+- e2e;
+- revisión arquitectónica;
+- deuda técnica;
+- gaps pendientes;
+- commits.
+
+No iniciar DGP-019.2 hasta recibir aprobación explícita de la Dirección.

@@ -15,6 +15,7 @@ import abastecimientoModuleRouter from "./routes/deltaops/abastecimiento-module"
 import preventivoModuleRouter from "./routes/deltaops/preventivo-module";
 import correctivoModuleRouter from "./routes/deltaops/correctivo-module";
 import analyticsModuleRouter from "./routes/deltaops/analytics-module";
+import utilizacionModuleRouter from "./routes/deltaops/utilizacion-module";
 import { logger } from "./lib/logger";
 import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
@@ -92,6 +93,7 @@ app.use("/api", abastecimientoModuleRouter);
 app.use("/api", preventivoModuleRouter);
 app.use("/api", correctivoModuleRouter);
 app.use("/api", analyticsModuleRouter);
+app.use("/api", utilizacionModuleRouter);
 app.use("/api", router);
 app.use("/api/deltaops", deltaopsErrorHandler);
 

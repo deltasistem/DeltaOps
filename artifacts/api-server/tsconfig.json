@@ -26,6 +26,9 @@
     },
     {
       "path": "../../lib/module-analytics"
+    },
+    {
+      "path": "../../lib/module-utilizacion"
     }
   ]
 }

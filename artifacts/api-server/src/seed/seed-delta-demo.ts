@@ -31,6 +31,8 @@ import { abastecimientoRuntime, principalAbastecimiento } from "../routes/deltao
 import { preventivoRuntime, principalPreventivo } from "../routes/deltaops/preventivo-runtime";
 import { correctivoRuntime, principalCorrectivo, formulariosRuntime, contextForFormularios } from "../routes/deltaops/correctivo-runtime";
 import { analyticsRuntime, principalAnalytics } from "../routes/deltaops/analytics-runtime";
+import { utilizacionRuntime, principalUtilizacion } from "../routes/deltaops/utilizacion-runtime";
+import { MODULO as MODULO_UTL } from "@workspace/module-utilizacion";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -197,7 +199,7 @@ async function seedEnterpriseIdentity(): Promise<void> {
     moneda: "CLP",
     modulos: [
       "referencia", "activos", "ordenes", "inventario", "planes",
-      "abastecimiento", "preventivo", "correctivo", "analytics",
+      "abastecimiento", "preventivo", "correctivo", "analytics", "utilizacion",
     ],
     branding: { ...DEMO_BRANDING },
     configuracion: { formatoFecha: "dd-MM-yyyy", formatoNumerico: "es-CL" },
@@ -241,7 +243,7 @@ async function seedEnterpriseIdentity(): Promise<void> {
     moneda: "CLP",
     modulos: [
       "referencia", "activos", "ordenes", "inventario", "planes",
-      "abastecimiento", "preventivo", "correctivo", "analytics",
+      "abastecimiento", "preventivo", "correctivo", "analytics", "utilizacion",
     ],
     branding: { nombre: "DeltaOps", nombreApp: "DeltaOps" },
   });
@@ -274,6 +276,9 @@ async function seedCatalogos(): Promise<void> {
     ["familias", "camiones", "Camiones"], ["familias", "tractores", "Tractores"],
     ["familias", "plantas-electricas", "Plantas eléctricas"],
     ["monedas", "USD", "Dólar"], ["criticidades", "alta", "Alta"], ["criticidades", "media", "Media"],
+    // Unidades de medición de medidores (usadas por Utilización al propagar el
+    // último valor válido a Activos vía actualizar-horometro/odometro).
+    ["unidades", "h", "Horas"], ["unidades", "km", "Kilómetros"],
   ];
   for (const [c, k, e] of cats) unwrap(await up(c, k, e), `catalogo.activos ${c}/${k}`);
   await drenarCompleto(rt.platform.kernel);
@@ -1904,6 +1909,77 @@ async function seedAnalytics(): Promise<Record<string, number>> {
   return valores;
 }
 
+/* --------------------- 11) Utilización / Combustible --------------------- */
+
+async function seedUtilizacion(activoIds: Map<string, string>): Promise<void> {
+  const rt = utilizacionRuntime();
+  const ctx = ctxCon(principalUtilizacion("seed-demo", "TENANT_ADMIN"));
+  const drain = () => drenarCompleto(rt.platform.kernel);
+  const cmd = (name: string, input: Record<string, unknown>) =>
+    rt.platform.kernel.commands.execute(ctx, name, input);
+
+  // Activos con medidor: excavadora (horómetro) y camión (odómetro). Ids DEMO.
+  const maq = activoIds.get("MAQ-001") ?? idDet("activo:MAQ-001");
+  const cam = activoIds.get("CAM-001") ?? idDet("activo:CAM-001");
+
+  // Lecturas crecientes de horómetro (excavadora) — se propagan a Activos.
+  const lecturasHoro = [
+    { valor: 1200, fecha: "2026-01-05T08:00:00.000Z" },
+    { valor: 1260, fecha: "2026-01-20T08:00:00.000Z" },
+    { valor: 1335, fecha: "2026-02-01T08:00:00.000Z" },
+  ];
+  for (const [i, l] of lecturasHoro.entries()) {
+    unwrap(
+      await cmd(`${MODULO_UTL}.registrar-lectura`, {
+        opId: `seed:utl:lec:MAQ-001:${i}`,
+        activoId: maq, tipoMedidor: "horometro", valor: l.valor, unidad: "h",
+        fechaHora: l.fecha, origen: "manual",
+      }),
+      `utl.lectura MAQ-001 #${i}`,
+    );
+    await drain();
+  }
+
+  // Lecturas de odómetro (camión).
+  const lecturasOdo = [
+    { valor: 85000, fecha: "2026-01-05T08:00:00.000Z" },
+    { valor: 86200, fecha: "2026-01-20T08:00:00.000Z" },
+    { valor: 87550, fecha: "2026-02-01T08:00:00.000Z" },
+  ];
+  for (const [i, l] of lecturasOdo.entries()) {
+    unwrap(
+      await cmd(`${MODULO_UTL}.registrar-lectura`, {
+        opId: `seed:utl:lec:CAM-001:${i}`,
+        activoId: cam, tipoMedidor: "odometro", valor: l.valor, unidad: "km",
+        fechaHora: l.fecha, origen: "manual",
+      }),
+      `utl.lectura CAM-001 #${i}`,
+    );
+    await drain();
+  }
+
+  // Tanqueos de combustible (diesel) para ambos activos.
+  const tanqueos = [
+    { activo: maq, seed: "MAQ-001", fecha: "2026-01-06T09:00:00.000Z", litros: 180, precio: 1.2 },
+    { activo: maq, seed: "MAQ-001", fecha: "2026-01-22T09:00:00.000Z", litros: 200, precio: 1.25 },
+    { activo: cam, seed: "CAM-001", fecha: "2026-01-06T10:00:00.000Z", litros: 300, precio: 1.2 },
+    { activo: cam, seed: "CAM-001", fecha: "2026-01-22T10:00:00.000Z", litros: 320, precio: 1.25 },
+  ];
+  for (const [i, t] of tanqueos.entries()) {
+    unwrap(
+      await cmd(`${MODULO_UTL}.registrar-tanqueo`, {
+        opId: `seed:utl:tnq:${t.seed}:${i}`,
+        activoId: t.activo, fechaHora: t.fecha, litros: t.litros,
+        tipoCombustible: "diesel", precioUnitario: t.precio, moneda: "USD",
+      }),
+      `utl.tanqueo ${t.seed} #${i}`,
+    );
+    await drain();
+  }
+
+  log(`Utilización: ${lecturasHoro.length + lecturasOdo.length} lecturas + ${tanqueos.length} tanqueos (MAQ-001, CAM-001)`);
+}
+
 export async function seedDeltaDemo(): Promise<void> {
   console.log(`\nSeed DEMO oficial DGP-011.3 — tenant "${DEMO_TENANT}" (${DEMO_EMPRESA})`);
   await wipeDeltaDemo();
@@ -1917,6 +1993,7 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedAbastecimiento();
   await seedPreventivo(activoIds);
   await seedCorrectivo(activoIds, invIds);
+  await seedUtilizacion(activoIds);
   await seedPlataforma(activoIds);
   await seedAnalytics();
   console.log("Seed DEMO completado.\n");

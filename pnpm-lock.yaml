@@ -205,6 +205,9 @@ importers:
       '@workspace/module-reference':
         specifier: workspace:*
         version: link:../../lib/module-reference
+      '@workspace/module-utilizacion':
+        specifier: workspace:*
+        version: link:../../lib/module-utilizacion
       '@workspace/platform':
         specifier: workspace:*
         version: link:../../lib/platform
@@ -1265,6 +1268,31 @@ importers:
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
 
   lib/module-reference:
+    dependencies:
+      '@workspace/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@workspace/platform':
+        specifier: workspace:*
+        version: link:../platform
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.20.0
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+
+  lib/module-utilizacion:
     dependencies:
       '@workspace/kernel':
         specifier: workspace:*
