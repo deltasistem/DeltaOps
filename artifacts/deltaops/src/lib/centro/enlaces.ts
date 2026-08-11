@@ -25,6 +25,41 @@ export function urlEjecutarOrden(ordenId: string): string {
   return `/ordenes/${encodeURIComponent(ordenId)}?tab=ejecucion`;
 }
 
+/**
+ * Identidad mínima de la sesión para el match estricto de asignación.
+ * (Subconjunto de `Sesion`; evita acoplar esta función pura al tipo completo.)
+ */
+export interface IdentidadSesion {
+  readonly identityId: string;
+  readonly email: string;
+}
+
+/**
+ * ¿La OT está asignada INEQUÍVOCAMENTE a la identidad de la sesión?
+ *
+ * Gap bloqueante G-1: el contrato de órdenes NO garantiza que `responsable`
+ * coincida con `identityId`/`email` de la sesión (puede traer nombre o rol).
+ * Para NO atribuir trabajo ajeno a un técnico, sólo se considera "propia" la OT
+ * cuando `responsable` (normalizado) es EXACTAMENTE igual al `identityId` o al
+ * `email` canónico de la sesión. Ante cualquier otro valor (nombre, rol, vacío,
+ * null) o ambigüedad → `false` (no se muestra ni se ofrece ejecutar).
+ *
+ * Es un criterio conservador y explícito, no permisivo: si el backend algún día
+ * expone un contrato de asignación por identityId, este match seguirá siendo
+ * correcto y podrá ampliarse sin riesgo de fuga de OTs de otros responsables.
+ */
+export function ordenAsignadaAIdentidad(
+  responsable: string | null | undefined,
+  sesion: IdentidadSesion,
+): boolean {
+  if (responsable == null) return false;
+  const r = responsable.trim().toLowerCase();
+  if (r === "") return false;
+  const id = sesion.identityId.trim().toLowerCase();
+  const email = sesion.email.trim().toLowerCase();
+  return (id !== "" && r === id) || (email !== "" && r === email);
+}
+
 /* ------------------------------- Activos ------------------------------- */
 
 /** Búsqueda/escaneo por QR de activos (`/activos/escanear`). */

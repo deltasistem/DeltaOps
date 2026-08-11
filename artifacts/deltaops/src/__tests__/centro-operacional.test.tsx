@@ -188,11 +188,13 @@ describe("Centro Operacional · resumen con datos reales", () => {
 
   it("TECNICO sin órdenes de hoy ve su estado vacío específico", async () => {
     renderLanding(sesion("TECNICO"), [
-      // Abierta pero sin fecha de hoy → no entra en "mi trabajo de hoy".
+      // Abierta con responsable de otra persona (nombre) → no hay match estricto
+      // con la identidad de la sesión → no entra en "mi trabajo de hoy" ni foco.
       orden({ id: "9", estado: "ABIERTA", responsable: "Técnico A" }),
     ]);
     await screen.findByText(/Bienvenido, Usuaria Demo/i);
-    expect(await screen.findByText(/No tienes órdenes asignadas para hoy/i)).toBeInTheDocument();
+    // El mensaje aparece tanto en el foco como en la bandeja "Mi trabajo": ≥1.
+    expect((await screen.findAllByText(/No tienes órdenes asignadas para hoy/i)).length).toBeGreaterThan(0);
   });
 });
 

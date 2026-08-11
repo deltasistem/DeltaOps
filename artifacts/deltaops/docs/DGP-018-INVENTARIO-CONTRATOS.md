@@ -26,7 +26,7 @@
 | Activos con órdenes abiertas | `OrdenRow.activoPrincipalId` (+ `datos.activoPrincipal.etiqueta`) | Agrupación en cliente de las órdenes abiertas por `activoPrincipalId` | ✅ Disponible |
 | Bloqueos / dependencias | `GET /ordenes/:id/dependencias` (`useDependencias`) + `analizarDependencias` (`ecosistema/dependencias`) | Por orden concreta (deep link); en resumen se listan las que declaran dependencias | ✅ Disponible (por OT) |
 | Órdenes sin asignación | `OrdenRow.responsable == null` | Filtro en cliente sobre abiertas | ✅ Disponible |
-| Mis órdenes (TECNICO) | `GET /ordenes?responsable=` y/o `OrdenRow.responsable != null` | Igual que la bandeja "mis" de `ordenes-operaciones` (filtra `responsable != null`) | ⚠️ Parcial — ver gap G-1 |
+| Mis órdenes (TECNICO) | `OrdenRow.responsable` (no garantizado = identityId/email) | **Match ESTRICTO** `responsable == identityId \|\| email`; sin match → foco conservador + bandeja oficial `/ordenes` | 🔒 Bloqueado por contrato — ver gap G-1 |
 | Actividad reciente / timeline (orden) | `GET /ordenes/:id/historial`, `/bitacora` (`useHistorial`, `useBitacora`) | Por OT (deep link) | ✅ Disponible (por OT) |
 | Actividad reciente (activo) | `GET /activos/:id/timeline` (`useTimelineActivo`) | Por activo (deep link) | ✅ Disponible (por activo) |
 | Agenda / calendario | `GET /ordenes/agenda`, `/ordenes/calendario` (`useAgenda`, `useCalendario`) | Trabajo de hoy / próximas por rango de fechas | ✅ Disponible |
@@ -106,15 +106,33 @@ Deep links (reutilizados, `ecosistema/deep-links`): `urlOrden`, `urlOrdenTab`,
 
 ## GAPS (documentados, NO inventados)
 
-- **G-1 · "Mis órdenes" por identidad del técnico.** El listado permite
-  `?responsable=`, pero el valor de `OrdenRow.responsable` no está garantizado que
-  coincida con `sesion.identityId`/`email` (puede ser nombre/rol). Para evitar
-  mostrar OTs ajenas se usa el mismo criterio conservador que la bandeja "mis" de
-  `ordenes-operaciones` (`responsable != null`) y se **deep-linka** a la bandeja
-  "Mis órdenes" oficial (`/ordenes`) que ya resuelve la identidad en su contexto.
-  No se inventa un filtro por identityId inexistente.
-  → **Impacto:** el resumen del TECNICO prioriza el acceso a la bandeja oficial;
-  no duplica su lógica. Sin cambios de contrato requeridos.
+- **G-1 · "Mis órdenes" por identidad del técnico — GAP BLOQUEANTE de la sección.**
+  El contrato de órdenes **NO garantiza** que `OrdenRow.responsable` coincida con
+  `sesion.identityId`/`email` (puede traer nombre, rol o cualquier etiqueta). Por
+  tanto, **no existe un contrato que relacione inequívocamente la asignación con
+  la identidad de la sesión**. Un criterio permisivo (`responsable != null`)
+  atribuiría al técnico OTs de OTROS responsables del mismo tenant (fuga de
+  trabajo ajeno) — **inaceptable**.
+  → **Tratamiento (revisor ronda 1):** la atribución "asignada a mí" del TECNICO
+  se considera **bloqueada** hasta que exista dicho contrato. La UI aplica un
+  **match ESTRICTO** (`ordenAsignadaAIdentidad` en `src/lib/centro/enlaces.ts`):
+  una OT es "propia" **sólo** si `responsable` (normalizado, trim + lowercase) es
+  EXACTAMENTE igual a `sesion.identityId` **o** a `sesion.email` canónico. Ante
+  cualquier otro valor (nombre, rol, vacío, `null`, ambigüedad) → **no se muestra
+  ni se ofrece "Ejecutar"**. Sin match estricto, el foco del TECNICO es
+  conservador: estado vacío "No tienes órdenes asignadas para hoy" + CTA a la
+  bandeja oficial "Mis órdenes" (`/ordenes`) + Escanear QR + estado offline/sync.
+  → **Alcance del criterio estricto:** aplica a `FocoTecnico` (orden prioritaria y
+  CTA "Ejecutar") y a la bandeja "Mi trabajo de hoy" (`trabajoPorRol` caso
+  TECNICO). SUPERVISOR/PLANIFICADOR/otros roles NO usan atribución "asignada a
+  mí": ven la operación del tenant (vencidas, en riesgo, sin asignar, pendientes),
+  lo cual es correcto y no se toca.
+  → **Pendiente de contrato:** cuando el backend exponga asignación por
+  `identityId` (o un `GET /ordenes?asignadoA=<identityId>` fiable), este match
+  podrá ampliarse sin riesgo; la función pura ya está lista para ello.
+  → **Prueba:** `centro-operacional-faseb` · describe "G-1 · el TECNICO nunca ve
+  ni ejecuta OTs de otro responsable" (dos responsables distintos: sólo aparece la
+  propia por match estricto; la ajena jamás; sin match → foco vacío conservador).
 
 - **G-2 · "Salud de activo" agregada.** No existe un read model que exponga
   directamente "activos que requieren atención" con un score/estado agregado. Se
@@ -214,9 +232,12 @@ Verificación **estática** contra el seed real `api-server/src/seed/seed-delta-
   secciones "Trabajo de hoy" (`ordenesDeHoy`) y "SLA en riesgo/vencido" muestran
   su **estado vacío correcto**, no datos falsos. Esto valida el comportamiento
   "sección sin fuente real → estado vacío" del mandato.
-- `responsable` sólo se puebla tras el paso `asignar`; el foco del TECNICO y la
-  bandeja "mis" usan el criterio conservador (`responsable != null`) ya
-  documentado en G-1.
+- `responsable` sólo se puebla tras el paso `asignar` y su valor NO es
+  garantizadamente el `identityId`/`email` de la sesión. Por G-1, el foco del
+  TECNICO aplica **match estricto**: en el tenant demo probablemente NINGUNA de
+  las 7 OTs coincidirá con la identidad del técnico demo → foco conservador +
+  estado vacío + bandeja oficial "Mis órdenes". Esto es el comportamiento correcto
+  (no atribuir trabajo ajeno), no un fallo.
 
 > **Pendiente para el agente principal / e2e:** confirmación en vivo con login
 > demo (`admin@delta.demo` u otro rol) de que el resumen y "trabajo de hoy"
@@ -266,3 +287,22 @@ Verificación **estática** contra el seed real `api-server/src/seed/seed-delta-
 - **G-8 · Dos sistemas de toast coexistentes.** El proyecto mantiene el `useToast`
   del Design System (páginas de dominio) y el `Toaster`/`use-toast` de shadcn
   (root). No se unificaron (fuera de alcance); ambos quedan provistos a nivel raíz.
+
+## Revisión arquitectónica ronda 1 — corrección MAYOR (aislamiento TECNICO)
+
+- **Hallazgo (MAYOR):** la experiencia TECNICO no estaba limitada a las órdenes
+  del técnico autenticado. `useOrdenesGlobal({limit:200})` + criterio permisivo
+  `responsable != null` en `trabajoPorRol`/foco permitían presentar como "Mi
+  trabajo" y ofrecer "Ejecutar" sobre OTs de otro responsable del tenant.
+- **Corrección:** G-1 elevado a **gap bloqueante** de la sección. Se introduce
+  `ordenAsignadaAIdentidad(responsable, sesion)` (match estricto identityId/email)
+  en `src/lib/centro/enlaces.ts`; `FocoTecnico` y `trabajoPorRol` (caso TECNICO)
+  filtran por ese match. `FocoTecnico` ya no selecciona la prioritaria desde el
+  listado global (vencidas/enRiesgo del tenant), sino sólo entre las OTs propias.
+  Sin match estricto → estado vacío conservador + CTA a bandeja oficial + QR +
+  offline. SUPERVISOR/PLANIFICADOR/otros: sin cambios (operación del tenant, no
+  atribución personal — verificado, no usan "asignada a mí").
+- **Archivos:** `src/lib/centro/enlaces.ts` (+ `ordenAsignadaAIdentidad`,
+  `IdentidadSesion`), `src/pages/inicio-empresa.tsx` (FocoTecnico/trabajoPorRol/
+  ContenidoInicio), tests en `centro-operacional-faseb.test.tsx` (+3) y ajuste en
+  `centro-operacional.test.tsx`.

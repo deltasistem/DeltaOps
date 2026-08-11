@@ -68,6 +68,7 @@ import {
   urlBandejaOrdenes,
   RUTA_ESCANEAR_ACTIVO,
   INTEGRACIONES,
+  ordenAsignadaAIdentidad,
   type AccesoModulo,
 } from "@/lib/centro/enlaces";
 import type { OrdenRow } from "@/lib/ordenes/tipos";
@@ -496,24 +497,31 @@ function AdministracionSeccion() {
  * escanear QR y acceso a "mis órdenes". La ejecución de checklist/formulario/
  * evidencia/medidor/recursos/firma/cierre se abre por deep link a la pestaña
  * de ejecución de la OT (no se duplica la ficha).
+ *
+ * Gap bloqueante G-1: SÓLO se muestra/ofrece "Ejecutar" sobre una OT si está
+ * asignada INEQUÍVOCAMENTE a la identidad de la sesión (match estricto con
+ * `identityId`/`email`). Sin match, el foco es conservador: bandeja oficial
+ * "Mis órdenes", escanear QR y estado vacío. Nunca se atribuye trabajo ajeno.
  */
 function FocoTecnico({
   sesion,
-  resumen,
-  ordenesHoy,
+  ordenesPropias,
   ahora,
 }: {
   sesion: Sesion;
-  resumen: ResumenOperacional;
-  ordenesHoy: OrdenRow[];
+  /** OTs asignadas ESTRICTAMENTE a la identidad de la sesión (ya filtradas). */
+  ordenesPropias: OrdenRow[];
   ahora: number;
 }) {
   const tieneOrdenes = moduloHabilitado(sesion, "ordenes");
   const tieneActivos = moduloHabilitado(sesion, "activos");
-  // Orden prioritaria: primero vencida/riesgo asignada; si no, la primera de hoy.
+  // Orden prioritaria: dentro de LAS PROPIAS, la primera vencida/en riesgo; si
+  // ninguna está en riesgo, la primera propia. Nunca una OT de otro responsable.
   const prioritaria =
-    [...resumen.vencidas, ...resumen.enRiesgo].map((x) => x.o).find((o) => o.responsable != null) ??
-    ordenesHoy[0] ??
+    ordenesPropias.find((o) => estadoSla(o, ahora).riesgo === "vencido") ??
+    ordenesPropias.find((o) => estadoSla(o, ahora).riesgo === "critico") ??
+    ordenesPropias.find((o) => estadoSla(o, ahora).riesgo === "riesgo") ??
+    ordenesPropias[0] ??
     null;
   return (
     <Section titulo="Tu foco ahora">
@@ -527,8 +535,8 @@ function FocoTecnico({
           </div>
         ) : tieneOrdenes ? (
           <EmptyState
-            titulo="Sin orden prioritaria"
-            descripcion="No tienes una orden urgente asignada ahora mismo."
+            titulo="No tienes órdenes asignadas para hoy"
+            descripcion="Abre «Mis órdenes» para ver tu bandeja oficial o escanea un activo para empezar."
           />
         ) : null}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-3)" }}>
@@ -606,18 +614,30 @@ function IntegracionesSeccion({ sesion }: { sesion: Sesion }) {
 
 /* --------------------------- Composición ------------------------------- */
 
-/** Título y bandeja "de hoy" según el rol (composición de presentación). */
-function trabajoPorRol(rol: Rol, resumen: ResumenOperacional, ordenes: OrdenRow[], ahora: number): {
+/**
+ * Título y bandeja "de hoy" según el rol (composición de presentación).
+ *
+ * Para TECNICO, "Mi trabajo" se limita a las OTs asignadas ESTRICTAMENTE a la
+ * identidad de la sesión (G-1): nunca OTs de otros responsables del tenant.
+ * SUPERVISOR/PLANIFICADOR/otros ven la operación del tenant (correcto): sus
+ * secciones son de supervisión/planificación, no atribución "asignada a mí".
+ */
+function trabajoPorRol(
+  sesion: Sesion,
+  resumen: ResumenOperacional,
+  ordenes: OrdenRow[],
+  ahora: number,
+): {
   titulo: string;
   ordenes: OrdenRow[];
   vacioTitulo: string;
   vacioDescripcion: string;
 } {
-  switch (rol) {
+  switch (sesion.rol) {
     case "TECNICO":
       return {
         titulo: "Mi trabajo de hoy",
-        ordenes: ordenesDeHoy(ordenes, ahora).filter((o) => o.responsable != null),
+        ordenes: ordenesDeHoy(ordenes, ahora).filter((o) => ordenAsignadaAIdentidad(o.responsable, sesion)),
         vacioTitulo: "No tienes órdenes asignadas para hoy",
         vacioDescripcion: "Cuando se te asignen órdenes con trabajo para hoy, aparecerán aquí.",
       };
@@ -658,12 +678,17 @@ function ContenidoInicio() {
     [tieneOrdenes, ordenes, ahora],
   );
 
-  const trabajo = resumen ? trabajoPorRol(sesion.rol, resumen, ordenes, ahora) : null;
+  const trabajo = resumen ? trabajoPorRol(sesion, resumen, ordenes, ahora) : null;
 
   const esTecnico = sesion.rol === "TECNICO";
-  const ordenesHoy = useMemo(
-    () => (resumen ? ordenesDeHoy(ordenes, ahora).filter((o) => o.responsable != null) : []),
-    [resumen, ordenes, ahora],
+  // OTs asignadas ESTRICTAMENTE a la identidad de la sesión (G-1): base del foco
+  // del técnico. Sin match estricto → lista vacía → estado vacío conservador.
+  const ordenesPropias = useMemo(
+    () =>
+      resumen && esTecnico
+        ? ordenes.filter((o) => ordenAsignadaAIdentidad(o.responsable, sesion))
+        : [],
+    [resumen, esTecnico, ordenes, sesion],
   );
 
   return (
@@ -678,7 +703,7 @@ function ContenidoInicio() {
       {esTecnico && <EstadoOffline tenant={sesion.tenant.id} />}
 
       {esTecnico && !cargando && !error && resumen && (
-        <FocoTecnico sesion={sesion} resumen={resumen} ordenesHoy={ordenesHoy} ahora={ahora} />
+        <FocoTecnico sesion={sesion} ordenesPropias={ordenesPropias} ahora={ahora} />
       )}
 
       {!esTecnico && <PuntoDePartida sesion={sesion} />}

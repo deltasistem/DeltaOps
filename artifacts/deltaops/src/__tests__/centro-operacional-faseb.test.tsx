@@ -228,25 +228,75 @@ describe("§8-12 · accesos de integración por módulo (entitlements)", () => {
 /* --------------------- §13 · experiencia móvil ------------------------- */
 
 describe("§13 · foco móvil del TECNICO", () => {
-  it("prioriza foco de ejecución con deep link a la pestaña de ejecución y escanear QR", async () => {
+  it("prioriza foco de ejecución SÓLO sobre una OT asignada estrictamente a la identidad", async () => {
+    // La sesión TECNICO tiene identityId="u1"; la OT propia lleva responsable="u1".
     renderInicio(sesion("TECNICO"), [
-      orden({ id: "9", estado: "EN_EJECUCION", responsable: "Técnico A", datos: { sla: { vencimiento: "2024-05-30T00:00:00.000Z" } } }),
+      orden({ id: "9", estado: "EN_EJECUCION", responsable: "u1", datos: { sla: { vencimiento: "2024-05-30T00:00:00.000Z" } } }),
     ]);
     await screen.findByText(/Bienvenido, Usuaria Demo/i);
     expect(await screen.findByText("Tu foco ahora")).toBeInTheDocument();
-    // Botón Ejecutar apunta a la pestaña de ejecución de la OT.
+    // Botón Ejecutar apunta a la pestaña de ejecución de la OT propia.
     const ejecutar = await screen.findByRole("link", { name: /Ejecutar/i });
     expect(ejecutar.getAttribute("href")).toContain("/ordenes/9?tab=ejecucion");
     expect(screen.getAllByRole("link", { name: /Escanear QR/i }).length).toBeGreaterThan(0);
   });
 
+  it("acepta el match estricto por email canónico de la sesión", async () => {
+    renderInicio(sesion("TECNICO"), [
+      orden({ id: "e", estado: "EN_EJECUCION", responsable: "user@delta.demo" }),
+    ]);
+    await screen.findByText("Tu foco ahora");
+    const ejecutar = await screen.findByRole("link", { name: /Ejecutar/i });
+    expect(ejecutar.getAttribute("href")).toContain("/ordenes/e?tab=ejecucion");
+  });
+
   it("objetivos táctiles ≥48px en los botones del foco del técnico", async () => {
     renderInicio(sesion("TECNICO"), [
-      orden({ id: "9", estado: "EN_EJECUCION", responsable: "Técnico A", datos: { sla: { vencimiento: "2024-05-30T00:00:00.000Z" } } }),
+      orden({ id: "9", estado: "EN_EJECUCION", responsable: "u1", datos: { sla: { vencimiento: "2024-05-30T00:00:00.000Z" } } }),
     ]);
     await screen.findByText("Tu foco ahora");
     const ejecutar = (await screen.findByRole("link", { name: /Ejecutar/i })).querySelector("button")!;
     expect(ejecutar.style.minHeight).toBe("48px");
+  });
+});
+
+/* --- G-1 · aislamiento estricto: nunca OTs de otro responsable (§ obligatorio) --- */
+
+describe("G-1 · el TECNICO nunca ve ni ejecuta OTs de otro responsable", () => {
+  it("con dos responsables distintos, sólo aparece la propia (match estricto) y jamás la ajena", async () => {
+    renderInicio(sesion("TECNICO"), [
+      // Ajena: responsable es un NOMBRE (ambiguo) y otra por identityId distinto.
+      orden({ id: "ajena-nombre", codigo: "OT-AJ1", estado: "EN_EJECUCION", responsable: "Técnico A", datos: { sla: { vencimiento: "2024-05-29T00:00:00.000Z" } } }),
+      orden({ id: "ajena-id", codigo: "OT-AJ2", estado: "EN_EJECUCION", responsable: "u2", datos: { sla: { vencimiento: "2024-05-28T00:00:00.000Z" } } }),
+      // Propia: responsable == identityId de la sesión ("u1").
+      orden({ id: "propia", codigo: "OT-MIA", estado: "EN_EJECUCION", responsable: "u1", datos: { sla: { vencimiento: "2024-05-30T00:00:00.000Z" } } }),
+    ]);
+    await screen.findByText("Tu foco ahora");
+    // La única OT con CTA "Ejecutar" es la propia.
+    const ejecutar = await screen.findByRole("link", { name: /Ejecutar/i });
+    expect(ejecutar.getAttribute("href")).toContain("/ordenes/propia?tab=ejecucion");
+    // Ninguna OT ajena se presenta ni ofrece ejecutar en el foco.
+    expect(screen.queryByText("OT-AJ1")).toBeNull();
+    expect(screen.queryByText("OT-AJ2")).toBeNull();
+    const ejecutables = screen.getAllByRole("link", { name: /Ejecutar/i });
+    for (const l of ejecutables) {
+      expect(l.getAttribute("href")).not.toContain("/ordenes/ajena");
+    }
+  });
+
+  it("si NINGUNA OT tiene match estricto, el foco es conservador y vacío (no atribuye ajenas)", async () => {
+    renderInicio(sesion("TECNICO"), [
+      // Todas con nombre/rol/identityId distinto: ninguna es de "u1"/"user@delta.demo".
+      orden({ id: "a", estado: "EN_EJECUCION", responsable: "Técnico A", datos: { sla: { vencimiento: "2024-05-29T00:00:00.000Z" } } }),
+      orden({ id: "b", estado: "EN_EJECUCION", responsable: "supervisor", datos: { sla: { vencimiento: "2024-05-28T00:00:00.000Z" } } }),
+    ]);
+    await screen.findByText("Tu foco ahora");
+    // Estado vacío conservador (foco + bandeja "Mi trabajo"); sin ningún CTA "Ejecutar".
+    expect((await screen.findAllByText(/No tienes órdenes asignadas para hoy/i)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: /Ejecutar/i })).toBeNull();
+    // Pero sí ofrece la bandeja oficial y escanear QR.
+    expect(screen.getAllByRole("link", { name: /Mis órdenes/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Escanear QR/i }).length).toBeGreaterThan(0);
   });
 });
 
