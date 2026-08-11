@@ -8,6 +8,8 @@ import {
   brand,
   gris,
   semantico,
+  useTheme,
+  type Tema,
   Button,
   IconButton,
   Spinner,
@@ -106,23 +108,33 @@ function DemoToast() {
   );
 }
 
+// Etiqueta legible de cada tema para el conmutador de la galería.
+const ETIQUETA_TEMA: Record<Tema, string> = { light: "Claro", dark: "Oscuro", auto: "Automático" };
+// Ciclo del conmutador (comparte la preferencia global, sin atributo local).
+const CICLO_TEMA: Tema[] = ["light", "dark", "auto"];
+
 function Galeria() {
-  const [tema, setTema] = useState<"light" | "dark">("light");
+  // Autoridad única: el conmutador de la galería usa la preferencia GLOBAL del
+  // DS (useTheme → localStorage "do-tema"), NO un estado/atributo local. Así
+  // /design-system hereda y respeta el tema del resto de la plataforma.
+  const { tema, setTema } = useTheme();
   const [modal, setModal] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [pagina, setPagina] = useState(2);
   const [radio, setRadio] = useState("a");
   const [sw, setSw] = useState(true);
 
+  const siguienteTema = CICLO_TEMA[(CICLO_TEMA.indexOf(tema) + 1) % CICLO_TEMA.length];
+
   return (
-    <div className="do-root" data-do-theme={tema} style={{ minHeight: "100vh", background: "var(--do-bg)", padding: "var(--do-sp-6)" }}>
+    <div className="do-root" style={{ minHeight: "100vh", background: "var(--do-bg)", padding: "var(--do-sp-6)" }}>
       <div style={{ maxWidth: "var(--do-max-ancho)", margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--do-sp-5)" }}>
         <PageHeader
           titulo="Design System DeltaOps"
           descripcion="Galería oficial de tokens y componentes (DGP-005). Marca DELTA según Brandbook."
           acciones={
-            <Button variant="secundario" onClick={() => setTema(tema === "light" ? "dark" : "light")}>
-              Tema: {tema === "light" ? "Claro" : "Oscuro"}
+            <Button variant="secundario" onClick={() => setTema(siguienteTema)}>
+              Tema: {ETIQUETA_TEMA[tema]}
             </Button>
           }
         />

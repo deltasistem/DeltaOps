@@ -10,8 +10,8 @@
  *  - la consola SUPER_ADMIN monta el selector de apariencia (Req 6);
  *  - el ThemeProvider raíz vive en App.tsx (autoridad única, Req 1-2).
  */
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 
@@ -21,6 +21,21 @@ const raiz = resolve(aqui, ".."); // .../src
 function leer(rel: string): string {
   return readFileSync(resolve(raiz, rel), "utf8");
 }
+
+/** Recolecta *.tsx bajo un directorio (recursivo), excluyendo tests. */
+function tsxRecursivo(relDir: string): string[] {
+  const salida: string[] = [];
+  for (const ent of readdirSync(resolve(raiz, relDir), { withFileTypes: true })) {
+    if (ent.name === "__tests__") continue;
+    const rel = join(relDir, ent.name);
+    if (ent.isDirectory()) salida.push(...tsxRecursivo(rel));
+    else if (ent.name.endsWith(".tsx")) salida.push(rel);
+  }
+  return salida;
+}
+
+/** Uso del ATRIBUTO JSX `data-do-theme` (no comentarios ni strings). */
+const ATRIBUTO_TEMA = /\bdata-do-theme\s*=/;
 
 const SHELLS = [
   "lib/ordenes/Shell.tsx",
@@ -46,6 +61,26 @@ describe("superficies · sin tema forzado (causa raíz corregida)", () => {
 
   it("el AppShell empresarial no fija data-do-theme=\"light\"", () => {
     expect(leer("lib/identidad/AppShell.tsx")).not.toContain('data-do-theme="light"');
+  });
+
+  // MAYOR corregido: ninguna página (incluida /design-system) debe FIJAR el
+  // atributo `data-do-theme`; la autoridad única es el ThemeProvider raíz. La
+  // galería del DS conmuta mediante `useTheme` (misma preferencia global), sin
+  // atributo local descendiente.
+  it("ninguna página de pages/ fija el atributo data-do-theme", () => {
+    const infractores = tsxRecursivo("pages").filter((rel) => ATRIBUTO_TEMA.test(leer(rel)));
+    expect(
+      infractores,
+      `Páginas que fijan data-do-theme (deben heredar del ThemeProvider raíz):\n${infractores.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("ningún componente de lib/ fija el atributo data-do-theme", () => {
+    const infractores = tsxRecursivo("lib").filter((rel) => ATRIBUTO_TEMA.test(leer(rel)));
+    expect(
+      infractores,
+      `Componentes que fijan data-do-theme (deben heredar del ThemeProvider raíz):\n${infractores.join("\n")}`,
+    ).toEqual([]);
   });
 });
 
