@@ -29,6 +29,7 @@ import { useSesion } from "./sesion";
 import { OpcionesApariencia } from "./SelectorApariencia";
 import { BrandingProvider, useBranding } from "./branding";
 import { esAdminEmpresa, esSuperAdmin, modulosVisibles, nombreRol } from "./rbac";
+import { utilizacionVisible } from "../utilizacion/capacidades";
 import type { Sesion } from "./tipos";
 
 /* --------------------------------- Marca -------------------------------- */
@@ -224,6 +225,21 @@ function Navegacion({ sesion }: { sesion: Sesion }) {
           </Button>
         </Link>
       ))}
+      {/* DGP-019.1 · Módulo emergente Utilización: se muestra sólo con el
+          entitlement "utilizacion" del tenant Y capacidad de lectura del rol.
+          El tipo `Modulo` del contrato de identidad aún no lo enumera, por eso
+          se gobierna con un guard de presentación dedicado. */}
+      {utilizacionVisible(sesion) && (
+        <Link href="/utilizacion/lecturas">
+          <Button
+            variant={esActiva(location, "/utilizacion") ? "primario" : "fantasma"}
+            size="sm"
+            aria-current={esActiva(location, "/utilizacion") ? "page" : undefined}
+          >
+            Utilización
+          </Button>
+        </Link>
+      )}
     </>
   );
 }

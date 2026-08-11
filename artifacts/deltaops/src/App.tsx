@@ -67,6 +67,11 @@ import CorrectivoDiagnostico from '@/pages/correctivo-diagnostico';
 import CorrectivoIntervencion from '@/pages/correctivo-intervencion';
 import CorrectivoEscanear from '@/pages/correctivo-escanear';
 import CorrectivoSincronizacion from '@/pages/correctivo-sincronizacion';
+import UtilizacionLecturas from '@/pages/utilizacion-lecturas';
+import UtilizacionLecturaNueva from '@/pages/utilizacion-lectura-nueva';
+import UtilizacionTanqueos from '@/pages/utilizacion-tanqueos';
+import UtilizacionTanqueoNuevo from '@/pages/utilizacion-tanqueo-nuevo';
+import UtilizacionResumen from '@/pages/utilizacion-resumen';
 import AnalyticsHome from '@/pages/analytics-home';
 import AnalyticsIndicadores from '@/pages/analytics-indicadores';
 import AnalyticsIndicador from '@/pages/analytics-indicador';
@@ -185,6 +190,11 @@ function Router() {
       <Route path="/correctivo/solicitudes/:id/diagnostico" component={CorrectivoDiagnostico} />
       <Route path="/correctivo/solicitudes/:id" component={CorrectivoSolicitudFicha} />
       <Route path="/correctivo/intervenciones/:id" component={CorrectivoIntervencion} />
+      <Route path="/utilizacion/lecturas/nueva" component={UtilizacionLecturaNueva} />
+      <Route path="/utilizacion/lecturas" component={UtilizacionLecturas} />
+      <Route path="/utilizacion/tanqueos/nuevo" component={UtilizacionTanqueoNuevo} />
+      <Route path="/utilizacion/tanqueos" component={UtilizacionTanqueos} />
+      <Route path="/utilizacion/resumen" component={UtilizacionResumen} />
       <Route path="/analytics" component={AnalyticsHome} />
       <Route path="/analytics/indicadores" component={AnalyticsIndicadores} />
       <Route path="/analytics/indicadores/:clave" component={AnalyticsIndicador} />
