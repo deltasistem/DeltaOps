@@ -34,12 +34,13 @@ import {
   obtenerIdentidadPorEmail,
 } from "../service";
 import { seedRolesDeTenant } from "../seed-roles";
+import { MODULOS_TODOS } from "../entitlements";
 import { credencialDemo, CLAVES_ENV } from "../../../seed/seed-credentials";
 
-const MODULOS = [
-  "referencia", "activos", "ordenes", "inventario", "planes",
-  "abastecimiento", "preventivo", "correctivo", "analytics",
-];
+// SIEMPRE el catálogo canónico completo: este suite corre contra la BD dev y
+// `actualizarModulos("delta-demo", ...)` es destructivo — una lista hardcodeada
+// desactualizada despoja entitlements de módulos nuevos (pasó con `utilizacion`).
+const MODULOS = [...MODULOS_TODOS];
 
 // Credenciales SIEMPRE desde la fuente centralizada (nunca literales).
 const PASS_DEMO = credencialDemo(CLAVES_ENV.DEMO_ADMIN);
