@@ -1,0 +1,266 @@
+DIRECTIVA DE DIRECCIÓN — ACCESO OFICIAL A DELTAOPS / CREDENCIALES DE ADMINISTRADOR
+
+Antes de iniciar cualquier nuevo DGP, necesito dejar completamente operativo y documentado el acceso a la plataforma DeltaOps.
+
+OBJETIVO:
+
+Determinar exactamente:
+
+1. Cuál es la URL actual y canónica de la aplicación DeltaOps.
+2. Cuál es la ruta oficial de login.
+3. Qué usuario administrador existe actualmente.
+4. Qué tenant tiene asociado.
+5. Qué rol/permisos tiene.
+6. Cómo se estableció originalmente su contraseña.
+7. Si la contraseña inicial puede recuperarse de forma segura.
+8. Si NO puede recuperarse, crear un mecanismo seguro para establecer/restablecer una contraseña temporal para el administrador DEMO.
+
+IMPORTANTE:
+
+NO inventes credenciales.
+
+NO expongas secretos de infraestructura.
+
+NO muestres:
+
+- GRAPH_CLIENT_SECRET
+- GRAPH_TENANT_ID
+- tokens OAuth
+- session secrets
+- claves privadas
+- secretos de Replit
+- credenciales de base de datos
+- API keys
+- cualquier secreto utilizado por la plataforma.
+
+==================================================
+1. INSPECCIÓN DE IDENTIDAD
+==================================================
+
+Inspecciona el sistema actual de autenticación de DeltaOps.
+
+Determina:
+
+- tabla/modelo de usuarios
+- tenant asociado
+- roles
+- permisos
+- mecanismo de hash de contraseña
+- seed inicial
+- usuario administrador DEMO
+- middleware de autenticación
+- endpoint de login
+- sesión/cookie/token utilizado
+- ruta frontend de login
+- ruta principal después de autenticarse
+
+NO modifiques todavía la arquitectura.
+
+==================================================
+2. ADMINISTRADOR DEMO
+==================================================
+
+Verifica si existe actualmente el administrador funcional del tenant DEMO creado durante DGP-011.3.
+
+Si existe:
+
+reporta únicamente:
+
+Usuario:
+<correo>
+
+Tenant:
+<tenant>
+
+Rol:
+<rol>
+
+Estado:
+<activo/inactivo>
+
+Permisos:
+<resumen>
+
+NO muestres el hash de contraseña.
+
+==================================================
+3. CONTRASEÑA
+==================================================
+
+Determina si existe una contraseña inicial documentada en el seed oficial.
+
+Si la contraseña DEMO está explícitamente definida como una credencial de desarrollo/demostración y es seguro mostrarla al Director del Programa, indícame:
+
+USUARIO:
+...
+
+CONTRASEÑA DEMO:
+...
+
+IMPORTANTE:
+NO muestres hashes.
+
+Si la contraseña NO puede recuperarse de forma segura, NO intentes invertir el hash.
+
+En ese caso crea/ejecuta un mecanismo controlado de RESET de contraseña exclusivamente para el usuario administrador DEMO.
+
+La nueva contraseña debe:
+
+- ser temporal
+- obligar a cambio posterior si el sistema ya soporta esa capacidad
+- no quedar escrita en código
+- no quedar en logs
+- no quedar en commits
+- no quedar en documentación pública
+- no afectar otros usuarios
+- no afectar otros tenants
+
+Si el sistema todavía no soporta cambio obligatorio de contraseña, simplemente establece una contraseña temporal DEMO y documenta que posteriormente deberá cambiarse.
+
+==================================================
+4. URL OFICIAL
+==================================================
+
+Determina cuál es la URL actual que debo utilizar para acceder a DeltaOps.
+
+No me entregues una URL de una vista antigua, preview anterior o aplicación distinta.
+
+Identifica:
+
+URL BASE:
+...
+
+LOGIN:
+...
+
+Después del login:
+...
+
+Si la plataforma está desplegada con BASE_PATH=/deltaops, verifica que la URL realmente corresponda a la aplicación actual.
+
+Si existen varias URLs:
+
+- indica cuál es la oficial
+- indica cuáles son previews/development
+- indica cuál debo utilizar para una demostración
+
+==================================================
+5. VALIDACIÓN REAL
+==================================================
+
+Realiza una prueba real de extremo a extremo:
+
+1. abrir login
+2. autenticarse con el administrador DEMO
+3. validar sesión
+4. validar tenant
+5. validar rol
+6. navegar al módulo principal
+7. verificar que los módulos disponibles correspondan al rol
+8. cerrar sesión
+9. volver a iniciar sesión
+
+No modifiques datos de negocio.
+
+No ejecutes acciones destructivas.
+
+==================================================
+6. SEGURIDAD MULTITENANT
+==================================================
+
+Verifica específicamente que el usuario administrador DEMO:
+
+- pertenezca únicamente al tenant DEMO
+- no pueda visualizar información de otros tenants
+- no dependa de Microsoft Entra ID
+- no dependa de Microsoft Graph
+- no utilice roles provenientes de Microsoft 365
+
+La identidad y autorización continúan siendo propiedad de DeltaOps.
+
+==================================================
+7. SI NO EXISTE ADMINISTRADOR FUNCIONAL
+==================================================
+
+Si no existe un administrador DEMO funcional:
+
+NO crees uno directamente mediante INSERT SQL.
+
+Utiliza el mecanismo oficial de creación de usuarios/administradores del sistema.
+
+Si dicho mecanismo no existe, implementa únicamente el mínimo mecanismo necesario para crear el administrador inicial de forma segura y documentada.
+
+No modificar módulos congelados sin necesidad.
+
+==================================================
+8. ENTREGA FINAL
+==================================================
+
+Al terminar, responde con un informe MUY CLARO:
+
+========================================
+
+ACCESO DELTAOPS
+
+URL OFICIAL:
+<URL>
+
+RUTA LOGIN:
+<ruta>
+
+USUARIO ADMINISTRADOR:
+<usuario>
+
+TENANT:
+<tenant>
+
+ROL:
+<rol>
+
+ESTADO:
+<estado>
+
+CONTRASEÑA:
+<si es una credencial DEMO recuperable, indicarla>
+<si no puede recuperarse, indicar que se realizó reset>
+
+========================================
+
+VALIDACIÓN:
+
+Login:
+PASS/FAIL
+
+Sesión:
+PASS/FAIL
+
+Tenant:
+PASS/FAIL
+
+Autorización:
+PASS/FAIL
+
+Acceso a DeltaOps:
+PASS/FAIL
+
+Logout:
+PASS/FAIL
+
+========================================
+
+SEGURIDAD:
+
+Aislamiento de tenant:
+PASS/FAIL
+
+Identidad independiente de Microsoft:
+PASS/FAIL
+
+Secretos protegidos:
+PASS/FAIL
+
+========================================
+
+Si hubo que crear/restablecer la contraseña, explica exactamente qué mecanismo se utilizó, sin mostrar hashes ni secretos de infraestructura.
+
+NO avances al siguiente DGP hasta dejar documentado este acceso.
