@@ -13,3 +13,9 @@ description: Lecciones de la fundación SaaS — contexto por sesión inmutable,
 - Notificaciones: NotificationPort/EmailNotificationPort centralizados con outbox idempotente y plantillas ES; proveedor Fake para tests; SMTP real solo por env con import perezoso de nodemailer (dependencia opcional).
 - Branding por tenant solo vía tokens seguros del DS (HEX validado, sin CSS arbitrario); DELTA/DEMO conserva identidad oficial.
 - e2e con estado persistente: si la identidad ya existe de corridas previas con otro hash, el beforeAll debe forzar la contraseña desde la misma fuente env que el seed.
+
+## Directiva M365 Mail (post-DGP-017)
+- Adaptador M365 (XOAUTH2 client_credentials, smtp.outlook.com:587 STARTTLS) tras EmailNotificationPort; selección NOTIFICATION_PROVIDER=fake|m365; en producción config m365 inválida ⇒ throw (jamás fallback silencioso a fake).
+- Lección de revisión: endpoints de estado/configuración GLOBAL deben ir en la superficie /admin Enterprise (SUPER_ADMIN canónico), nunca tras el guard de platform-console que acepta el rol legacy "admin" (= TENANT_ADMIN proyectado).
+- Pendiente consciente: /platform/logs y /platform/queues (consola técnica pre-DGP-017) exponen metadatos cross-tenant bajo admin legacy; endurecerlas requeriría directiva expresa.
+- Permisos Entra mínimos: SMTP.SendAsApp + Application Access Policy; sin Graph de lectura. Smoke real pendiente de M365_TENANT_ID/CLIENT_ID/CLIENT_SECRET/MAIL_FROM.
