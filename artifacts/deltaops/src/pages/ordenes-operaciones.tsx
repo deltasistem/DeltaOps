@@ -47,6 +47,12 @@ export function Contenido() {
     () => leerParam(search, "activoPrincipalId") ?? leerParam(search, "activo"),
     [search],
   );
+  // Bandeja inicial vía deep link (`?bandeja=<id>`); se valida contra el
+  // catálogo canónico. Sin param o inválido → «mis» (comportamiento previo).
+  const bandejaInicial = useMemo(() => {
+    const b = leerParam(search, "bandeja");
+    return b && BANDEJAS.some((x) => x.id === b) ? b : "mis";
+  }, [search]);
 
   // Una sola carga del read model; las bandejas derivan en cliente. Evita 10
   // peticiones simultáneas (los paneles del DS Tabs se montan todos). Cuando hay
@@ -65,8 +71,9 @@ export function Contenido() {
         <FiltroContextualActivo activoId={activoPrincipalId} onQuitar={() => navegar("/ordenes")} />
       )}
       <Tabs
+        key={bandejaInicial}
         etiquetaLista="Bandejas de órdenes"
-        porDefecto="mis"
+        porDefecto={bandejaInicial}
         items={BANDEJAS.map((b) => ({
           id: b.id,
           etiqueta: b.etiqueta,

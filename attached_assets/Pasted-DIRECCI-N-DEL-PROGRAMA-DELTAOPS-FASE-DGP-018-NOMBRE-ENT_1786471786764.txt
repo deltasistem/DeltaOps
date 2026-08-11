@@ -1,0 +1,849 @@
+DIRECCIÓN DEL PROGRAMA DELTAOPS
+
+FASE: DGP-018
+NOMBRE: ENTERPRISE OPERATIONS EXPERIENCE
+ESTADO: NUEVA FASE — NO INICIAR NINGUNA FASE POSTERIOR
+
+============================================================
+1. OBJETIVO
+============================================================
+
+Construir la experiencia operacional empresarial principal de DeltaOps.
+
+El objetivo de DGP-018 NO es crear nuevos dominios de negocio.
+
+El objetivo es convertir los contratos, módulos y capacidades ya construidos en una experiencia empresarial coherente, clara y orientada al trabajo diario de mantenimiento.
+
+DeltaOps debe comenzar a sentirse como una plataforma EAM profesional para empresas de mantenimiento, logística, maquinaria amarilla, equipos estáticos, plantas, bandas transportadoras, tolvas, empacadoras, cocedoras, vehículos y demás activos industriales.
+
+La experiencia debe permitir que un usuario empresarial entienda inmediatamente:
+
+- dónde está
+- qué tiene pendiente
+- qué está ocurriendo
+- qué debe ejecutar
+- qué activos requieren atención
+- qué órdenes están abiertas
+- qué mantenimientos están próximos
+- qué recursos necesita
+- qué situaciones requieren intervención
+
+SIN introducir dashboards ejecutivos, BI, analytics ni IA.
+
+DGP-018 es experiencia OPERACIONAL, no analítica ejecutiva.
+
+============================================================
+2. REGLA ARQUITECTÓNICA PRINCIPAL
+============================================================
+
+CONSTRUIR POR COMPOSICIÓN.
+
+No modificar innecesariamente:
+
+- Kernel
+- Shared Platform
+- Business Foundation
+- Workflow Engine
+- Dynamic Forms
+- Design System
+- Identity
+- Tenancy
+- RLS
+- NotificationPort
+- Module Activos
+- Module Órdenes
+- Module Inventario
+- Module Plans
+- otros módulos congelados
+
+No crear un segundo sistema de navegación.
+
+No crear un segundo sistema de autorización.
+
+No crear nuevos contratos de API si los contratos existentes permiten resolver la necesidad.
+
+No duplicar lógica de dominio en frontend.
+
+No duplicar datos.
+
+El frontend debe consumir los read models y contratos existentes.
+
+Si una capacidad realmente requiere un contrato inexistente, NO inventarla silenciosamente:
+documentar el gap y detenerse para revisión de Dirección.
+
+============================================================
+3. EXPERIENCIAS POR ROL
+============================================================
+
+Mantener la separación establecida en la directiva anterior.
+
+SUPER_ADMIN:
+
+Continúa utilizando la consola global/técnica.
+
+NO convertir la consola SUPER_ADMIN en la aplicación operacional.
+
+TENANT_ADMIN:
+
+Debe recibir una experiencia empresarial completa de su tenant.
+
+Landing:
+
+Centro Operacional de la Empresa.
+
+Debe tener acceso, según capacidades, a:
+
+- Centro de mantenimiento
+- Activos
+- Órdenes
+- Planes
+- Preventivo
+- Correctivo
+- Inventario
+- Abastecimiento
+- Recursos
+- Usuarios del tenant
+- Configuración del tenant
+
+SUPERVISOR:
+
+Landing operacional orientada a:
+
+- órdenes pendientes
+- órdenes en ejecución
+- prioridades
+- SLA
+- técnicos/cuadrillas
+- bloqueos
+- activos críticos
+- mantenimiento del día
+
+PLANIFICADOR:
+
+Landing orientada a:
+
+- calendario
+- programación
+- reprogramación
+- carga
+- conflictos
+- planes preventivos
+- órdenes pendientes de programación
+- dependencias
+
+TECNICO:
+
+Landing orientada a ejecución:
+
+- mis órdenes
+- órdenes prioritarias
+- órdenes de hoy
+- órdenes próximas
+- activo de la OT
+- checklist
+- formulario
+- recursos
+- evidencias
+- medidores
+- firma
+- cierre
+- estado offline/sincronización
+
+CONSULTA:
+
+Landing de consulta y lectura.
+
+Nunca mostrar controles que requieran capacidades que el usuario no posee.
+
+============================================================
+4. NUEVA LANDING EMPRESARIAL
+============================================================
+
+Crear o evolucionar la landing empresarial existente de DGP-017.
+
+Ruta:
+
+/deltaops/
+
+Para usuarios empresariales.
+
+NO utilizar:
+
+- Estado Global
+- Uptime del servidor
+- Node.js
+- session_secret
+- Readiness técnico
+- Información de infraestructura
+- métricas de servidor
+- consola de plataforma
+
+Esos elementos pertenecen exclusivamente a SUPER_ADMIN.
+
+La landing empresarial debe utilizar lenguaje de negocio.
+
+Ejemplo conceptual:
+
+------------------------------------------------------------
+
+DELTA LOGÍSTICA
+Centro de Mantenimiento
+
+Buenos días, Carlos.
+
+Resumen operacional
+[ OTs abiertas ]
+[ En ejecución ]
+[ Próximas ]
+[ Vencidas / riesgo SLA ]
+
+Trabajo de hoy
+------------------------------------------------------------
+OT-000123
+Cambio de aceite
+MONTACARGAS-MT-04
+Prioridad alta
+Asignada a Carlos
+[ ABRIR ]
+
+OT-000124
+Inspección banda transportadora
+BANDA-BT-02
+Programada 14:00
+[ VER ]
+
+Activos que requieren atención
+------------------------------------------------------------
+
+Próximos mantenimientos
+------------------------------------------------------------
+
+Alertas operacionales
+------------------------------------------------------------
+
+Acciones rápidas
+[ Nueva OT ]
+[ Ver activos ]
+[ Ver órdenes ]
+[ Escanear QR ]
+[ Inventario ]
+
+------------------------------------------------------------
+
+NO es obligatorio utilizar exactamente este diseño.
+Utilizar los patrones y componentes del Design System existente.
+
+============================================================
+5. PRINCIPIO VISUAL
+============================================================
+
+Esta fase debe mejorar significativamente la comprensión visual de DeltaOps.
+
+La interfaz debe sentirse:
+
+- empresarial
+- profesional
+- limpia
+- moderna
+- industrial
+- clara
+- orientada a operación
+- usable en jornadas prolongadas
+
+NO debe parecer una consola de desarrolladores.
+
+NO utilizar:
+
+- bloques técnicos innecesarios
+- información de infraestructura
+- texto excesivamente técnico
+- tablas gigantes como única forma de interacción
+- tarjetas decorativas sin información útil
+- métricas inventadas
+- gráficos sin fuente de datos
+
+Utilizar exclusivamente:
+
+@workspace/design-system
+
+y sus tokens existentes.
+
+No crear un nuevo Design System.
+
+No inventar colores fuera de los tokens.
+
+No inventar tipografías.
+
+No inventar iconografía.
+
+============================================================
+6. CENTRO OPERACIONAL
+============================================================
+
+Componer una superficie operacional que permita conocer el estado actual del mantenimiento.
+
+Debe utilizar información real existente.
+
+Como mínimo:
+
+- órdenes abiertas
+- órdenes en ejecución
+- órdenes pendientes
+- prioridades
+- riesgo SLA
+- mantenimientos próximos
+- activos con órdenes abiertas
+- bloqueos/dependencias
+- órdenes sin asignación cuando el read model lo permita
+- actividad reciente
+- alertas operacionales
+
+No convertir esto en BI.
+
+No incluir:
+
+- tendencias históricas
+- proyecciones
+- KPIs financieros
+- análisis estadístico
+- inteligencia artificial
+
+La finalidad es:
+
+"¿Qué está pasando y qué debo hacer ahora?"
+
+============================================================
+7. ACCIONES RÁPIDAS
+============================================================
+
+Componer acciones rápidas utilizando comandos existentes.
+
+Como mínimo cuando el rol tenga permisos:
+
+- Nueva Orden de Trabajo
+- Nuevo Activo
+- Registrar lectura de medidor
+- Consultar Inventario
+- Crear reserva
+- Escanear QR
+- Ver calendario
+- Ver mis órdenes
+
+Las acciones deben respetar las policies y permisos existentes.
+
+No crear bypass.
+
+============================================================
+8. ACTIVOS
+============================================================
+
+Integrar la experiencia existente de Activos.
+
+Desde la landing empresarial debe poder accederse fácilmente a:
+
+- listado de activos
+- búsqueda
+- filtros
+- ubicación
+- estado
+- responsable
+- medidores
+- órdenes relacionadas
+- próximos mantenimientos
+
+Mantener la Vista 360° de DGP-010.
+
+No duplicar la ficha del activo.
+
+Utilizar deep links existentes.
+
+============================================================
+9. ÓRDENES
+============================================================
+
+Integrar la experiencia existente de Órdenes.
+
+Debe ser evidente:
+
+- qué órdenes están abiertas
+- qué órdenes están en ejecución
+- qué órdenes están atrasadas
+- qué órdenes tienen prioridad
+- qué órdenes requieren atención
+
+Mantener:
+
+- Workflow
+- checklist
+- formularios
+- recursos
+- evidencias
+- medidores
+- timeline
+- dependencias
+- SLA
+- offline
+
+No duplicar la lógica de DGP-010.
+
+============================================================
+10. INVENTARIO
+============================================================
+
+Integrar Enterprise Inventory.
+
+Mostrar únicamente información operacional disponible mediante contratos existentes.
+
+Ejemplos:
+
+- existencias
+- reservas
+- movimientos recientes
+- transferencias pendientes
+- items críticos
+- ubicaciones
+- acceso a bodegas
+
+No crear valoración financiera ni analytics.
+
+Mantener Workflow y trazabilidad.
+
+============================================================
+11. PLANES / PREVENTIVO
+============================================================
+
+Integrar Module Plans y la experiencia de mantenimiento preventivo existente.
+
+Mostrar:
+
+- planes activos
+- próximos mantenimientos
+- programación
+- calendario
+- Gantt cuando corresponda
+- órdenes generadas
+- activos asociados
+- tareas pendientes
+
+No duplicar Module Plans.
+
+La landing debe ser una composición de sus read models y contratos.
+
+============================================================
+12. ABASTECIMIENTO
+============================================================
+
+Si el módulo existente lo permite, integrar acceso operacional a:
+
+- necesidades
+- solicitudes
+- reservas
+- disponibilidad
+- materiales requeridos
+- órdenes relacionadas
+
+NO crear compras ni ERP.
+
+NO inventar estados.
+
+Utilizar exclusivamente capacidades ya existentes.
+
+============================================================
+13. EXPERIENCIA MÓVIL
+============================================================
+
+La experiencia empresarial debe ser responsive.
+
+Prioridad:
+
+Desktop
+Tablet
+Mobile
+
+Para TECNICO:
+
+la experiencia móvil debe priorizar:
+
+- Mis órdenes
+- Orden prioritaria
+- Escanear QR
+- Checklist
+- Formulario
+- Evidencia
+- Medidor
+- Recursos
+- Firma
+- Cierre
+
+Acciones táctiles >=48px.
+
+Mantener Offline First.
+
+============================================================
+14. ESTADOS DE UI
+============================================================
+
+Todas las superficies nuevas/compuestas deben manejar:
+
+- loading
+- vacío
+- error
+- offline
+- sincronizando
+- conflicto
+- éxito
+
+No mostrar pantallas vacías sin contexto.
+
+Ejemplo:
+
+"No tienes órdenes asignadas para hoy."
+
+en lugar de una tabla vacía.
+
+============================================================
+15. NOTIFICACIONES
+============================================================
+
+La integración Microsoft Graph de DGP-017 queda intacta.
+
+NO modificarla.
+
+La experiencia puede mostrar el estado de notificaciones o eventos cuando exista información en contratos actuales.
+
+NO crear un sistema paralelo de correo.
+
+DeltaOps continúa siendo propietario de:
+
+- usuarios
+- roles
+- permisos
+- tenants
+
+Microsoft Graph solamente transporta correo.
+
+============================================================
+16. MULTITENANCY
+============================================================
+
+Todo contenido debe estar estrictamente limitado al tenant actual.
+
+Nunca mostrar:
+
+- información de otro tenant
+- activos de otro tenant
+- órdenes de otro tenant
+- inventario de otro tenant
+- usuarios de otro tenant
+
+El contexto de tenant proviene de la sesión canónica.
+
+No confiar únicamente en filtros frontend.
+
+Backend/RLS continúa siendo autoridad.
+
+============================================================
+17. SEGURIDAD
+============================================================
+
+Frontend:
+
+ocultar acciones sin capacidad.
+
+Backend:
+
+continuar validando autorización.
+
+Nunca asumir que ocultar un botón constituye autorización.
+
+Probar acceso directo por URL.
+
+Probar llamadas directas a endpoints.
+
+Probar cambio de identidad.
+
+Probar refresh.
+
+Probar logout/re-login.
+
+============================================================
+18. DATOS
+============================================================
+
+Utilizar datos DEMO existentes.
+
+No crear datasets falsos para aparentar funcionalidad.
+
+Si una tarjeta, métrica o sección no puede alimentarse con información real existente:
+
+- no inventar el valor
+- ocultar la sección
+- o mostrar estado vacío correctamente
+
+El tenant DEMO debe continuar siendo reproducible.
+
+============================================================
+19. NO HACER EN DGP-018
+============================================================
+
+Queda expresamente fuera:
+
+- BI
+- Analytics
+- IA
+- predicción
+- machine learning
+- reportes ejecutivos
+- contabilidad
+- compras ERP
+- nómina
+- gestión documental empresarial nueva
+- nuevos dominios no autorizados
+- integración con otros ERPs
+- nueva infraestructura
+- nueva autenticación
+- OAuth de usuarios
+- Microsoft como Identity Provider
+- modificación de RLS
+- rediseño del Design System
+
+============================================================
+20. ACCESIBILIDAD
+============================================================
+
+Mantener WCAG AA:
+
+- teclado
+- foco visible
+- labels
+- ARIA
+- contraste
+- semántica
+- navegación coherente
+- targets táctiles >=48px
+
+============================================================
+21. PRUEBAS OBLIGATORIAS
+============================================================
+
+Agregar pruebas para:
+
+1. SUPER_ADMIN conserva consola global.
+
+2. TENANT_ADMIN obtiene landing empresarial.
+
+3. SUPERVISOR obtiene centro operacional.
+
+4. PLANIFICADOR obtiene planificación.
+
+5. TECNICO obtiene ejecución.
+
+6. CONSULTA obtiene experiencia de lectura.
+
+7. Ningún rol accede a información de otro tenant.
+
+8. Acciones ocultas sin capacidad.
+
+9. URLs directas protegidas.
+
+10. Responsive.
+
+11. Estados loading/empty/error/offline.
+
+12. Deep links existentes.
+
+13. Datos DEMO reales.
+
+14. Logout/re-login.
+
+15. Refresh.
+
+16. Offline First donde corresponda.
+
+============================================================
+22. VERIFICACIÓN TÉCNICA
+============================================================
+
+Obligatorio:
+
+- typecheck limpio
+- build limpio
+- pruebas completas
+- cero pruebas omitidas
+- drift OpenAPI limpio si hubo interacción con API
+- ninguna regresión de módulos existentes
+- tenant DEMO operativo
+- login real
+- smoke HTTP real
+- revisión arquitectónica independiente
+
+============================================================
+23. REVISIÓN ARQUITECTÓNICA
+============================================================
+
+Realizar mínimo dos rondas independientes.
+
+Ronda 1:
+
+buscar especialmente:
+
+- duplicación de lógica
+- acceso cross-tenant
+- bypass de autorización
+- datos inventados
+- contratos inexistentes
+- duplicación de componentes
+- navegación inconsistente
+- regresiones del AppShell
+- regresiones SUPER_ADMIN/TENANT_ADMIN
+
+Corregir todos los hallazgos MAYORES/CRÍTICOS.
+
+Ronda 2:
+
+PASS obligatorio.
+
+============================================================
+24. CRITERIOS DE ACEPTACIÓN
+============================================================
+
+DGP-018 solamente puede cerrarse cuando:
+
+A.
+
+admin@deltaops.dev
+
+continúa viendo exclusivamente la experiencia SUPER_ADMIN.
+
+B.
+
+admin@delta.demo
+
+ve una experiencia empresarial clara y operacional.
+
+C.
+
+Un TENANT_ADMIN no ve infraestructura técnica.
+
+D.
+
+Un TECNICO recibe una experiencia orientada a ejecución.
+
+E.
+
+Un PLANIFICADOR recibe una experiencia orientada a planificación.
+
+F.
+
+Un SUPERVISOR recibe una experiencia orientada a supervisión.
+
+G.
+
+Los datos mostrados son datos reales del tenant DEMO.
+
+H.
+
+No existen dashboards técnicos en la experiencia empresarial.
+
+I.
+
+No existen métricas inventadas.
+
+J.
+
+No se duplicó ningún dominio.
+
+K.
+
+No se modificaron contratos congelados innecesariamente.
+
+L.
+
+No se rompió la identidad autónoma de DeltaOps.
+
+M.
+
+Microsoft Graph continúa únicamente como proveedor de correo.
+
+N.
+
+Multitenancy continúa aislado.
+
+O.
+
+Responsive y accesibilidad AA verificadas.
+
+P.
+
+Todas las pruebas verdes.
+
+============================================================
+25. ENTREGA DEL INFORME
+============================================================
+
+Al finalizar NO escribas simplemente "DGP-018 completado".
+
+Entrega un:
+
+INFORME OFICIAL DE CIERRE — DGP-018 · ENTERPRISE OPERATIONS EXPERIENCE
+
+Incluyendo:
+
+1. Objeto
+2. Alcance
+3. Arquitectura
+4. Experiencia por rol
+5. Landing empresarial
+6. Centro operacional
+7. Integración Activos
+8. Integración Órdenes
+9. Integración Inventario
+10. Integración Plans/Preventivo
+11. Integración Abastecimiento
+12. Responsive/Mobile
+13. Accesibilidad
+14. Multitenancy
+15. Seguridad
+16. Pruebas
+17. Resultados técnicos
+18. Revisión arquitectónica
+19. Deuda técnica
+20. Oportunidades de mejora
+21. Estado del programa
+22. Declaración oficial de cierre
+
+IMPORTANTE:
+
+NO iniciar DGP-019 ni ninguna fase posterior.
+
+La Dirección del Programa revisará primero el resultado funcional y visual de DGP-018.
+
+============================================================
+DECLARACIÓN FINAL
+============================================================
+
+DGP-018 debe convertir DeltaOps de una colección de módulos funcionales en una experiencia empresarial coherente de operación de mantenimiento.
+
+La prioridad es:
+
+CLARIDAD OPERACIONAL
++
+USABILIDAD
++
+COMPOSICIÓN
++
+SEGURIDAD
++
+MULTITENANCY
++
+RESPONSIVE
+
+sin sacrificar la arquitectura existente.
+
+NO inventar capacidades.
+
+NO inventar datos.
+
+NO modificar el corpus congelado sin justificación.
+
+NO iniciar ninguna fase posterior.
