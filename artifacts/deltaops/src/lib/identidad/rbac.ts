@@ -59,6 +59,33 @@ export function capacidadesDe(sesion: Pick<Sesion, "rol">): Capacidades {
   };
 }
 
+/**
+ * ¿El rol es una identidad de administración GLOBAL de plataforma (consola
+ * técnica de infraestructura: salud, uptime, readiness, motores, plataforma)?
+ * SÓLO el SUPER_ADMIN aterriza en esa superficie. El resto NUNCA la ve.
+ */
+export function esConsolaGlobal(rol: Rol): boolean {
+  return rol === "SUPER_ADMIN";
+}
+
+/**
+ * Superficies EXCLUSIVAS del SUPER_ADMIN (administración global / infraestructura).
+ * El guard de ruta oculta/redirige estas rutas para el resto de roles; la
+ * autorización real la sigue imponiendo el backend (403). No confiar sólo en esto.
+ */
+export const RUTAS_SOLO_SUPER_ADMIN: readonly string[] = [
+  "/plataforma",
+  "/motores",
+  "/motores/playground",
+  "/consola-activos",
+  "/administracion/saas",
+];
+
+/** ¿La ruta pertenece a las superficies exclusivas del SUPER_ADMIN? */
+export function esRutaSoloSuperAdmin(ruta: string): boolean {
+  return RUTAS_SOLO_SUPER_ADMIN.some((r) => ruta === r || ruta.startsWith(r + "/"));
+}
+
 /* --------------------------- Módulos / entitlements --------------------- */
 
 /** Catálogo de módulos de negocio con su superficie de entrada. */
@@ -103,4 +130,63 @@ export function modulosVisibles(sesion: Pick<Sesion, "modulos">): { modulo: Modu
     nombre: MODULOS_META[m].nombre,
     ruta: MODULOS_META[m].ruta,
   }));
+}
+
+/* ------------------------------- Landing -------------------------------- */
+
+/**
+ * Entrada operacional PRINCIPAL por rol dentro de la experiencia empresarial.
+ * NO es autorización (el backend manda): sólo decide a qué superficie de negocio
+ * llevar/priorizar según el perfil, respetando siempre los módulos habilitados.
+ * El SUPER_ADMIN no usa esto: aterriza en la consola global técnica.
+ */
+export interface LandingRol {
+  /** Ruta operacional destacada (CTA principal) para ese rol. */
+  readonly ruta: string;
+  /** Etiqueta de la superficie destacada. */
+  readonly etiqueta: string;
+  /** Módulo que respalda la superficie (para verificar entitlement). */
+  readonly modulo?: Modulo;
+}
+
+/**
+ * Preferencia de landing por rol (en orden de prioridad). Se elige la primera
+ * cuyo módulo esté habilitado; si ninguna aplica, se cae al primer módulo
+ * visible o al perfil (sin superficies globales para no-SUPER_ADMIN).
+ */
+const PREFERENCIA_LANDING: Record<Rol, LandingRol[]> = {
+  SUPER_ADMIN: [{ ruta: "/administracion/saas", etiqueta: "Administración global" }],
+  TENANT_ADMIN: [
+    { ruta: "/centro", etiqueta: "Centro de mantenimiento", modulo: "ordenes" },
+    { ruta: "/administracion/usuarios", etiqueta: "Usuarios de la empresa" },
+  ],
+  SUPERVISOR: [
+    { ruta: "/centro", etiqueta: "Centro de mantenimiento", modulo: "ordenes" },
+    { ruta: "/ordenes/supervisor", etiqueta: "Supervisión de órdenes", modulo: "ordenes" },
+  ],
+  PLANIFICADOR: [
+    { ruta: "/ordenes/planificacion", etiqueta: "Planificación", modulo: "ordenes" },
+    { ruta: "/planes/calendario", etiqueta: "Calendario de planes", modulo: "planes" },
+  ],
+  TECNICO: [{ ruta: "/ordenes", etiqueta: "Mis órdenes", modulo: "ordenes" }],
+  CONSULTA: [
+    { ruta: "/centro", etiqueta: "Centro de mantenimiento", modulo: "ordenes" },
+    { ruta: "/activos", etiqueta: "Activos", modulo: "activos" },
+  ],
+};
+
+/**
+ * Resuelve la superficie operacional principal (CTA) para la sesión, respetando
+ * entitlements. Devuelve `null` para SUPER_ADMIN (consola global, no aplica) o
+ * cuando no hay ninguna superficie operativa habilitada.
+ */
+export function landingOperacional(sesion: Pick<Sesion, "rol" | "modulos">): LandingRol | null {
+  if (esConsolaGlobal(sesion.rol)) return null;
+  const preferencias = PREFERENCIA_LANDING[sesion.rol] ?? [];
+  for (const p of preferencias) {
+    if (!p.modulo || sesion.modulos.includes(p.modulo)) return p;
+  }
+  const visibles = modulosVisibles(sesion);
+  if (visibles.length > 0) return { ruta: visibles[0].ruta, etiqueta: visibles[0].nombre, modulo: visibles[0].modulo };
+  return null;
 }

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import Login from '@/pages/login';
-import Console from '@/pages/console';
+import Inicio from '@/pages/inicio';
 import Plataforma from '@/pages/plataforma';
 import Referencia from '@/pages/referencia';
 import ReferenciaDetalle from '@/pages/referencia-detalle';
@@ -80,6 +80,7 @@ import AdministracionUsuarios from '@/pages/administracion-usuarios';
 import AdministracionConfiguracion from '@/pages/administracion-configuracion';
 import AdministracionSaaS from '@/pages/administracion-saas';
 import { SesionProvider } from '@/lib/identidad/sesion';
+import { SoloSuperAdmin } from '@/lib/identidad/GuardaRuta';
 
 const queryClient = new QueryClient();
 
@@ -100,9 +101,11 @@ function NotFound() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Console} />
+      <Route path="/" component={Inicio} />
       <Route path="/centro" component={CentroMantenimiento} />
-      <Route path="/plataforma" component={Plataforma} />
+      <Route path="/plataforma">
+        <SoloSuperAdmin><Plataforma /></SoloSuperAdmin>
+      </Route>
       <Route path="/referencia" component={Referencia} />
       <Route path="/referencia/:id" component={ReferenciaDetalle} />
       <Route path="/login" component={Login} />
@@ -113,11 +116,19 @@ function Router() {
       <Route path="/perfil/contrasena" component={Perfil} />
       <Route path="/administracion/usuarios" component={AdministracionUsuarios} />
       <Route path="/administracion/configuracion" component={AdministracionConfiguracion} />
-      <Route path="/administracion/saas" component={AdministracionSaaS} />
+      <Route path="/administracion/saas">
+        <SoloSuperAdmin><AdministracionSaaS /></SoloSuperAdmin>
+      </Route>
       <Route path="/design-system" component={DesignSystem} />
-      <Route path="/motores/playground" component={MotoresPlayground} />
-      <Route path="/motores" component={Motores} />
-      <Route path="/consola-activos" component={ConsolaActivos} />
+      <Route path="/motores/playground">
+        <SoloSuperAdmin><MotoresPlayground /></SoloSuperAdmin>
+      </Route>
+      <Route path="/motores">
+        <SoloSuperAdmin><Motores /></SoloSuperAdmin>
+      </Route>
+      <Route path="/consola-activos">
+        <SoloSuperAdmin><ConsolaActivos /></SoloSuperAdmin>
+      </Route>
       <Route path="/activos" component={ActivosListado} />
       <Route path="/activos/nuevo" component={ActivosNuevo} />
       <Route path="/activos/arboles" component={ActivosArboles} />

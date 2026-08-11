@@ -1,0 +1,288 @@
+DIRECCIÓN DEL PROGRAMA — DIAGNÓSTICO OBLIGATORIO ANTES DE CONTINUAR EL SIGUIENTE DGP
+
+Se detectó un problema funcional en la experiencia de acceso de DeltaOps que debe investigarse y corregirse antes de iniciar cualquier nuevo DGP.
+
+CONTEXTO VERIFICADO
+
+Existen actualmente al menos dos identidades:
+
+1. SUPER_ADMIN
+   Usuario: admin@deltaops.dev
+   Tenant: deltaops
+   Rol: SUPER_ADMIN
+
+2. Usuario DEMO empresarial
+   Usuario: admin@delta.demo
+   Tenant: delta-demo
+   Rol: TENANT_ADMIN
+
+El login, sesión, tenant, membresía y autorización ya fueron verificados correctamente por HTTP según el informe anterior.
+
+Sin embargo, al iniciar sesión con:
+
+admin@delta.demo
+
+la plataforma sigue mostrando exactamente la misma superficie técnica de administración de plataforma que aparece para SUPER_ADMIN:
+
+- DeltaOps Console
+- REFERENCIA
+- PLATAFORMA
+- MOTORES
+- ACTivos
+- ÓRDENES
+- INVENTARIO
+- PLANES
+- ABASTECIMIENTO
+- PREVENTIVO
+- CORRECTIVO
+- ANALYTICS
+- CONSOLA ACTIVOS
+- Estado Global
+- Uptime
+- Rendimiento
+- Tasa de errores
+- Readiness
+- Información de Sistema
+
+Esto NO es la experiencia esperada para un TENANT_ADMIN empresarial.
+
+OBJETIVO
+
+Determinar exactamente por qué la identidad TENANT_ADMIN está aterrizando en la superficie de administración técnica/global en lugar de la experiencia empresarial del tenant.
+
+IMPORTANTE:
+NO iniciar el siguiente DGP.
+NO crear nuevas funcionalidades de negocio.
+NO modificar módulos de dominio.
+NO modificar contratos públicos existentes salvo que sea estrictamente necesario y sea demostrado por el diagnóstico.
+NO alterar RLS, identidad, tenancy, roles ni permisos ya congelados.
+NO crear un nuevo sistema de navegación paralelo.
+
+FASE 1 — DIAGNÓSTICO
+
+Antes de modificar código, inspeccionar y documentar:
+
+1. Cómo se resuelve actualmente la ruta /deltaops después del login.
+
+2. Qué componente decide el AppShell inicial.
+
+3. Qué componente decide qué navegación mostrar según rol.
+
+4. Cómo se diferencia actualmente:
+   - SUPER_ADMIN
+   - TENANT_ADMIN
+   - SUPERVISOR
+   - PLANIFICADOR
+   - TECNICO
+   - CONSULTA
+
+5. Qué valor devuelve actualmente:
+   GET /api/deltaops/auth/session
+
+6. Confirmar con una prueba HTTP real qué devuelve para:
+   admin@deltaops.dev
+   admin@delta.demo
+
+7. Confirmar:
+   identity
+   tenant
+   role
+   capabilities
+   permissions
+
+8. Determinar si el problema está en:
+   - routing
+   - AppShell
+   - role guard
+   - selección de landing page
+   - menú de navegación
+   - resolución de tenant
+   - configuración de módulos
+   - o una combinación de los anteriores.
+
+9. Determinar si la superficie actualmente llamada "DeltaOps Console" es realmente la consola SUPER_ADMIN o si accidentalmente se convirtió en el AppShell común de todos los usuarios.
+
+FASE 2 — CRITERIO FUNCIONAL ESPERADO
+
+La separación debe ser conceptualmente:
+
+SUPER_ADMIN
+→ Administración GLOBAL de DeltaOps
+→ tenants
+→ plataforma
+→ motores
+→ salud técnica
+→ configuración global
+→ operaciones cross-tenant autorizadas
+
+TENANT_ADMIN
+→ Administración de SU empresa
+→ usuarios del tenant
+→ configuración/branding del tenant
+→ activos
+→ órdenes
+→ inventario
+→ planes
+→ preventivo
+→ correctivo
+→ abastecimiento
+→ demás módulos habilitados
+→ SIN acceso a superficies globales de SUPER_ADMIN.
+
+SUPERVISOR
+→ operación y supervisión del mantenimiento de SU tenant
+→ centro de mantenimiento
+→ órdenes
+→ activos
+→ planificación según permisos
+→ inventario según permisos
+→ indicadores operacionales que correspondan
+→ SIN superficies de administración global.
+
+PLANIFICADOR
+→ planificación y programación
+→ calendario
+→ Gantt
+→ planes preventivos
+→ órdenes
+→ recursos
+→ dependencias
+→ etc., según permisos.
+
+TECNICO
+→ experiencia enfocada en ejecución móvil
+→ mis órdenes
+→ activos
+→ checklist
+→ formularios
+→ recursos
+→ evidencias
+→ medidores
+→ firma
+→ cierre
+→ offline.
+
+CONSULTA
+→ únicamente lectura de las superficies autorizadas.
+
+FASE 3 — UX
+
+El usuario empresarial NO debería aterrizar en una pantalla que le muestre:
+
+"Estado Global"
+"Uptime"
+"Readiness"
+"Información de Sistema"
+"Node.js"
+"session_secret"
+"database"
+
+Esos conceptos pertenecen a la administración técnica/global.
+
+La experiencia empresarial debe tener como entrada una superficie operacional de mantenimiento, no una consola de infraestructura.
+
+IMPORTANTE:
+No diseñar todavía una nueva interfaz visual completa.
+No hacer un rediseño general.
+Primero corregir la separación funcional y el routing.
+
+FASE 4 — PRUEBAS OBLIGATORIAS
+
+Crear pruebas que demuestren como mínimo:
+
+A. SUPER_ADMIN
+login
+→ tenant deltaops
+→ landing global
+→ puede acceder a superficies globales.
+
+B. TENANT_ADMIN
+login
+→ tenant delta-demo
+→ landing empresarial
+→ NO puede acceder a superficies SUPER_ADMIN
+→ recibe 403 en endpoints/superficies globales protegidas.
+
+C. SUPERVISOR
+login
+→ tenant correcto
+→ landing operacional
+→ navegación limitada a sus capacidades.
+
+D. TECNICO
+login
+→ tenant correcto
+→ landing de ejecución
+→ navegación limitada a sus capacidades.
+
+E. CONSULTA
+login
+→ tenant correcto
+→ únicamente lectura.
+
+F. Aislamiento
+Intentar navegar directamente mediante URL hacia una superficie SUPER_ADMIN usando TENANT_ADMIN y comprobar que el acceso sigue siendo rechazado.
+
+G. Refresh
+El usuario debe conservar correctamente su contexto después de refrescar la página.
+
+H. Logout/login
+Después de logout y nuevo login, el AppShell debe reconstruirse según la identidad actual.
+
+FASE 5 — RESTRICCIONES ARQUITECTÓNICAS
+
+Preservar:
+
+- identidad autónoma DeltaOps
+- tenants
+- membresías
+- roles
+- permisos
+- capabilities
+- RLS
+- sesión propia
+- Microsoft Graph únicamente como transporte de correo
+- ningún rol proveniente de Microsoft
+- ningún cambio innecesario al corpus congelado.
+
+NO duplicar autorización en frontend.
+El frontend puede ocultar navegación, pero la autorización real debe continuar estando en backend.
+
+FASE 6 — ENTREGA
+
+NO cierres esta directiva simplemente porque las pruebas existentes estén verdes.
+
+Debes entregar:
+
+1. Diagnóstico de causa raíz.
+2. Archivos/componentes involucrados.
+3. Explicación de por qué TENANT_ADMIN terminaba en la consola técnica.
+4. Corrección mínima necesaria.
+5. Pruebas agregadas.
+6. Resultado de pruebas.
+7. Confirmación HTTP real con:
+   - SUPER_ADMIN
+   - TENANT_ADMIN
+8. Confirmación de que SUPER_ADMIN continúa funcionando.
+9. Confirmación de que TENANT_ADMIN ahora aterriza en la experiencia empresarial.
+10. Confirmación de que ningún rol puede acceder indebidamente a superficies superiores.
+11. Typecheck.
+12. Build.
+13. Drift OpenAPI si aplica.
+14. Revisión arquitectónica independiente.
+
+CONDICIÓN DE CIERRE
+
+La directiva NO se considera cerrada hasta demostrar con una sesión real que:
+
+admin@deltaops.dev
+→ consola global SUPER_ADMIN
+
+y
+
+admin@delta.demo
+→ experiencia empresarial DELTA DEMO / TENANT_ADMIN
+
+son dos experiencias distintas y correctamente autorizadas.
+
+NO avances al siguiente DGP hasta que esto esté PASS.
