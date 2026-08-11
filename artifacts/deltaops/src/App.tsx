@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ToastProvider } from '@workspace/design-system';
 import { Toaster } from '@/components/ui/toaster';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import Login from '@/pages/login';
@@ -199,12 +200,21 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-        <SesionProvider>
-          <Router />
-        </SesionProvider>
-      </WouterRouter>
-      <Toaster />
+      {/*
+        ToastProvider del Design System a nivel raíz: los `useToast` de las
+        páginas (órdenes, escaneo, etc.) consumen un único provider de ancestro.
+        La región de toasts usa `position: fixed` y tokens `--do-*` globales
+        (`:root`), por lo que funciona fuera de cada `do-root` sin duplicar el
+        provider en cada Shell. Convive con el `<Toaster />` shadcn local.
+      */}
+      <ToastProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <SesionProvider>
+            <Router />
+          </SesionProvider>
+        </WouterRouter>
+        <Toaster />
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

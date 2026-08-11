@@ -233,3 +233,36 @@ Verificación **estática** contra el seed real `api-server/src/seed/seed-delta-
 - **G-7 · Verificación de datos demo en vivo.** Bloqueada en el alcance del
   subagente (sin servidor HTTP). Se verificó estáticamente contra el seed; la
   comprobación en navegador la realiza el agente principal.
+
+## Corrección de regresión — ToastProvider en la ruta real /ordenes
+
+- **Síntoma (e2e):** navegar a `/deltaops/ordenes` lanzaba
+  `useToast debe usarse dentro de <ToastProvider>` (stack: `useToast` del DS en
+  `overlays.tsx` vía `FilaOrden` en `ordenes-operaciones.tsx`).
+- **Causa raíz (pre-existente, DGP-009):** `FilaOrden` usa el `useToast` del
+  Design System, pero **ningún Shell ni `App` proveía `ToastProvider` del DS**.
+  `ShellOrdenes`/`ShellActivos` sólo aportan `ThemeProvider` + `OfflineProvider`.
+  Sólo `App` traía el `Toaster` de shadcn (`@/hooks/use-toast`), que es un sistema
+  de toasts **distinto** e incompatible con el `useToast` del DS. Las pruebas
+  previas de `ordenes-operaciones` sí envolvían manualmente con `ToastProvider`,
+  por eso pasaban sin detectar el crash de la ruta real.
+- **Fix de raíz (capa de presentación, sin tocar corpus congelado):** se envuelve
+  el árbol de rutas en `App.tsx` con el `ToastProvider` del DS
+  (`@workspace/design-system`), a nivel raíz, un único provider para todas las
+  rutas. La región de toasts usa `position: fixed` y tokens `--do-*` en `:root`,
+  por lo que funciona fuera de cada `do-root` y no requiere duplicar el provider
+  en cada Shell. Convive con el `<Toaster />` de shadcn (sistemas independientes).
+- **Cobertura:** al colocarse en la raíz, quedan cubiertas TODAS las rutas que
+  consumen el `useToast` del DS (órdenes: operaciones/ficha/supervisor/
+  planificación/escaneo/paneles; flujo de escaneo bajo activos y órdenes). No se
+  detectaron otras rutas con el mismo defecto fuera del árbol raíz.
+- **Prueba de regresión añadida:** `centro-operacional-faseb` · describe
+  "regresión · ruta real /ordenes": (1) monta la ruta REAL
+  (`OrdenesOperacionesPage` → `ShellOrdenes` → `Contenido`) bajo los providers de
+  `App` y verifica que renderiza sin crash; (2) sin `ToastProvider` ancestro,
+  captura el error con un Error Boundary y comprueba el mensaje `ToastProvider`
+  (documenta el contrato de dependencia). Habría atrapado esta regresión.
+
+- **G-8 · Dos sistemas de toast coexistentes.** El proyecto mantiene el `useToast`
+  del Design System (páginas de dominio) y el `Toaster`/`use-toast` de shadcn
+  (root). No se unificaron (fuera de alcance); ambos quedan provistos a nivel raíz.

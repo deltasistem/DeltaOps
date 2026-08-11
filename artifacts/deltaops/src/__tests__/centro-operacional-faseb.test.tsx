@@ -17,7 +17,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router, Link } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import Inicio from "../pages/inicio";
-import { Contenido as OrdenesOperaciones } from "../pages/ordenes-operaciones";
+import OrdenesOperacionesPage, { Contenido as OrdenesOperaciones } from "../pages/ordenes-operaciones";
 import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { OfflineProvider } from "../lib/offline/contexto";
 import { SesionProvider } from "../lib/identidad/sesion";
@@ -324,5 +324,76 @@ describe("§21 · /ordenes abre la bandeja indicada por deep link", () => {
     );
     const tab = await screen.findByRole("tab", { name: /Mis órdenes/i });
     await waitFor(() => expect(tab.getAttribute("aria-selected")).toBe("true"));
+  });
+});
+
+/* ---------- Regresión: /ordenes no explota por falta de provider --------- */
+
+/**
+ * `OrdenesOperacionesPage` (export por defecto) monta `ShellOrdenes` → `Contenido`,
+ * cuyo `FilaOrden` usa `useToast()` del Design System. La página NO trae su propio
+ * ToastProvider; depende de un ancestro (el `ToastProvider` raíz de `App`). Estos
+ * tests reproducen la ruta REAL: sin el provider, `useToast` lanza y la página
+ * explota; con él (como en `App`), renderiza. Habría atrapado la regresión
+ * "useToast debe usarse dentro de <ToastProvider>".
+ */
+describe("regresión · ruta real /ordenes (ShellOrdenes → Contenido)", () => {
+  function backendOrdenes(ordenes: OrdenRow[]) {
+    vi.spyOn(global, "fetch").mockImplementation(async (u) => {
+      const url = String(u);
+      // ShellOrdenes autentica vía /auth/me (useDeltaopsMe).
+      if (url.includes("/auth/me")) return resp({ identityId: "u1", nombre: "Usuaria Demo", rol: "TECNICO" });
+      if (url.includes("/api/deltaops/ordenes")) return resp({ ordenes });
+      return resp(null);
+    });
+  }
+
+  /** Réplica exacta de la composición de providers de `App` (root ToastProvider). */
+  function renderRutaReal(path = "/ordenes") {
+    const { hook } = memoryLocation({ path, static: false, record: true });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <ToastProvider>
+          <Router hook={hook}>
+            <OrdenesOperacionesPage />
+          </Router>
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("renderiza la ruta real sin crash cuando el ToastProvider raíz existe", async () => {
+    backendOrdenes([orden({ id: "m", estado: "ABIERTA" })]);
+    renderRutaReal();
+    // La navegación de la Shell y las bandejas montan → no explotó.
+    expect(await screen.findByRole("tab", { name: /Mis órdenes/i })).toBeInTheDocument();
+  });
+
+  it("sin ToastProvider ancestro la página explota (contrato de dependencia)", async () => {
+    backendOrdenes([orden({ id: "m", estado: "ABIERTA" })]);
+    const { hook } = memoryLocation({ path: "/ordenes", static: false, record: true });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Silencia el error esperado de React para no ensuciar la salida.
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    let capturado: unknown = null;
+    class Limite extends React.Component<{ children: React.ReactNode }, { e: unknown }> {
+      state = { e: null as unknown };
+      static getDerivedStateFromError(e: unknown) { return { e }; }
+      componentDidCatch(e: unknown) { capturado = e; }
+      render() { return this.state.e ? <p>falló</p> : this.props.children; }
+    }
+    render(
+      <QueryClientProvider client={qc}>
+        <Limite>
+          <Router hook={hook}>
+            <OrdenesOperacionesPage />
+          </Router>
+        </Limite>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(capturado).not.toBeNull());
+    expect(String((capturado as Error)?.message ?? capturado)).toMatch(/ToastProvider/i);
+    err.mockRestore();
   });
 });
