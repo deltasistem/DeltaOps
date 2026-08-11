@@ -69,4 +69,63 @@ describe("Req 8 · capa de contención de overflow en index.css", () => {
   it("los hijos de flex/grid en superficies pueden encogerse (min-width:0)", () => {
     expect(css).toMatch(/\.do-root :where\(main, section, article[\s\S]*?min-width:\s*0/);
   });
+
+  it("la contención cubre los envoltorios de contenido del DS (Section/Card)", () => {
+    // El DS envuelve el contenido de Section/Card en `.do-section__contenido` y
+    // `.do-card__content`. Sin ellos en la capa de contención, una tabla/rejilla
+    // anidada un nivel más adentro empuja la página en móvil (regresión real de
+    // /utilizacion/lecturas: scrollWidth 789 vs 375). La regla `:where(…)` que
+    // aplica `min-width:0` a los hijos directos debe incluir ambos envoltorios.
+    const regla = css.match(/\.do-root :where\(([^)]*)\)\s*>\s*\*\s*\{[^}]*min-width:\s*0[^}]*\}/);
+    expect(regla, "no se encontró la regla de contención `:where(...) > * { min-width:0 }`").toBeTruthy();
+    const lista = regla![1];
+    expect(lista).toContain(".do-section__contenido");
+    expect(lista).toContain(".do-card__content");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Guarda estructural del módulo Utilización: las tablas deben ir en   */
+/* el componente `Table` del DS (que renderiza `.do-tabla__envoltura`  */
+/* con overflow-x:auto), nunca `<table>` suelto que empujaría la página*/
+/* ------------------------------------------------------------------ */
+describe("Req 8 · módulo Utilización — tablas en el envoltorio desplazable del DS", () => {
+  const PAGINAS = tsxRecursivo("pages").filter((r) => /utilizacion-/.test(r));
+
+  it("las páginas de utilización existen y se escanean", () => {
+    expect(PAGINAS.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("ninguna página de utilización usa `<table>` crudo (usar el componente Table)", () => {
+    const infractores = PAGINAS.filter((rel) => /<table[\s>]/.test(leer(rel)));
+    expect(infractores, `Tablas crudas fuera de <Table> del DS:\n${infractores.join("\n")}`).toEqual([]);
+  });
+
+  it("las páginas con tabla la renderizan con el componente `Table` del DS", () => {
+    for (const rel of PAGINAS) {
+      const src = leer(rel);
+      if (/<thead[\s>]/.test(src)) {
+        expect(/<Table[\s>]/.test(src), `${rel} usa <thead> sin el componente <Table> del DS`).toBe(true);
+      }
+    }
+  });
+
+  // Regresión E2E real (~375-500px): una tabla ancha del DS infla
+  // `document.documentElement.scrollWidth` (scroll de PÁGINA) aunque `body` esté
+  // recortado, porque su contenido desborda dentro del `overflow-x:auto` de la
+  // envoltura. El patrón sistémico del DS (Activos) es tabla en desktop +
+  // tarjetas en móvil. Toda página de utilización con tabla DEBE ofrecer ambas
+  // variantes con `.do-solo-desktop` / `.do-solo-movil`.
+  it("las páginas de lista con tabla ofrecen variante de tarjetas en móvil", () => {
+    const conTabla = PAGINAS.filter((rel) => /<Table[\s>]/.test(leer(rel)));
+    expect(conTabla.length, "se esperaban páginas de lista con tabla (lecturas/tanqueos)").toBeGreaterThanOrEqual(2);
+    const sinResponsive = conTabla.filter((rel) => {
+      const src = leer(rel);
+      return !(src.includes("do-solo-desktop") && src.includes("do-solo-movil"));
+    });
+    expect(
+      sinResponsive,
+      `Tablas sin variante responsive (añadir .do-solo-desktop tabla + .do-solo-movil tarjetas):\n${sinResponsive.join("\n")}`,
+    ).toEqual([]);
+  });
 });

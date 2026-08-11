@@ -125,6 +125,16 @@
  * Centro. No introducen colores ni contratos: sólo contención de layout.
  * ===================================================================== */
 
+/* El documento raíz nunca desborda horizontalmente. Junto a `.do-root` (abajo)
+ * acota el scroll de PÁGINA a la anchura del viewport, de modo que ningún
+ * contenido ancho (tablas) empuje `document`/`body` (patrón sistémico, sin
+ * colores ni contratos). */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 /* La raíz de cada superficie nunca provoca scroll horizontal de página. */
 .do-root {
   max-width: 100%;
@@ -134,8 +144,14 @@
 /* Los hijos directos de contenedores flex/grid dentro de una superficie deben
  * poder encogerse por debajo de su tamaño intrínseco (min-width:auto → 0), de
  * modo que las envolturas scrollables (tablas) activen su propio overflow en
- * lugar de empujar el ancho de la página. */
-.do-root :where(main, section, article, .do-card, .do-tarjeta) > * {
+ * lugar de empujar el ancho de la página.
+ *
+ * NB: el DS envuelve el contenido de `Section`/`Card` en `.do-section__contenido`
+ * y `.do-card__content`. Sin incluirlos aquí, una tabla/rejilla anidada un nivel
+ * más adentro (el caso real de las páginas de módulo) conservaba `min-width:auto`
+ * y empujaba la página en móvil. Se añaden esos envoltorios (y sus propios hijos)
+ * a la capa de contención para que el patrón funcione a cualquier profundidad. */
+.do-root :where(main, section, article, .do-card, .do-tarjeta, .do-section__contenido, .do-card__content) > * {
   min-width: 0;
 }
 

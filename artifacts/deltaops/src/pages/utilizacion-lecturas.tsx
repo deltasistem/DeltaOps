@@ -98,11 +98,22 @@ export function Consulta() {
           <EmptyState titulo="Sin lecturas" descripcion="No hay lecturas para los filtros seleccionados." />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
-            <TablaLecturas
-              lecturas={visibles}
-              puedeAnular={cap.anularLectura}
-              onAnular={(l) => setAnulando(l)}
-            />
+            {/* Desktop: tabla desplazable. Móvil: tarjetas (evita el scroll
+                horizontal de PÁGINA que una tabla ancha provoca a ~375px). */}
+            <div className="do-solo-desktop">
+              <TablaLecturas
+                lecturas={visibles}
+                puedeAnular={cap.anularLectura}
+                onAnular={(l) => setAnulando(l)}
+              />
+            </div>
+            <div className="do-solo-movil">
+              <TarjetasLecturas
+                lecturas={visibles}
+                puedeAnular={cap.anularLectura}
+                onAnular={(l) => setAnulando(l)}
+              />
+            </div>
             {totalPaginas > 1 && <Pagination pagina={paginaActual} totalPaginas={totalPaginas} onChange={setPagina} />}
           </div>
         )}
@@ -158,6 +169,39 @@ function TablaLecturas({ lecturas, puedeAnular, onAnular }: { lecturas: LecturaR
         ))}
       </tbody>
     </Table>
+  );
+}
+
+function TarjetasLecturas({ lecturas, puedeAnular, onAnular }: { lecturas: LecturaRow[]; puedeAnular: boolean; onAnular: (l: LecturaRow) => void }) {
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
+      {lecturas.map((l) => (
+        <li key={l.id}>
+          <Card>
+            <CardContent>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
+                  <strong>{l.valor != null ? `${l.valor}${l.unidad ? ` ${l.unidad}` : ""}` : "—"}</strong>
+                  <span style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>
+                    {l.tipoMedidor ? ETIQUETA_TIPO_MEDIDOR[l.tipoMedidor] ?? l.tipoMedidor : "—"}
+                  </span>
+                </div>
+                <span style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>{fmtFecha(l.fechaHora)}</span>
+                <span style={{ fontSize: "var(--do-text-sm)", wordBreak: "break-word" }}>Activo: {l.activoId ?? "—"}</span>
+                <div style={{ display: "flex", gap: "var(--do-sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                  <BadgeEstadoLectura estado={l.estado} inconsistente={l.inconsistente} />
+                  <BadgeSyncActivo valor={l.sincronizacionActivo} motivo={l.motivo} />
+                  <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>{l.origen ?? "—"}</span>
+                </div>
+                {puedeAnular && l.estado !== "anulada" && (
+                  <Button size="sm" variant="secundario" onClick={() => onAnular(l)}>Anular</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </li>
+      ))}
+    </ul>
   );
 }
 

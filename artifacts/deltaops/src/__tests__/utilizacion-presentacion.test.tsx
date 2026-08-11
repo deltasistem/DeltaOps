@@ -82,9 +82,11 @@ describe("presentación · consulta de lecturas y gating de CTAs", () => {
     expect(screen.queryByRole("button", { name: /anular/i })).not.toBeInTheDocument();
   });
 
-  it("muestra el estado de sincronización en la fila", () => {
+  it("muestra el estado de sincronización (tabla desktop + tarjeta móvil)", () => {
     wrap(<ConsultaLecturas />);
-    expect(screen.getByText("Sincronizada")).toBeInTheDocument();
+    // Se renderizan ambas variantes responsivas (desktop/móvil); basta con que
+    // el estado de sincronización sea visible al menos una vez.
+    expect(screen.getAllByText("Sincronizada").length).toBeGreaterThan(0);
   });
 
   it("SUPERVISOR sí muestra el botón de anular", () => {

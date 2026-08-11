@@ -91,7 +91,14 @@ export function Consulta() {
           <EmptyState titulo="Sin tanqueos" descripcion="No hay tanqueos para los filtros seleccionados." />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
-            <TablaTanqueos tanqueos={visibles} puedeAnular={cap.anularTanqueo} onAnular={setAnulando} />
+            {/* Desktop: tabla desplazable. Móvil: tarjetas (evita el scroll
+                horizontal de PÁGINA que una tabla ancha provoca a ~375px). */}
+            <div className="do-solo-desktop">
+              <TablaTanqueos tanqueos={visibles} puedeAnular={cap.anularTanqueo} onAnular={setAnulando} />
+            </div>
+            <div className="do-solo-movil">
+              <TarjetasTanqueos tanqueos={visibles} puedeAnular={cap.anularTanqueo} onAnular={setAnulando} />
+            </div>
             {totalPaginas > 1 && <Pagination pagina={paginaActual} totalPaginas={totalPaginas} onChange={setPagina} />}
           </div>
         )}
@@ -145,6 +152,36 @@ function TablaTanqueos({ tanqueos, puedeAnular, onAnular }: { tanqueos: TanqueoR
         ))}
       </tbody>
     </Table>
+  );
+}
+
+function TarjetasTanqueos({ tanqueos, puedeAnular, onAnular }: { tanqueos: TanqueoRow[]; puedeAnular: boolean; onAnular: (t: TanqueoRow) => void }) {
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
+      {tanqueos.map((t) => (
+        <li key={t.id}>
+          <Card>
+            <CardContent>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
+                  <strong>{t.litros != null ? `${t.litros} L` : "—"}</strong>
+                  <span style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>{etiquetaCombustible(t.tipoCombustible)}</span>
+                </div>
+                <span style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>{fmtFecha(t.fechaHora)}</span>
+                <span style={{ fontSize: "var(--do-text-sm)", wordBreak: "break-word" }}>Activo: {t.activoId ?? "—"}</span>
+                <div style={{ display: "flex", gap: "var(--do-sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                  <BadgeEstadoTanqueo estado={t.estado} />
+                  <span style={{ fontSize: "var(--do-text-sm)" }}>{fmtCosto(t)}</span>
+                </div>
+                {puedeAnular && t.estado !== "anulada" && (
+                  <Button size="sm" variant="secundario" onClick={() => onAnular(t)}>Anular</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </li>
+      ))}
+    </ul>
   );
 }
 
