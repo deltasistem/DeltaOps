@@ -46,6 +46,7 @@ import { usePlanesDeActivo } from "../planes/hooks";
 import { OfflineProvider, useOffline } from "../offline/contexto";
 import { useSesion } from "../identidad/sesion";
 import { capacidadesUtilizacion, type CapacidadesUtilizacion } from "./capacidades";
+import { capacidadesOrdenes, type CapacidadesOrdenes } from "../ordenes/capacidades";
 import { registrarLectura, registrarTanqueo } from "./mutaciones";
 import { ValorCalculo, etiquetaCombustible } from "./componentes";
 import {
@@ -90,6 +91,9 @@ export function PanelOperacional({ activo, ahoraIso }: { activo: ActivoRow; ahor
 function PanelContenido({ activo, ahoraIso }: { activo: ActivoRow; ahoraIso?: string }) {
   const { sesion } = useSesion();
   const cap = capacidadesUtilizacion(sesion ?? { rol: "CONSULTA" });
+  // Señal CANÓNICA de capacidad de Órdenes (réplica de aRolLegacy→principalOrdenes).
+  // Gatea la creación de OT (escritura de Órdenes) desde este panel.
+  const capOrd = capacidadesOrdenes(sesion ?? { rol: "CONSULTA" });
   const rol = String(sesion?.rol ?? "CONSULTA").toUpperCase();
 
   // Ventana temporal (últimos 30 días) + período anterior para tendencia.
@@ -105,7 +109,7 @@ function PanelContenido({ activo, ahoraIso }: { activo: ActivoRow; ahoraIso?: st
 
   return (
     <>
-      <CabeceraOperacional activo={activo} cap={cap} rol={rol} onAccion={setAccion} />
+      <CabeceraOperacional activo={activo} cap={cap} capOrd={capOrd} rol={rol} onAccion={setAccion} />
 
       <IndicadoresOperacionales
         activo={activo}
@@ -120,7 +124,7 @@ function PanelContenido({ activo, ahoraIso }: { activo: ActivoRow; ahoraIso?: st
         <SeccionConsumo activo={activo} resumenActual={resumenActual} resumenAnterior={resumenAnterior} tanqueos={tanqueos} />
       </div>
 
-      <SeccionOrdenes activoId={activo.id} activoNombre={activo.nombre} cap={cap} rol={rol} />
+      <SeccionOrdenes activoId={activo.id} activoNombre={activo.nombre} capOrd={capOrd} rol={rol} />
 
       <SeccionHistorial activoId={activo.id} />
 
@@ -136,9 +140,10 @@ function PanelContenido({ activo, ahoraIso }: { activo: ActivoRow; ahoraIso?: st
 
 /* =============================== Cabecera ================================= */
 
-function CabeceraOperacional({ activo, cap, rol, onAccion }: {
+function CabeceraOperacional({ activo, cap, capOrd, rol, onAccion }: {
   activo: ActivoRow;
   cap: CapacidadesUtilizacion;
+  capOrd: CapacidadesOrdenes;
   rol: string;
   onAccion: (a: "lectura" | "tanqueo") => void;
 }) {
@@ -193,9 +198,13 @@ function CabeceraOperacional({ activo, cap, rol, onAccion }: {
                   Registrar tanqueo
                 </Button>
               )}
-              <Link href={urlNuevaOrden({ activo: activo.id, activoEtiqueta: activo.nombre })}>
-                <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Crear orden</Button>
-              </Link>
+              {/* Crear orden = ESCRITURA de Órdenes: gatear con la capacidad
+                  canónica (ocultar sin permiso, no deshabilitar). */}
+              {capOrd.crear && (
+                <Link href={urlNuevaOrden({ activo: activo.id, activoEtiqueta: activo.nombre })}>
+                  <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Crear orden</Button>
+                </Link>
+              )}
               <Link href={esTecnico ? "/ordenes/operaciones" : urlActivoTab(activo.id, "ordenes")}>
                 <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>{esTecnico ? "Mis órdenes" : "Ver órdenes"}</Button>
               </Link>
@@ -481,13 +490,12 @@ function SeccionConsumo({ activo, resumenActual, resumenAnterior, tanqueos }: {
 
 /* =============================== Órdenes ================================= */
 
-function SeccionOrdenes({ activoId, activoNombre, cap, rol }: {
+function SeccionOrdenes({ activoId, activoNombre, capOrd, rol }: {
   activoId: string;
   activoNombre: string;
-  cap: CapacidadesUtilizacion;
+  capOrd: CapacidadesOrdenes;
   rol: string;
 }) {
-  void cap;
   const { datos, cargando, error, recargar } = useOrdenesDeActivo(activoId);
 
   const grupos = useMemo(() => {
@@ -538,8 +546,13 @@ function SeccionOrdenes({ activoId, activoNombre, cap, rol }: {
               )}
 
               <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
+                {/* "Ver todas las órdenes" = navegación de consulta (autorizada
+                    para cualquier rol con lectura). "Nueva orden" = ESCRITURA:
+                    gatear con la capacidad canónica (ocultar sin permiso). */}
                 <Link href={urlActivoTab(activoId, "ordenes")}><Button variant="secundario" size="sm">Ver todas las órdenes</Button></Link>
-                <Link href={urlNuevaOrden({ activo: activoId, activoEtiqueta: activoNombre })}><Button variant="primario" size="sm">Nueva orden</Button></Link>
+                {capOrd.crear && (
+                  <Link href={urlNuevaOrden({ activo: activoId, activoEtiqueta: activoNombre })}><Button variant="primario" size="sm">Nueva orden</Button></Link>
+                )}
                 {rol === "TECNICO" && <Link href="/ordenes/operaciones"><Button variant="fantasma" size="sm">Mis órdenes</Button></Link>}
               </div>
             </div>

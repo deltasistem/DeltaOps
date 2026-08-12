@@ -215,8 +215,10 @@ describe("Ficha Operacional 360° · permisos (ocultar, no deshabilitar)", () =>
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
     expect(screen.queryByRole("button", { name: /Registrar medidor/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Registrar tanqueo/ })).not.toBeInTheDocument();
-    // pero sí puede consultar (crear/ver órdenes, ver QR)
+    // pero sí puede CONSULTAR (navegación de solo lectura: ver órdenes, ver QR)
     expect(screen.getByRole("button", { name: /Ver QR/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ver órdenes/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ver todas las órdenes/ })).toBeInTheDocument();
   });
 
   it("TENANT_ADMIN sí ve las acciones de escritura", () => {
@@ -224,6 +226,50 @@ describe("Ficha Operacional 360° · permisos (ocultar, no deshabilitar)", () =>
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
     expect(screen.getByRole("button", { name: /Registrar medidor/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Registrar tanqueo/ })).toBeInTheDocument();
+  });
+});
+
+describe("Ficha Operacional 360° · RBAC de creación de Órdenes (ocultar CTAs de escritura)", () => {
+  // Matriz contra la señal CANÓNICA (aRolLegacy→principalOrdenes):
+  //   admin(TENANT_ADMIN/SUPER_ADMIN) y operador(SUPERVISOR/PLANIFICADOR/TECNICO)
+  //   pueden crear OT; lector(CONSULTA) NO.
+  const CTAS_CREAR = [/Crear orden/, /Nueva orden/];
+
+  function verCrear(rol: string): boolean {
+    ROL = rol;
+    const { unmount } = wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
+    const visto = CTAS_CREAR.every((re) => screen.queryAllByRole("button", { name: re }).length > 0);
+    unmount();
+    return visto;
+  }
+
+  it("TENANT_ADMIN y SUPERVISOR VEN los CTAs de crear orden", () => {
+    expect(verCrear("TENANT_ADMIN")).toBe(true);
+    expect(verCrear("SUPERVISOR")).toBe(true);
+  });
+
+  it("TECNICO VE los CTAs de crear orden (operador tiene gestionar-ordenes)", () => {
+    // "según la capacidad REAL del módulo Órdenes": TECNICO→operador→gestionar.
+    expect(verCrear("TECNICO")).toBe(true);
+  });
+
+  it("CONSULTA NO ve los CTAs de crear orden (ocultos, no deshabilitados)", () => {
+    ROL = "CONSULTA";
+    wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
+    expect(screen.queryByRole("button", { name: /Crear orden/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Nueva orden/ })).not.toBeInTheDocument();
+    // Nunca se deshabilita: no debe existir ningún botón "Crear/Nueva orden" disabled.
+    const posibles = screen.queryAllByRole("button", { name: /(Crear|Nueva) orden/ });
+    expect(posibles).toHaveLength(0);
+  });
+
+  it("todos los roles con lectura conservan la navegación de consulta de órdenes", () => {
+    for (const rol of ["TENANT_ADMIN", "SUPERVISOR", "PLANIFICADOR", "TECNICO", "CONSULTA"]) {
+      ROL = rol;
+      const { unmount } = wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
+      expect(screen.getByRole("button", { name: /Ver todas las órdenes/ })).toBeInTheDocument();
+      unmount();
+    }
   });
 });
 
