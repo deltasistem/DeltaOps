@@ -21,6 +21,9 @@ vi.mock("../lib/activos/hooks", () => ({
 vi.mock("../lib/offline/contexto", () => ({
   useOffline: () => ({ cola: {}, enLinea: true, pendientes: 0, procesar: () => {} }),
 }));
+vi.mock("../lib/identidad/sesion", () => ({
+  useSesion: () => ({ sesion: { rol: "TENANT_ADMIN", modulos: ["activos"], permisos: [], capacidades: [] } }),
+}));
 
 import { TabRelaciones } from "../pages/ficha/tab-relaciones";
 

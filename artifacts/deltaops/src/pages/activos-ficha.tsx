@@ -47,6 +47,7 @@ import { TabCorrectivo } from "./ficha/tab-correctivo";
 import { leerParam } from "../lib/ecosistema/deep-links";
 import { PanelOperacional } from "../lib/utilizacion/PanelOperacional";
 import { utilizacionVisible } from "../lib/utilizacion/capacidades";
+import { capacidadesActivos } from "../lib/activos/capacidades";
 import { useSesion } from "../lib/identidad/sesion";
 
 export default function ActivosFichaPage() {
@@ -81,7 +82,11 @@ function Ficha({ id }: { id: string }) {
   }
 
   const a = datos;
-  const transiciones = transicionesDesde(a.estado);
+  // Capacidades canónicas del módulo Activos (réplica aRolLegacy→principalActivos).
+  // Gatean las ESCRITURAS de la cabecera (ocultar sin permiso, no deshabilitar).
+  const capActivos = capacidadesActivos(sesion);
+  // Sin permiso de transición, no se ofrecen acciones de estado (escritura `operar`).
+  const transiciones = capActivos.transicionar ? transicionesDesde(a.estado) : [];
 
   async function ejecutarTransicion(accion: string) {
     const r = await transicion(cola, id, accion, a.version);
@@ -104,7 +109,9 @@ function Ficha({ id }: { id: string }) {
         acciones={
           <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
             <Badge variant={variantEstado(a.estado)}>{etiquetaEstado(a.estado)}</Badge>
-            <Button variant="secundario" size="sm" onClick={() => setEditando(true)}>Editar</Button>
+            {capActivos.editar && (
+              <Button variant="secundario" size="sm" onClick={() => setEditando(true)}>Editar</Button>
+            )}
             {transiciones.map((t) => (
               <Button key={t.accion} variant="primario" size="sm" onClick={() => setAccionConfirm({ accion: t.accion, etiqueta: t.etiqueta })}>
                 {t.etiqueta}

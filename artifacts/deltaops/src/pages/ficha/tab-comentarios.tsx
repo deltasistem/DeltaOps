@@ -18,6 +18,8 @@ import { comentar, editarComentario, borrarComentario } from "../../lib/activos/
 import type { Comentario } from "../../lib/activos/tipos";
 import { FormularioDinamico, useFormularioDinamico } from "../../lib/forms/FormularioDinamico";
 import { plantillaComentario } from "../../lib/forms/plantillas";
+import { useSesion } from "../../lib/identidad/sesion";
+import { capacidadesActivos } from "../../lib/activos/capacidades";
 
 function fecha(c: Comentario): string {
   const iso = c.creadoAt ?? c.editadoAt ?? undefined;
@@ -28,6 +30,8 @@ function fecha(c: Comentario): string {
 
 export function TabComentarios({ id }: { id: string }) {
   const { cola } = useOffline();
+  const { sesion } = useSesion();
+  const puedeEscribir = capacidadesActivos(sesion).editar;
   const { datos, cargando, error, recargar } = useComentarios(id);
   const defComentario = useMemo(() => plantillaComentario(), []);
   const form = useFormularioDinamico(defComentario);
@@ -60,19 +64,21 @@ export function TabComentarios({ id }: { id: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
       {msg && <Alert variant="info" titulo={msg} />}
-      <Card>
-        <CardContent>
-          <FormularioDinamico
-            definicion={defComentario}
-            valores={form.valores}
-            onCambio={form.setValores}
-            hallazgos={form.hallazgos}
-          />
-          <div style={{ marginTop: "var(--do-sp-2)", display: "flex", justifyContent: "flex-end" }}>
-            <Button variant="primario" size="sm" loading={enviando} disabled={!texto.trim()} onClick={() => void publicar()}>Publicar</Button>
-          </div>
-        </CardContent>
-      </Card>
+      {puedeEscribir && (
+        <Card>
+          <CardContent>
+            <FormularioDinamico
+              definicion={defComentario}
+              valores={form.valores}
+              onCambio={form.setValores}
+              hallazgos={form.hallazgos}
+            />
+            <div style={{ marginTop: "var(--do-sp-2)", display: "flex", justifyContent: "flex-end" }}>
+              <Button variant="primario" size="sm" loading={enviando} disabled={!texto.trim()} onClick={() => void publicar()}>Publicar</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {cargando ? (
         <Card><CardContent><div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div></CardContent></Card>
@@ -89,10 +95,12 @@ export function TabComentarios({ id }: { id: string }) {
                   <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>{c.autor ?? c.actorId ?? "Anónimo"} · {fecha(c)}</span>
                   <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{c.texto}</p>
                 </div>
-                <div style={{ display: "flex", gap: "var(--do-sp-1)" }}>
-                  <Button variant="fantasma" size="sm" onClick={() => setEditar(c)}>Editar</Button>
-                  <Button variant="peligro" size="sm" onClick={() => setConfirmar(c)}>Eliminar</Button>
-                </div>
+                {puedeEscribir && (
+                  <div style={{ display: "flex", gap: "var(--do-sp-1)" }}>
+                    <Button variant="fantasma" size="sm" onClick={() => setEditar(c)}>Editar</Button>
+                    <Button variant="peligro" size="sm" onClick={() => setConfirmar(c)}>Eliminar</Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

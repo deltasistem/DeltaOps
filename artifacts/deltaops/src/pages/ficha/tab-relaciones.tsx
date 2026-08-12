@@ -20,6 +20,8 @@ import { crearRelacion, eliminarRelacion } from "../../lib/activos/mutaciones";
 import { RelacionesGrafo } from "../../lib/activos/RelacionesGrafo";
 import { FormularioDinamico, useFormularioDinamico } from "../../lib/forms/FormularioDinamico";
 import { plantillaRelacion } from "../../lib/forms/plantillas";
+import { useSesion } from "../../lib/identidad/sesion";
+import { capacidadesActivos } from "../../lib/activos/capacidades";
 
 const TIPOS_RELACION = [
   "padre-de", "hijo-de", "compuesto-por", "componente-de",
@@ -28,6 +30,8 @@ const TIPOS_RELACION = [
 
 export function TabRelaciones({ id, nombre, onNavegar }: { id: string; nombre: string; onNavegar: (id: string) => void }) {
   const { cola } = useOffline();
+  const { sesion } = useSesion();
+  const puedeEscribir = capacidadesActivos(sesion).editar;
   const { datos, cargando, error, recargar } = useRelacionados(id);
   const [crear, setCrear] = useState(false);
   const [confirmarBorrar, setConfirmarBorrar] = useState<string | null>(null);
@@ -47,9 +51,11 @@ export function TabRelaciones({ id, nombre, onNavegar }: { id: string; nombre: s
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
       {msg && <Alert variant="info" titulo={msg} />}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <Button variant="primario" size="sm" onClick={() => setCrear(true)}>Crear relación</Button>
-      </div>
+      {puedeEscribir && (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button variant="primario" size="sm" onClick={() => setCrear(true)}>Crear relación</Button>
+        </div>
+      )}
       {cargando ? (
         <Card><CardContent><div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div></CardContent></Card>
       ) : error ? (
@@ -62,14 +68,14 @@ export function TabRelaciones({ id, nombre, onNavegar }: { id: string; nombre: s
           <Card>
             <CardContent>
               <DoTable caption="Relaciones del activo">
-                <thead><tr><th>Tipo</th><th>Origen</th><th>Destino</th><th></th></tr></thead>
+                <thead><tr><th>Tipo</th><th>Origen</th><th>Destino</th>{puedeEscribir && <th></th>}</tr></thead>
                 <tbody>
                   {relaciones.map((r) => (
                     <tr key={r.id}>
                       <td><code style={{ fontSize: "var(--do-text-xs)" }}>{r.tipo}</code></td>
                       <td><button className="do-vinculo" onClick={() => onNavegar(r.origenId)} style={{ background: "none", border: "none", color: "var(--do-primario)", cursor: "pointer", padding: 0 }}>{r.origenNombre ?? r.origenId.slice(0, 8)}</button></td>
                       <td><button onClick={() => onNavegar(r.destinoId)} style={{ background: "none", border: "none", color: "var(--do-primario)", cursor: "pointer", padding: 0 }}>{r.destinoNombre ?? r.destinoId.slice(0, 8)}</button></td>
-                      <td><Button variant="peligro" size="sm" onClick={() => setConfirmarBorrar(r.id)}>Eliminar</Button></td>
+                      {puedeEscribir && <td><Button variant="peligro" size="sm" onClick={() => setConfirmarBorrar(r.id)}>Eliminar</Button></td>}
                     </tr>
                   ))}
                 </tbody>

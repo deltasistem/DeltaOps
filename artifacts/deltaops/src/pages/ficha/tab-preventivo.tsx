@@ -16,9 +16,13 @@ import {
 import { useProgramasDeActivo } from "../../lib/preventivo/hooks";
 import { BadgeEstadoPrograma } from "../../lib/preventivo/componentes";
 import { urlPrograma, urlNuevoPrograma, urlCalendario } from "../../lib/preventivo/deep-links";
+import { useSesion } from "../../lib/identidad/sesion";
+import { puedeEscribirModulo } from "../../lib/identidad/capacidades-modulo";
 
 export function TabPreventivo({ activoId }: { activoId: string; activoNombre?: string }) {
   const { datos, cargando, error, recargar } = useProgramasDeActivo(activoId);
+  const { sesion } = useSesion();
+  const puedeCrear = puedeEscribirModulo(sesion, "modulo.preventivo", "programas");
 
   if (cargando) return <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div>;
   if (error) return <ErrorState titulo="No se pudieron cargar los programas del activo" descripcion={error.message} onReintentar={recargar} />;
@@ -35,7 +39,9 @@ export function TabPreventivo({ activoId }: { activoId: string; activoNombre?: s
         </div>
         <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
           <Link href={urlCalendario({ activo: activoId })}><Button variant="secundario" size="sm">Ver calendario</Button></Link>
-          <Link href={urlNuevoPrograma({ activo: activoId })}><Button variant="primario" size="sm">Nuevo programa para este activo</Button></Link>
+          {puedeCrear && (
+            <Link href={urlNuevoPrograma({ activo: activoId })}><Button variant="primario" size="sm">Nuevo programa para este activo</Button></Link>
+          )}
         </div>
       </div>
 

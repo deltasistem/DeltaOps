@@ -8,6 +8,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { OfflineProvider } from "../lib/offline/contexto";
+
+// La pestaña «Órdenes» oculta el CTA de crear OT sin permiso (DGP-019.2).
+// Un TENANT_ADMIN (rol con capacidad de crear) mantiene el deep link visible.
+vi.mock("../lib/identidad/sesion", () => ({
+  useSesion: () => ({ sesion: { rol: "TENANT_ADMIN", modulos: ["ordenes"], permisos: [], capacidades: [] } }),
+}));
+
 import { TabOrdenes } from "../pages/ficha/tab-ordenes";
 import type { OrdenRow } from "../lib/ordenes/tipos";
 

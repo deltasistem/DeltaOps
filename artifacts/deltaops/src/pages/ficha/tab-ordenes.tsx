@@ -24,6 +24,8 @@ import { useOrdenesDeActivo } from "../../lib/ecosistema/hooks";
 import { estadoSla, tonoRiesgo } from "../../lib/ecosistema/sla";
 import { BadgeEstado, BadgePrioridad } from "../../lib/ordenes/componentes";
 import { urlOrden, urlNuevaOrden } from "../../lib/ecosistema/deep-links";
+import { useSesion } from "../../lib/identidad/sesion";
+import { capacidadesOrdenes } from "../../lib/ordenes/capacidades";
 import type { OrdenRow } from "../../lib/ordenes/tipos";
 
 const ABIERTAS_EXCLUIDAS = new Set(["CERRADA", "CANCELADA"]);
@@ -31,6 +33,8 @@ const PLANIFICADAS = new Set(["PLANIFICADA", "PROGRAMADA", "ABIERTA"]);
 
 export function TabOrdenes({ activoId, activoNombre }: { activoId: string; activoNombre: string }) {
   const { datos, cargando, error, recargar } = useOrdenesDeActivo(activoId);
+  const { sesion } = useSesion();
+  const puedeCrear = capacidadesOrdenes(sesion ?? { rol: "CONSULTA" }).crear;
   const ahora = Date.now();
 
   const grupos = useMemo(() => {
@@ -51,9 +55,11 @@ export function TabOrdenes({ activoId, activoNombre }: { activoId: string; activ
           <Badge variant="info">{grupos.abiertas.length} abierta(s)</Badge>
           <Badge variant="neutro">{grupos.cerradas.length} cerrada(s)</Badge>
         </div>
-        <Link href={urlNuevaOrden({ activo: activoId, activoEtiqueta: activoNombre })}>
-          <Button variant="primario" size="sm">Nueva orden para este activo</Button>
-        </Link>
+        {puedeCrear && (
+          <Link href={urlNuevaOrden({ activo: activoId, activoEtiqueta: activoNombre })}>
+            <Button variant="primario" size="sm">Nueva orden para este activo</Button>
+          </Link>
+        )}
       </div>
 
       {grupos.todas.length === 0 && (

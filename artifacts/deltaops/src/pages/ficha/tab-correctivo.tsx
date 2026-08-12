@@ -26,6 +26,8 @@ import { plantillaEventoActivo } from "../../lib/forms/plantillas-correctivo";
 import { registrarEventoActivo } from "../../lib/correctivo/mutaciones";
 import { construirInputEventoActivo } from "../../lib/correctivo/alta";
 import type { EventoActivo } from "../../lib/correctivo/tipos";
+import { useSesion } from "../../lib/identidad/sesion";
+import { puedeEscribirModulo } from "../../lib/identidad/capacidades-modulo";
 
 /**
  * Calcula, de forma tolerante, si un evento es reincidente: si el read model no
@@ -60,6 +62,8 @@ function TabCorrectivoInterno({ activoId }: { activoId: string; activoNombre?: s
   const eventos = useEventosActivo(activoId);
   const solicitudes = useSolicitudesDeActivo(activoId);
   const { cola } = useOffline();
+  const { sesion } = useSesion();
+  const puedeEscribir = puedeEscribirModulo(sesion, "modulo.correctivo", "solicitudes");
 
   const def = useMemo(() => plantillaEventoActivo(), []);
   const form = useFormularioDinamico(def, {}, {});
@@ -88,7 +92,9 @@ function TabCorrectivoInterno({ activoId }: { activoId: string; activoNombre?: s
           {reincidentes > 0 && <Badge variant="error">{reincidentes} reincidente(s)</Badge>}
           <Badge variant="info">{(solicitudes.datos ?? []).length} solicitud(es)</Badge>
         </div>
-        <Link href={urlNuevaSolicitud({ activo: activoId })}><Button variant="primario" size="sm">Nueva solicitud para este activo</Button></Link>
+        {puedeEscribir && (
+          <Link href={urlNuevaSolicitud({ activo: activoId })}><Button variant="primario" size="sm">Nueva solicitud para este activo</Button></Link>
+        )}
       </div>
 
       {reincidentes > 0 && (
@@ -144,17 +150,19 @@ function TabCorrectivoInterno({ activoId }: { activoId: string; activoNombre?: s
         </CardContent>
       </Card>
 
-      {/* Registro manual de un evento */}
-      <Card>
-        <CardHeader><strong>Registrar evento manual</strong></CardHeader>
-        <CardContent>
-          {msg && <Alert variant={msg.tono} titulo={msg.texto} />}
-          <FormularioDinamico definicion={def} valores={form.valores} onCambio={form.setValores} />
-          <div style={{ marginTop: "var(--do-sp-2)" }}>
-            <Button variant="primario" disabled={ocupado} onClick={() => void registrar()}>{ocupado ? "Registrando…" : "Registrar evento"}</Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Registro manual de un evento (ESCRITURA: oculto sin permiso). */}
+      {puedeEscribir && (
+        <Card>
+          <CardHeader><strong>Registrar evento manual</strong></CardHeader>
+          <CardContent>
+            {msg && <Alert variant={msg.tono} titulo={msg.texto} />}
+            <FormularioDinamico definicion={def} valores={form.valores} onCambio={form.setValores} />
+            <div style={{ marginTop: "var(--do-sp-2)" }}>
+              <Button variant="primario" disabled={ocupado} onClick={() => void registrar()}>{ocupado ? "Registrando…" : "Registrar evento"}</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

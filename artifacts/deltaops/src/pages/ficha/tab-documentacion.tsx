@@ -29,6 +29,8 @@ import { hashArchivo } from "../../lib/activos/hash";
 import type { Adjunto } from "../../lib/activos/tipos";
 import { FormularioDinamico, useFormularioDinamico } from "../../lib/forms/FormularioDinamico";
 import { plantillaAdjunto } from "../../lib/forms/plantillas";
+import { useSesion } from "../../lib/identidad/sesion";
+import { capacidadesActivos } from "../../lib/activos/capacidades";
 
 const ETIQUETA_CAT: Record<string, string> = {
   manual: "Manual", certificado: "Certificado", garantia: "Garantía",
@@ -45,6 +47,8 @@ function formatoTamano(bytes: number): string {
 
 export function TabDocumentacion({ id }: { id: string }) {
   const { datos, cargando, error, recargar } = useDocumentacion(id);
+  const { sesion } = useSesion();
+  const puedeEscribir = capacidadesActivos(sesion).editar;
   const [registrar, setRegistrar] = useState(false);
 
   const porCategoria = useMemo(() => {
@@ -64,9 +68,11 @@ export function TabDocumentacion({ id }: { id: string }) {
         HMAC con caducidad), no los binarios. La previsualización muestra la verificación de la referencia, no el
         contenido. Ver <code>lib/module-activos/docs/colaboracion.md</code>.
       </Alert>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <Button variant="primario" size="sm" onClick={() => setRegistrar(true)}>Registrar documentación</Button>
-      </div>
+      {puedeEscribir && (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button variant="primario" size="sm" onClick={() => setRegistrar(true)}>Registrar documentación</Button>
+        </div>
+      )}
       {cargando ? (
         <Card><CardContent><div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div></CardContent></Card>
       ) : error ? (

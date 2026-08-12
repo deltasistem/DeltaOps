@@ -22,9 +22,13 @@ import {
 import { usePlanesDeActivo } from "../../lib/planes/hooks";
 import { BadgeEstadoPlan, resumenFrecuencia, fechaCorta } from "../../lib/planes/componentes";
 import { urlPlan, urlNuevoPlan } from "../../lib/planes/deep-links";
+import { useSesion } from "../../lib/identidad/sesion";
+import { puedeEscribirModulo } from "../../lib/identidad/capacidades-modulo";
 
 export function TabPlanes({ activoId }: { activoId: string; activoNombre?: string }) {
   const { datos, cargando, error, recargar } = usePlanesDeActivo(activoId);
+  const { sesion } = useSesion();
+  const puedeCrear = puedeEscribirModulo(sesion, "modulo.planes");
 
   if (cargando) return <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div>;
   if (error) return <ErrorState titulo="No se pudieron cargar los planes del activo" descripcion={error.message} onReintentar={recargar} />;
@@ -39,9 +43,11 @@ export function TabPlanes({ activoId }: { activoId: string; activoNombre?: strin
           <Badge variant="exito">{vigentes} vigente(s)</Badge>
           <Badge variant="neutro">{planes.length} plan(es)</Badge>
         </div>
-        <Link href={urlNuevoPlan(activoId)}>
-          <Button variant="primario" size="sm">Nuevo plan para este activo</Button>
-        </Link>
+        {puedeCrear && (
+          <Link href={urlNuevoPlan(activoId)}>
+            <Button variant="primario" size="sm">Nuevo plan para este activo</Button>
+          </Link>
+        )}
       </div>
 
       {planes.length === 0 ? (
