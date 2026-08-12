@@ -94,9 +94,58 @@ export function useDocumentacion(id: string): EstadoAsync<Adjunto[]> {
   return useConsulta<Adjunto[]>((signal) => activosFetch<Adjunto[]>(`/${id}/documentacion`, { signal }), [id]);
 }
 
+/**
+ * Forma REAL del read model del backend `activos.relacionados`:
+ * `{ id, salientes: RelacionReadRow[], entrantes: RelacionReadRow[] }`
+ * (ver `lib/module-activos/src/module.ts`). El contrato NO cambia; sólo se
+ * normaliza en cliente a la lista plana `Relacion[]` que consume la UI.
+ */
+interface RespuestaRelacionados {
+  id?: string;
+  salientes?: unknown;
+  entrantes?: unknown;
+}
+
+/**
+ * Normaliza la respuesta de `/{id}/relacionados` a `Relacion[]`.
+ *
+ * Deuda saldada (DGP-008.x, detectada en DGP-019.2): el endpoint devuelve un
+ * OBJETO `{id, salientes, entrantes}`, pero `TabRelaciones` esperaba un arreglo
+ * y hacía `datos.map(...)`, lo que reventaba la ficha ENTERA (los `Tabs` del DS
+ * montan todos los paneles de forma eager). Se concatenan salientes + entrantes
+ * conservando la dirección (cada fila ya trae origen/destino) y se deduplica por
+ * `id`. Se toleran además la forma legada (array directo) y respuestas nulas o
+ * inesperadas (guardas `Array.isArray`), devolviendo siempre un arreglo.
+ */
+export function normalizarRelacionados(datos: unknown): Relacion[] {
+  if (Array.isArray(datos)) return datos as Relacion[];
+  if (datos && typeof datos === "object") {
+    const r = datos as RespuestaRelacionados;
+    const salientes = Array.isArray(r.salientes) ? (r.salientes as Relacion[]) : [];
+    const entrantes = Array.isArray(r.entrantes) ? (r.entrantes as Relacion[]) : [];
+    const combinadas = [...salientes, ...entrantes];
+    const vistas = new Set<string>();
+    const unicas: Relacion[] = [];
+    for (const rel of combinadas) {
+      const clave = rel && typeof rel === "object" && rel.id != null ? String(rel.id) : "";
+      if (clave && vistas.has(clave)) continue;
+      if (clave) vistas.add(clave);
+      unicas.push(rel);
+    }
+    return unicas;
+  }
+  return [];
+}
+
 export function useRelacionados(id: string, categoria?: string): EstadoAsync<Relacion[]> {
   const q = categoria ? `?categoria=${categoria}` : "";
-  return useConsulta<Relacion[]>((signal) => activosFetch<Relacion[]>(`/${id}/relacionados${q}`, { signal }), [id, categoria ?? ""]);
+  return useConsulta<Relacion[]>(
+    async (signal) => {
+      const raw = await activosFetch<unknown>(`/${id}/relacionados${q}`, { signal });
+      return normalizarRelacionados(raw);
+    },
+    [id, categoria ?? ""],
+  );
 }
 
 export function useArbol(id: string): EstadoAsync<NodoArbol> {

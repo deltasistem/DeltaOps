@@ -40,7 +40,9 @@ export function TabRelaciones({ id, nombre, onNavegar }: { id: string; nombre: s
     if (!r.error) recargar();
   }
 
-  const relaciones = datos ?? [];
+  // Robustez: `useRelacionados` ya normaliza la respuesta del backend a
+  // `Relacion[]`; esta guarda evita cualquier `.map` sobre un valor no-arreglo.
+  const relaciones = Array.isArray(datos) ? datos : [];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>

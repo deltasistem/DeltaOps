@@ -1,0 +1,843 @@
+DIRECTIVA DE DIRECCIÓN — DGP-019.2
+ENTERPRISE ASSET OPERATIONAL EXPERIENCE
+
+Programa DeltaOps
+
+ESTADO
+
+DGP-019.1 — DOMINIO DE UTILIZACIÓN queda oficialmente APROBADO y CERRADO.
+
+La fundación operacional ya está disponible:
+
+* historial de horómetro;
+* historial de odómetro;
+* tanqueos;
+* cálculos básicos de consumo;
+* sincronización con Activos;
+* Offline First;
+* Timeline;
+* QR;
+* CQRS;
+* RLS;
+* OpenAPI;
+* capacidades RBAC.
+
+La Dirección AUTORIZA ahora DGP-019.2.
+
+==================================================
+OBJETIVO
+========
+
+Construir la primera experiencia operacional integrada del activo:
+
+FICHA OPERACIONAL 360°
+
+El usuario debe poder abrir un activo y comprender rápidamente:
+
+* qué equipo es;
+* dónde está;
+* en qué estado se encuentra;
+* cuánto ha trabajado;
+* cuánto combustible consume;
+* cuándo requiere mantenimiento;
+* qué órdenes tiene;
+* qué ocurrió recientemente;
+* qué necesita atención;
+* cómo registrar una nueva medición;
+* cómo registrar un tanqueo;
+* cómo continuar la operación desde móvil.
+
+La experiencia debe utilizar DATOS REALES.
+
+NO utilizar datos ficticios para rellenar indicadores.
+
+NO crear métricas que no tengan fuente real.
+
+==================================================
+PRINCIPIO DE EXPERIENCIA
+========================
+
+La ficha del activo debe responder:
+
+"¿Qué está pasando con este equipo y qué debo hacer ahora?"
+
+No queremos una ficha que sea únicamente una tabla de atributos.
+
+Debe existir:
+
+CONTEXTO
+→ ESTADO
+→ OPERACIÓN
+→ MANTENIMIENTO
+→ CONSUMO
+→ HISTORIAL
+→ ACCIONES
+
+==================================================
+
+1. INTEGRACIÓN CON ACTIVOS
+   ==================================================
+
+Utilizar la ficha existente de Activos como punto de entrada.
+
+NO crear una segunda ficha de activo.
+
+Extender/componer la experiencia existente.
+
+Mantener intactos:
+
+* identidad del activo;
+* código;
+* tipo;
+* marca;
+* modelo;
+* ubicación;
+* estado;
+* responsable;
+* información existente.
+
+Agregar una sección/panel operacional integrado.
+
+==================================================
+2. CABECERA OPERACIONAL
+=======================
+
+La cabecera debe mostrar como mínimo:
+
+* nombre del activo;
+* código;
+* tipo;
+* estado actual;
+* ubicación;
+* imagen si existe en el contrato actual;
+* QR;
+* información relevante disponible.
+
+Acciones rápidas según capacidad:
+
+[Registrar horómetro]
+[Registrar odómetro]
+[Registrar tanqueo]
+[Crear/consultar OT]
+[Escanear QR]
+
+No mostrar acciones que el usuario no tenga permiso para ejecutar.
+
+==================================================
+3. INDICADORES OPERACIONALES
+============================
+
+Crear una zona visual de indicadores.
+
+Como mínimo evaluar:
+
+HORÓMETRO ACTUAL
+ODÓMETRO ACTUAL
+CONSUMO PROMEDIO
+ÚLTIMO TANQUEO
+UTILIZACIÓN
+DISPONIBILIDAD
+
+Pero:
+
+SI NO EXISTEN DATOS SUFICIENTES:
+
+mostrar:
+
+"Sin datos"
+
+NO mostrar:
+
+0
+0%
+0 L/h
+
+cuando realmente significa que no existe información.
+
+Los indicadores deben mostrar, cuando sea útil, el período utilizado.
+
+Ejemplo:
+
+"Consumo promedio · últimos 30 días"
+
+No presentar valores sin contexto temporal.
+
+==================================================
+4. ESTADO DEL EQUIPO
+====================
+
+Crear una representación visual clara del estado:
+
+🟢 Operativo
+🟡 Atención requerida
+🟠 En mantenimiento
+🔴 Fuera de servicio
+
+Utilizar exclusivamente los estados reales definidos por el dominio.
+
+NO inventar nuevos estados.
+
+Si existe información operacional adicional:
+
+* última actividad;
+* última OT;
+* próximo mantenimiento;
+
+puede mostrarse como contexto.
+
+==================================================
+5. UTILIZACIÓN
+==============
+
+Integrar los datos reales de module-utilizacion.
+
+Mostrar cuando exista información:
+
+* horómetro;
+* odómetro;
+* variación del período;
+* horas derivables;
+* utilización.
+
+No calcular "horas trabajadas" si DGP-019.1 no proporciona una fuente suficiente.
+
+En ese caso:
+
+"Sin datos suficientes para calcular horas trabajadas."
+
+Debe ser una respuesta válida.
+
+==================================================
+6. COMBUSTIBLE
+==============
+
+Integrar el historial de tanqueos.
+
+Mostrar:
+
+* último tanqueo;
+* litros;
+* costo;
+* fecha;
+* consumo calculado cuando sea válido;
+* tendencia básica si existen suficientes datos.
+
+Para maquinaria:
+
+L/h
+
+Para vehículos:
+
+L/100 km
+
+según el medidor disponible.
+
+No utilizar una métrica incorrecta para el activo.
+
+==================================================
+7. CONSUMO VISUAL
+=================
+
+Crear una visualización simple y útil.
+
+NO crear todavía un dashboard BI.
+
+Ejemplo conceptual:
+
+CONSUMO — ÚLTIMOS 30 DÍAS
+
+12,4 L/h
+▲ 8,2 % vs período anterior
+
+[gráfico/tendencia]
+
+Debe utilizar datos reales.
+
+Si no existen suficientes puntos:
+
+mostrar una visualización vacía de negocio:
+
+"Registra más tanqueos para visualizar la tendencia."
+
+No generar una línea artificial.
+
+==================================================
+8. MANTENIMIENTO
+================
+
+Integrar información existente de:
+
+* Planes;
+* Preventivo;
+* Correctivo;
+* Órdenes.
+
+La ficha debe mostrar, cuando exista:
+
+PRÓXIMO MANTENIMIENTO
+
+* plan;
+* actividad;
+* fecha o condición;
+* horómetro objetivo si existe;
+* estado.
+
+También:
+
+ÚLTIMAS INTERVENCIONES
+
+* OT;
+* tipo;
+* fecha;
+* estado.
+
+No duplicar las órdenes.
+
+Utilizar deep links existentes.
+
+==================================================
+9. ÓRDENES
+==========
+
+Crear una sección resumida:
+
+ÓRDENES DEL ACTIVO
+
+Ejemplo conceptual:
+
+Pendientes: 3
+En ejecución: 1
+Cerradas recientes: 8
+
+Estas cifras deben venir de fuentes reales.
+
+Cada elemento debe permitir navegar a la OT original.
+
+NO crear una segunda implementación de Órdenes.
+
+==================================================
+10. TIMELINE
+============
+
+Integrar Shared Timeline como historial operacional.
+
+Mostrar eventos como:
+
+* mantenimiento;
+* orden;
+* tanqueo;
+* lectura de horómetro;
+* lectura de odómetro;
+* cambio de estado;
+* eventos relevantes existentes.
+
+NO crear una timeline paralela.
+
+La experiencia debe permitir:
+
+"Ver historial completo"
+
+mediante la superficie existente.
+
+==================================================
+11. QR
+======
+
+Integrar el QR existente.
+
+Desde la ficha:
+
+[Ver QR]
+[Imprimir etiqueta]
+
+si los contratos existentes lo soportan.
+
+Desde el móvil:
+
+Escanear QR
+→ abrir activo
+→ ficha operacional
+
+No crear otro resolutor QR.
+
+==================================================
+12. ACCIONES RÁPIDAS
+====================
+
+Las acciones deben ser contextuales.
+
+Para TENANT_ADMIN/SUPERVISOR:
+
+* registrar;
+* consultar;
+* gestionar según capacidades.
+
+Para TECNICO:
+
+priorizar:
+
+[Registrar horómetro]
+[Registrar tanqueo]
+[Mis órdenes]
+[Escanear QR]
+
+Para CONSULTA:
+
+solo lectura.
+
+No mostrar botones deshabilitados innecesariamente.
+
+Es preferible ocultar acciones no autorizadas según el patrón existente de DeltaOps.
+
+==================================================
+13. EXPERIENCIA MÓVIL
+=====================
+
+Este punto es PRIORITARIO.
+
+A ~390px:
+
+La información debe reorganizarse.
+
+Prioridad:
+
+1. Estado
+2. Identificación del activo
+3. Acción principal
+4. Horómetro/odómetro
+5. Mantenimiento
+6. Combustible
+7. Órdenes
+8. Historial
+
+Los botones deben ser táctiles.
+
+No debe existir:
+
+* overflow horizontal;
+* tablas ilegibles;
+* tarjetas comprimidas;
+* botones diminutos.
+
+Cuando una tabla no sea adecuada para móvil:
+
+usar tarjetas/listas responsive.
+
+==================================================
+14. EXPERIENCIA DESKTOP
+=======================
+
+En desktop puede utilizarse una composición más rica:
+
+┌───────────────────────────────────────────┐
+│ ACTIVO + ESTADO + ACCIONES                │
+├─────────┬─────────┬─────────┬─────────────┤
+│HORÓMETRO│CONSUMO  │UTILIZ.  │DISPONIB.    │
+├─────────┴─────────┴─────────┴─────────────┤
+│                                           │
+│ MANTENIMIENTO        │ CONSUMO            │
+│                      │                    │
+├──────────────────────┴────────────────────┤
+│ ÓRDENES                                   │
+├───────────────────────────────────────────┤
+│ HISTORIAL / TIMELINE                      │
+└───────────────────────────────────────────┘
+
+No copiar literalmente este wireframe.
+
+Usarlo como referencia de jerarquía.
+
+==================================================
+15. DISEÑO VISUAL
+=================
+
+La Dirección ha identificado que la aplicación actualmente se percibe demasiado plana.
+
+DGP-019.2 debe comenzar a mejorar la jerarquía visual.
+
+NO romper el Design System.
+
+NO crear un nuevo sistema visual.
+
+Utilizar exclusivamente:
+
+* Design System existente;
+* tokens --do-*;
+* tipografía existente;
+* espaciado existente;
+* componentes existentes.
+
+Pero aprovechar correctamente:
+
+* tarjetas;
+* badges;
+* estados;
+* iconografía;
+* jerarquía tipográfica;
+* agrupación;
+* espacios;
+* acciones primarias;
+* indicadores;
+* timelines;
+* visualizaciones simples.
+
+La interfaz debe sentirse como:
+
+PLATAFORMA EAM MODERNA
+
+y no como:
+
+"formulario administrativo con tablas".
+
+No sobrecargar visualmente.
+
+La estética debe ser profesional, industrial y operacional.
+
+==================================================
+16. TEMA
+========
+
+Respetar estrictamente:
+
+Claro
+Oscuro
+Automático
+
+No establecer:
+
+data-do-theme="light"
+
+dentro del módulo.
+
+No crear ThemeProvider local.
+
+La autoridad continúa siendo el ThemeProvider global.
+
+==================================================
+17. BRANDING
+============
+
+Respetar el Brandbook y el lenguaje visual DeltaOps.
+
+No introducir colores arbitrarios.
+
+No utilizar gradientes decorativos sin justificación.
+
+No convertir la interfaz en una aplicación "gaming".
+
+Debe sentirse:
+
+* industrial;
+* profesional;
+* moderna;
+* confiable;
+* limpia.
+
+==================================================
+18. DATOS
+=========
+
+Todos los indicadores deben utilizar:
+
+read models existentes.
+
+No consultar agregados directamente desde frontend.
+
+No crear cálculos de dominio en React.
+
+Los cálculos derivados deben provenir de:
+
+* read models;
+* funciones puras;
+* contratos existentes.
+
+==================================================
+19. CQRS
+========
+
+Mantener estrictamente:
+
+COMANDOS
+→ agregados
+
+CONSULTAS
+→ read models
+
+La ficha operacional debe consumir read models.
+
+No hacer:
+
+frontend → agregado → dato
+
+para obtener información.
+
+==================================================
+20. MULTITENANCY
+================
+
+Toda información debe permanecer tenant-scoped.
+
+No confiar en:
+
+tenantId enviado desde frontend.
+
+Utilizar contexto de sesión y RLS.
+
+Verificar cambio de identidad y tenant.
+
+==================================================
+21. OFFLINE
+===========
+
+Las acciones de campo deben conservar la capacidad Offline First existente:
+
+* registrar horómetro;
+* registrar odómetro;
+* registrar tanqueo.
+
+No crear una cola nueva.
+
+Mostrar al usuario el estado:
+
+* pendiente de sincronizar;
+* sincronizado;
+* conflicto/error.
+
+No ocultar fallos.
+
+==================================================
+22. PERMISOS
+============
+
+Validar:
+
+TENANT_ADMIN
+SUPERVISOR
+PLANIFICADOR
+TECNICO
+CONSULTA
+
+La experiencia debe respetar capacidades existentes.
+
+CONSULTA:
+
+ninguna escritura.
+
+TECNICO:
+
+solo acciones permitidas.
+
+No implementar autorización únicamente frontend.
+
+Backend continúa siendo autoridad.
+
+==================================================
+23. ACCESIBILIDAD
+=================
+
+Mantener WCAG AA según las capacidades actuales.
+
+Targets táctiles ≥48px.
+
+Labels correctos.
+
+Focus visible.
+
+Contraste adecuado.
+
+No depender exclusivamente de color para comunicar estados.
+
+==================================================
+24. NO HACER EN DGP-019.2
+=========================
+
+NO implementar:
+
+* BI ejecutivo;
+* analytics avanzado;
+* IA;
+* mantenimiento predictivo;
+* costos completos;
+* mano de obra;
+* duración real de OT;
+* turnos;
+* disponibilidad avanzada;
+* medidores personalizados;
+* integración telemática/GPS;
+* IoT.
+
+Estos temas permanecen como gaps/fases futuras.
+
+==================================================
+25. PRUEBAS
+===========
+
+Agregar pruebas para:
+
+* ficha con datos completos;
+* ficha sin datos;
+* ficha con datos parciales;
+* consumo;
+* indicadores;
+* órdenes;
+* mantenimiento;
+* Timeline;
+* permisos;
+* tenant isolation;
+* offline;
+* QR;
+* tema claro;
+* tema oscuro;
+* automático;
+* responsive.
+
+E2E real:
+
+TENANT_ADMIN
+TECNICO
+CONSULTA
+
+Viewports:
+
+desktop
+tablet
+390px
+
+Verificar:
+
+* no overflow;
+* navegación;
+* acciones;
+* refresh;
+* logout/re-login;
+* cambio de tema.
+
+==================================================
+26. REVISIÓN VISUAL
+===================
+
+Antes del cierre:
+
+Realizar una revisión visual independiente.
+
+Evaluar:
+
+1. Jerarquía.
+2. Legibilidad.
+3. Densidad.
+4. Consistencia.
+5. Uso correcto de estados.
+6. Claridad de acciones.
+7. Experiencia móvil.
+8. Apariencia profesional.
+9. Coherencia con DeltaOps.
+10. Ausencia de superficies excesivamente planas.
+
+Si la interfaz funciona pero visualmente es pobre:
+
+NO declarar PASS automáticamente.
+
+Registrar el hallazgo y corregirlo antes del cierre.
+
+==================================================
+27. REVISIÓN ARQUITECTÓNICA
+===========================
+
+Debe verificar:
+
+* CQRS;
+* RLS;
+* multitenancy;
+* RBAC;
+* Offline;
+* Timeline;
+* QR;
+* Design System;
+* ausencia de duplicación;
+* ausencia de endpoints innecesarios;
+* ausencia de modificaciones no autorizadas al corpus congelado.
+
+==================================================
+28. CRITERIO DE CIERRE
+======================
+
+DGP-019.2 queda cerrado únicamente cuando:
+
+* Ficha Operacional 360° funcional.
+* Datos reales.
+* Integración con Activos.
+* Integración con Utilización.
+* Integración con Combustible.
+* Integración con Órdenes.
+* Integración con Mantenimiento.
+* Timeline integrada.
+* QR integrado.
+* Offline operativo.
+* RBAC correcto.
+* Responsive correcto.
+* Claro/Oscuro/Automático correcto.
+* Accesibilidad verificada.
+* Revisión visual PASS.
+* Revisión arquitectónica PASS.
+* Tests verdes.
+* E2E PASS.
+* Typecheck PASS.
+* Build PASS.
+* OpenAPI sin drift.
+
+==================================================
+29. REGLA DE GOBIERNO
+=====================
+
+Si para implementar DGP-019.2 es necesario modificar:
+
+* módulo congelado;
+* contrato congelado;
+* Workflow;
+* Identity;
+* RLS;
+* Design System;
+
+DETENERSE.
+
+Documentar GAP.
+
+Esperar autorización de la Dirección.
+
+No buscar atajos.
+
+==================================================
+30. ENTREGA
+===========
+
+Al finalizar entregar:
+
+INFORME OFICIAL DE CIERRE — DGP-019.2
+
+Debe incluir:
+
+1. Cambios.
+2. Archivos.
+3. Integraciones.
+4. Read models utilizados.
+5. Endpoints utilizados/creados.
+6. Experiencia por rol.
+7. Experiencia móvil.
+8. Experiencia desktop.
+9. Tema.
+10. Accesibilidad.
+11. Offline.
+12. QR.
+13. Timeline.
+14. Datos demo.
+15. Pruebas.
+16. E2E.
+17. Revisión visual.
+18. Revisión arquitectónica.
+19. Deuda técnica.
+20. Gaps pendientes.
+21. Commits.
+
+NO iniciar DGP-019.3 automáticamente.
+
+Esperar aprobación explícita de la Dirección.

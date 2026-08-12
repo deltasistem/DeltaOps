@@ -176,3 +176,41 @@ body {
 .do-root :where(img, svg, video, canvas, pre) {
   max-width: 100%;
 }
+
+/* =====================================================================
+ * DGP-019.2 · Semáforo de estado operacional (Ficha 360°).
+ * Punto de color que refuerza el Badge de estado del equipo. El COLOR nunca
+ * es el único canal de información (§23): el Badge lleva el texto del estado y
+ * el punto expone `title`. Sólo usa tokens semánticos --do-*, sin colores
+ * arbitrarios ni gradientes (§17).
+ * ===================================================================== */
+.do-semaforo {
+  display: inline-block;
+  width: var(--do-sp-3);
+  height: var(--do-sp-3);
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: var(--do-texto-suave);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--do-texto-suave) 22%, transparent);
+}
+.do-semaforo--operativo {
+  background: var(--do-exito);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--do-exito) 22%, transparent);
+}
+.do-semaforo--atencion {
+  background: var(--do-info);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--do-info) 22%, transparent);
+}
+.do-semaforo--mantenimiento {
+  background: var(--do-advertencia);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--do-advertencia) 22%, transparent);
+}
+.do-semaforo--fuera {
+  background: var(--do-error);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--do-error) 22%, transparent);
+}
+.do-semaforo--neutro {
+  background: var(--do-texto-suave);
+  box-shadow: none;
+  opacity: 0.5;
+}

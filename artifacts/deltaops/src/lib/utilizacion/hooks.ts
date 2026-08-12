@@ -99,23 +99,37 @@ export function useTanqueo(id: string): EstadoAsync<TanqueoRow | null> {
   );
 }
 
+/** Rango temporal opcional del resumen (contrato `GET .../resumen`). */
+export interface PeriodoResumen {
+  /** ISO-8601 inclusive inferior. */
+  desde?: string;
+  /** ISO-8601 inclusive superior. */
+  hasta?: string;
+}
+
 /**
  * Resumen operacional básico por activo. Devuelve `null` si el backend no
  * expone el endpoint (404). Cuando responde, sus campos `ResultadoCalculo`
  * pueden traer `tipo: "sin-datos"`: la UI lo pinta como "Sin datos" (nunca 0).
+ *
+ * Acepta un `periodo` opcional (`desde`/`hasta`) que el read model del backend
+ * ya soporta como filtro del rango: la ficha operacional lo usa para acotar los
+ * indicadores a una ventana ("últimos 30 días") y para comparar contra el
+ * período anterior (tendencia). Los cálculos SIEMPRE los hace el backend.
  */
-export function useResumen(activoId: string): EstadoAsync<ResumenActivo | null> {
+export function useResumen(activoId: string, periodo: PeriodoResumen = {}): EstadoAsync<ResumenActivo | null> {
+  const query = qs({ desde: periodo.desde, hasta: periodo.hasta });
   return useConsulta<ResumenActivo | null>(
     async (signal) => {
       if (!activoId) return null;
       const r = await utilizacionFetch<{ resumen?: ResumenActivo } | ResumenActivo>(
-        `/activos/${encodeURIComponent(activoId)}/resumen`,
+        `/activos/${encodeURIComponent(activoId)}/resumen${query}`,
         { signal, toleraNoEncontrado: true },
       );
       if (!r) return null;
       return (r as { resumen?: ResumenActivo }).resumen ?? (r as ResumenActivo);
     },
-    [activoId],
+    [activoId, query],
   );
 }
 

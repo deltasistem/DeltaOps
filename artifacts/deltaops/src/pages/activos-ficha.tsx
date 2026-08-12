@@ -45,6 +45,9 @@ import { TabPlanes } from "./ficha/tab-planes";
 import { TabPreventivo } from "./ficha/tab-preventivo";
 import { TabCorrectivo } from "./ficha/tab-correctivo";
 import { leerParam } from "../lib/ecosistema/deep-links";
+import { PanelOperacional } from "../lib/utilizacion/PanelOperacional";
+import { utilizacionVisible } from "../lib/utilizacion/capacidades";
+import { useSesion } from "../lib/identidad/sesion";
 
 export default function ActivosFichaPage() {
   const [, params] = useRoute("/activos/:id");
@@ -59,6 +62,7 @@ export default function ActivosFichaPage() {
 function Ficha({ id }: { id: string }) {
   const [, navegar] = useLocation();
   const { cola } = useOffline();
+  const { sesion } = useSesion();
   const { datos, cargando, error, recargar } = useDetalle(id);
   const [accionConfirm, setAccionConfirm] = useState<{ accion: string; etiqueta: string } | null>(null);
   const [editando, setEditando] = useState(false);
@@ -113,6 +117,12 @@ function Ficha({ id }: { id: string }) {
       {mensaje && (
         <Alert variant={mensaje.tono === "exito" ? "exito" : mensaje.tono === "error" ? "error" : "info"} titulo={mensaje.texto} />
       )}
+
+      {/* DGP-019.2 · Ficha Operacional 360°: panel operacional integrado
+          (estado → indicadores → mantenimiento → combustible → órdenes →
+          historial). Sólo si el tenant tiene el módulo Utilización habilitado y
+          la sesión puede leerlo; la ficha base de Activos se mantiene intacta. */}
+      {sesion && utilizacionVisible(sesion) && <PanelOperacional activo={a} />}
 
       <DatosGenerales a={a} />
 
