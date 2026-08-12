@@ -14,7 +14,7 @@ import {
   type Principal,
 } from "@workspace/kernel";
 import { officialServices } from "@workspace/platform";
-import { ASIGNACION_REGISTRADA, ordenesModule, crearOrdenesRuntime, MODULO, type OrdenesRuntime } from "..";
+import { ASIGNACION_REGISTRADA, ordenesModule, crearOrdenesRuntime, FakeIdentidad, MODULO, type OrdenesRuntime } from "..";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -259,5 +259,81 @@ suite("Módulo Órdenes · PostgreSQL", () => {
       const vigentes = rows.filter((x) => x.asignadoId === "cuad-concurrente" && x.vigente);
       expect(vigentes.length).toBe(1);
     }
+  });
+
+  // DGP-020.1 (E2E fix) · Flujo COMPLETO comando→outbox→proyección→query real:
+  // una asignación FUERTE de PERSONA como responsable debe reflejarse en el read
+  // model de responsables (`/responsables` expone identityId+nombre) Y en el
+  // listado/detalle del supervisor (`responsable` deja de ser null). La
+  // proyección consume el evento ASIGNACION_REGISTRADA (no sólo el comando
+  // legado), es idempotente por (read model, tenant, eventId) y sólo usa payload.
+  it("asignar-recurso-humano (persona) proyecta responsables e ilumina el listado", async () => {
+    // Runtime dedicado con Identidad canónica sembrada, sobre el MISMO pool real.
+    const identidad = new FakeIdentidad().registrar({
+      identityId: "idn-ana", tenantId: T_A, nombre: "Ana Soto", email: "ana@a.cl", rol: "TECNICO",
+    });
+    const rtId = crearOrdenesRuntime({ pool, identidad });
+    const execId = (name: string, input: unknown) =>
+      rtId.platform.kernel.commands.execute(ctx(T_A), name, input);
+    const queryId = (name: string, input: unknown) =>
+      rtId.platform.kernel.queries.execute(ctx(T_A), name, input);
+    const drenarId = () => rtId.platform.kernel.outboxProcessor.processPending();
+
+    const crear = await execId(`${MODULO}.crear`, { titulo: "OT Responsable", tipo: "correctiva" });
+    expect(crear.ok).toBe(true);
+    if (!crear.ok) return;
+    const oid = (crear.value as { id: string }).id;
+    await drenarId();
+
+    // Antes: sin responsable en el listado/detalle.
+    const antes = await queryId(`${MODULO}.detalle`, { id: oid });
+    expect(antes.ok).toBe(true);
+    if (antes.ok) expect((antes.value as { orden: { responsable: string | null } }).orden.responsable).toBeNull();
+
+    // Asignación FUERTE de persona como responsable.
+    const asig = await execId(`${MODULO}.asignar-recurso-humano`, {
+      ordenId: oid, tipo: "persona", asignadoId: "idn-ana", rol: "responsable", reemplazaVigentes: true,
+    });
+    expect(asig.ok).toBe(true);
+    if (!asig.ok) return;
+
+    // Materializa la proyección (comando→outbox→proyección).
+    await drenarId();
+
+    // /responsables expone identityId + nombre (proyectado desde el payload).
+    const resp = await queryId(`${MODULO}.responsables`, { ordenId: oid });
+    expect(resp.ok).toBe(true);
+    if (resp.ok) {
+      const filas = (resp.value as { responsables: Array<Record<string, unknown>> }).responsables;
+      const conIdentidad = filas.find((f) => f["responsableIdentityId"] === "idn-ana");
+      expect(conIdentidad).toBeDefined();
+      expect(conIdentidad!["responsableNombre"]).toBe("Ana Soto");
+      expect(conIdentidad!["responsable"]).toBe("Ana Soto");
+    }
+
+    // El listado/detalle del supervisor ya muestra el responsable (no null).
+    const despues = await queryId(`${MODULO}.detalle`, { id: oid });
+    expect(despues.ok).toBe(true);
+    if (despues.ok) expect((despues.value as { orden: { responsable: string | null } }).orden.responsable).toBe("Ana Soto");
+    const listado = await queryId(`${MODULO}.listar`, {});
+    expect(listado.ok).toBe(true);
+    if (listado.ok) {
+      const fila = (listado.value as { ordenes: Array<{ id: string; responsable: string | null }> })
+        .ordenes.find((o) => o.id === oid);
+      expect(fila?.responsable).toBe("Ana Soto");
+    }
+
+    // Idempotencia de la proyección: re-drenar/reproyectar no duplica ni rompe.
+    const repro = await execId(`${MODULO}.reproyectar`, {});
+    expect(repro.ok).toBe(true);
+    await drenarId();
+    const resp2 = await queryId(`${MODULO}.responsables`, { ordenId: oid });
+    expect(resp2.ok).toBe(true);
+    if (resp2.ok) {
+      const filas = (resp2.value as { responsables: Array<Record<string, unknown>> }).responsables;
+      expect(filas.filter((f) => f["responsableIdentityId"] === "idn-ana").length).toBe(1);
+    }
+    const detalle2 = await queryId(`${MODULO}.detalle`, { id: oid });
+    if (detalle2.ok) expect((detalle2.value as { orden: { responsable: string | null } }).orden.responsable).toBe("Ana Soto");
   });
 });

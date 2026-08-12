@@ -502,7 +502,7 @@ export class PgProyeccionesStore implements ProyeccionesStore {
   async aplicarResponsable(uow: UnitOfWork, row: FilaAppend) {
     try {
       return await this.appendGeneric(uow, "deltaops.ord_responsables_read",
-        ["tenant_id", "event_id", "orden_id", "responsable", "supervisor", "version", "actor_id", "registrado_at"], row);
+        ["tenant_id", "event_id", "orden_id", "responsable", "responsable_identity_id", "responsable_nombre", "supervisor", "version", "actor_id", "registrado_at"], row);
     } catch (err) { return fail(KernelErrors.infrastructure("responsable apply falló", err)); }
   }
   async aplicarHistorial(uow: UnitOfWork, row: FilaAppend) {

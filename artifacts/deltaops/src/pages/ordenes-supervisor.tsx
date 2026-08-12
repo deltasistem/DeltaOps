@@ -199,7 +199,7 @@ function TarjetaAsignacion({ orden, onCambio, onAbrir }: { orden: OrdenRow; onCa
   );
 }
 
-function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenRow; onCerrar: () => void; onGuardado: () => void }) {
+export function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenRow; onCerrar: () => void; onGuardado: () => void }) {
   const { cola } = useOffline();
   // DGP-020.1 · Identidades canónicas del tenant (fuente de verdad). El selector
   // muestra nombre+rol y ENVÍA únicamente el identityId; nunca texto libre.
@@ -213,6 +213,15 @@ function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenRow; onC
   const form = useFormularioDinamico(def, {}, { responsable: "", supervisor: orden.supervisor ?? "" });
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // DGP-020.1 (E2E) · Habilitación del submit anclada al identityId SELECCIONADO
+  // (no a un campo de texto legacy): se puede asignar si hay una identidad
+  // elegida como responsable, o si cambió el supervisor de la OT. Evita un
+  // submit no-op y mantiene el botón usable en cuanto se elige a la persona.
+  const responsableSel = form.valores.responsable ? String(form.valores.responsable) : "";
+  const supervisorSel = form.valores.supervisor ? String(form.valores.supervisor) : "";
+  const supervisorCambio = supervisorSel !== (orden.supervisor ?? "");
+  const puedeAsignar = responsableSel.length > 0 || supervisorCambio;
 
   async function guardar() {
     setGuardando(true);
@@ -244,7 +253,7 @@ function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenRow; onC
       pie={
         <>
           <Button variant="fantasma" onClick={onCerrar}>Cancelar</Button>
-          <Button variant="primario" loading={guardando} onClick={() => void guardar()}>Asignar</Button>
+          <Button variant="primario" loading={guardando} disabled={!puedeAsignar} onClick={() => void guardar()}>Asignar</Button>
         </>
       }
     >

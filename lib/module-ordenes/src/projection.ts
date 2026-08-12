@@ -295,6 +295,31 @@ export async function aplicarEventoOperacional(
       };
       const r = await adapters.proyecciones.aplicarAsignacion(uow, row);
       if (!r.ok) return r;
+      // DGP-020.1 (E2E) · Una asignación FUERTE de PERSONA como RESPONSABLE debe
+      // reflejarse también en el read model de responsables (fuente de
+      // `/responsables` y de la superficie del supervisor). Se proyecta SÓLO
+      // desde el payload autosuficiente e idempotente por (tenant, event_id).
+      // La entrada más reciente (registrado_at DESC) es el responsable vigente.
+      if (String(row.tipo) === "persona" && s(p["rol"]) === "responsable") {
+        // `responsable` (texto de presentación) prioriza el nombre canónico y
+        // cae al identityId/asignadoId para no perder trazabilidad legible.
+        const nombrePresentacion = s(p["asignadoNombre"]) ?? s(p["asignadoIdentityId"]) ?? s(p["asignadoId"]);
+        const resp = await adapters.proyecciones.aplicarResponsable(uow, {
+          tenantId, eventId: ev.id, ordenId,
+          responsable: nombrePresentacion,
+          responsableIdentityId: p["asignadoIdentityId"] ? String(p["asignadoIdentityId"]) : null,
+          responsableNombre: s(p["asignadoNombre"]),
+          supervisor: null,
+          version: Number(p["version"] ?? 1),
+          actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
+          registradoAt: actualizadoAt(p),
+        });
+        if (!resp.ok) return resp;
+        // También refleja el responsable en el read model de listado/detalle
+        // (superficie del supervisor: "Sin responsable asignado" ⇒ nombre).
+        const rm = await adapters.readModel.actualizarResponsable(uow, tenantId, ordenId, nombrePresentacion);
+        if (!rm.ok) return rm;
+      }
       return histOperacional(adapters, uow, ev, ordenId, `Asignación registrada (${row.tipo})`);
     }
     case RELACION_CREADA: {

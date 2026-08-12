@@ -285,6 +285,13 @@ export interface OrdenReadFiltro {
 
 export interface OrdenReadModel {
   apply(uow: UnitOfWork, row: OrdenReadRow): Promise<Result<boolean, KernelError>>;
+  /**
+   * DGP-020.1 (E2E) · Refleja el RESPONSABLE (texto de presentación) en el read
+   * model de listado/detalle a partir de la asignación FUERTE de persona
+   * (evento operacional). Actualización DIRIGIDA que NO toca los demás campos
+   * del agregado; no-op si la OT aún no está proyectada.
+   */
+  actualizarResponsable(uow: UnitOfWork, tenantId: string, ordenId: string, responsable: string | null): Promise<Result<boolean, KernelError>>;
   get(tenantId: string, id: string): Promise<Result<OrdenReadRow | null, KernelError>>;
   list(tenantId: string, filtro: OrdenReadFiltro): Promise<Result<OrdenReadRow[], KernelError>>;
   stats(tenantId: string): Promise<Result<Record<string, number>, KernelError>>;
@@ -301,6 +308,12 @@ export class FakeOrdenReadModel implements OrdenReadModel {
     if (current && current.version > row.version) return ok(false);
     this.applied.add(row.lastEventId);
     this.rows.set(key(row.tenantId, row.id), row);
+    return ok(true);
+  }
+  async actualizarResponsable(_uow: UnitOfWork, tenantId: string, ordenId: string, responsable: string | null) {
+    const current = this.rows.get(key(tenantId, ordenId));
+    if (!current) return ok(false); // OT aún no proyectada: no-op.
+    this.rows.set(key(tenantId, ordenId), { ...current, responsable });
     return ok(true);
   }
   async get(tenantId: string, id: string) {
@@ -370,6 +383,18 @@ export class PgOrdenReadModel implements OrdenReadModel {
       return ok((res.rowCount ?? 0) > 0);
     } catch (err) {
       return fail(KernelErrors.infrastructure("ReadModel apply falló", err));
+    }
+  }
+  async actualizarResponsable(uow: UnitOfWork, tenantId: string, ordenId: string, responsable: string | null) {
+    try {
+      await setTenant(uow, tenantId);
+      const res = await pgSessionOf(uow).query(
+        `UPDATE deltaops.ord_ordenes_read SET responsable=$3 WHERE tenant_id=$1 AND id=$2`,
+        [tenantId, ordenId, responsable],
+      );
+      return ok((res.rowCount ?? 0) > 0);
+    } catch (err) {
+      return fail(KernelErrors.infrastructure("ReadModel actualizarResponsable falló", err));
     }
   }
   async get(tenantId: string, id: string) {
