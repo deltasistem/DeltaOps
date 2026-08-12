@@ -1,0 +1,901 @@
+DGP-021 — DISCOVERY: COSTOS DE MANTENIMIENTO
+
+DIRECTIVA DE LA DIRECCIÓN DEL PROGRAMA
+
+Estado: DISCOVERY ÚNICAMENTE.
+NO implementar código.
+NO crear migraciones.
+NO modificar contratos.
+NO modificar frontend.
+NO modificar backend.
+NO modificar Workflow.
+NO modificar Identity.
+NO modificar RLS.
+NO modificar módulos congelados.
+NO iniciar DGP-021.1 automáticamente.
+
+El único entregable de esta fase debe ser un documento de descubrimiento arquitectónico completo que permita a Dirección aprobar o rechazar el diseño antes de implementar.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Realizar un Discovery exhaustivo para diseñar la futura capacidad de COSTOS DE MANTENIMIENTO de DeltaOps.
+
+La finalidad no es simplemente mostrar un "costo total", sino establecer una fuente de verdad auditable y componible para conocer cuánto cuesta mantener y operar cada activo y cada orden de trabajo.
+
+La futura solución debe poder componer, cuando los contratos existentes lo permitan:
+
+- Mano de obra.
+- Repuestos/materiales.
+- Combustible.
+- Otros costos de mantenimiento que realmente existan en el corpus.
+- Costo por OT.
+- Costo acumulado por activo.
+- Costo por hora de operación cuando existan datos suficientes.
+- Costos estimados vs reales cuando el corpus lo permita.
+- Información preparada para Analytics futuro.
+
+PRINCIPIO FUNDAMENTAL:
+
+NO INVENTAR DATOS.
+
+Si un costo no puede calcularse de forma demostrable con contratos y datos existentes, debe declararse como GAP.
+
+Nunca representar "Sin datos" como $0.
+
+==================================================
+2. GOBIERNO
+==================================================
+
+Antes de realizar cualquier propuesta:
+
+1. Inspeccionar el corpus real.
+2. Identificar contratos existentes.
+3. Identificar read models existentes.
+4. Identificar comandos existentes.
+5. Identificar relaciones reales entre módulos.
+6. Identificar fuentes de costos existentes.
+7. Identificar limitaciones.
+8. Documentar gaps.
+9. Proponer arquitectura únicamente después del análisis.
+
+NO asumir que una relación existe porque conceptualmente sería conveniente.
+
+NO crear adaptadores provisionales para ocultar un gap.
+
+NO leer directamente tablas internas de otros módulos si existe un contrato público.
+
+NO modificar módulos congelados.
+
+NO modificar código durante esta fase.
+
+==================================================
+3. CORPUS QUE DEBE AUDITARSE
+==================================================
+
+Auditar como mínimo:
+
+- module-activos
+- module-ordenes
+- module-utilizacion
+- module-manodeobra
+- module-inventario
+- module-abastecimiento
+- module-planes
+- module-preventivo
+- module-correctivo
+- Analytics
+- Shared Timeline
+- Record Store
+- Workflow
+- Identity
+- tenancy
+- RLS
+- Offline
+- Outbox
+- Dynamic Forms
+- QR
+- Read models existentes
+- API/OpenAPI
+
+Revisar también migraciones, seeds, fixtures, contratos públicos, puertos, adaptadores y documentación existente.
+
+No limitar el Discovery a nombres de archivos.
+
+Seguir las relaciones reales de los contratos.
+
+==================================================
+4. AUDITORÍA DE REPUESTOS Y MATERIALES
+==================================================
+
+Determinar exactamente:
+
+1. Cómo se representa actualmente un artículo.
+2. Cómo se representa el inventario.
+3. Cómo se representa una salida de inventario.
+4. Cómo se representa una entrada.
+5. Cómo se representa una devolución.
+6. Cómo se representa un ajuste.
+7. Cómo se representa el costo unitario.
+8. Si existe costo promedio, último costo, costo estándar u otro.
+9. Cómo se relaciona actualmente un artículo con una OT.
+10. Si registrar-recurso de Órdenes permite identificar inequívocamente un repuesto.
+11. Si existe cantidad consumida.
+12. Si existe unidad de medida.
+13. Si existe precio/costo al momento del consumo.
+14. Si existe trazabilidad de quién realizó el consumo.
+15. Si existe trazabilidad del almacén/bodega.
+16. Si existe snapshot histórico del costo.
+17. Qué sucede cuando cambia posteriormente el precio del artículo.
+18. Qué sucede ante una devolución.
+19. Qué sucede ante una anulación.
+20. Si el costo actual puede atribuirse realmente a una OT y a un activo.
+
+Distinguir claramente:
+
+REFERENCIA DE ARTÍCULO
+vs
+HECHO ECONÓMICO DE CONSUMO.
+
+No asumir que tener un artículo en Inventario significa que ya existe un costo atribuible a mantenimiento.
+
+==================================================
+5. AUDITORÍA DE ABASTECIMIENTO
+==================================================
+
+Determinar:
+
+- Solicitudes.
+- Compras.
+- Proveedores.
+- Órdenes de compra si existen.
+- Recepciones.
+- Precios.
+- Costos.
+- Moneda.
+- Impuestos si existen.
+- Cantidades.
+- Estado de adquisición.
+- Relación con inventario.
+- Relación con OT.
+- Relación con activo.
+
+Determinar si Abastecimiento representa:
+
+a) costo comprometido,
+b) costo adquirido,
+c) costo recibido,
+d) costo consumido,
+
+o ninguna de estas categorías de forma completa.
+
+NO confundir precio de compra con costo de mantenimiento consumido.
+
+==================================================
+6. AUDITORÍA DE COMBUSTIBLE
+==================================================
+
+Usar DGP-019 como fuente de contexto, pero verificar nuevamente el corpus real.
+
+Determinar exactamente qué existe actualmente para:
+
+- Tanqueos.
+- Activo.
+- Fecha/hora.
+- Litros.
+- Costo.
+- Precio unitario.
+- Proveedor/estación.
+- Medidor.
+- Horómetro.
+- Odómetro.
+- Evidencia.
+- Usuario.
+- Tenant.
+- Estado/anulación.
+- Moneda.
+
+Determinar qué costos pueden derivarse realmente.
+
+Ejemplos posibles, SOLO SI LOS DATOS EXISTEN:
+
+- costo por tanqueo;
+- costo combustible por período;
+- litros consumidos;
+- L/h;
+- L/100 km;
+- costo por hora;
+- costo por km.
+
+No asumir que un indicador calculable operacionalmente equivale automáticamente a un costo financiero.
+
+==================================================
+7. AUDITORÍA DE MANO DE OBRA
+==================================================
+
+Usar DGP-020.3 como fuente de contexto y verificar el contrato real.
+
+Determinar:
+
+- identityId;
+- recurso;
+- categoría;
+- tarifa;
+- moneda;
+- unidad;
+- vigencia;
+- sesión;
+- efectivoMs;
+- valoración;
+- costo;
+- estimado/final;
+- anulaciones;
+- revaloración;
+- histórico.
+
+Confirmar exactamente cómo puede vincularse:
+
+OT → sesión → identityId → mano de obra → costo.
+
+Determinar si el costo de mano de obra ya puede considerarse un HECHO ECONÓMICO SNAPSHOT o si requiere una capa adicional.
+
+No recalcular en frontend.
+
+==================================================
+8. RELACIÓN OT → ACTIVO → COSTO
+==================================================
+
+Determinar cómo se puede construir de forma confiable:
+
+OT
+↓
+Activo
+↓
+Hechos económicos
+↓
+Costo de mantenimiento
+
+Auditar:
+
+- activo_principal_id;
+- activoId derivado;
+- identityId;
+- sesiones;
+- mano de obra;
+- combustible;
+- recursos/repuestos;
+- timeline;
+- read models.
+
+Identificar cualquier relación que actualmente sea:
+
+- texto libre;
+- opcional;
+- indirecta;
+- histórica;
+- no verificable;
+- dependiente del frontend.
+
+Clasificar cada relación como:
+
+CONFIRMADA
+PARCIAL
+NO EXISTE
+GAP
+
+==================================================
+9. MODELO ECONÓMICO
+==================================================
+
+Proponer, SIN IMPLEMENTAR, una arquitectura de hechos económicos.
+
+Evaluar si conviene una abstracción tipo:
+
+HECHO ECONÓMICO
+- tenantId
+- hechoId
+- origen
+- tipo
+- OT
+- activo
+- fecha
+- identidad
+- cantidad
+- unidad
+- costoUnitario
+- costoTotal
+- moneda
+- snapshot
+- estado
+- evidencia
+- opId
+- timestamps
+
+PERO:
+
+No implementar esta entidad automáticamente.
+
+Primero demostrar si realmente es necesaria y si no duplica conceptos existentes.
+
+Evaluar alternativas:
+
+A. Cada módulo conserva su costo y un agregador los compone.
+
+B. Nuevo módulo de costos consume contratos públicos.
+
+C. Read model transversal de costos.
+
+D. Otra arquitectura justificada por el corpus.
+
+Comparar ventajas, riesgos, trazabilidad, RLS, offline, idempotencia y mantenimiento.
+
+Elegir una opción solo después del análisis.
+
+==================================================
+10. SNAPSHOT Y CAMBIOS HISTÓRICOS
+==================================================
+
+Analizar obligatoriamente cómo preservar la historia.
+
+Ejemplo:
+
+Hoy:
+
+Tarifa técnico = $40.000/h
+
+OT-001 consume 2 horas.
+
+Costo histórico = $80.000.
+
+Mañana:
+
+Tarifa técnico = $50.000/h.
+
+El costo histórico de OT-001 NO puede convertirse en $100.000.
+
+El mismo principio debe analizarse para:
+
+- mano de obra;
+- repuestos;
+- combustible;
+- precios;
+- monedas;
+- proveedores;
+- unidades.
+
+Definir qué debe ser snapshot y qué puede ser referencia viva.
+
+==================================================
+11. ESTADOS ECONÓMICOS
+==================================================
+
+Investigar si el corpus permite distinguir:
+
+- estimado;
+- reservado;
+- comprometido;
+- consumido;
+- valorado;
+- facturado;
+- final;
+- anulado.
+
+No inventar estados.
+
+Si no existen, documentar GAP.
+
+Proponer únicamente los estados necesarios y justificarlos.
+
+==================================================
+12. COSTO DE UNA OT
+==================================================
+
+Determinar qué componentes podrían formar:
+
+COSTO OT =
+
+MANO DE OBRA
++
+REPUESTOS/MATERIALES
++
+COMBUSTIBLE
++
+OTROS COSTOS VALIDOS
+
+Pero solamente incluir componentes cuya fuente exista realmente.
+
+Cada componente debe indicar:
+
+- fuente;
+- contrato;
+- read model;
+- nivel de confianza;
+- snapshot;
+- fecha;
+- moneda;
+- estado.
+
+Si falta un componente:
+
+"Sin datos suficientes"
+
+NO:
+
+"$0".
+
+==================================================
+13. COSTO DE UN ACTIVO
+==================================================
+
+Diseñar conceptualmente:
+
+Activo
+↓
+OTs
+↓
+Costos asociados
+↓
+Costo acumulado
+
+Analizar:
+
+- costo histórico;
+- costo por período;
+- costo por tipo de mantenimiento;
+- costo por OT;
+- costo de combustible;
+- costo de mano de obra;
+- costo de repuestos;
+- costo por hora;
+- costo por km cuando aplique.
+
+Determinar cuáles son posibles HOY y cuáles requieren contratos futuros.
+
+==================================================
+14. COSTO POR HORA DE OPERACIÓN
+==================================================
+
+Este punto es PRIORITARIO para Dirección.
+
+Determinar qué se necesita para calcular:
+
+COSTO OPERATIVO / HORA
+
+Ejemplo conceptual:
+
+(costo mantenimiento + combustible + mano de obra)
+/
+horas de operación
+
+Pero distinguir cuidadosamente:
+
+- hora de mantenimiento;
+- hora de sesión de trabajo;
+- hora de horómetro;
+- hora calendario.
+
+NO asumir que son equivalentes.
+
+Determinar cuál debe ser el denominador correcto.
+
+Si faltan datos, documentar GAP.
+
+==================================================
+15. DISPONIBILIDAD Y COSTO
+==================================================
+
+No asumir:
+
+OT abierta = activo fuera de servicio.
+
+Investigar si existe información suficiente para distinguir:
+
+- mantenimiento;
+- indisponibilidad;
+- operación;
+- espera;
+- parada;
+- reparación.
+
+Si no existe, documentarlo como GAP.
+
+==================================================
+16. MONEDA
+==================================================
+
+Investigar:
+
+- moneda del tenant;
+- moneda de tarifas;
+- moneda de combustible;
+- moneda de inventario;
+- moneda de abastecimiento.
+
+Determinar si existe una moneda canónica.
+
+No convertir monedas si no existe una política oficial.
+
+No usar COP/CLP/etc. hardcodeado.
+
+==================================================
+17. OFFLINE
+==================================================
+
+Determinar qué hechos económicos pueden originarse offline.
+
+Especialmente:
+
+- consumo de repuestos;
+- combustible;
+- sesiones;
+- mano de obra.
+
+Determinar qué debe sincronizarse.
+
+No crear una segunda cola.
+
+Utilizar el framework Offline existente si corresponde.
+
+Analizar idempotencia y concurrencia.
+
+==================================================
+18. AUDITORÍA
+==================================================
+
+Toda futura cifra económica debe poder responder:
+
+¿Quién?
+¿Qué?
+¿Cuándo?
+¿Sobre qué OT?
+¿Sobre qué activo?
+¿Qué cantidad?
+¿Qué tarifa/precio?
+¿De dónde salió?
+¿Qué moneda?
+¿Qué versión?
+¿Quién la generó?
+¿Fue modificada?
+¿Fue anulada?
+
+Si una cifra no puede responder estas preguntas, señalar el problema.
+
+==================================================
+19. ANALYTICS
+==================================================
+
+No construir dashboards ejecutivos en DGP-021.
+
+Determinar únicamente qué read models/datasets futuros deberían quedar disponibles para Analytics.
+
+Proponer métricas posibles:
+
+- costo por OT;
+- costo por activo;
+- costo por período;
+- costo de mano de obra;
+- costo de repuestos;
+- costo de combustible;
+- costo por hora;
+- costo por km;
+- tendencia de costos;
+- costo acumulado;
+- top activos por costo.
+
+Cada métrica debe indicar si es:
+
+DISPONIBLE
+DISPONIBLE CON DATOS FUTUROS
+NO DISPONIBLE
+
+==================================================
+20. MULTITENANCY Y RLS
+==================================================
+
+Auditar todas las fuentes.
+
+Toda futura composición debe mantener:
+
+tenantId
++
+RLS
++
+identidad canónica
++
+autorización backend.
+
+Analizar explícitamente:
+
+- acceso cross-tenant;
+- identidad;
+- OT;
+- activo;
+- inventario;
+- abastecimiento;
+- combustible;
+- mano de obra.
+
+No aceptar filtros frontend como mecanismo de aislamiento.
+
+==================================================
+21. RBAC
+==================================================
+
+Determinar qué debería poder hacer cada rol:
+
+SUPER_ADMIN
+TENANT_ADMIN
+SUPERVISOR
+PLANIFICADOR
+TECNICO
+CONSULTA
+
+Separar:
+
+- visualizar costos;
+- registrar costo;
+- corregir;
+- anular;
+- revalorar;
+- administrar tarifas;
+- administrar precios;
+- consultar costos globales.
+
+No crear permisos todavía.
+
+Solo proponer la matriz.
+
+==================================================
+22. GAPS
+==================================================
+
+Crear un registro explícito de gaps.
+
+Como mínimo investigar:
+
+GAP-COST-01
+Atribución de repuestos a OT.
+
+GAP-COST-02
+Snapshot histórico de costo de repuestos.
+
+GAP-COST-03
+Relación abastecimiento → consumo.
+
+GAP-COST-04
+Política de moneda.
+
+GAP-COST-05
+Costo real vs estimado.
+
+GAP-COST-06
+Costo de disponibilidad/indisponibilidad.
+
+GAP-COST-07
+Costo por hora de operación.
+
+GAP-COST-08
+Devoluciones/anulaciones.
+
+GAP-COST-09
+Otros costos.
+
+NO declarar un GAP como resuelto sin evidencia del corpus.
+
+Agregar todos los gaps adicionales encontrados.
+
+==================================================
+23. ARQUITECTURA PROPUESTA
+==================================================
+
+Después de toda la investigación, proponer la arquitectura recomendada.
+
+Debe incluir:
+
+- módulos afectados;
+- módulos nuevos si fueran necesarios;
+- puertos;
+- adaptadores;
+- read models;
+- comandos;
+- eventos;
+- snapshots;
+- RLS;
+- identidad;
+- offline;
+- auditoría;
+- OpenAPI;
+- Analytics.
+
+Explicar por qué la arquitectura:
+
+- no duplica dominios;
+- conserva fuentes de verdad;
+- mantiene contratos;
+- es multitenant;
+- es auditable;
+- es compatible con offline;
+- es escalable.
+
+==================================================
+24. FASES FUTURAS
+==================================================
+
+Proponer fases posteriores.
+
+Como punto de partida evaluar:
+
+DGP-021.1
+Fundación de hechos económicos / costos.
+
+DGP-021.2
+Integración de repuestos e inventario.
+
+DGP-021.3
+Integración combustible.
+
+DGP-021.4
+Composición costo OT / activo.
+
+DGP-021.5
+Analytics/read models económicos.
+
+Pero NO asumir que estas fases serán exactamente así.
+
+Derivar la secuencia correcta de los gaps encontrados.
+
+Identificar dependencias y bloqueantes.
+
+==================================================
+25. CRITERIOS DE ACEPTACIÓN DEL DISCOVERY
+==================================================
+
+El Discovery solamente podrá cerrarse PASS si:
+
+1. Todo el corpus relevante fue auditado.
+2. No se inventaron relaciones.
+3. Mano de obra fue contrastada con DGP-020.3.
+4. Combustible fue contrastado con DGP-019.
+5. Sesiones fueron contrastadas con DGP-020.2.
+6. Inventario fue auditado.
+7. Abastecimiento fue auditado.
+8. Se identificó la fuente real de cada costo.
+9. Se documentaron los gaps.
+10. Se definió estrategia de snapshots.
+11. Se definió estrategia de moneda.
+12. Se definió estrategia de auditoría.
+13. Se definió estrategia offline.
+14. Se definió estrategia RBAC.
+15. Se definió estrategia RLS.
+16. Se definió cómo evitar $0 cuando realmente significa "Sin datos".
+17. Se definió qué métricas podrán alimentar Analytics.
+18. Se identificó qué NO puede calcularse todavía.
+19. Se propuso arquitectura sin duplicación de dominio.
+20. Se propusieron fases posteriores.
+21. Una revisión arquitectónica independiente ejecutó el análisis contra el corpus real.
+22. Si la revisión encuentra una afirmación no demostrada, corregir el Discovery antes de declararlo PASS.
+
+==================================================
+26. ENTREGABLE
+==================================================
+
+Crear únicamente:
+
+docs/DGP-021-DESCUBRIMIENTO.md
+
+El documento debe contener:
+
+- objetivo;
+- alcance;
+- corpus auditado;
+- hallazgos;
+- arquitectura actual;
+- fuentes de costo;
+- relaciones verificadas;
+- modelo económico propuesto;
+- snapshots;
+- moneda;
+- offline;
+- auditoría;
+- RBAC;
+- RLS;
+- Analytics;
+- gaps;
+- riesgos;
+- alternativas arquitectónicas;
+- arquitectura recomendada;
+- fases futuras;
+- criterios de aceptación;
+- decisiones pendientes de Dirección.
+
+NO modificar código.
+
+NO crear migraciones.
+
+NO crear endpoints.
+
+NO crear componentes frontend.
+
+NO tocar contratos congelados.
+
+NO tocar base de datos.
+
+==================================================
+27. REVISIÓN ARQUITECTÓNICA OBLIGATORIA
+==================================================
+
+Antes de declarar PASS:
+
+Ejecutar una revisión independiente sobre el Discovery.
+
+El revisor debe intentar encontrar:
+
+- datos inventados;
+- relaciones asumidas;
+- duplicación de dominio;
+- costos sin fuente;
+- problemas de snapshot;
+- problemas de moneda;
+- problemas de multitenancy;
+- problemas de RLS;
+- problemas de identidad;
+- problemas offline;
+- cálculos de costo incorrectos;
+- confusión entre hora de mantenimiento y hora de operación;
+- métricas que realmente no pueden calcularse;
+- dependencias ocultas.
+
+Si encuentra problemas:
+
+R1 FAIL
+→ corregir
+→ nueva revisión.
+
+Solo declarar:
+
+DISCOVERY PASS
+
+cuando no existan hallazgos CRÍTICOS o MAYORES.
+
+==================================================
+28. REGLA FINAL DE DIRECCIÓN
+==================================================
+
+Este Discovery es la base económica de DeltaOps.
+
+No quiero una solución que simplemente "sume números".
+
+Quiero una arquitectura que permita demostrar de dónde salió cada peso de costo de mantenimiento.
+
+La cadena objetivo es:
+
+ACTIVO
+ ↓
+ORDEN DE TRABAJO
+ ↓
+HECHOS OPERACIONALES
+ ↓
+MANO DE OBRA / REPUESTOS / COMBUSTIBLE
+ ↓
+SNAPSHOT ECONÓMICO
+ ↓
+COSTO OT
+ ↓
+COSTO ACTIVO
+ ↓
+COSTO POR HORA/KM
+ ↓
+ANALYTICS
+
+Pero esta cadena solo debe implementarse donde el corpus real permita sostenerla.
+
+Si un eslabón no existe:
+
+DOCUMENTAR GAP.
+
+NO INVENTARLO.
+
+No iniciar ninguna fase posterior automáticamente.
+
+Esperar aprobación explícita de Dirección.
