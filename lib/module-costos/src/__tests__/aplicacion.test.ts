@@ -52,7 +52,7 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
 
   it("MATERIAL: verifica OT, DERIVA activo de la OT y congela el costo exacto", async () => {
     const h = must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, {
-      otId: "ot1", articuloId: "art1", cantidad: "2.000000", unidad: "UN", moneda: "COP",
+      opId: "op-material-1", otId: "ot1", articuloId: "art1", cantidad: "2.000000", unidad: "UN", moneda: "COP",
     })) as Record<string, unknown>;
     expect(h["activoId"]).toBe("act-9"); // derivado, NO del frontend
     expect(h["costoUnitario"]).toBe("1500.250000");
@@ -62,18 +62,18 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
   });
 
   it("MATERIAL: OT inexistente ⇒ 404; SIN COSTO exacto ⇒ rechazo (≠ 0)", async () => {
-    const noOt = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "zzz", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" });
+    const noOt = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-404-noot", otId: "zzz", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" });
     expect(noOt.ok).toBe(false);
-    const sinCosto = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "art-sin", cantidad: "1", unidad: "UN", moneda: "COP" });
+    const sinCosto = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-sincosto", otId: "ot1", articuloId: "art-sin", cantidad: "1", unidad: "UN", moneda: "COP" });
     expect(sinCosto.ok).toBe(false);
     // moneda sin costo exacto tampoco materializa
-    const otraMoneda = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "USD" });
+    const otraMoneda = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-otramoneda", otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "USD" });
     expect(otraMoneda.ok).toBe(false);
   });
 
   it("SNAPSHOT INMUTABLE: cambiar el costo origen NO altera el hecho ya materializado", async () => {
     const h = must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, {
-      opId: "op-snap", otId: "ot1", articuloId: "art1", cantidad: "1.000000", unidad: "UN", moneda: "COP",
+      opId: "op-snap-1", otId: "ot1", articuloId: "art1", cantidad: "1.000000", unidad: "UN", moneda: "COP",
     })) as Record<string, unknown>;
     expect(h["costoUnitario"]).toBe("1500.250000");
     // El costo origen cambia radicalmente...
@@ -86,11 +86,11 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
 
   it("OTROS: identidad canónica fail-closed (falta identityId ⇒ 403)", async () => {
     const sinId = await exec(ctx(), `${MODULO}.hecho.materializar-otros`, {
-      otId: "ot1", concepto: "peaje", cantidad: "1", unidad: "UN", costoUnitario: "500", moneda: "COP",
+      opId: "op-otros-noid", otId: "ot1", concepto: "peaje", cantidad: "1", unidad: "UN", costoUnitario: "500", moneda: "COP",
     });
     expect(sinId.ok).toBe(false);
     const conId = must(await exec(ctx("u1"), `${MODULO}.hecho.materializar-otros`, {
-      otId: "ot-admin", concepto: "peaje", cantidad: "2", unidad: "UN", costoUnitario: "500", moneda: "COP",
+      opId: "op-otros-conid", otId: "ot-admin", concepto: "peaje", cantidad: "2", unidad: "UN", costoUnitario: "500", moneda: "COP",
     })) as Record<string, unknown>;
     expect(conId["identityId"]).toBe("u1");
     expect(conId["activoId"]).toBeNull(); // OT sin activo principal (caso documentado)
@@ -98,7 +98,7 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
   });
 
   it("idempotencia por opId: reejecutar el mismo comando ⇒ un solo hecho", async () => {
-    const input = { opId: "dup", otId: "ot1", concepto: "x", cantidad: "1", unidad: "UN", costoUnitario: "10", moneda: "COP" };
+    const input = { opId: "op-dup-idem", otId: "ot1", concepto: "x", cantidad: "1", unidad: "UN", costoUnitario: "10", moneda: "COP" };
     const a = must(await exec(ctx("u1"), `${MODULO}.hecho.materializar-otros`, input)) as Record<string, unknown>;
     expect(a["idempotente"]).toBe(false);
     // Reintento con el MISMO opId ⇒ recibo sellado ⇒ resultado idempotente, sin duplicar.
@@ -111,14 +111,14 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
 
   it("anulación auditable: cambia estado, conserva importes", async () => {
     const h = must(await exec(ctx("u1"), `${MODULO}.hecho.materializar-otros`, {
-      otId: "ot1", concepto: "x", cantidad: "1", unidad: "UN", costoUnitario: "10", moneda: "COP",
+      opId: "op-anu-crear", otId: "ot1", concepto: "x", cantidad: "1", unidad: "UN", costoUnitario: "10", moneda: "COP",
     })) as Record<string, unknown>;
-    const anulado = must(await exec(ctx(), `${MODULO}.hecho.anular`, { costoId: h["costoId"], motivo: "error de captura" })) as Record<string, unknown>;
+    const anulado = must(await exec(ctx(), `${MODULO}.hecho.anular`, { opId: "op-anu-1", costoId: h["costoId"], motivo: "error de captura" })) as Record<string, unknown>;
     expect(anulado["estado"]).toBe("ANULADO");
     expect(anulado["motivoAnulacion"]).toBe("error de captura");
     expect(anulado["costoTotal"]).toBe(h["costoTotal"]);
-    // re-anular ⇒ conflicto
-    const re = await exec(ctx(), `${MODULO}.hecho.anular`, { costoId: h["costoId"], motivo: "otra" });
+    // re-anular (otro opId) ⇒ conflicto de dominio (ya está ANULADO)
+    const re = await exec(ctx(), `${MODULO}.hecho.anular`, { opId: "op-anu-2", costoId: h["costoId"], motivo: "otra" });
     expect(re.ok).toBe(false);
   });
 
@@ -126,8 +126,8 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
     rt.fakes!.costoExacto.set(TENANT, "artU", [
       { articuloId: "artU", moneda: "USD", metodoValoracion: "PROMEDIO_PONDERADO", costoUnitario: "2.000000", cantidadAcumulada: "5.000000", actualizadoAt: "2024-01-01T00:00:00.000Z" },
     ]);
-    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" }));
-    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "artU", cantidad: "1", unidad: "UN", moneda: "USD" }));
+    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-pm-cop", otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" }));
+    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-pm-usd", otId: "ot1", articuloId: "artU", cantidad: "1", unidad: "UN", moneda: "USD" }));
     const r = must(await query(ctx(), `${MODULO}.hechos.por-moneda`, { otId: "ot1" })) as { monedas: { moneda: string; hechos: unknown[] }[] };
     const monedas = r.monedas.map((m) => m.moneda).sort();
     expect(monedas).toEqual(["COP", "USD"]);
@@ -140,5 +140,29 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
       // @ts-expect-error prueba de robustez: number nunca debe aceptarse
       f.set(TENANT, "art1", [{ articuloId: "art1", moneda: "COP", metodoValoracion: "X", costoUnitario: 1500.25, cantidadAcumulada: "1.000000", actualizadoAt: "x" }]),
     ).toThrow(TypeError);
+  });
+
+  it("IDEMPOTENCIA INVARIANTE: TODA mutación sin opId ⇒ RECHAZADA (§16)", async () => {
+    // MATERIAL sin opId
+    const mat = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" });
+    expect(mat.ok).toBe(false);
+    // OTROS sin opId
+    const otr = await exec(ctx("u1"), `${MODULO}.hecho.materializar-otros`, { otId: "ot1", concepto: "x", cantidad: "1", unidad: "UN", costoUnitario: "10", moneda: "COP" });
+    expect(otr.ok).toBe(false);
+    // ANULAR sin opId (crear uno con opId válido primero)
+    const h = must(await exec(ctx("u1"), `${MODULO}.hecho.materializar-otros`, { opId: "op-noopid-crear", otId: "ot1", concepto: "x", cantidad: "1", unidad: "UN", costoUnitario: "10", moneda: "COP" })) as Record<string, unknown>;
+    const anu = await exec(ctx(), `${MODULO}.hecho.anular`, { costoId: h["costoId"], motivo: "sin opId" });
+    expect(anu.ok).toBe(false);
+    // Ningún efecto colateral: sólo existe el hecho creado con opId válido.
+    const lista = must(await query(ctx(), `${MODULO}.hechos`, { otId: "ot1" })) as { hechos: unknown[] };
+    expect(lista.hechos.length).toBe(1);
+  });
+
+  it("opId ACOTADO: vacío, demasiado corto o con espacios ⇒ RECHAZADO", async () => {
+    const base = { otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" };
+    for (const bad of ["", "corto", "   ", "con espacio 12345"]) {
+      const r = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { ...base, opId: bad });
+      expect(r.ok).toBe(false);
+    }
   });
 });

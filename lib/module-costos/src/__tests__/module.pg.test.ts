@@ -99,6 +99,25 @@ suite("DGP-021.1 · Costos · PostgreSQL", { timeout: 30_000 }, () => {
     expect(n).toBe(1);
   });
 
+  it("IDEMPOTENCIA INVARIANTE (PG): materializar sin opId ⇒ rechazado y NINGUNA fila", async () => {
+    const antes = (await pool.query(`SELECT count(*)::int n FROM deltaops.cos_hechos WHERE tenant_id=$1`, [T_A])).rows[0]["n"];
+    const r = await exec(ctx(T_A), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" });
+    expect(r.ok).toBe(false);
+    const despues = (await pool.query(`SELECT count(*)::int n FROM deltaops.cos_hechos WHERE tenant_id=$1`, [T_A])).rows[0]["n"];
+    expect(despues).toBe(antes); // el claim falla cerrado ANTES de cualquier efecto en BD
+  });
+
+  it("reintento SECUENCIAL con el mismo opId ⇒ exactamente un resultado durable", async () => {
+    const op = `retry-${RUN}`;
+    const a = must(await exec(ctx(T_A), `${MODULO}.hecho.materializar-material`, { opId: op, otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" })) as Record<string, unknown>;
+    expect(a["idempotente"]).toBe(false);
+    const b = must(await exec(ctx(T_A), `${MODULO}.hecho.materializar-material`, { opId: op, otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" })) as Record<string, unknown>;
+    expect(b["idempotente"]).toBe(true);
+    expect(b["costoId"]).toBe(a["costoId"]);
+    const n = (await pool.query(`SELECT count(*)::int n FROM deltaops.cos_hechos WHERE tenant_id=$1 AND op_id=$2`, [T_A, op])).rows[0]["n"];
+    expect(n).toBe(1);
+  });
+
   it("SNAPSHOT inmutable a nivel de BD: cambiar el costo origen no altera la fila persistida", async () => {
     const op = `snap-${RUN}`;
     const h = must(await exec(ctx(T_A), `${MODULO}.hecho.materializar-material`, {
@@ -119,7 +138,7 @@ suite("DGP-021.1 · Costos · PostgreSQL", { timeout: 30_000 }, () => {
     const h = must(await exec(ctx(T_A), `${MODULO}.hecho.materializar-material`, {
       opId: `anu-${RUN}`, otId: "ot1", articuloId: "art1", cantidad: "2", unidad: "UN", moneda: "COP",
     })) as Record<string, unknown>;
-    must(await exec(ctx(T_A), `${MODULO}.hecho.anular`, { costoId: h["costoId"], motivo: "duplicado" }));
+    must(await exec(ctx(T_A), `${MODULO}.hecho.anular`, { opId: `anu-op-${RUN}`, costoId: h["costoId"], motivo: "duplicado" }));
     const row = (await pool.query(
       `SELECT estado, motivo_anulacion m, anulado_por p, costo_total::text tt FROM deltaops.cos_hechos WHERE tenant_id=$1 AND costo_id=$2`,
       [T_A, h["costoId"]],

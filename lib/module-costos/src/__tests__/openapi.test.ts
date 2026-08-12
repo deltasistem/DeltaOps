@@ -46,6 +46,15 @@ describe("DGP-021.1 · OpenAPI contract-first", () => {
     expect(json.includes('"type": "number"')).toBe(false);
   });
 
+  it("opId es REQUERIDO en TODOS los cuerpos de mutación (idempotencia invariante)", () => {
+    const doc = construirOpenApi() as { components: { schemas: Record<string, { required?: string[]; properties?: Record<string, unknown> }> } };
+    for (const nombre of ["MaterializarMaterial", "MaterializarOtros", "AnularHecho"]) {
+      const schema = doc.components.schemas[nombre]!;
+      expect(schema.properties && "opId" in schema.properties).toBe(true);
+      expect(schema.required ?? []).toContain("opId");
+    }
+  });
+
   it("cubre CADA comando y consulta del módulo (operationId por ruta)", () => {
     const nombres = nombresDelModulo();
     expect(nombres.length).toBeGreaterThanOrEqual(6);

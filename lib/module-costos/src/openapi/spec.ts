@@ -62,6 +62,15 @@ export function construirOpenApi(): Record<string, unknown> {
     pattern: "^\\d{1,12}\\.\\d{6}$",
     description: "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales).",
   });
+  // DGP-021.1 · idempotencia INVARIANTE (§16): opId OBLIGATORIO y ACOTADO en toda
+  // mutación. El servidor NUNCA genera opId de fallback (haría duplicados por
+  // reintento). 8..200 caracteres imprimibles ASCII sin espacios.
+  const opIdReq = str({
+    minLength: 8,
+    maxLength: 200,
+    pattern: "^[\\x21-\\x7e]+$",
+    description: "Clave de idempotencia OBLIGATORIA (invariante): 8..200 caracteres imprimibles ASCII sin espacios. Un reintento con el mismo opId devuelve el mismo resultado sin duplicar.",
+  });
 
   const schemas: Record<string, Schema> = {
     Error: obj({ error: str(), code: str({ example: "KRN-VAL-001" }) }, ["error", "code"]),
@@ -70,7 +79,7 @@ export function construirOpenApi(): Record<string, unknown> {
     // ---- Materialización ----
     MaterializarMaterial: obj(
       {
-        opId: str({ description: "Idempotencia durable del comando" }),
+        opId: opIdReq,
         costoId: str({ format: "uuid" }),
         otId: str({ description: "OT verificada por contrato público; el activo se DERIVA de la relación canónica" }),
         articuloId: str({ description: "Artículo cuyo costo EXACTO se snapshotea (DGP-021.0)" }),
@@ -79,11 +88,11 @@ export function construirOpenApi(): Record<string, unknown> {
         moneda: str({ description: "Moneda del hecho; debe existir costo exacto en esa moneda (SIN COSTO ≠ 0)" }),
         ocurridoAt: str({ format: "date-time" }),
       },
-      ["otId", "articuloId", "cantidad", "unidad", "moneda"],
+      ["opId", "otId", "articuloId", "cantidad", "unidad", "moneda"],
     ),
     MaterializarOtros: obj(
       {
-        opId: str(),
+        opId: opIdReq,
         costoId: str({ format: "uuid" }),
         otId: str(),
         concepto: str({ description: "Concepto auditable del costo manual (origen no es texto libre suelto)" }),
@@ -93,11 +102,11 @@ export function construirOpenApi(): Record<string, unknown> {
         moneda: str(),
         ocurridoAt: str({ format: "date-time" }),
       },
-      ["otId", "concepto", "cantidad", "unidad", "costoUnitario", "moneda"],
+      ["opId", "otId", "concepto", "cantidad", "unidad", "costoUnitario", "moneda"],
     ),
     AnularHecho: obj(
-      { opId: str(), motivo: str({ description: "Motivo auditable de la anulación" }) },
-      ["motivo"],
+      { opId: opIdReq, motivo: str({ description: "Motivo auditable de la anulación" }) },
+      ["opId", "motivo"],
     ),
 
     // ---- Hecho económico (identidad + snapshot inmutable + auditoría) ----

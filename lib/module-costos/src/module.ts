@@ -111,7 +111,12 @@ async function emitir(
   return ok(undefined);
 }
 
-/** Claim durable del opId ANTES de efectos (§25 idempotencia). */
+/**
+ * Claim durable del opId ANTES de efectos (§16 · §25 idempotencia como
+ * INVARIANTE). El claim ocurre ANTES de cualquier lookup de OT/fuente o efecto
+ * en BD. Falla CERRADO si el opId está ausente (defensa en profundidad: el
+ * schema zod ya lo exige, pero el claim nunca procede sin clave de idempotencia).
+ */
 async function reclamar(
   adapters: ModuleAdapters,
   ctx: ExecutionContext,
@@ -120,7 +125,9 @@ async function reclamar(
   comando: string,
   opId: string | undefined,
 ): Promise<{ proceder: true } | { proceder: false; corto: Result<Record<string, unknown>, KernelError> }> {
-  if (!opId) return { proceder: true };
+  if (!opId) {
+    return { proceder: false, corto: fail(KernelErrors.validation("opId es obligatorio: la idempotencia es invariante en toda mutación de costos")) };
+  }
   const claim = await adapters.recibos.reclamar(uow, tenant, comando, opId, ctx.principal.id);
   if (!claim.ok) return { proceder: false, corto: claim };
   if (claim.value.duenio) return { proceder: true };
@@ -213,6 +220,25 @@ const dineroSchema = z
   })
   .regex(RE_DINERO, "valor decimal inválido: use \\d{1,12}(\\.\\d{1,6})? (sin signo ni notación científica, ≤6 decimales)");
 
+/**
+ * IDEMPOTENCIA COMO INVARIANTE (§16 · criterio de cierre 15). El `opId` es
+ * OBLIGATORIO y ACOTADO en TODA mutación: el cliente debe aportar una clave de
+ * operación estable para que un reintento sea idempotente. NUNCA se genera un
+ * opId de fallback en el servidor (un UUID fresco por intento haría cada
+ * reintento un hecho NUEVO → duplicados). Formato: cadena no vacía de 8..200
+ * caracteres imprimibles ASCII (cubre UUIDv4 y claves deterministas del corpus
+ * tipo `recepcionId:numeroLinea`), sin espacios en blanco delimitando.
+ */
+const opIdSchema = z
+  .string({
+    invalid_type_error: "opId debe ser una CADENA",
+    required_error: "opId es obligatorio: la idempotencia es invariante, no opcional",
+  })
+  .trim()
+  .min(8, "opId demasiado corto (mínimo 8 caracteres)")
+  .max(200, "opId demasiado largo (máximo 200 caracteres)")
+  .regex(/^[\x21-\x7e]+$/, "opId inválido: use caracteres imprimibles ASCII sin espacios");
+
 export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinition {
   return {
     name: MODULO,
@@ -238,7 +264,7 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
       (deps) => ({
         name: `${MODULO}.hecho.materializar-material`,
         inputSchema: z.object({
-          opId: z.string().optional(),
+          opId: opIdSchema,
           costoId: z.string().uuid().optional(),
           otId: z.string().min(1),
           articuloId: z.string().min(1),
@@ -280,7 +306,7 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
             otId: input.otId,
             activoId: ot.value.activoId,
             identityId: null,
-            opId: input.opId ?? crypto.randomUUID(),
+            opId: input.opId,
             cantidad: input.cantidad,
             unidad: input.unidad,
             costoUnitario: exacto.costoUnitario,
@@ -332,7 +358,7 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
       (deps) => ({
         name: `${MODULO}.hecho.materializar-otros`,
         inputSchema: z.object({
-          opId: z.string().optional(),
+          opId: opIdSchema,
           costoId: z.string().uuid().optional(),
           otId: z.string().min(1),
           concepto: z.string().min(1),
@@ -371,7 +397,7 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
             otId: input.otId,
             activoId: ot.value.activoId,
             identityId: yo,
-            opId: input.opId ?? crypto.randomUUID(),
+            opId: input.opId,
             cantidad: input.cantidad,
             unidad: input.unidad,
             costoUnitario: input.costoUnitario,
@@ -414,7 +440,7 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
       (deps) => ({
         name: `${MODULO}.hecho.anular`,
         inputSchema: z.object({
-          opId: z.string().optional(),
+          opId: opIdSchema,
           costoId: z.string().min(1),
           motivo: z.string().min(1),
         }),

@@ -586,7 +586,10 @@
         "properties": {
           "opId": {
             "type": "string",
-            "description": "Idempotencia durable del comando"
+            "minLength": 8,
+            "maxLength": 200,
+            "pattern": "^[\\x21-\\x7e]+$",
+            "description": "Clave de idempotencia OBLIGATORIA (invariante): 8..200 caracteres imprimibles ASCII sin espacios. Un reintento con el mismo opId devuelve el mismo resultado sin duplicar."
           },
           "costoId": {
             "type": "string",
@@ -618,6 +621,7 @@
           }
         },
         "required": [
+          "opId",
           "otId",
           "articuloId",
           "cantidad",
@@ -630,7 +634,11 @@
         "type": "object",
         "properties": {
           "opId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200,
+            "pattern": "^[\\x21-\\x7e]+$",
+            "description": "Clave de idempotencia OBLIGATORIA (invariante): 8..200 caracteres imprimibles ASCII sin espacios. Un reintento con el mismo opId devuelve el mismo resultado sin duplicar."
           },
           "costoId": {
             "type": "string",
@@ -665,6 +673,7 @@
           }
         },
         "required": [
+          "opId",
           "otId",
           "concepto",
           "cantidad",
@@ -678,7 +687,11 @@
         "type": "object",
         "properties": {
           "opId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200,
+            "pattern": "^[\\x21-\\x7e]+$",
+            "description": "Clave de idempotencia OBLIGATORIA (invariante): 8..200 caracteres imprimibles ASCII sin espacios. Un reintento con el mismo opId devuelve el mismo resultado sin duplicar."
           },
           "motivo": {
             "type": "string",
@@ -686,6 +699,7 @@
           }
         },
         "required": [
+          "opId",
           "motivo"
         ],
         "additionalProperties": false
