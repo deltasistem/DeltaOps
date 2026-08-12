@@ -12,6 +12,14 @@ import { memoryLocation } from "wouter/memory-location";
 import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { OfflineProvider } from "../lib/offline/contexto";
 import { MenuAccionesEscaneo } from "../lib/ecosistema/flujo-escaneo";
+
+// Sesión de PRESENTACIÓN: este test verifica el filtro ruta→consulta, no el
+// gating RBAC de transiciones, así que se aísla el hook de sesión (evita montar
+// SesionProvider/QueryClient) con un rol operador (capacidad `ejecutar`).
+vi.mock("../lib/identidad/sesion", () => ({
+  useSesion: () => ({ sesion: { rol: "SUPERVISOR", modulos: ["ordenes"], permisos: [], capacidades: [] } }),
+}));
+
 import { Contenido as OrdenesOperaciones } from "../pages/ordenes-operaciones";
 
 // Registro de las URLs de listado consultadas (para afirmar el filtro por ruta).

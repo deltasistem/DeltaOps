@@ -29,6 +29,8 @@ import { transicionar } from "../lib/ordenes/mutaciones";
 import { BANDEJAS, TRANSICIONES, type BandejaDef } from "../lib/ordenes/constantes";
 import { TarjetaOrden, esCritica, proximaAVencer } from "../lib/ordenes/componentes";
 import type { OrdenRow } from "../lib/ordenes/tipos";
+import { useSesion } from "../lib/identidad/sesion";
+import { capacidadesOrdenes } from "../lib/ordenes/capacidades";
 
 export default function OrdenesOperacionesPage() {
   return (
@@ -111,6 +113,13 @@ function Bandeja({
 }) {
   const [busqueda, setBusqueda] = useState("");
   const ahoraMs = useMemo(() => Date.parse(new Date().toISOString()), []);
+  // RBAC de PRESENTACIÓN (§22): las acciones inmediatas de transición
+  // (Abrir/Planificar/Asignar/Iniciar/Pausar/Reanudar/Enviar a validación/Cancelar)
+  // disparan `POST /:id/transicionar`, que el backend autoriza con
+  // `modulo.ordenes.operar` → capacidad canónica `ejecutar`. CONSULTA (lector)
+  // sólo lee/navega: se OCULTAN (no se deshabilitan) estos CTAs de escritura.
+  const { sesion } = useSesion();
+  const puedeEjecutar = capacidadesOrdenes(sesion ?? { rol: "CONSULTA" }).ejecutar;
 
   const filtradas = useMemo(() => {
     let lista = todas;
@@ -156,7 +165,7 @@ function Bandeja({
           <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>{filtradas.length} orden(es)</span>
           <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))" }}>
             {filtradas.map((o) => (
-              <FilaOrden key={o.id} orden={o} onCambio={recargar} />
+              <FilaOrden key={o.id} orden={o} onCambio={recargar} puedeEjecutar={puedeEjecutar} />
             ))}
           </div>
         </div>
@@ -166,11 +175,15 @@ function Bandeja({
 }
 
 /** Tarjeta con acciones inmediatas de transición (según estado). */
-function FilaOrden({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+export function FilaOrden({ orden, onCambio, puedeEjecutar }: { orden: OrdenRow; onCambio: () => void; puedeEjecutar: boolean }) {
   const { cola } = useOffline();
   const toast = useToast();
   const [ocupado, setOcupado] = useState(false);
-  const acciones = (TRANSICIONES[orden.estado] ?? []).filter((a) => !a.requiereValidacion);
+  // Sin capacidad `ejecutar` (CONSULTA/lector) NO se ofrece ninguna transición:
+  // son escrituras (`POST /:id/transicionar`, `modulo.ordenes.operar`). Se ocultan.
+  const acciones = puedeEjecutar
+    ? (TRANSICIONES[orden.estado] ?? []).filter((a) => !a.requiereValidacion)
+    : [];
 
   async function ejecutar(comando: string, etiqueta: string) {
     setOcupado(true);

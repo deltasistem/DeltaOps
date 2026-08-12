@@ -344,11 +344,13 @@ describe("§21 · /ordenes abre la bandeja indicada por deep link", () => {
       <QueryClientProvider client={qc}>
         <ThemeProvider>
           <ToastProvider>
-            <OfflineProvider tenant="delta-demo" modulo="ordenes">
-              <Router hook={hook}>
-                <OrdenesOperaciones />
-              </Router>
-            </OfflineProvider>
+            <SesionProvider>
+              <OfflineProvider tenant="delta-demo" modulo="ordenes">
+                <Router hook={hook}>
+                  <OrdenesOperaciones />
+                </Router>
+              </OfflineProvider>
+            </SesionProvider>
           </ToastProvider>
         </ThemeProvider>
       </QueryClientProvider>,
@@ -365,11 +367,13 @@ describe("§21 · /ordenes abre la bandeja indicada por deep link", () => {
       <QueryClientProvider client={qc}>
         <ThemeProvider>
           <ToastProvider>
-            <OfflineProvider tenant="delta-demo" modulo="ordenes">
-              <Router hook={hook}>
-                <OrdenesOperaciones />
-              </Router>
-            </OfflineProvider>
+            <SesionProvider>
+              <OfflineProvider tenant="delta-demo" modulo="ordenes">
+                <Router hook={hook}>
+                  <OrdenesOperaciones />
+                </Router>
+              </OfflineProvider>
+            </SesionProvider>
           </ToastProvider>
         </ThemeProvider>
       </QueryClientProvider>,
@@ -407,9 +411,11 @@ describe("regresión · ruta real /ordenes (ShellOrdenes → Contenido)", () => 
     return render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <Router hook={hook}>
-            <OrdenesOperacionesPage />
-          </Router>
+          <SesionProvider>
+            <Router hook={hook}>
+              <OrdenesOperacionesPage />
+            </Router>
+          </SesionProvider>
         </ToastProvider>
       </QueryClientProvider>,
     );
@@ -438,9 +444,11 @@ describe("regresión · ruta real /ordenes (ShellOrdenes → Contenido)", () => 
     render(
       <QueryClientProvider client={qc}>
         <Limite>
-          <Router hook={hook}>
-            <OrdenesOperacionesPage />
-          </Router>
+          <SesionProvider>
+            <Router hook={hook}>
+              <OrdenesOperacionesPage />
+            </Router>
+          </SesionProvider>
         </Limite>
       </QueryClientProvider>,
     );
