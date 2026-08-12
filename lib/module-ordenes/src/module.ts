@@ -448,6 +448,16 @@ async function ejecutarSesion(
 ): Promise<Result<Record<string, unknown>, KernelError>> {
   const tenant = tenantOf(ctx);
   if (!tenant.ok) return tenant;
+
+  // FALLO CERRADO PRIMERO (antes del claim de opId, del lookup de OT y de
+  // cualquier efecto): la identidad CANÓNICA del contexto autenticado
+  // (idn_identities.identity_id) es imprescindible para atribuir trabajo. NUNCA
+  // el ID espejo legacy ni el body. Si falta ⇒ KRN-AUTH determinista, con
+  // independencia de la existencia/estado de la OT.
+  const identidad = identidadDeSesion(ctx);
+  if (!identidad.ok) return identidad;
+  const identityId = identidad.value;
+
   const nombreComando = `${MODULO}.sesion.${comando === "iniciar" ? "abrir" : comando}`;
   const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, nombreComando, input.opId);
   if (!reclamo.proceder) return reclamo.cortocircuito;
@@ -464,11 +474,6 @@ async function ejecutarSesion(
 
   // Activo SIEMPRE derivado de la OT (nunca del frontend).
   const activoId = orden.value.activoPrincipal?.activoId ?? null;
-  // Identidad CANÓNICA del contexto autenticado (idn_identities.identity_id),
-  // NUNCA el ID espejo legacy ni el body. Fallo cerrado si falta.
-  const identidad = identidadDeSesion(ctx);
-  if (!identidad.ok) return identidad;
-  const identityId = identidad.value;
 
   const registradoAt = new Date();
   const ocurridoAt = input.ocurridoAt ? new Date(input.ocurridoAt) : new Date(registradoAt.getTime());

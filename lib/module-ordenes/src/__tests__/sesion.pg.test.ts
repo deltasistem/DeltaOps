@@ -30,11 +30,14 @@ const PERMS = [
   ]),
 ];
 
-const T_A = `pgses-a-${Date.now()}`;
-const T_B = `pgses-b-${Date.now()}`;
-// Identidad CANÓNICA (idn_identities.identity_id).
-const TEC = "tec-1";
-const OTRO = "tec-2";
+// Tenants ÚNICOS por corrida (sufijo aleatorio): elimina cualquier residuo de
+// corridas previas interrumpidas y descarta colisiones entre archivos/reintentos.
+const RUN = crypto.randomUUID().slice(0, 8);
+const T_A = `pgses-a-${RUN}`;
+const T_B = `pgses-b-${RUN}`;
+// Identidad CANÓNICA (idn_identities.identity_id) — ÚNICA por corrida.
+const TEC = `tec-1-${RUN}`;
+const OTRO = `tec-2-${RUN}`;
 // IDs ESPEJO legacy (deltaops.users.id) — DISTINTOS del canónico a propósito,
 // para probar que la atribución jamás usa el mirror sino metadata.identityId.
 const MIRROR_TEC = "1001";
@@ -82,12 +85,16 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", () => {
    */
   async function otAsignada(tenantId: string, identityId: string): Promise<string> {
     const c = await exec(ctx(tenantId), `${MODULO}.crear`, { titulo: "OT sesión", tipo: "correctiva" });
-    if (!c.ok) throw new Error("crear OT falló");
+    if (!c.ok) throw new Error(`crear OT falló: ${c.error.message}`);
     const id = (c.value as { id: string }).id;
+    await drenar(); // asienta la proyección/outbox de `crear` antes de transicionar.
     // BORRADOR → ABIERTA → PLANIFICADA → ASIGNADA (vía Workflow Engine, no la sesión).
+    // El motor sincroniza el estado en UoW separada; drenamos tras cada paso para
+    // que el siguiente `findById`/instancia lea un estado ya asentado (determinista).
     for (const comando of ["abrir", "planificar", "asignar"]) {
       const t = await exec(ctx(tenantId), `${MODULO}.transicionar`, { id, comando });
-      if (!t.ok) throw new Error(`transición ${comando} falló: ${t.error.message}`);
+      if (!t.ok) throw new Error(`transición ${comando} de OT ${id} en ${tenantId} falló: ${t.error.message}`);
+      await drenar();
     }
     const a = await exec(ctx(tenantId), `${MODULO}.asignar-recurso-humano`, {
       ordenId: id, tipo: "persona", asignadoId: identityId,
@@ -98,7 +105,11 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", () => {
   }
 
   beforeAll(() => {
-    pool = new pg.Pool({ connectionString: DATABASE_URL });
+    // Pool holgado: las lecturas de sesión (`getAbierta`, `tramosDe`, …) abren
+    // una conexión propia MIENTRAS el comando mantiene abierta la UoW; con la
+    // suite completa compartiendo el pool, un `max` pequeño podía provocar
+    // contención/espera. Un margen amplio hace las lecturas deterministas.
+    pool = new pg.Pool({ connectionString: DATABASE_URL, max: 20 });
     const identidad = new FakeIdentidad();
     for (const t of [T_A, T_B]) {
       identidad.registrar({ identityId: TEC, tenantId: t, nombre: "Tec Uno", email: "tec1@e.co" });
@@ -135,8 +146,15 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", () => {
     expect((abrir.value as { activoId: string | null }).activoId).toBeNull(); // OT sin activo ⇒ derivado null
     expect((abrir.value as { identityId: string }).identityId).toBe(TEC);
 
+    // Cada comando de sesión es una petición INDEPENDIENTE en el mundo real
+    // (HTTP o worker de /sync): drenamos el outbox entre pasos para reproducir
+    // fronteras de petición deterministas (evita acoplarse al orden de vaciado
+    // del outbox cuando la suite completa comparte el pool y el procesador).
+    await drenar();
     expect((await exec(ctxTec(T_A, TEC), `${MODULO}.sesion.pausar`, { ordenId, ocurridoAt: t1, opId: "op-pausar-1" })).ok).toBe(true);
+    await drenar();
     expect((await exec(ctxTec(T_A, TEC), `${MODULO}.sesion.reanudar`, { ordenId, ocurridoAt: t2, opId: "op-reanudar-1" })).ok).toBe(true);
+    await drenar();
     expect((await exec(ctxTec(T_A, TEC), `${MODULO}.sesion.cerrar`, { ordenId, ocurridoAt: t3, opId: "op-cerrar-1" })).ok).toBe(true);
     await drenar();
 
@@ -172,6 +190,17 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", () => {
     if (!r.ok) {
       expect(r.error.code).toContain("KRN-AUTH");
       expect(r.error.code).not.toContain("KRN-INT");
+    }
+  });
+
+  it("la falta de identidad se evalúa ANTES que la OT (AUTH tiene precedencia sobre NF)", async () => {
+    // OT INEXISTENTE + ctx SIN identidad canónica ⇒ debe ganar el fallo cerrado
+    // por identidad (KRN-AUTH), NO KRN-NF de la OT (determinismo del orden §R2).
+    const r = await exec(ctx(T_A, tecnico(MIRROR_TEC)), `${MODULO}.sesion.abrir`, { ordenId: "ot-inexistente-xyz", opId: "op-orden-precedencia" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.code).toContain("KRN-AUTH");
+      expect(r.error.code).not.toContain("KRN-NF");
     }
   });
 
