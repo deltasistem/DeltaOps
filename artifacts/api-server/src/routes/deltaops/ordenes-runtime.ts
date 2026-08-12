@@ -142,9 +142,26 @@ export function principalOrdenes(userId: string, rol: string): Principal {
   };
 }
 
-export function contextForOrdenes(userId: string, rol: string, tenant: string = DELTAOPS_TENANT): ExecutionContext {
+/**
+ * Construye el contexto de ejecución del Módulo Órdenes.
+ *
+ * `userId` es el ID ESPEJO legacy (deltaops.users.id) que alimenta `principal.id`
+ * (compat con permisos/recibos existentes). La IDENTIDAD CANÓNICA autenticada
+ * (idn_identities.identity_id) se propaga por separado en `metadata.identityId`,
+ * y es la ÚNICA que el dominio usa para atribuir sesiones de trabajo y verificar
+ * asignaciones (DGP-020.1/020.2). Si no hay identidad canónica en la sesión, se
+ * omite y los comandos de sesión fallarán CERRADO.
+ */
+export function contextForOrdenes(
+  userId: string,
+  rol: string,
+  tenant: string = DELTAOPS_TENANT,
+  identityId?: string,
+): ExecutionContext {
+  const metadata: Record<string, unknown> = { tenantId: tenant };
+  if (identityId) metadata["identityId"] = identityId;
   return createExecutionContext({
     principal: principalOrdenes(userId, rol),
-    metadata: { tenantId: tenant },
+    metadata,
   });
 }

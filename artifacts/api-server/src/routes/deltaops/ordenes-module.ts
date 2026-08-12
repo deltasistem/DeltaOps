@@ -30,7 +30,11 @@ router.use(BASE, async (req, res, next): Promise<void> => {
     res.status(401).json({ error: "Sesión inválida" });
     return;
   }
-  res.locals.ctx = contextForOrdenes(String(user.id), user.rol, user.tenant);
+  // Identidad CANÓNICA (idn_identities) desde la sesión Enterprise: es la que el
+  // dominio usa para atribuir sesiones de trabajo y verificar asignaciones. El
+  // `user.id` legacy sólo alimenta `principal.id` (permisos/recibos). Si no hay
+  // identidad canónica en la sesión, los comandos de sesión fallan CERRADO.
+  res.locals.ctx = contextForOrdenes(String(user.id), user.rol, user.tenant, req.session?.identityId);
   next();
 });
 

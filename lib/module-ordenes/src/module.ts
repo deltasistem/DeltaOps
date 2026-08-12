@@ -369,6 +369,40 @@ async function reclamarOpId(
  */
 const ESTADOS_OT_INCOMPATIBLES_SESION = new Set(["BORRADOR", "CERRADA", "CANCELADA"]);
 
+/**
+ * Identidad CANÓNICA autenticada para atribuir la mano de obra (DGP-020.1/020.2).
+ *
+ * El `principal.id` del router de Órdenes es el ID ESPEJO legacy (`deltaops.users.id`,
+ * entero), mientras que las asignaciones y toda la trazabilidad Enterprise usan el
+ * `idn_identities.identity_id` (UUID). Por eso la identidad de sesión se lee del
+ * contexto explícito (`ctx.metadata.identityId`), que el api-server rellena desde
+ * `req.session.identityId`. NUNCA proviene del body del comando.
+ *
+ * FALLO CERRADO: si no hay identidad canónica en el contexto (p. ej. un login legacy
+ * sin Enterprise), los comandos de sesión se rechazan con un error de NEGOCIO claro,
+ * en vez de atribuir el trabajo al ID espejo (lo que rompería la atribución).
+ */
+function identidadDeSesion(ctx: ExecutionContext): Result<string, KernelError> {
+  const id = ctx.metadata["identityId"];
+  if (typeof id !== "string" || id.length === 0) {
+    return fail(KernelErrors.forbidden(
+      "sesión de trabajo: falta la identidad canónica autenticada (identityId). " +
+        "Reautentíquese con una cuenta Enterprise para registrar trabajo.",
+    ));
+  }
+  return ok(id);
+}
+
+/**
+ * Identidad canónica para LECTURAS (nunca falla): permite marcar `esPropia`
+ * usando el MISMO canon (idn_identities) que la atribución de escritura. Si el
+ * contexto no la trae (login legacy), devuelve null y `esPropia` será false.
+ */
+function identidadDeSesionSuave(ctx: ExecutionContext): string | null {
+  const id = ctx.metadata["identityId"];
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+
 /** ¿El principal es supervisor/admin (capacidades EXISTENTES, sin permisos nuevos)? */
 function esSupervisorOAdmin(ctx: ExecutionContext): boolean {
   const caps = (ctx.principal.capacidades ?? []) as string[];
@@ -430,8 +464,11 @@ async function ejecutarSesion(
 
   // Activo SIEMPRE derivado de la OT (nunca del frontend).
   const activoId = orden.value.activoPrincipal?.activoId ?? null;
-  // Identidad SIEMPRE del contexto autenticado (nunca del frontend).
-  const identityId = ctx.principal.id;
+  // Identidad CANÓNICA del contexto autenticado (idn_identities.identity_id),
+  // NUNCA el ID espejo legacy ni el body. Fallo cerrado si falta.
+  const identidad = identidadDeSesion(ctx);
+  if (!identidad.ok) return identidad;
+  const identityId = identidad.value;
 
   const registradoAt = new Date();
   const ocurridoAt = input.ocurridoAt ? new Date(input.ocurridoAt) : new Date(registradoAt.getTime());
@@ -551,7 +588,9 @@ async function finalizarSesion(
     actualizadoAt: tramo.registradoAt.toISOString(),
     secuencia: tramo.secuencia, tipoTramo: tramo.tipo, origenTramo: tramo.origen,
     anomaliaReloj: tramo.anomaliaReloj,
-    actorId: ctx.principal.id,
+    // Actor CANÓNICO (idn_identities): coincide con la identidad atribuida a la
+    // sesión (incluido el caso supervisor/admin, que abre a su propio nombre).
+    actorId: cabecera.identityId,
   };
   const emit = await emitirEvento(adapters, ctx, uow, tenantId, { tipo: tipoEvento, payload, eventId });
   if (!emit.ok) return emit;
@@ -2396,7 +2435,10 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           if (!tenant.ok) return tenant;
           const r = await adapters.sesiones.sesionActiva(tenant.value, input.ordenId, input.identityId ?? null);
           if (!r.ok) return r;
-          return ok({ sesion: r.value });
+          // `esPropia`: comparación por el MISMO canon (identityId de Identity).
+          const yo = identidadDeSesionSuave(ctx);
+          const sesion = r.value ? { ...r.value, esPropia: yo !== null && r.value.identityId === yo } : null;
+          return ok({ sesion });
         },
       }),
       () => ({
@@ -2418,7 +2460,10 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
                 ? await adapters.sesiones.sesionesPorActivo(tenant.value, input.activoId)
                 : fail(KernelErrors.validation("Especifique ordenId, identityId o activoId"));
           if (!r.ok) return r;
-          return ok({ sesiones: r.value });
+          // `esPropia` por fila usando el MISMO canon (identityId de Identity).
+          const yo = identidadDeSesionSuave(ctx);
+          const sesiones = r.value.map((s) => ({ ...s, esPropia: yo !== null && s.identityId === yo }));
+          return ok({ sesiones });
         },
       }),
       () => ({
