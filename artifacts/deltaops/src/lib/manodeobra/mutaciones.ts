@@ -79,8 +79,8 @@ export function cambiarEstadoRecurso(datos: {
 /** Crear tarifa (no-solape de vigencias; unidad sólo HORA). */
 export function crearTarifa(datos: {
   sujetoId: string;
-  /** DINERO en PUNTO FIJO: CADENA decimal (numeric(18,6)); number tolerado. */
-  valor: string | number;
+  /** DINERO en PUNTO FIJO: SÓLO CADENA decimal canónica (numeric(18,6)); el backend rechaza números (R2). */
+  valor: string;
   sujetoTipo?: "CATEGORIA" | "IDENTIDAD";
   moneda?: string;
   unidad?: "HORA";
@@ -96,8 +96,8 @@ export function crearTarifa(datos: {
  */
 export function actualizarTarifa(datos: {
   sujetoId: string;
-  /** DINERO en PUNTO FIJO: CADENA decimal (numeric(18,6)); number tolerado. */
-  valor: string | number;
+  /** DINERO en PUNTO FIJO: SÓLO CADENA decimal canónica (numeric(18,6)); el backend rechaza números (R2). */
+  valor: string;
   vigenciaDesde: string;
   sujetoTipo?: "CATEGORIA" | "IDENTIDAD";
   moneda?: string;

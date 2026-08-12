@@ -51,7 +51,7 @@ beforeEach(() => {
   rt = crearManodeobraRuntime({ identidad, ordenes });
 });
 
-async function definirRecursoYTarifa(valor = 40000) {
+async function definirRecursoYTarifa(valor: string = "40000") {
   must(await exec(ctx(), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" }));
   must(await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
 }
@@ -95,8 +95,8 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
   it("idempotencia por opId ⇒ mismo comando repetido no re-ejecuta", async () => {
     const op = "op-tarifa-1";
     must(await exec(ctx(), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" }));
-    const a = must(await exec(ctx(), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "soldador", valor: 40000, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" })) as Record<string, unknown>;
-    const b = must(await exec(ctx(), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "soldador", valor: 40000, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" })) as Record<string, unknown>;
+    const a = must(await exec(ctx(), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "soldador", valor: "40000", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" })) as Record<string, unknown>;
+    const b = must(await exec(ctx(), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "soldador", valor: "40000", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" })) as Record<string, unknown>;
     expect(a["idempotente"]).toBe(false);
     expect(b["idempotente"]).toBe(true);
     const tarifas = must(await query(ctx(), `${MODULO}.tarifas`, { sujetoId: "soldador" })) as { tarifas: unknown[] };
@@ -104,12 +104,12 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
   });
 
   it("cambio de tarifa (actualizar) NO altera el histórico valorado", async () => {
-    await definirRecursoYTarifa(40000);
+    await definirRecursoYTarifa("40000");
     sesionCerrada("s1", "o1", "u1", 9_000_000);
     const v = must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" })) as Record<string, unknown>;
     expect(v["costo"]).toBe("100000.000000");
     // Sube la tarifa: cierra la vigente y crea una nueva.
-    must(await exec(ctx(), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: 80000, moneda: "CLP", vigenciaDesde: "2024-07-01T00:00:00Z" }));
+    must(await exec(ctx(), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: "80000", moneda: "CLP", vigenciaDesde: "2024-07-01T00:00:00Z" }));
     // Reprocesar la MISMA sesión: sigue siendo la valoración original (VALORADA inmutable).
     const again = must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" })) as Record<string, unknown>;
     expect(again["yaExistia"]).toBe(true);
@@ -124,7 +124,7 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     must(await exec(ctx(), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" }));
     sesionCerrada("s1", "o1", "u1", 9_000_000);
     must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" }));
-    must(await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: 40000, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
+    must(await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: "40000", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
     const rev = must(await exec(ctx(), `${MODULO}.valoracion.revalorar`, { sesionId: "s1" })) as Record<string, unknown>;
     expect(rev["estado"]).toBe("VALORADA");
     expect(rev["costo"]).toBe("100000.000000");
@@ -146,7 +146,7 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
   });
 
   it("costo-estimado de sesión ABIERTA usa duraciones actuales × tarifa vigente", async () => {
-    await definirRecursoYTarifa(35000);
+    await definirRecursoYTarifa("35000");
     ordenes.set(TENANT, { sesionId: "sa", ordenId: "o1", activoId: "act1", identityId: "u1", estado: "ABIERTA", efectivoMs: 4_800_000, abierta: true, iniciadoAt: D("2024-03-01T00:00:00Z"), cerradoAt: null });
     const est = must(await query(ctx(), `${MODULO}.costo-estimado`, { sesionId: "sa" })) as Record<string, unknown>;
     expect(est["estimado"]).toBe(true);
@@ -168,7 +168,7 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
 
     const tec = tecnico([`${MODULO}.read`, `${MODULO}.mias`]);
     // Técnico NO puede crear tarifas.
-    const noTarifa = await exec(ctx(tec, "u1"), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: 1, moneda: "CLP" });
+    const noTarifa = await exec(ctx(tec, "u1"), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: "1", moneda: "CLP" });
     expect(noTarifa.ok).toBe(false);
     // Técnico NO puede definir recursos.
     const noCfg = await exec(ctx(tec, "u1"), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" });
@@ -232,12 +232,33 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     expect(supAjena.valoraciones.length).toBe(1);
   });
 
+  it("frontera ESTRICTA (R2): tarifa.crear/actualizar RECHAZAN el dinero como NÚMERO JSON", async () => {
+    must(await exec(ctx(), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" }));
+    // Número JSON con decimales que YA perdió precisión ⇒ rechazo de validación.
+    const numFrac = await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: 35000.123456789 as unknown as string, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" });
+    expect(numFrac.ok).toBe(false);
+    if (!numFrac.ok) expect(numFrac.error.kind).toBe("validation");
+    // Notación científica como número ⇒ rechazo.
+    const numExp = await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: 1e5 as unknown as string, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" });
+    expect(numExp.ok).toBe(false);
+    // Cadena con notación científica ⇒ rechazo (no calza el pattern).
+    const strExp = await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: "1e5", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" });
+    expect(strExp.ok).toBe(false);
+    // actualizar también rechaza número.
+    must(await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: "40000", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
+    const updNum = await exec(ctx(), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: 80000 as unknown as string, moneda: "CLP", vigenciaDesde: "2024-07-01T00:00:00Z" });
+    expect(updNum.ok).toBe(false);
+    // La CADENA canónica sí se acepta.
+    const okStr = await exec(ctx(), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: "80000", moneda: "CLP", vigenciaDesde: "2024-07-01T00:00:00Z" });
+    expect(okStr.ok).toBe(true);
+  });
+
   it("catálogo vacío expone categorías canónicas; unidad no soportada rechazada", async () => {
     const ops = must(await query(ctx(), `${MODULO}.catalogo.opciones`, { catalogo: "categorias-mdo" })) as { opciones: { value: string }[]; unidades: string[] };
     expect(ops.opciones.map((o) => o.value)).toContain("soldador");
     expect(ops.unidades).toEqual(["HORA"]);
     must(await exec(ctx(), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" }));
-    const mala = await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: 1, moneda: "CLP", unidad: "DIA" });
+    const mala = await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: "1", moneda: "CLP", unidad: "DIA" });
     expect(mala.ok).toBe(false);
   });
 });

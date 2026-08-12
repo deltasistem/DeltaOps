@@ -29,23 +29,24 @@ export function formatearTiempo(ms: number | null | undefined): string {
  * con muchos decimales): pasamos la CADENA directamente a `Intl.NumberFormat`,
  * que la interpreta como decimal exacto. Se valida que sea un decimal canónico.
  */
-const RE_DECIMAL = /^-?\d+(\.\d+)?$/;
+const RE_DECIMAL = /^\d+(\.\d+)?$/;
 
-function montoNormalizado(monto: string | number | null | undefined): string | null {
+function montoNormalizado(monto: string | null | undefined): string | null {
   if (monto == null) return null;
-  const s = typeof monto === "number" ? (Number.isFinite(monto) ? String(monto) : "") : monto.trim();
+  const s = monto.trim();
   if (!s || !RE_DECIMAL.test(s)) return null;
   return s;
 }
 
 /**
  * Formatea un monto YA CALCULADO por el backend con `Intl.NumberFormat` en la
- * moneda dada. No hace aritmética monetaria ni conversión a float: sólo
+ * moneda dada. El dinero es SIEMPRE una CADENA decimal (PUNTO FIJO); NO se acepta
+ * `number` (frontera string-only, R2) ni se hace conversión a float: sólo
  * presentación. Devuelve `null` si no hay monto/moneda (el llamador debe mostrar
  * «Sin tarifa configurada»).
  */
 export function formatearMoneda(
-  monto: string | number | null | undefined,
+  monto: string | null | undefined,
   moneda: string | null | undefined,
   locale = "es-CO",
 ): string | null {
@@ -75,7 +76,7 @@ export const SIN_TARIFA_TEXTO = "Sin tarifa configurada";
  * monto viniera como 0 (defensa contra costo $0 ante ausencia de tarifa).
  */
 export function costoPresentacion(
-  monto: string | number | null | undefined,
+  monto: string | null | undefined,
   moneda: string | null | undefined,
   hayTarifa: boolean,
   locale?: string,
@@ -87,7 +88,7 @@ export function costoPresentacion(
 
 /** Formatea una tarifa como `valor moneda/unidad` (p. ej. «$40.000 COP/h»). */
 export function formatearTarifa(
-  valor: string | number | null | undefined,
+  valor: string | null | undefined,
   moneda: string | null | undefined,
   unidad: string | null | undefined,
   locale?: string,

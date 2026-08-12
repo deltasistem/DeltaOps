@@ -39,8 +39,11 @@ describe("DGP-020.3 · precisión monetaria (PUNTO FIJO decimal)", () => {
     const r = calcularCosto(4_800_000, "35000");
     expect(r.ok && r.value).not.toBe("46550.000000");
   });
-  it("acepta cadena o number equivalentes (sin pérdida)", () => {
-    expect(calcularCosto(9_000_000, "40000")).toEqual(calcularCosto(9_000_000, 40000));
+  it("frontera ESTRICTA (R2): el dinero de origen externo SÓLO es cadena; number ⇒ rechazo", () => {
+    // Un number JS ya pudo perder precisión: se rechaza en la frontera del dominio.
+    expect(aMicros(40000 as unknown as string).ok).toBe(false);
+    expect(normalizarTarifa(35000.1234 as unknown as string).ok).toBe(false);
+    expect(calcularCosto(9_000_000, 40000 as unknown as string).ok).toBe(false);
   });
   it("tarifa fraccional 35000.1234 se conserva exacta y se calcula sin float", () => {
     expect(normalizarTarifa("35000.1234")).toEqual({ ok: true, value: "35000.123400" });
@@ -48,10 +51,16 @@ describe("DGP-020.3 · precisión monetaria (PUNTO FIJO decimal)", () => {
     const r = calcularCosto(3_600_000, "35000.1234");
     expect(r.ok && r.value).toBe("35000.123400");
   });
-  it("rechaza más de 6 decimales y valores negativos", () => {
+  it("rechaza formato inválido: >6 decimales, negativos, notación científica, espacios y >12 enteros", () => {
     expect(normalizarTarifa("1.1234567").ok).toBe(false);
     expect(normalizarTarifa("-1").ok).toBe(false);
     expect(aMicros("abc").ok).toBe(false);
+    expect(aMicros("1e5").ok).toBe(false);
+    expect(aMicros(" 100").ok).toBe(false);
+    expect(aMicros("100 ").ok).toBe(false);
+    expect(aMicros("1234567890123").ok).toBe(false); // 13 dígitos enteros
+    expect(aMicros("100").ok).toBe(true);
+    expect(aMicros("100.5").ok).toBe(true);
   });
   it("microsACadena/aMicros son inversos exactos", () => {
     const m = aMicros("46666.6667");
@@ -67,7 +76,7 @@ describe("DGP-020.3 · tarifa versionable", () => {
   it("rechaza unidad no soportada", () => {
     expect(esUnidadSoportada("DIA")).toBe(false);
     const r = crearTarifa({
-      id: "T", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: 1, moneda: "CLP",
+      id: "T", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: "1", moneda: "CLP",
       unidad: "DIA", vigenciaDesde: D("2024-01-01T00:00:00Z"), actorId: "a", ahora: D("2024-01-01T00:00:00Z"), existentes: [],
     });
     expect(r.ok).toBe(false);
@@ -75,7 +84,7 @@ describe("DGP-020.3 · tarifa versionable", () => {
   it("rechaza solape de vigencias del mismo sujeto", () => {
     const abierta = tarifaBase();
     const r = crearTarifa({
-      id: "T2", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: 50000, moneda: "CLP",
+      id: "T2", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: "50000", moneda: "CLP",
       unidad: "HORA", vigenciaDesde: D("2024-06-01T00:00:00Z"), actorId: "a", ahora: D("2024-06-01T00:00:00Z"), existentes: [abierta],
     });
     expect(r.ok).toBe(false);
@@ -87,7 +96,7 @@ describe("DGP-020.3 · tarifa versionable", () => {
     expect(cerrada.ok).toBe(true);
     if (!cerrada.ok) return;
     const nueva = crearTarifa({
-      id: "T2", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: 50000, moneda: "CLP",
+      id: "T2", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: "50000", moneda: "CLP",
       unidad: "HORA", vigenciaDesde: D("2024-06-01T00:00:00Z"), actorId: "a", ahora: D("2024-06-01T00:00:00Z"), existentes: [cerrada.value],
     });
     expect(nueva.ok).toBe(true);

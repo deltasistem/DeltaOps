@@ -48,29 +48,32 @@ export function esUnidadSoportada(u: string): u is UnidadTarifa {
  */
 export type Dinero = string; // cadena decimal canónica, p.ej. "40000.000000"
 
-const RE_DECIMAL = /^-?\d+(\.\d+)?$/;
+/**
+ * Frontera ESTRICTA de dinero (HALLAZGO R2): el importe de origen externo es
+ * SIEMPRE una CADENA decimal canónica. Sin signo, sin espacios, sin notación
+ * científica, con a lo sumo `ESCALA` (6) decimales y parte entera acotada a
+ * numeric(18,6) (≤ 12 dígitos enteros). NUNCA se acepta `number` de JS: un
+ * número JSON ya puede haber perdido precisión antes de llegar aquí.
+ *
+ * El mismo patrón se replica en el contrato (zod + OpenAPI) para rechazar en la
+ * frontera de la API cualquier número JSON.
+ */
+export const RE_DINERO = /^\d{1,12}(\.\d{1,6})?$/;
 
 /**
- * Parsea un importe (cadena decimal o `number` legado) a MICROS exactos (BigInt),
- * validando: finito, no negativo, y a lo sumo `ESCALA` (6) decimales. Rechaza
- * NaN/Infinity y notación científica.
+ * Parsea una CADENA decimal canónica a MICROS exactos (BigInt). Rechaza cualquier
+ * cosa que no calce con {@link RE_DINERO} (incluye number, negativos, notación
+ * científica, espacios y >6 decimales).
  */
-export function aMicros(valor: string | number): Result<bigint, KernelError> {
-  let s: string;
-  if (typeof valor === "number") {
-    if (!Number.isFinite(valor)) return fail(KernelErrors.validation("El importe debe ser finito"));
-    // Un number entero es exacto; con decimales se serializa sin notación
-    // científica y se valida su escala más abajo.
-    s = Number.isInteger(valor) ? valor.toString() : valor.toFixed(ESCALA);
-  } else {
-    s = valor.trim();
+export function aMicros(valor: Dinero): Result<bigint, KernelError> {
+  if (typeof valor !== "string") {
+    return fail(KernelErrors.validation("El importe monetario debe ser una cadena decimal, no un número"));
   }
-  if (!RE_DECIMAL.test(s)) return fail(KernelErrors.validation(`Importe decimal inválido: "${valor}"`));
-  if (s.startsWith("-")) return fail(KernelErrors.validation("El importe no puede ser negativo"));
+  const s = valor;
+  if (!RE_DINERO.test(s)) {
+    return fail(KernelErrors.validation(`Importe decimal inválido (esperado \\d{1,12}(\\.\\d{1,6})?): "${valor}"`));
+  }
   const [entero, frac = ""] = s.split(".");
-  if (frac.length > ESCALA) {
-    return fail(KernelErrors.validation(`El importe admite a lo sumo ${ESCALA} decimales: "${valor}"`));
-  }
   const fracPad = (frac + "0".repeat(ESCALA)).slice(0, ESCALA);
   try {
     return ok(BigInt(entero) * FACTOR + BigInt(fracPad === "" ? "0" : fracPad));
@@ -101,10 +104,11 @@ function reescalarHalfUp(micros: bigint, decimales: number): bigint {
 }
 
 /**
- * Normaliza un importe de TARIFA a su cadena canónica (6 decimales), validando
- * escala/negatividad. NO redondea (la tarifa admite hasta 6 decimales).
+ * Normaliza un importe de TARIFA (CADENA decimal) a su cadena canónica (6
+ * decimales), validando formato/escala. NO redondea (la tarifa admite hasta 6
+ * decimales). NO acepta `number`: la frontera de dinero es string-only (R2).
  */
-export function normalizarTarifa(valor: string | number): Result<Dinero, KernelError> {
+export function normalizarTarifa(valor: Dinero): Result<Dinero, KernelError> {
   const m = aMicros(valor);
   if (!m.ok) return m;
   return ok(microsACadena(m.value));
@@ -116,7 +120,7 @@ export function normalizarTarifa(valor: string | number): Result<Dinero, KernelE
  * El tiempo NO se redondea; el resultado final se redondea HALF-UP a 4 decimales
  * y se devuelve como cadena decimal canónica (6 decimales, con ceros de relleno).
  */
-export function calcularCosto(efectivoMs: number, tarifa: string | number): Result<Dinero, KernelError> {
+export function calcularCosto(efectivoMs: number, tarifa: Dinero): Result<Dinero, KernelError> {
   if (!Number.isFinite(efectivoMs) || efectivoMs < 0 || !Number.isInteger(efectivoMs)) {
     return fail(KernelErrors.validation("efectivoMs debe ser entero finito y no negativo"));
   }

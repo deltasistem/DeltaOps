@@ -47,7 +47,7 @@ import {
 import { cambiarEstadoRecurso, definirRecurso, type EstadoRecurso } from "./domain/recurso";
 import { cerrarTarifa, crearTarifa, type SujetoTarifa, type Tarifa } from "./domain/tarifa";
 import { costoEstimado, esRevalorable, valorarSesion, type Valoracion } from "./domain/valoracion";
-import { aMicros, microsACadena, UNIDADES_TARIFA } from "./domain/dinero";
+import { aMicros, microsACadena, RE_DINERO, UNIDADES_TARIFA } from "./domain/dinero";
 import type { CatalogoService } from "./infrastructure/catalogo-service";
 import type {
   DuracionSesion,
@@ -412,21 +412,21 @@ async function resumenPorOrden(
 /* ------------------------------ El servicio ------------------------------ */
 
 /**
- * DGP-020.3 · Schema de DINERO de entrada (PUNTO FIJO). Acepta CADENA decimal
- * (preferida, sin pérdida) o `number` legado; valida no-negativo y a lo sumo 6
- * decimales. La normalización a micros exactos ocurre en el dominio (`aMicros`).
+ * DGP-020.3 · Schema de DINERO de entrada (PUNTO FIJO, frontera ESTRICTA — R2).
+ * El dinero SÓLO se acepta como CADENA decimal canónica `\d{1,12}(\.\d{1,6})?`
+ * (sin signo, sin espacios, sin notación científica, ≤6 decimales, parte entera
+ * acotada a numeric(18,6)). Un número JSON se RECHAZA con validación clara: ya
+ * pudo perder precisión antes de llegar. El pattern coincide con `RE_DINERO` del
+ * dominio y con el `pattern` del contrato OpenAPI. La normalización a micros
+ * exactos ocurre en el dominio (`aMicros`).
  */
-const dineroSchema = z
-  .union([z.string(), z.number()])
-  .superRefine((v, ctx) => {
-    const s = typeof v === "number" ? (Number.isFinite(v) ? String(v) : "NaN") : v.trim();
-    if (!/^\d+(\.\d+)?$/.test(s)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "importe decimal inválido (no negativo, sin notación científica)" });
-      return;
-    }
-    const frac = s.split(".")[1] ?? "";
-    if (frac.length > 6) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "el importe admite a lo sumo 6 decimales" });
-  });
+const dineroSchema = z.string({
+  invalid_type_error: "el importe monetario debe ser una CADENA decimal, no un número",
+  required_error: "el importe monetario es obligatorio",
+}).regex(
+  RE_DINERO,
+  "importe decimal inválido: use una cadena \\d{1,12}(\\.\\d{1,6})? (sin signo ni notación científica, ≤6 decimales)",
+);
 
 export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefinition {
   const catalogoEnum = z.enum([...CATALOGOS] as [string, ...string[]]);

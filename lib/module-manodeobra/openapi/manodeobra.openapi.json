@@ -1458,8 +1458,8 @@
           },
           "valor": {
             "type": "string",
-            "pattern": "^\\d+(\\.\\d{1,6})?$",
-            "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Monto en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado."
           },
           "moneda": {
             "type": "string",
@@ -1503,8 +1503,8 @@
           },
           "valor": {
             "type": "string",
-            "pattern": "^\\d+(\\.\\d{1,6})?$",
-            "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Monto en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado."
           },
           "moneda": {
             "type": "string"
@@ -1578,8 +1578,8 @@
           },
           "valor": {
             "type": "string",
-            "pattern": "^\\d+(\\.\\d{1,6})?$",
-            "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Monto en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado."
           },
           "moneda": {
             "type": "string"
@@ -1863,8 +1863,8 @@
                 },
                 "costo": {
                   "type": "string",
-                  "pattern": "^\\d+(\\.\\d{1,6})?$",
-                  "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
+                  "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+                  "description": "Monto en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado."
                 }
               },
               "required": [

@@ -71,7 +71,7 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
     await pool.end();
   });
 
-  async function prep(t: string, valor: string | number = "40000") {
+  async function prep(t: string, valor: string = "40000") {
     must(await exec(ctx(t), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" }));
     must(await exec(ctx(t), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
   }
@@ -116,7 +116,7 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
   });
 
   it("aislamiento cross-tenant: las valoraciones de T_A no se ven desde T_B", async () => {
-    await prep(T_B, 50000);
+    await prep(T_B, "50000");
     cerrada(T_B, "sB", "oB", "u1", 3_600_000); // 1h × 50000 = 50000
     must(await exec(ctx(T_B), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "sB" }));
     const enB = must(await query(ctx(T_B), `${MODULO}.valoraciones`, { ordenId: "o1" })) as { valoraciones: unknown[] };
@@ -139,7 +139,7 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
 
   it("solape de tarifas rechazado (misma vigencia abierta) — dominio + índice único parcial", async () => {
     // Ya hay una vigencia ABIERTA para 'soldador' en T_A (de prep). Crear otra abierta ⇒ rechazo.
-    const r = await exec(ctx(T_A), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: 99999, moneda: "CLP", vigenciaDesde: "2024-02-01T00:00:00Z" });
+    const r = await exec(ctx(T_A), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: "99999", moneda: "CLP", vigenciaDesde: "2024-02-01T00:00:00Z" });
     expect(r.ok).toBe(false);
   });
 
@@ -148,8 +148,8 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
     identidad.registrar(T_A, "u3", "Ceci");
     must(await exec(ctx(T_A), `${MODULO}.recurso.definir`, { identityId: "u3", categoriaClave: "ayudante" }));
     const [a, b] = await Promise.all([
-      exec(ctx(T_A), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "ayudante", valor: 20000, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }),
-      exec(ctx(T_A), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "ayudante", valor: 20000, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }),
+      exec(ctx(T_A), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "ayudante", valor: "20000", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }),
+      exec(ctx(T_A), `${MODULO}.tarifa.crear`, { opId: op, sujetoId: "ayudante", valor: "20000", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }),
     ]);
     expect(a.ok && b.ok).toBe(true);
     const rows = (await pool.query(`SELECT count(*)::int AS n FROM deltaops.mdo_tarifas WHERE tenant_id=$1 AND sujeto_id='ayudante'`, [T_A])).rows;
@@ -159,7 +159,7 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
   it("cambio de tarifa (actualizar) versiona sin alterar el histórico valorado", async () => {
     cerrada(T_A, "shist", "ohist", "u1", 9_000_000);
     must(await exec(ctx(T_A), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "shist" }));
-    must(await exec(ctx(T_A), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: 90000, moneda: "CLP", vigenciaDesde: "2024-08-01T00:00:00Z" }));
+    must(await exec(ctx(T_A), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: "90000", moneda: "CLP", vigenciaDesde: "2024-08-01T00:00:00Z" }));
     const again = must(await exec(ctx(T_A), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "shist" })) as Record<string, unknown>;
     expect(again["yaExistia"]).toBe(true);
     expect(again["costo"]).toBe("100000.000000"); // sigue con la tarifa histórica (exacto)

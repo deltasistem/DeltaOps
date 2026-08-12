@@ -50,7 +50,7 @@ export interface CrearTarifaInput {
   readonly tenantId: string;
   readonly sujetoTipo: SujetoTarifa;
   readonly sujetoId: string;
-  readonly valor: string | number; // se normaliza a cadena decimal exacta
+  readonly valor: Dinero; // CADENA decimal canónica (string-only; R2): se normaliza a 6 dec
   readonly moneda: string;
   readonly unidad: string;
   readonly vigenciaDesde: Date;

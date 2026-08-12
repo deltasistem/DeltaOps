@@ -2031,7 +2031,8 @@ async function seedManoDeObra(): Promise<void> {
   unwrap(await cmd(`${MODULO_MDO}.tarifa.crear`, {
     opId: "seed:mdo:tarifa:tecnico-mecanico",
     sujetoTipo: "CATEGORIA", sujetoId: "tecnico-mecanico",
-    valor: 40000, moneda: "CLP", unidad: "HORA", vigenciaDesde: "2026-01-01T00:00:00.000Z",
+    // DINERO string-only (R2): la tarifa se envía como CADENA decimal canónica.
+    valor: "40000", moneda: "CLP", unidad: "HORA", vigenciaDesde: "2026-01-01T00:00:00.000Z",
     motivo: "Tarifa base DEMO",
   }), "mdo.tarifa tecnico-mecanico");
   await drain();

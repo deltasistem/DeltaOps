@@ -19,7 +19,6 @@ type Schema = Record<string, unknown>;
 const ref = (n: string): Schema => ({ $ref: `#/components/schemas/${n}` });
 const str = (extra: Schema = {}): Schema => ({ type: "string", ...extra });
 const int = (extra: Schema = {}): Schema => ({ type: "integer", ...extra });
-const num = (extra: Schema = {}): Schema => ({ type: "number", ...extra });
 const bool = (): Schema => ({ type: "boolean" });
 const obj = (props: Record<string, Schema>, required: string[] = []): Schema => ({
   type: "object",
@@ -55,7 +54,7 @@ export function construirOpenApi(): Record<string, unknown> {
     pattern: "^\\d+\\.\\d{6}$",
     description: "Monto en PUNTO FIJO como cadena decimal (numeric(18,6)); NULL cuando no hay tarifa/costo",
   });
-  const dineroReq = str({ pattern: "^\\d+(\\.\\d{1,6})?$", description: "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)" });
+  const dineroReq = str({ pattern: "^\\d{1,12}(\\.\\d{1,6})?$", description: "Monto en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado." });
 
   const schemas: Record<string, Schema> = {
     Error: obj({ error: str(), code: str({ example: "KRN-VAL-001" }) }, ["error", "code"]),
