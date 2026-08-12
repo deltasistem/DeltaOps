@@ -1,0 +1,724 @@
+DGP-021.1 — FUNDACIÓN DEL MÓDULO DE COSTOS DE MANTENIMIENTO
+
+DIRECTIVA DE DIRECCIÓN
+
+DGP-021 Discovery = PASS.
+DGP-021.0 = PASS.
+GAP-COST-14 = RESUELTO.
+
+Ahora se autoriza implementar únicamente la FUNDACIÓN del módulo de Costos de Mantenimiento.
+
+NO implementar todavía la composición completa de costos de OT/Activo.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Crear una base económica auditable y multitenant para DeltaOps que permita materializar hechos económicos de mantenimiento sin duplicar las fuentes de verdad existentes.
+
+La fundación debe quedar preparada para consumir posteriormente:
+
+- Mano de obra de DGP-020.3.
+- Repuestos/materiales mediante DGP-021.0.
+- Combustible de DGP-019.
+- Otros costos futuros.
+
+IMPORTANTE:
+
+DGP-021.1 NO debe calcular todavía el costo total de una OT ni el costo total de un activo.
+
+Solo debe construir la infraestructura necesaria para registrar y consultar hechos económicos de forma auditable.
+
+==================================================
+2. PRINCIPIO DE ARQUITECTURA
+==================================================
+
+La fuente de verdad de cada componente continúa perteneciendo a su módulo de origen.
+
+Ejemplo:
+
+Mano de obra
+→ module-manodeobra
+
+Combustible
+→ module-utilizacion
+
+Costo de materiales
+→ module-abastecimiento
+
+module-costos NO debe duplicar esas fuentes.
+
+Debe materializar únicamente el hecho económico necesario para conservar:
+
+- qué ocurrió;
+- cuánto;
+- cuándo;
+- sobre qué OT;
+- sobre qué activo;
+- con qué moneda;
+- con qué fuente;
+- con qué snapshot;
+- y cuál fue el estado del hecho.
+
+==================================================
+3. REVISIÓN PREVIA OBLIGATORIA
+==================================================
+
+Antes de implementar:
+
+Revisar nuevamente:
+
+- DGP-021 Discovery.
+- DGP-021.0.
+- DGP-020.3.
+- DGP-020.2.
+- DGP-019.1.
+- module-ordenes.
+- module-activos.
+- module-abastecimiento.
+- module-inventario.
+
+Confirmar que las interfaces reales coinciden con lo documentado.
+
+Si existe contradicción:
+
+NO asumir.
+
+Documentar y resolver antes de implementar.
+
+==================================================
+4. MÓDULO
+==================================================
+
+Crear:
+
+lib/module-costos
+
+siguiendo los patrones canónicos de los módulos existentes.
+
+Debe incluir, según corresponda:
+
+- dominio;
+- comandos;
+- queries;
+- repositorios;
+- puertos;
+- read models;
+- runtime;
+- OpenAPI;
+- RLS;
+- offline solo donde realmente aplique;
+- auditoría;
+- tests.
+
+No copiar código de otros módulos sin justificarlo.
+
+==================================================
+5. HECHO ECONÓMICO
+==================================================
+
+Diseñar e implementar una entidad de hecho económico.
+
+La estructura exacta debe derivarse del corpus, pero como mínimo evaluar:
+
+- costoId;
+- tenantId;
+- tipo;
+- origen;
+- referenciaOrigen;
+- otId;
+- activoId;
+- identityId cuando aplique;
+- fecha;
+- cantidad;
+- unidad;
+- costoUnitario;
+- costoTotal;
+- moneda;
+- estado;
+- snapshot;
+- opId;
+- ocurridoAt;
+- registradoAt;
+- metadata/auditoría.
+
+NO implementar campos que no tengan semántica demostrable.
+
+Separar claramente:
+
+IDENTIDAD DEL HECHO
+
+de
+
+DATOS SNAPSHOT DEL HECHO.
+
+==================================================
+6. TIPOS DE HECHO
+==================================================
+
+DGP-021.1 debe preparar el modelo para:
+
+- MANO_DE_OBRA
+- MATERIAL
+- COMBUSTIBLE
+- OTROS
+
+Pero NO es obligatorio materializar todos inmediatamente.
+
+Implementar solamente los tipos necesarios para la fundación.
+
+Si un tipo todavía no tiene fuente disponible:
+
+no inventar registros.
+
+==================================================
+7. SNAPSHOT ECONÓMICO
+==================================================
+
+Este es uno de los puntos más importantes.
+
+Cuando un hecho económico se materializa, debe conservar la información necesaria para que cambios posteriores en la fuente no modifiquen el histórico.
+
+Ejemplo:
+
+Material:
+costo promedio ponderado actual = 35.000,123456
+
+Se crea un hecho económico.
+
+Posteriormente el costo promedio cambia a 42.000.
+
+El hecho histórico debe continuar representando:
+
+35.000,123456
+
+No debe recalcularse automáticamente.
+
+La misma regla aplica a:
+
+- tarifas;
+- combustible;
+- cantidades;
+- moneda;
+- unidad;
+- categoría.
+
+No modificar históricos mediante referencias vivas.
+
+==================================================
+8. DINERO
+==================================================
+
+REGLA ABSOLUTA:
+
+Dinero = decimal string-safe.
+
+Nunca:
+
+parseFloat
+Number
+float
+conversiones implícitas.
+
+Mantener:
+
+PostgreSQL numeric
+→ driver string
+→ dominio string
+→ API string
+→ frontend string.
+
+Aplicar el mismo estándar utilizado por DGP-020.3 y DGP-021.0.
+
+No introducir una precisión distinta sin justificación.
+
+==================================================
+9. MONEDA
+==================================================
+
+No convertir monedas.
+
+Los hechos deben conservar su moneda.
+
+Los agregados futuros deberán separar:
+
+COP
+USD
+CLP
+etc.
+
+Nunca sumar:
+
+100.000 COP + 100 USD
+
+como si fueran comparables.
+
+Si una consulta encuentra múltiples monedas:
+
+devolverlas separadamente.
+
+==================================================
+10. ESTADOS
+==================================================
+
+Definir únicamente estados necesarios y justificables.
+
+Como mínimo evaluar:
+
+ACTIVO
+ANULADO
+
+Si el modelo necesita otros estados:
+
+justificarlos antes de implementarlos.
+
+La anulación debe ser auditable.
+
+NO borrar hechos económicos.
+
+NO editar silenciosamente un hecho histórico.
+
+==================================================
+11. INMUTABILIDAD
+==================================================
+
+Una vez materializado un hecho económico:
+
+NO sobrescribir silenciosamente:
+
+- costo;
+- moneda;
+- cantidad;
+- fuente;
+- OT;
+- activo;
+- snapshot.
+
+Si existe un error:
+
+utilizar mecanismo de corrección/anulación auditable.
+
+Seguir el patrón append-only donde corresponda.
+
+==================================================
+12. IDENTIDAD
+==================================================
+
+Cuando un hecho requiera persona:
+
+usar exclusivamente identityId canónico.
+
+Nunca:
+
+- email como ID;
+- nombre como ID;
+- usuario legacy;
+- ID espejo.
+
+Identity debe derivarse del contexto autenticado o de contratos públicos.
+
+==================================================
+13. OT Y ACTIVO
+==================================================
+
+Cuando el hecho provenga de una OT:
+
+OT debe ser referencia verificable.
+
+Cuando el activo provenga de una OT:
+
+activoId debe derivarse de la OT cuando el contrato lo permita.
+
+NO aceptar activoId arbitrario enviado por frontend si existe una relación canónica OT→Activo.
+
+No duplicar la relación OT→Activo.
+
+==================================================
+14. MULTITENANCY
+==================================================
+
+tenantId exclusivamente desde contexto autenticado.
+
+RLS obligatoria.
+
+Todo hecho debe estar tenant-scoped.
+
+Probar:
+
+Tenant A no puede:
+
+- crear hecho para Tenant B;
+- consultar hecho de Tenant B;
+- modificar hecho de Tenant B;
+- anular hecho de Tenant B.
+
+==================================================
+15. RBAC
+==================================================
+
+No crear permisos nuevos innecesariamente.
+
+Definir la matriz usando capacidades existentes cuando sea posible.
+
+Evaluar como mínimo:
+
+SUPER_ADMIN
+TENANT_ADMIN
+SUPERVISOR
+PLANIFICADOR
+TECNICO
+CONSULTA
+
+Separar:
+
+- consulta;
+- materialización;
+- anulación;
+- administración.
+
+Un TECNICO no debe obtener capacidad administrativa sobre costos por el simple hecho de poder ejecutar una OT.
+
+==================================================
+16. IDEMPOTENCIA
+==================================================
+
+Toda materialización mutante debe tener:
+
+opId
+
+y claim durable.
+
+El claim debe ejecutarse antes de producir efectos.
+
+Doble solicitud con mismo opId:
+
+exactamente un hecho.
+
+Probar concurrencia real contra PostgreSQL.
+
+==================================================
+17. ORIGEN
+==================================================
+
+Cada hecho económico debe poder identificar su origen.
+
+Ejemplos conceptuales:
+
+MANO_DE_OBRA
+→ module-manodeobra
+
+MATERIAL
+→ module-abastecimiento
+
+COMBUSTIBLE
+→ module-utilizacion
+
+El origen debe ser suficientemente preciso para auditoría.
+
+No depender únicamente de texto libre.
+
+==================================================
+18. REFERENCIA DE ORIGEN
+==================================================
+
+Debe poder rastrearse:
+
+Hecho económico
+↓
+fuente original
+↓
+OT / activo / sesión / tanqueo / consumo
+
+pero sin copiar toda la entidad origen.
+
+Evaluar:
+
+originType
+originId
+
+o el mecanismo canónico equivalente.
+
+No crear referencias que el origen no pueda garantizar.
+
+==================================================
+19. ORQUESTACIÓN
+==================================================
+
+El Discovery identificó que el corpus actual no dispone de una suscripción cross-módulo general.
+
+Seguir el patrón aprobado en DGP-020.3:
+
+orquestación desde api-server cuando sea necesario.
+
+Debe ser:
+
+- fail-safe;
+- idempotente;
+- auditable;
+- recuperable.
+
+Un fallo en la materialización económica NO debe romper la operación principal cuando el flujo de negocio ya fue diseñado como fail-safe.
+
+Pero el hecho pendiente debe quedar visible y recuperable.
+
+==================================================
+20. OFFLINE
+==================================================
+
+NO crear una segunda cola.
+
+Utilizar OfflineProvider existente cuando corresponda.
+
+DGP-021.1 debe definir qué operaciones pueden ocurrir offline.
+
+Si no es seguro materializar económicamente offline:
+
+la operación puede quedar pendiente de sincronización.
+
+Nunca inventar costos localmente.
+
+==================================================
+21. READ MODELS
+==================================================
+
+Crear read models únicamente para:
+
+- hechos económicos;
+- consulta por OT;
+- consulta por activo;
+- consulta por período;
+- consulta por tipo;
+- consulta por moneda.
+
+No construir todavía:
+
+- dashboard;
+- KPI ejecutivo;
+- analytics avanzado;
+- costo/hora;
+- costo/km.
+
+Eso será posterior.
+
+==================================================
+22. API / OPENAPI
+==================================================
+
+Crear contratos públicos mínimos para:
+
+- consultar hechos;
+- consultar hechos por OT;
+- consultar hechos por activo;
+- consultar hechos por tipo/moneda cuando esté justificado.
+
+Las operaciones mutantes solo deben existir si DGP-021.1 realmente las necesita.
+
+No crear endpoints anticipatorios.
+
+OpenAPI debe ser generado y protegido con drift tests.
+
+==================================================
+23. AUDITORÍA
+==================================================
+
+Cada hecho debe permitir reconstruir:
+
+QUIÉN
+QUÉ
+CUÁNDO
+ORIGEN
+OT
+ACTIVO
+CANTIDAD
+COSTO
+MONEDA
+SNAPSHOT
+ESTADO
+OPERATION ID
+
+No depender exclusivamente de logs.
+
+La evidencia debe vivir en datos persistentes.
+
+==================================================
+24. FRONTEND
+==================================================
+
+NO construir todavía un dashboard de costos.
+
+Si se requiere una superficie mínima para validar el módulo:
+
+debe ser estrictamente operacional y respetar el design system.
+
+No crear una experiencia visual completa de costos todavía.
+
+El foco de DGP-021.1 es arquitectura y dominio.
+
+==================================================
+25. PRUEBAS
+==================================================
+
+Obligatorio:
+
+- dominio;
+- aplicación;
+- PostgreSQL real;
+- RLS;
+- concurrencia;
+- idempotencia;
+- precisión decimal;
+- moneda;
+- snapshot;
+- anulación;
+- tenant isolation;
+- identidad;
+- OpenAPI;
+- regresión.
+
+Casos importantes:
+
+1. mismo opId dos veces.
+2. dos opId diferentes simultáneos.
+3. costo decimal de alta precisión.
+4. cero real.
+5. ausencia de costo.
+6. moneda A.
+7. moneda B.
+8. mismo activo con varias monedas.
+9. OT de otro tenant.
+10. activo de otro tenant.
+11. identidad de otro tenant.
+12. anulación.
+13. histórico después de cambio de precio/tarifa.
+14. fallo de orquestación.
+15. reintento de materialización.
+
+==================================================
+26. E2E
+==================================================
+
+Realizar E2E real únicamente para validar la fundación.
+
+Debe verificarse como mínimo:
+
+- sesión real;
+- tenant;
+- RBAC;
+- creación/materialización autorizada;
+- consulta;
+- persistencia;
+- refresh;
+- aislamiento;
+- anulación si existe;
+- histórico.
+
+No construir un dashboard.
+
+==================================================
+27. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Realizar revisión independiente.
+
+El revisor debe buscar especialmente:
+
+- duplicación de fuentes;
+- floats;
+- pérdida de precisión;
+- modificación histórica;
+- moneda mezclada;
+- tenant bypass;
+- identidad incorrecta;
+- activo enviado desde frontend sin validación;
+- OT no verificable;
+- opId inseguro;
+- acceso directo a tablas de otros módulos;
+- dependencia con endpoints legacy;
+- abuso de module-costos como "base de datos universal".
+
+Si existe un hallazgo MAYOR:
+
+R1 FAIL
+→ corregir
+→ nueva revisión.
+
+Solo PASS sin críticos/mayores.
+
+==================================================
+28. CRITERIOS DE CIERRE
+==================================================
+
+DGP-021.1 solo puede cerrarse PASS cuando:
+
+1. module-costos existe siguiendo patrón canónico.
+2. La entidad económica tiene fuente y semántica claras.
+3. No duplica mano de obra.
+4. No duplica combustible.
+5. No duplica costos de abastecimiento.
+6. Consume el contrato exacto de DGP-021.0 cuando corresponda.
+7. Dinero es string-safe.
+8. Monedas no se mezclan.
+9. Históricos son inmutables.
+10. Anulación es auditable.
+11. identityId es canónico.
+12. OT/activo son verificables.
+13. RLS está implementada.
+14. RBAC está implementado.
+15. opId tiene claim durable.
+16. Concurrencia está probada.
+17. Read models están tenant-scoped.
+18. OpenAPI está documentado.
+19. No existe dashboard ejecutivo.
+20. No existe todavía costo total OT.
+21. No existe todavía costo total activo.
+22. No existe todavía costo/hora.
+23. No existe todavía costo/km.
+24. Tests verdes.
+25. E2E real PASS.
+26. Revisión arquitectónica independiente PASS.
+
+==================================================
+29. ENTREGABLE
+==================================================
+
+Al finalizar generar:
+
+INFORME OFICIAL DE CIERRE — DGP-021.1
+
+Debe incluir:
+
+- arquitectura;
+- entidades;
+- comandos;
+- queries;
+- fuentes;
+- snapshots;
+- precisión;
+- monedas;
+- RLS;
+- RBAC;
+- idempotencia;
+- offline;
+- auditoría;
+- read models;
+- OpenAPI;
+- pruebas;
+- E2E;
+- revisión arquitectónica;
+- gaps;
+- deuda técnica;
+- commits.
+
+==================================================
+30. REGLA FINAL
+==================================================
+
+NO iniciar DGP-021.2 automáticamente.
+
+DGP-021.1 es únicamente la fundación.
+
+Al finalizar:
+
+DETENERSE.
+
+Esperar aprobación explícita de Dirección.
