@@ -250,6 +250,136 @@ suite("Módulo Enterprise Procurement · PostgreSQL", () => {
     }
   });
 
+  /* ===================================================================== */
+  /* DGP-021.0 · Contrato público de COSTOS EXACTOS (string-decimal).       */
+  /* GAP-COST-14: el costo debe viajar DB→repo→dominio→app→API como CADENA  */
+  /* DECIMAL sin float en ninguna capa; distinguir SIN COSTO de "0"; RLS.   */
+  /* ===================================================================== */
+
+  // Principal SIN el permiso de lectura del módulo (para 403).
+  const SIN_PERMISO: Principal = { id: "sin-perm", rol: "operador", permisos: [], capacidades: [] };
+
+  // Inserta/reemplaza una fila EXACTA en abs_costos_read con RLS (bypass del
+  // camino de escritura float): prueba que la PRECISIÓN del numeric(18,6) se
+  // conserva íntegra al leerla como string por el contrato público.
+  async function sembrarCostoExacto(
+    tenantId: string, articuloId: string, moneda: string, costoUnitario: string, cantidad: string,
+  ): Promise<void> {
+    await conTenant(
+      tenantId,
+      `INSERT INTO deltaops.abs_costos_read
+         (tenant_id, articulo_id, moneda, metodo_valoracion, costo_unitario, cantidad_acumulada, datos, version, last_event_id, actualizado_at)
+       VALUES ($1,$2,$3,'promedio-ponderado',$4::numeric,$5::numeric,'{}'::jsonb,1,$6,now())
+       ON CONFLICT (tenant_id, articulo_id, moneda)
+       DO UPDATE SET costo_unitario=EXCLUDED.costo_unitario, cantidad_acumulada=EXCLUDED.cantidad_acumulada`,
+      [tenantId, articuloId, moneda, costoUnitario, cantidad, `seed-${crypto.randomUUID()}`],
+    );
+  }
+
+  it("expone el costo EXACTO como decimal string (typeof string, sin float ni notación científica)", async () => {
+    const artId = crypto.randomUUID();
+    // 12 dígitos enteros + 6 decimales: precisión máxima del numeric(18,6).
+    await sembrarCostoExacto(T_A, artId, "usd", "12345678.123456", "999999.500000");
+
+    const r = await query(ctx(T_A), `${MODULO}.costos-exactos`, { articuloId: artId });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const { costos } = r.value as { articuloId: string; costos: Array<Record<string, unknown>> };
+    expect(costos).toHaveLength(1);
+    const c = costos[0]!;
+    // NO-CONVERSIÓN-A-FLOAT: los montos son STRINGS, no numbers.
+    expect(typeof c["costoUnitario"]).toBe("string");
+    expect(typeof c["cantidadAcumulada"]).toBe("string");
+    // La cadena decimal sobrevive INTACTA (escala 6, sin 1.2345678123456e7).
+    expect(c["costoUnitario"]).toBe("12345678.123456");
+    expect(c["cantidadAcumulada"]).toBe("999999.500000");
+    expect(String(c["costoUnitario"])).not.toContain("e");
+    expect(c["moneda"]).toBe("usd");
+    expect(c["metodoValoracion"]).toBe("promedio-ponderado");
+  });
+
+  it("conserva precisión de MUCHOS DECIMALES y valores GRANDES sin redondeo float", async () => {
+    const artId = crypto.randomUUID();
+    // Este valor perdería precisión si pasara por Number()/parseFloat.
+    await sembrarCostoExacto(T_A, artId, "clp", "999999999999.999999", "0.000001");
+    const r = await query(ctx(T_A), `${MODULO}.costos-exactos`, { articuloId: artId });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const c = (r.value as { costos: Array<Record<string, unknown>> }).costos[0]!;
+    expect(c["costoUnitario"]).toBe("999999999999.999999");
+    expect(c["cantidadAcumulada"]).toBe("0.000001");
+    // Prueba directa de no-float: reconstruir por Number rompería el valor.
+    expect(Number(c["costoUnitario"] as string).toString()).not.toBe(c["costoUnitario"]);
+  });
+
+  it("distingue COSTO CERO REAL (\"0.000000\") de la AUSENCIA de costo (arreglo vacío)", async () => {
+    const conCero = crypto.randomUUID();
+    await sembrarCostoExacto(T_A, conCero, "usd", "0", "0");
+    const rCero = await query(ctx(T_A), `${MODULO}.costos-exactos`, { articuloId: conCero });
+    expect(rCero.ok).toBe(true);
+    if (rCero.ok) {
+      const costos = (rCero.value as { costos: Array<Record<string, unknown>> }).costos;
+      expect(costos).toHaveLength(1);
+      // CERO real: cadena decimal "0.000000", jamás ausencia.
+      expect(costos[0]!["costoUnitario"]).toBe("0.000000");
+    }
+
+    // Artículo SIN fila de costo: ausencia ⇒ [] (nunca traducida a "0").
+    const sinCosto = crypto.randomUUID();
+    const rVacio = await query(ctx(T_A), `${MODULO}.costos-exactos`, { articuloId: sinCosto });
+    expect(rVacio.ok).toBe(true);
+    if (rVacio.ok) expect((rVacio.value as { costos: unknown[] }).costos).toEqual([]);
+  });
+
+  it("AÍSLA por tenant: A no ve el costo exacto sembrado en B (RLS)", async () => {
+    const artId = crypto.randomUUID();
+    await sembrarCostoExacto(T_B, artId, "usd", "77.000000", "3.000000");
+    // Mismo articuloId consultado por A: no debe filtrarse el costo de B.
+    const desdeA = await query(ctx(T_A), `${MODULO}.costos-exactos`, { articuloId: artId });
+    expect(desdeA.ok).toBe(true);
+    if (desdeA.ok) expect((desdeA.value as { costos: unknown[] }).costos).toEqual([]);
+    // B sí lo ve.
+    const desdeB = await query(ctx(T_B), `${MODULO}.costos-exactos`, { articuloId: artId });
+    expect(desdeB.ok).toBe(true);
+    if (desdeB.ok) {
+      const c = (desdeB.value as { costos: Array<Record<string, unknown>> }).costos[0]!;
+      expect(c["costoUnitario"]).toBe("77.000000");
+    }
+  });
+
+  it("RECHAZA sin permiso modulo.abastecimiento.read (403 · KRN-AUTH)", async () => {
+    const c = createExecutionContext({ principal: SIN_PERMISO, metadata: { tenantId: T_A } });
+    const r = await query(c, `${MODULO}.costos-exactos`, { articuloId: crypto.randomUUID() });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code.startsWith("KRN-AUTH")).toBe(true);
+  });
+
+  it("RECHAZA sin tenant en la sesión (no autenticado / sin contexto de tenant)", async () => {
+    const sinTenant = createExecutionContext({ principal: ADMIN, metadata: {} });
+    const r = await query(sinTenant, `${MODULO}.costos-exactos`, { articuloId: crypto.randomUUID() });
+    expect(r.ok).toBe(false);
+  });
+
+  it("REGRESIÓN: `costos` (consumidores actuales, float) sigue intacto junto al nuevo contrato", async () => {
+    const art = await crearArticulo(T_A, { nombre: "Buje regresión" });
+    const prov = await crearProveedor(T_A);
+    const oc = await ocEnviada(T_A, art.id, prov.id);
+    await recepcionTotal(T_A, oc.id, oc.version);
+
+    const legacy = await query(ctx(T_A), `${MODULO}.costos`, { articuloId: art.id });
+    expect(legacy.ok).toBe(true);
+    if (legacy.ok) {
+      const usd = (legacy.value as Array<{ moneda: string; costoUnitario: number }>).find((f) => f.moneda === "usd");
+      expect(typeof usd!.costoUnitario).toBe("number"); // semántica congelada: number
+    }
+    const exacto = await query(ctx(T_A), `${MODULO}.costos-exactos`, { articuloId: art.id });
+    expect(exacto.ok).toBe(true);
+    if (exacto.ok) {
+      const c = (exacto.value as { costos: Array<Record<string, unknown>> }).costos.find((x) => x["moneda"] === "usd");
+      expect(typeof c!["costoUnitario"]).toBe("string"); // nuevo contrato: string
+    }
+  });
+
   it("reconstruye por REPLAY del event log durable con EQUIVALENCIA", async () => {
     const before = await query(ctx(T_A), `${MODULO}.articulos`, {});
     expect(before.ok).toBe(true);

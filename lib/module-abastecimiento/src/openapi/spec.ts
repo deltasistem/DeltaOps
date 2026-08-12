@@ -221,6 +221,26 @@ export function construirOpenApi(): Record<string, unknown> {
       },
       ["articuloId", "moneda"],
     ),
+    // DGP-021.0 · Contrato público de COSTO EXACTO (GAP-COST-14). Valores
+    // monetarios como STRING DECIMAL canónico (numeric(18,6) de PostgreSQL leído
+    // sin conversión a float). `costoUnitario` = costo unitario PROMEDIO
+    // PONDERADO de las recepciones valorizadas del artículo en esa moneda (lo
+    // que mantiene el cost-engine de Abastecimiento; NO es último ni estándar).
+    // Escala fija 6, hasta 12 dígitos enteros, no negativo, sin notación
+    // científica. Ausencia de costo ⇒ `costos: []` (SIN COSTO ≠ "0").
+    CostoExacto: obj(
+      {
+        articuloId: str(), moneda: str(), metodoValoracion: str(),
+        costoUnitario: str({ pattern: "^\\d{1,12}\\.\\d{6}$", description: "Costo unitario promedio ponderado (decimal string, escala 6). Ej: \"35000.123400\"." }),
+        cantidadAcumulada: str({ pattern: "^\\d{1,12}\\.\\d{6}$", description: "Cantidad valorizada acumulada (decimal string, escala 6)." }),
+        actualizadoAt: str({ format: "date-time" }),
+      },
+      ["articuloId", "moneda", "costoUnitario", "cantidadAcumulada"],
+    ),
+    CostosExactos: obj(
+      { articuloId: str(), costos: arr(ref("CostoExacto")) },
+      ["articuloId", "costos"],
+    ),
     OperacionSync: obj({ opId: str(), comando: str(), input: obj({}, []) }, ["opId", "comando", "input"]),
     ColaSync: obj({ operaciones: arr(ref("OperacionSync")) }, ["operaciones"]),
     ResumenSync: obj({
@@ -261,6 +281,17 @@ export function construirOpenApi(): Record<string, unknown> {
   add(`${BASE}/articulos/{id}/costos`, "get", {
     tags: ["Artículos"], operationId: "abastecimiento.costos", summary: "Costos valorizados del artículo (read model; Inventario es la autoridad)",
     parameters: [idParam], responses: { "200": jsonOk(arr(ref("Costo"))), ...errores("401", "403") },
+  });
+  add(`${BASE}/articulos/{id}/costos-exactos`, "get", {
+    tags: ["Artículos"], operationId: "abastecimiento.costos-exactos",
+    summary: "Costo EXACTO del artículo como decimal string (DGP-021.0 · GAP-COST-14)",
+    description:
+      "Contrato público string-safe de costos. Devuelve el costo unitario PROMEDIO PONDERADO por moneda como cadena decimal " +
+      "canónica (numeric(18,6) leído de PostgreSQL sin conversión a float; escala 6, no negativo, sin notación científica). " +
+      "Tenant derivado EXCLUSIVAMENTE de la sesión (RLS por tenant; un tenant no ve costos de otro). Autorización: permiso " +
+      "`modulo.abastecimiento.read` (mismo que /costos). Sin sesión ⇒ 401; sin permiso ⇒ 403. Artículo sin costo valorizado " +
+      "⇒ `costos: []` (SIN COSTO ≠ \"0\"). Semántica: costo promedio ponderado de recepciones (NO último ni estándar).",
+    parameters: [idParam], responses: { "200": jsonOk(ref("CostosExactos")), ...errores("401", "403", "500") },
   });
 
   // ---- Proveedores ----

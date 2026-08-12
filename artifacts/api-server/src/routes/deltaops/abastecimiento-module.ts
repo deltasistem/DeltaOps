@@ -88,6 +88,12 @@ function boolQuery(v: unknown): boolean | undefined {
 router.get(`${BASE}/articulos/:id/costos`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.costos`, { articuloId: req.params.id }));
 });
+// DGP-021.0 · Costos EXACTOS del artículo (contrato público string-decimal,
+// GAP-COST-14). Tenant SOLO desde la sesión; misma autorización que /costos
+// (`modulo.abastecimiento.read`). Aditivo; no altera /costos existente.
+router.get(`${BASE}/articulos/:id/costos-exactos`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.costos-exactos`, { articuloId: req.params.id }));
+});
 router.get(`${BASE}/articulos/:id`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.articulo`, { id: req.params.id }));
 });

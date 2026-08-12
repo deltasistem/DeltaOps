@@ -404,6 +404,69 @@
         }
       }
     },
+    "/api/deltaops/abastecimiento/articulos/{id}/costos-exactos": {
+      "get": {
+        "tags": [
+          "Artículos"
+        ],
+        "operationId": "abastecimiento.costos-exactos",
+        "summary": "Costo EXACTO del artículo como decimal string (DGP-021.0 · GAP-COST-14)",
+        "description": "Contrato público string-safe de costos. Devuelve el costo unitario PROMEDIO PONDERADO por moneda como cadena decimal canónica (numeric(18,6) leído de PostgreSQL sin conversión a float; escala 6, no negativo, sin notación científica). Tenant derivado EXCLUSIVAMENTE de la sesión (RLS por tenant; un tenant no ve costos de otro). Autorización: permiso `modulo.abastecimiento.read` (mismo que /costos). Sin sesión ⇒ 401; sin permiso ⇒ 403. Artículo sin costo valorizado ⇒ `costos: []` (SIN COSTO ≠ \"0\"). Semántica: costo promedio ponderado de recepciones (NO último ni estándar).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del recurso"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostosExactos"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error de infraestructura (KRN-INF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/deltaops/abastecimiento/proveedores": {
       "get": {
         "tags": [
@@ -3333,6 +3396,60 @@
         "required": [
           "articuloId",
           "moneda"
+        ],
+        "additionalProperties": false
+      },
+      "CostoExacto": {
+        "type": "object",
+        "properties": {
+          "articuloId": {
+            "type": "string"
+          },
+          "moneda": {
+            "type": "string"
+          },
+          "metodoValoracion": {
+            "type": "string"
+          },
+          "costoUnitario": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Costo unitario promedio ponderado (decimal string, escala 6). Ej: \"35000.123400\"."
+          },
+          "cantidadAcumulada": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Cantidad valorizada acumulada (decimal string, escala 6)."
+          },
+          "actualizadoAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "articuloId",
+          "moneda",
+          "costoUnitario",
+          "cantidadAcumulada"
+        ],
+        "additionalProperties": false
+      },
+      "CostosExactos": {
+        "type": "object",
+        "properties": {
+          "articuloId": {
+            "type": "string"
+          },
+          "costos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CostoExacto"
+            }
+          }
+        },
+        "required": [
+          "articuloId",
+          "costos"
         ],
         "additionalProperties": false
       },

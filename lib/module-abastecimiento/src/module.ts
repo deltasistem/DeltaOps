@@ -359,6 +359,23 @@ const cantidadSchema = z.object({ valor: z.number().positive(), unidad: z.string
 const dineroSchema = z.object({ moneda: z.string().min(1), monto: z.number().nonnegative() });
 const referenciaExternaSchema = z.object({ tipo: z.string().min(1), id: z.string().min(1), etiqueta: z.string().optional() });
 
+/**
+ * DGP-021.0 · Patrón STRING-DECIMAL del contrato de costos exactos. Deriva de la
+ * fuente real `abs_costos_read.{costo_unitario,cantidad_acumulada} numeric(18,6)`:
+ * el driver pg devuelve numeric con escala fija 6 (p.ej. "9.000000",
+ * "35000.123400"), hasta 12 dígitos enteros (18 − 6). No negativo (el cost-engine
+ * y el DEFAULT del esquema garantizan >= 0). SIN notación científica.
+ */
+const RE_COSTO_EXACTO = /^\d{1,12}\.\d{6}$/;
+const costoExactoSalidaSchema = z.object({
+  articuloId: z.string().min(1),
+  moneda: z.string().min(1),
+  metodoValoracion: z.string(),
+  costoUnitario: z.string().regex(RE_COSTO_EXACTO, "costoUnitario debe ser decimal canónico numeric(18,6)"),
+  cantidadAcumulada: z.string().regex(RE_COSTO_EXACTO, "cantidadAcumulada debe ser decimal canónico numeric(18,6)"),
+  actualizadoAt: z.string(),
+});
+
 const lineaSolicitudSchema = z.object({
   numero: z.number().int().positive(),
   articuloId: z.string().min(1).nullable().optional(),
@@ -1678,6 +1695,45 @@ export function abastecimientoModule(adapters: ModuleAdapters): PlatformServiceD
             articuloId: x.articuloId, moneda: x.moneda, metodoValoracion: x.metodoValoracion,
             costoUnitario: x.costoUnitario, cantidadAcumulada: x.cantidadAcumulada, ...x.datos,
           })) as unknown as Record<string, unknown>[]);
+        },
+      }),
+      // DGP-021.0 · CONTRATO PÚBLICO DE COSTOS EXACTOS (GAP-COST-14).
+      // Extensión ADITIVA (excepción §45): expone el costo unitario PROMEDIO
+      // PONDERADO exacto por artículo/moneda como CADENA DECIMAL CANÓNICA
+      // (numeric(18,6) leído tal cual de PostgreSQL, sin float en ninguna capa).
+      // NO altera la semántica de `${MODULO}.costos` (que sigue devolviendo float
+      // JS para sus consumidores actuales). Reutiliza el permiso `${MODULO}.read`.
+      // Tenant SOLO desde la sesión (RLS por `withTenantRead`). Ausencia de costo
+      // ⇒ arreglo vacío (SIN COSTO ≠ "0"). Consumidor previsto: DGP-021.1.
+      (deps) => ({
+        name: `${MODULO}.costos-exactos`,
+        inputSchema: z.object({ articuloId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          void deps;
+          if (!adapters.readModel) return ok({ articuloId: input.articuloId, costos: [] as Record<string, unknown>[] });
+          const rm = await adapters.readModel.costosExactosPorArticulo(tenant.value, input.articuloId);
+          if (!rm.ok) return rm;
+          // Validación de FRONTERA string-only: cada costo es una cadena decimal
+          // canónica (escala 6). Si un valor no cumple (dato corrupto), se rechaza
+          // el contrato en lugar de emitir un número/float o silenciarlo.
+          const salida: Array<Record<string, unknown>> = [];
+          for (const c of rm.value) {
+            const val = costoExactoSalidaSchema.safeParse({
+              articuloId: c.articuloId, moneda: c.moneda, metodoValoracion: c.metodoValoracion,
+              costoUnitario: c.costoUnitario, cantidadAcumulada: c.cantidadAcumulada,
+              actualizadoAt: c.actualizadoAt instanceof Date ? c.actualizadoAt.toISOString() : String(c.actualizadoAt),
+            });
+            if (!val.success) {
+              return fail(KernelErrors.infrastructure(
+                `costo exacto con formato inválido para artículo ${input.articuloId} (${c.moneda}): ${val.error.issues[0]?.message ?? "formato"}`,
+              ));
+            }
+            salida.push(val.data);
+          }
+          return ok({ articuloId: input.articuloId, costos: salida });
         },
       }),
       (deps) => ({

@@ -255,6 +255,30 @@ export interface CostoReadRow {
   readonly version: number; readonly lastEventId: string; readonly actualizadoAt: Date;
 }
 
+/**
+ * DGP-021.0 · Fila de COSTO EXACTO (string-safe) del read model `abs_costos_read`.
+ *
+ * A diferencia de `CostoReadRow` (que usa `number` JS y contamina la precisión,
+ * GAP-COST-10), esta proyección conserva los `numeric(18,6)` de PostgreSQL como
+ * CADENAS DECIMALES CANÓNICAS leídas TAL CUAL del driver (pg devuelve numeric
+ * como string): sin `Number`/`parseFloat`, sin notación científica, sin pérdida.
+ *
+ * `costoUnitario` = costo unitario PROMEDIO PONDERADO de las recepciones
+ * valorizadas del artículo en esa moneda (columna `costo_unitario`, que el
+ * cost-engine alimenta desde `costoPromedio`; ver `projection.ts:costoRows`).
+ * `cantidadAcumulada` = cantidad valorizada acumulada (columna `cantidad_acumulada`).
+ * Ambos SIEMPRE presentes cuando hay una fila; la AUSENCIA de fila (artículo sin
+ * costo valorizado) se representa devolviendo `[]` — nunca "0" (SIN COSTO ≠ 0).
+ */
+export interface CostoExactoReadRow {
+  readonly tenantId: string; readonly articuloId: string; readonly moneda: string; readonly metodoValoracion: string;
+  /** numeric(18,6) como cadena decimal canónica (p.ej. "35000.123400"). */
+  readonly costoUnitario: string;
+  /** numeric(18,6) como cadena decimal canónica. */
+  readonly cantidadAcumulada: string;
+  readonly actualizadoAt: Date;
+}
+
 export interface ReadModelsStore {
   aplicarArticulo(uow: UnitOfWork, row: ArticuloReadRow): Promise<Result<boolean, KernelError>>;
   articuloGet(tenantId: string, id: string): Promise<Result<ArticuloReadRow | null, KernelError>>;
@@ -277,6 +301,12 @@ export interface ReadModelsStore {
   historialPorEntidad(tenantId: string, entityRef: string, limit?: number): Promise<Result<HistorialReadRow[], KernelError>>;
   aplicarCosto(uow: UnitOfWork, row: CostoReadRow): Promise<Result<boolean, KernelError>>;
   costosPorArticulo(tenantId: string, articuloId: string): Promise<Result<CostoReadRow[], KernelError>>;
+  /**
+   * DGP-021.0 · Lectura STRING-SAFE de costos exactos por artículo (contrato
+   * público GAP-COST-14). Devuelve el numeric(18,6) SIN convertir a float. RLS
+   * conservada (tenant desde la sesión). Ausencia ⇒ `[]` (nunca costo "0").
+   */
+  costosExactosPorArticulo(tenantId: string, articuloId: string): Promise<Result<CostoExactoReadRow[], KernelError>>;
   contar(tenantId: string): Promise<Result<Record<string, number>, KernelError>>;
   clear(uow: UnitOfWork, tenantId: string): Promise<Result<void, KernelError>>;
 }
@@ -384,6 +414,20 @@ export class FakeReadModelsStore implements ReadModelsStore {
   }
   async costosPorArticulo(t: string, articuloId: string) {
     return ok([...this.costos.values()].filter((r) => r.tenantId === t && r.articuloId === articuloId).sort((a, b) => (a.moneda < b.moneda ? -1 : 1)));
+  }
+  async costosExactosPorArticulo(t: string, articuloId: string): Promise<Result<CostoExactoReadRow[], KernelError>> {
+    // Fake en memoria: no hay driver PG que devuelva numeric-string, así que se
+    // deriva la cadena canónica (escala 6) desde el valor almacenado. El camino
+    // de PRECISIÓN EXACTA lo garantiza el store PG (numeric leído tal cual).
+    const canon = (v: number): string => v.toFixed(6);
+    const filas = [...this.costos.values()]
+      .filter((r) => r.tenantId === t && r.articuloId === articuloId)
+      .sort((a, b) => (a.moneda < b.moneda ? -1 : 1))
+      .map((r) => ({
+        tenantId: r.tenantId, articuloId: r.articuloId, moneda: r.moneda, metodoValoracion: r.metodoValoracion,
+        costoUnitario: canon(r.costoUnitario), cantidadAcumulada: canon(r.cantidadAcumulada), actualizadoAt: r.actualizadoAt,
+      }));
+    return ok(filas);
   }
 
   async contar(t: string) {
@@ -714,6 +758,30 @@ export class PgReadModelsStore implements ReadModelsStore {
         datos: parseJson(r["datos"]), version: Number(r["version"] ?? 1), lastEventId: String(r["last_event_id"] ?? ""), actualizadoAt: r["actualizado_at"] as Date,
       })));
     } catch (err) { return fail(KernelErrors.infrastructure("costo read list falló", err)); }
+  }
+  async costosExactosPorArticulo(t: string, articuloId: string): Promise<Result<CostoExactoReadRow[], KernelError>> {
+    try {
+      // El driver pg devuelve numeric como STRING por defecto: se propaga TAL
+      // CUAL (sin Number/parseFloat) para preservar escala y evitar float. RLS
+      // aplicada por `withTenantRead` (set_config app.tenant_id por transacción).
+      const res = await withTenantRead(this.pool, t, (c) =>
+        c.query(
+          `SELECT articulo_id, moneda, metodo_valoracion, costo_unitario, cantidad_acumulada, actualizado_at
+             FROM deltaops.abs_costos_read WHERE tenant_id=$1 AND articulo_id=$2 ORDER BY moneda ASC`,
+          [t, articuloId],
+        ),
+      );
+      return ok(res.rows.map((r) => ({
+        tenantId: t,
+        articuloId: String(r["articulo_id"]),
+        moneda: String(r["moneda"]),
+        metodoValoracion: String(r["metodo_valoracion"] ?? ""),
+        // numeric → string canónico del driver; jamás Number(...) aquí.
+        costoUnitario: String(r["costo_unitario"]),
+        cantidadAcumulada: String(r["cantidad_acumulada"]),
+        actualizadoAt: r["actualizado_at"] as Date,
+      })));
+    } catch (err) { return fail(KernelErrors.infrastructure("costo exacto read list falló", err)); }
   }
 
   async contar(t: string) {

@@ -258,3 +258,35 @@ describe("Concurrencia optimista", () => {
     expect((cal.value as { calificacionPromedio: number }).calificacionPromedio).toBeGreaterThan(0);
   });
 });
+
+/* ------- DGP-021.0 · Contrato de costos exactos (puerto string-safe) ------- */
+// Prueba del PUERTO de lectura string-safe (`costosExactosPorArticulo`) contra
+// el Fake, verificando el TIPO (string) y la semántica SIN COSTO ≠ "0". El
+// camino de PRECISIÓN EXACTA (numeric leído del driver) se prueba con PG real
+// en `module.pg.test.ts`.
+describe("DGP-021.0 · costos exactos (string-safe)", () => {
+  it("el puerto devuelve montos como STRING y distingue ausencia de cero", async () => {
+    const { FakeReadModelsStore } = await import("../infrastructure/operacional");
+    const store = new FakeReadModelsStore();
+
+    // AUSENCIA: sin fila ⇒ [] (jamás "0").
+    const vacio = await store.costosExactosPorArticulo(TENANT, "art-sin-costo");
+    expect(vacio.ok).toBe(true);
+    if (vacio.ok) expect(vacio.value).toEqual([]);
+
+    // Sembrar una fila con CERO real vía el puerto de escritura de costos.
+    const now = new Date("2024-01-01T00:00:00.000Z");
+    const seed = await store.aplicarCosto({} as never, {
+      tenantId: TENANT, articuloId: "art-cero", moneda: "usd", metodoValoracion: "promedio-ponderado",
+      costoUnitario: 0, cantidadAcumulada: 0, datos: {}, version: 1, lastEventId: "e1", actualizadoAt: now,
+    });
+    expect(seed.ok).toBe(true);
+
+    const r = await store.costosExactosPorArticulo(TENANT, "art-cero");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value).toHaveLength(1);
+    expect(typeof r.value[0]!.costoUnitario).toBe("string");
+    expect(r.value[0]!.costoUnitario).toBe("0.000000"); // CERO real, no ausencia
+  });
+});
