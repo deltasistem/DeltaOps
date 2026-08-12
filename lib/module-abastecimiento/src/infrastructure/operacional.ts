@@ -322,6 +322,11 @@ export class FakeReadModelsStore implements ReadModelsStore {
   private readonly recepciones = new Map<string, RecepcionReadRow>();
   private readonly historial = new Map<string, HistorialReadRow>();
   private readonly costos = new Map<string, CostoReadRow>();
+  // DGP-021.0 · Respaldo INDEPENDIENTE del contrato de costos exactos: guarda
+  // los montos como CADENAS DECIMALES CANÓNICAS (nunca number), en paralelo al
+  // read model legacy float (`costos`). NO se deriva uno del otro: el camino
+  // exacto es string extremo a extremo (equivale al numeric-string de PG).
+  private readonly costosExactos = new Map<string, CostoExactoReadRow>();
   private k(t: string, id: string) { return `${t}::${id}`; }
 
   private aplicarVersionado<T extends { tenantId: string; id: string; version: number; lastEventId: string }>(m: Map<string, T>, row: T): Result<boolean, KernelError> {
@@ -415,18 +420,26 @@ export class FakeReadModelsStore implements ReadModelsStore {
   async costosPorArticulo(t: string, articuloId: string) {
     return ok([...this.costos.values()].filter((r) => r.tenantId === t && r.articuloId === articuloId).sort((a, b) => (a.moneda < b.moneda ? -1 : 1)));
   }
+  /**
+   * DGP-021.0 · Seeder STRING-ONLY del respaldo de costos exactos. Acepta
+   * EXCLUSIVAMENTE cadenas decimales; conserva la cadena INTACTA (sin `Number`/
+   * `parseFloat`/`toFixed`). Es el análogo en memoria del numeric-string que el
+   * driver de PostgreSQL entrega. Emula el read model: PK (tenant, articulo,
+   * moneda). NO comparte estructura con el read model legacy float (`costos`).
+   */
+  sembrarCostoExacto(row: CostoExactoReadRow): void {
+    if (typeof row.costoUnitario !== "string" || typeof row.cantidadAcumulada !== "string") {
+      // Barrera dura: el puerto exacto NO puede fabricar strings desde number.
+      throw new TypeError("costo exacto: costoUnitario y cantidadAcumulada deben ser strings decimales");
+    }
+    this.costosExactos.set(`${row.tenantId}::${row.articuloId}::${row.moneda}`, row);
+  }
   async costosExactosPorArticulo(t: string, articuloId: string): Promise<Result<CostoExactoReadRow[], KernelError>> {
-    // Fake en memoria: no hay driver PG que devuelva numeric-string, así que se
-    // deriva la cadena canónica (escala 6) desde el valor almacenado. El camino
-    // de PRECISIÓN EXACTA lo garantiza el store PG (numeric leído tal cual).
-    const canon = (v: number): string => v.toFixed(6);
-    const filas = [...this.costos.values()]
+    // Lee SOLO del respaldo string-only: la cadena decimal viaja TAL CUAL, sin
+    // pasar jamás por float. Ausencia de fila ⇒ [] (SIN COSTO ≠ "0").
+    const filas = [...this.costosExactos.values()]
       .filter((r) => r.tenantId === t && r.articuloId === articuloId)
-      .sort((a, b) => (a.moneda < b.moneda ? -1 : 1))
-      .map((r) => ({
-        tenantId: r.tenantId, articuloId: r.articuloId, moneda: r.moneda, metodoValoracion: r.metodoValoracion,
-        costoUnitario: canon(r.costoUnitario), cantidadAcumulada: canon(r.cantidadAcumulada), actualizadoAt: r.actualizadoAt,
-      }));
+      .sort((a, b) => (a.moneda < b.moneda ? -1 : 1));
     return ok(filas);
   }
 

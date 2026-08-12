@@ -274,13 +274,12 @@ describe("DGP-021.0 · costos exactos (string-safe)", () => {
     expect(vacio.ok).toBe(true);
     if (vacio.ok) expect(vacio.value).toEqual([]);
 
-    // Sembrar una fila con CERO real vía el puerto de escritura de costos.
+    // Sembrar CERO real vía el respaldo STRING-ONLY (no vía el read model float).
     const now = new Date("2024-01-01T00:00:00.000Z");
-    const seed = await store.aplicarCosto({} as never, {
+    store.sembrarCostoExacto({
       tenantId: TENANT, articuloId: "art-cero", moneda: "usd", metodoValoracion: "promedio-ponderado",
-      costoUnitario: 0, cantidadAcumulada: 0, datos: {}, version: 1, lastEventId: "e1", actualizadoAt: now,
+      costoUnitario: "0.000000", cantidadAcumulada: "0.000000", actualizadoAt: now,
     });
-    expect(seed.ok).toBe(true);
 
     const r = await store.costosExactosPorArticulo(TENANT, "art-cero");
     expect(r.ok).toBe(true);
@@ -288,5 +287,35 @@ describe("DGP-021.0 · costos exactos (string-safe)", () => {
     expect(r.value).toHaveLength(1);
     expect(typeof r.value[0]!.costoUnitario).toBe("string");
     expect(r.value[0]!.costoUnitario).toBe("0.000000"); // CERO real, no ausencia
+  });
+
+  it("el respaldo fake es STRING-ONLY: preserva un valor float-inseguro intacto y NO acepta number", async () => {
+    const { FakeReadModelsStore } = await import("../infrastructure/operacional");
+    const store = new FakeReadModelsStore();
+    const now = new Date("2024-01-01T00:00:00.000Z");
+
+    // Valor NO representable exactamente en float64: 11 enteros + 6 decimales.
+    // Si pasara por Number()/toFixed(6) se corrompería.
+    const CRUDO = "12345678901.123456";
+    // Evidencia de que float LO PIERDE: la ida-y-vuelta por number cambia el valor.
+    expect(Number(CRUDO).toFixed(6)).not.toBe(CRUDO);
+
+    store.sembrarCostoExacto({
+      tenantId: TENANT, articuloId: "art-preciso", moneda: "clp", metodoValoracion: "promedio-ponderado",
+      costoUnitario: CRUDO, cantidadAcumulada: "0.000001", actualizadoAt: now,
+    });
+    const r = await store.costosExactosPorArticulo(TENANT, "art-preciso");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // La cadena sobrevive BIT A BIT (nunca tocó float en el fake).
+    expect(r.value[0]!.costoUnitario).toBe(CRUDO);
+    expect(r.value[0]!.cantidadAcumulada).toBe("0.000001");
+
+    // El fake NO puede fabricar silenciosamente un string exacto desde un number:
+    // el seeder string-only rechaza montos numéricos (barrera dura anti-float).
+    expect(() => store.sembrarCostoExacto({
+      tenantId: TENANT, articuloId: "art-preciso", moneda: "usd", metodoValoracion: "promedio-ponderado",
+      costoUnitario: 12345678901.123456 as unknown as string, cantidadAcumulada: "0.000000", actualizadoAt: now,
+    })).toThrow(TypeError);
   });
 });
