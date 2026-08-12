@@ -30,6 +30,7 @@ import type {
   PlantillaVerificada,
   PlantillasPort,
   Recibo,
+  ReciboClaim,
   ReciboPort,
   TenantId,
 } from "../domain/ports";
@@ -169,15 +170,30 @@ export class FakeConsecutivo implements ConsecutivoPort {
 
 /* ------------------------- Recibos de idempotencia ----------------------- */
 
+interface EntradaRecibo { readonly estado: "pendiente" | "sellado"; readonly recibo: Recibo; }
+
 export class FakeRecibos implements ReciboPort {
-  private readonly store = new Map<string, Recibo>();
+  private readonly store = new Map<string, EntradaRecibo>();
   private k(tenant: string, comando: string, opId: string) { return `${tenant}::${comando}::${opId}`; }
   async buscar(tenant: string, comando: string, opId: string): Promise<Result<Recibo | null, KernelError>> {
     const found = this.store.get(this.k(tenant, comando, opId));
-    return ok(found ? clone(found) : null);
+    // Sólo un recibo SELLADO cuenta como aplicación completa.
+    return ok(found && found.estado === "sellado" ? clone(found.recibo) : null);
+  }
+  async reclamar(_uow: UnitOfWork, tenant: string, comando: string, opId: string): Promise<Result<ReciboClaim, KernelError>> {
+    const key = this.k(tenant, comando, opId);
+    const found = this.store.get(key);
+    // Sólo un recibo SELLADO cortocircuita (idempotente). Un `pendiente` es un
+    // claim en curso; como el Fake es MONO-HILO no existen carreras reales, así
+    // que un pendiente sólo puede ser un residuo de un comando FALLIDO (el
+    // adaptador en memoria del Kernel no revierte estado): se re-reclama para
+    // permitir el reintento sin duplicar (en PG el ROLLBACK ya lo elimina).
+    if (found && found.estado === "sellado") return ok({ duenio: false, resultado: clone(found.recibo).resultado });
+    this.store.set(key, { estado: "pendiente", recibo: { opId, comando, resultado: {} } });
+    return ok({ duenio: true });
   }
   async sellar(_uow: UnitOfWork, tenant: string, recibo: Recibo): Promise<Result<void, KernelError>> {
-    this.store.set(this.k(tenant, recibo.comando, recibo.opId), clone(recibo));
+    this.store.set(this.k(tenant, recibo.comando, recibo.opId), { estado: "sellado", recibo: clone(recibo) });
     return ok(undefined);
   }
 }

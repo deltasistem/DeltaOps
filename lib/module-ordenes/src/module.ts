@@ -292,15 +292,45 @@ async function persistir(
  * resultado previo sin re-ejecutar el efecto. `sellar` se invoca DENTRO de la
  * UoW del comando junto con el resto de la escritura.
  */
-async function reciboPrevio(
+/**
+ * Resultado de la RECLAMACIÓN durable de `opId` dentro de la UoW del comando.
+ *  - `cortocircuito`: hay un `Result` que el handler debe DEVOLVER de inmediato
+ *    (recibo ya sellado ⇒ idempotente; carrera en curso ⇒ conflicto).
+ *  - `proceder=true`: este llamador es el DUEÑO (o no hay opId) y debe ejecutar
+ *    el efecto y luego `sellar`.
+ */
+type ReclamoOp =
+  | { readonly proceder: true }
+  | { readonly proceder: false; readonly cortocircuito: Result<Record<string, unknown>, KernelError> };
+
+/**
+ * DGP-020.1 (R1) · Reclamación atómica y DURABLE del `opId` ANTES de producir
+ * cualquier efecto del comando, dentro de la MISMA UoW (transacción). Cierra la
+ * carrera de dos POST directos concurrentes con el mismo opId: sólo UN llamador
+ * es dueño; el resto obtiene el resultado sellado (idempotente) o —si el dueño
+ * aún no finaliza— un conflicto coherente. Misma lección que DGP-019.1.
+ */
+async function reclamarOpId(
   adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
   tenant: string,
   comando: string,
   opId: string | undefined,
-): Promise<Record<string, unknown> | null> {
-  if (!opId) return null;
-  const previo = await adapters.recibos.buscar(tenant, comando, opId);
-  return previo.ok && previo.value ? previo.value.resultado : null;
+): Promise<ReclamoOp> {
+  if (!opId) return { proceder: true };
+  const claim = await adapters.recibos.reclamar(uow, tenant, comando, opId, ctx.principal.id);
+  if (!claim.ok) return { proceder: false, cortocircuito: claim };
+  if (claim.value.duenio) return { proceder: true };
+  if (claim.value.resultado !== undefined) {
+    return { proceder: false, cortocircuito: ok({ ...claim.value.resultado, idempotente: true }) };
+  }
+  // Carrera cabeza-a-cabeza: el dueño reclamó pero aún no selló. Devolvemos un
+  // CONFLICTO coherente (reintentable) en lugar de duplicar el efecto.
+  return {
+    proceder: false,
+    cortocircuito: fail(KernelErrors.conflict(`Operación ${opId} en curso; reintente`)),
+  };
 }
 
 /* ----------------------- Orquestación de Workflow ------------------------ */
@@ -590,8 +620,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
 
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.crear`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.crear`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
 
             const pol = evaluar(deps, ctx, POLICY_PUEDE_CREAR, {});
             if (!pol.ok) return pol;
@@ -713,8 +743,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.editar`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.editar`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
 
             const actual = await adapters.repository.findById(tenant.value, input.id);
             if (!actual.ok) return actual;
@@ -817,8 +847,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.asignar`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.asignar`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const actual = await adapters.repository.findById(tenant.value, input.id);
             if (!actual.ok) return actual;
             if (!actual.value) return fail(KernelErrors.notFound("orden-trabajo", input.id));
@@ -860,8 +890,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.registrarEjecucion`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.registrarEjecucion`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const actual = await adapters.repository.findById(tenant.value, input.id);
             if (!actual.ok) return actual;
             if (!actual.value) return fail(KernelErrors.notFound("orden-trabajo", input.id));
@@ -987,10 +1017,15 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             if (!tenant.ok) return tenant;
             const comando = `${MODULO}.capturarRespuesta`;
 
-            // Idempotencia terminal por opId: si ya se selló, devolver el mismo
-            // resultado (un solo efecto entre reintentos y workers de /sync).
-            const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            // Idempotencia terminal por opId. `capturarRespuesta` es un
+            // ORQUESTADOR sin UoW única: compone sub-comandos con sub-opIds
+            // idempotentes y el EFECTO PERSISTENTE de anclaje se protege con la
+            // RECLAMACIÓN DURABLE dentro de `asociarPlantilla` (sub-opId
+            // `:asociar`, en su propia UoW). Aquí basta el cortocircuito por
+            // recibo ya SELLADO para converger reintentos y workers de /sync.
+            const sellado = await adapters.recibos.buscar(tenant.value, comando, input.opId);
+            if (!sellado.ok) return sellado;
+            if (sellado.value) return ok({ ...sellado.value.resultado, idempotente: true });
 
             // La OT debe existir; se re-lee su versión ACTUAL para el anclaje.
             const actual = await adapters.repository.findById(tenant.value, input.id);
@@ -1076,8 +1111,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.agregarEvidencia`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.agregarEvidencia`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const actual = await adapters.repository.findById(tenant.value, input.id);
             if (!actual.ok) return actual;
             if (!actual.value) return fail(KernelErrors.notFound("orden-trabajo", input.id));
@@ -1113,8 +1148,15 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.transicionar`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            // ORQUESTADOR de Workflow (sin UoW única): la exactly-once del efecto
+            // persistente la garantiza la máquina de estados del motor (rechaza
+            // transiciones duplicadas/ inválidas). Aquí basta el cortocircuito
+            // por recibo ya SELLADO para converger reintentos y workers de /sync.
+            if (input.opId) {
+              const sellado = await adapters.recibos.buscar(tenant.value, `${MODULO}.transicionar`, input.opId);
+              if (!sellado.ok) return sellado;
+              if (sellado.value) return ok({ ...sellado.value.resultado, idempotente: true });
+            }
 
             const actual = await adapters.repository.findById(tenant.value, input.id);
             if (!actual.ok) return actual;
@@ -1189,8 +1231,14 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.aprobarCierre`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            // ORQUESTADOR del gate de aprobación (sin UoW única): la máquina de
+            // estados gobierna la unicidad del efecto; cortocircuito por recibo
+            // SELLADO para converger reintentos y workers de /sync.
+            if (input.opId) {
+              const sellado = await adapters.recibos.buscar(tenant.value, `${MODULO}.aprobarCierre`, input.opId);
+              if (!sellado.ok) return sellado;
+              if (sellado.value) return ok({ ...sellado.value.resultado, idempotente: true });
+            }
 
             const actual = await adapters.repository.findById(tenant.value, input.id);
             if (!actual.ok) return actual;
@@ -1297,8 +1345,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.bitacora.registrar`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.bitacora.registrar`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const orden = await adapters.repository.findById(tenant.value, input.ordenId);
             if (!orden.ok) return orden;
             if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
@@ -1347,8 +1395,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.planificar`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.planificar`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const orden = await adapters.repository.findById(tenant.value, input.ordenId);
             if (!orden.ok) return orden;
             if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
@@ -1440,8 +1488,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.asignar-recurso-humano`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.asignar-recurso-humano`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const orden = await adapters.repository.findById(tenant.value, input.ordenId);
             if (!orden.ok) return orden;
             if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
@@ -1530,8 +1578,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.registrar-recurso`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.registrar-recurso`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const orden = await adapters.repository.findById(tenant.value, input.ordenId);
             if (!orden.ok) return orden;
             if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
@@ -1584,8 +1632,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.sla.definir`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.sla.definir`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const orden = await adapters.repository.findById(tenant.value, input.ordenId);
             if (!orden.ok) return orden;
             if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
@@ -1665,8 +1713,8 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           async handle(ctx, input, uow) {
             const tenant = tenantOf(ctx);
             if (!tenant.ok) return tenant;
-            const previo = await reciboPrevio(adapters, tenant.value, `${MODULO}.crear-relacion`, input.opId);
-            if (previo) return ok({ ...previo, idempotente: true });
+            const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, `${MODULO}.crear-relacion`, input.opId);
+            if (!reclamo.proceder) return reclamo.cortocircuito;
             const orden = await adapters.repository.findById(tenant.value, input.ordenId);
             if (!orden.ok) return orden;
             if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
@@ -2181,8 +2229,8 @@ async function asociarPlantilla(
   const tenant = tenantOf(ctx);
   if (!tenant.ok) return tenant;
   const comando = `${MODULO}.asociar${clase === "formulario" ? "Formulario" : "Checklist"}`;
-  const previo = await reciboPrevio(adapters, tenant.value, comando, input.opId);
-  if (previo) return ok({ ...previo, idempotente: true });
+  const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, comando, input.opId);
+  if (!reclamo.proceder) return reclamo.cortocircuito;
   const actual = await adapters.repository.findById(tenant.value, input.id);
   if (!actual.ok) return actual;
   if (!actual.value) return fail(KernelErrors.notFound("orden-trabajo", input.id));

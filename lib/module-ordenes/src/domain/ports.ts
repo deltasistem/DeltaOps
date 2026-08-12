@@ -109,11 +109,33 @@ export interface Recibo {
   readonly resultado: Record<string, unknown>;
 }
 
+/**
+ * Resultado de una RECLAMACIÓN atómica de `opId` (claim durable). `duenio=true`
+ * cuando ESTE llamador insertó el recibo `pendiente` (debe ejecutar el efecto y
+ * luego sellar). Si `duenio=false`, la operación ya fue reclamada por otro: si
+ * `estado='sellado'` viene `resultado`; si el dueño aún no finaliza,
+ * `pendiente=true` (una carrera cabeza-a-cabeza). Idéntico a DGP-019.1.
+ */
+export interface ReciboClaim {
+  readonly duenio: boolean;
+  readonly resultado?: Record<string, unknown>;
+  readonly pendiente?: boolean;
+}
+
 /** Recibos offline: exactamente-una aplicación por opId+comando. */
 export interface ReciboPort {
-  /** Devuelve el recibo previo si el opId ya fue aplicado. */
+  /** Devuelve el recibo previo SELLADO si el opId ya fue aplicado. */
   buscar(tenantId: TenantId, comando: string, opId: string): Promise<Result<Recibo | null, KernelError>>;
-  /** Sella el recibo dentro de la UoW del comando. */
+  /**
+   * Reclama el `opId` de forma ATÓMICA y DURABLE dentro de la MISMA UoW del
+   * comando, ANTES de producir cualquier efecto: inserta un recibo `pendiente`
+   * con `INSERT ... ON CONFLICT DO NOTHING`. Un segundo intento concurrente con
+   * el mismo `(tenant, comando, opId)` se BLOQUEA en la fila hasta que la
+   * primera transacción confirma y entonces observa el conflicto (mutua
+   * exclusión durable). Esto protege tanto el POST directo como `/sync`.
+   */
+  reclamar(uow: UnitOfWork, tenantId: TenantId, comando: string, opId: string, actorId: string): Promise<Result<ReciboClaim, KernelError>>;
+  /** Sella (finaliza) el recibo reclamado: `pendiente` → `sellado` con el resultado. */
   sellar(uow: UnitOfWork, tenantId: TenantId, recibo: Recibo, actorId: string): Promise<Result<void, KernelError>>;
 }
 

@@ -14,7 +14,7 @@ import {
   type Principal,
 } from "@workspace/kernel";
 import { officialServices } from "@workspace/platform";
-import { ordenesModule, crearOrdenesRuntime, MODULO, type OrdenesRuntime } from "..";
+import { ASIGNACION_REGISTRADA, ordenesModule, crearOrdenesRuntime, MODULO, type OrdenesRuntime } from "..";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -191,5 +191,73 @@ suite("Módulo Órdenes · PostgreSQL", () => {
     expect(r1.aplicadas).toBe(2);
     const r2 = await rt.sincronizar(ctx(T_A), cola);
     expect(r2.idempotentes).toBe(2);
+  });
+
+  // DGP-020.1 (R1) · Concurrencia REAL contra PostgreSQL: dos POST directos
+  // simultáneos con el MISMO opId sobre `asignar-recurso-humano` deben producir
+  // EXACTAMENTE UN hecho de asignación, UN evento y UN recibo sellado, gracias a
+  // la RECLAMACIÓN DURABLE del opId (claim antes del efecto). Se usa un tipo NO
+  // persona (cuadrilla) para aislar la garantía de idempotencia del contrato de
+  // identidad. El perdedor recibe el resultado del dueño (idempotente) o un
+  // conflicto reintentable coherente; en ningún caso duplica el efecto.
+  it("dos asignaciones concurrentes con el mismo opId ⇒ exactamente UNA asignación (claim durable)", async () => {
+    const crear = await exec(ctx(T_A), `${MODULO}.crear`, { titulo: "OT Concurrencia", tipo: "correctiva" });
+    expect(crear.ok).toBe(true);
+    if (!crear.ok) return;
+    const id = (crear.value as { id: string }).id;
+    await drenar();
+
+    const opId = `pg-op-concurrente-${Date.now()}`;
+    const input = { ordenId: id, tipo: "cuadrilla", asignadoId: "cuad-concurrente", rol: "colaborador", opId };
+
+    // Disparo SIMULTÁNEO (Promise.all): ambos compiten por el mismo claim.
+    const [a, b] = await Promise.all([
+      exec(ctx(T_A), `${MODULO}.asignar-recurso-humano`, input),
+      exec(ctx(T_A), `${MODULO}.asignar-recurso-humano`, input),
+    ]);
+
+    // Exactamente uno es "dueño" (idempotente=false); el otro o bien reobtiene
+    // el resultado sellado (idempotente=true) o bien recibe un CONFLICTO
+    // reintentable (carrera cabeza-a-cabeza). NUNCA dos efectos.
+    const resultados = [a, b];
+    const oks = resultados.filter((r) => r.ok);
+    const conflictos = resultados.filter((r) => !r.ok && r.error.code.includes("KRN-CFL"));
+    // Al menos uno debe haber tenido éxito; los que no, deben ser conflicto.
+    expect(oks.length).toBeGreaterThanOrEqual(1);
+    expect(oks.length + conflictos.length).toBe(2);
+    const duenios = oks.filter((r) => r.ok && (r.value as { idempotente: boolean }).idempotente === false);
+    expect(duenios.length).toBe(1); // EXACTAMENTE un dueño
+
+    // Un reintento posterior con el mismo opId es idempotente (recibo sellado).
+    const reintento = await exec(ctx(T_A), `${MODULO}.asignar-recurso-humano`, input);
+    expect(reintento.ok).toBe(true);
+    if (reintento.ok) expect((reintento.value as { idempotente: boolean }).idempotente).toBe(true);
+
+    await drenar();
+
+    // UN solo hecho de asignación (aggregate) y UN solo evento.
+    const hechos = await conTenant<{ n: number }>(
+      T_A, "select count(*)::int as n from deltaops.ord_asignaciones where orden_id = $1 and asignado_id = $2", [id, "cuad-concurrente"],
+    );
+    expect(hechos[0]!.n).toBe(1);
+    const eventos = await conTenant<{ n: number }>(
+      T_A, "select count(*)::int as n from deltaops.ord_eventos where tipo = $1 and payload->>'ordenId' = $2", [ASIGNACION_REGISTRADA, id],
+    );
+    expect(eventos[0]!.n).toBe(1);
+    // UN solo recibo, en estado 'sellado'.
+    const recibos = await conTenant<{ n: number; estado: string }>(
+      T_A, "select count(*)::int as n, max(estado) as estado from deltaops.ord_recibos where comando = $1 and op_id = $2",
+      [`${MODULO}.asignar-recurso-humano`, opId],
+    );
+    expect(recibos[0]!.n).toBe(1);
+    expect(recibos[0]!.estado).toBe("sellado");
+    // UNA sola asignación vigente en el read model.
+    const asg = await query(ctx(T_A), `${MODULO}.asignaciones`, { ordenId: id });
+    expect(asg.ok).toBe(true);
+    if (asg.ok) {
+      const rows = (asg.value as { asignaciones: Array<{ asignadoId: string; vigente: boolean }> }).asignaciones;
+      const vigentes = rows.filter((x) => x.asignadoId === "cuad-concurrente" && x.vigente);
+      expect(vigentes.length).toBe(1);
+    }
   });
 });
