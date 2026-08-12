@@ -22,6 +22,7 @@
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { pool } from "@workspace/db";
 import app from "../../../app";
 import { proveedorSolicitado } from "../notification-provider";
 import { hashPassword } from "../crypto";
@@ -41,6 +42,19 @@ import { credencialDemo, CLAVES_ENV } from "../../../seed/seed-credentials";
 // `actualizarModulos("delta-demo", ...)` es destructivo — una lista hardcodeada
 // desactualizada despoja entitlements de módulos nuevos (pasó con `utilizacion`).
 const MODULOS = [...MODULOS_TODOS];
+
+// AISLAMIENTO DE ESTADO ENTRE ARCHIVOS (R3): `vitest run` ejecuta los archivos en
+// PARALELO contra la MISMA BD dev. El tenant de plataforma `deltaops` es SEMILLA
+// compartida y el seed (`seed-delta-demo`) lo (re)escribe con TODOS los módulos
+// (incluye `correctivo`). Este suite necesita un tenant B que contrate SÓLO un
+// subconjunto (SIN `correctivo`) para probar de verdad el 403 de entitlement, así
+// que NO puede compartir `deltaops`: crea su PROPIO tenant B único por corrida.
+// Patrón idéntico al de `module-manodeobra`/`flows.integration` (tenants únicos).
+const RUN = crypto.randomUUID().slice(0, 8);
+const TENANT_B = `e2e-plat-${RUN}`;
+const MODULOS_B = ["referencia", "activos"]; // SIN correctivo, a propósito
+const EMAIL_PLAT = `admin.plat.${RUN}@deltaops.test`;
+const EMAIL_AB = `ab.${RUN}@delta.test`;
 
 // Credenciales SIEMPRE desde la fuente centralizada (nunca literales).
 const PASS_DEMO = credencialDemo(CLAVES_ENV.DEMO_ADMIN);
@@ -110,23 +124,27 @@ beforeAll(async () => {
   await seedRolesDeTenant("delta-demo");
   await actualizarModulos("delta-demo", MODULOS);
 
-  // Tenant B (deltaops): plataforma; contrata solo un SUBCONJUNTO de módulos
-  // para poder verificar el rechazo por entitlement (correctivo NO contratado).
+  // Tenant B (ÚNICO por corrida): plataforma; contrata solo un SUBCONJUNTO de
+  // módulos (SIN correctivo) para verificar el rechazo por entitlement SIN
+  // depender del estado del tenant semilla `deltaops` (que el seed reescribe).
   await crearTenant({
-    tenantId: "deltaops", codigo: "DELTAOPS", nombreComercial: "DeltaOps",
+    tenantId: TENANT_B, codigo: `E2EPLAT${RUN}`.toUpperCase(), nombreComercial: "DeltaOps E2E",
     zonaHoraria: "America/Santiago", idioma: "es", moneda: "CLP",
-    modulos: ["referencia", "activos"], branding: { nombre: "DeltaOps", nombreApp: "DeltaOps" },
+    modulos: MODULOS_B, branding: { nombre: "DeltaOps", nombreApp: "DeltaOps" },
   });
-  await seedRolesDeTenant("deltaops");
-  await actualizarModulos("deltaops", ["referencia", "activos"]);
+  await seedRolesDeTenant(TENANT_B);
+  await actualizarModulos(TENANT_B, MODULOS_B);
 
   await asegurarIdentidad("admin@delta.demo", "Carlos Pacheco", PASS_DEMO, "delta-demo", "TENANT_ADMIN");
-  await asegurarIdentidad("admin@deltaops.dev", "Administrador de Plataforma", PASS_PLAT, "deltaops", "SUPER_ADMIN");
+  // Administrador de plataforma (SUPER_ADMIN) del tenant B único (email único
+  // para no colisionar con el `admin@deltaops.dev` del seed).
+  await asegurarIdentidad(EMAIL_PLAT, "Administrador de Plataforma", PASS_PLAT, TENANT_B, "SUPER_ADMIN");
 
-  // Identidad A/B: MISMA identidad con membresías en AMBOS tenants con roles
-  // DISTINTOS. En delta-demo (A) es TENANT_ADMIN; en deltaops (B) es SUPERVISOR.
-  await asegurarIdentidad("ab@delta.test", "AB Tester", PASS_AB, "delta-demo", "TENANT_ADMIN");
-  await asegurarIdentidad("ab@delta.test", "AB Tester", PASS_AB, "deltaops", "SUPERVISOR");
+  // Identidad A/B: MISMA identidad con membresías en DOS tenants con roles
+  // DISTINTOS. En delta-demo (A) es TENANT_ADMIN; en el tenant B único es
+  // SUPERVISOR. Email único por corrida para aislar el epoch de la identidad.
+  await asegurarIdentidad(EMAIL_AB, "AB Tester", PASS_AB, "delta-demo", "TENANT_ADMIN");
+  await asegurarIdentidad(EMAIL_AB, "AB Tester", PASS_AB, TENANT_B, "SUPERVISOR");
 
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => resolve());
@@ -137,6 +155,17 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+  // Purga el tenant B ÚNICO y las identidades propias de esta corrida para no
+  // dejar residuos en la BD dev compartida.
+  const c = await pool.connect();
+  try {
+    for (const tbl of ["idn_invitations", "idn_password_resets", "idn_memberships", "idn_roles", "ntf_email_outbox", "platform_audit", "ten_tenants"]) {
+      await c.query(`DELETE FROM deltaops.${tbl} WHERE tenant_id = $1`, [TENANT_B]).catch(() => undefined);
+    }
+    await c.query(`DELETE FROM deltaops.idn_identities WHERE lower(email) = ANY($1)`, [[EMAIL_PLAT.toLowerCase(), EMAIL_AB.toLowerCase()]]).catch(() => undefined);
+  } finally {
+    c.release();
+  }
 });
 
 describe("E2E · login DEMO devuelve SessionResponse completa (no legacy)", () => {
@@ -192,12 +221,12 @@ describe("E2E · login DEMO devuelve SessionResponse completa (no legacy)", () =
 });
 
 describe("E2E · login del administrador de plataforma", () => {
-  it("admin@deltaops.dev → SessionResponse con rol SUPER_ADMIN", async () => {
+  it("admin de plataforma → SessionResponse con rol SUPER_ADMIN", async () => {
     const c = crearCliente();
-    const r = await c.req("POST", "/deltaops/auth/login", { email: "admin@deltaops.dev", password: PASS_PLAT, tenantId: "deltaops" });
+    const r = await c.req("POST", "/deltaops/auth/login", { email: EMAIL_PLAT, password: PASS_PLAT, tenantId: TENANT_B });
     expect(r.status).toBe(200);
     expect(r.json.rol).toBe("SUPER_ADMIN");
-    expect(r.json.tenant.id).toBe("deltaops");
+    expect(r.json.tenant.id).toBe(TENANT_B);
     const admin = await c.req("GET", "/deltaops/admin/tenants");
     expect(admin.status).toBe(200);
     expect(Array.isArray(admin.json)).toBe(true);
@@ -206,9 +235,10 @@ describe("E2E · login del administrador de plataforma", () => {
 
 describe("E2E · entitlements de módulo (rechazo backend)", () => {
   it("módulo NO contratado por el tenant ⇒ 403 MODULE_NOT_ENTITLED", async () => {
-    // El tenant `deltaops` (B) NO contrató `correctivo` (solo referencia/activos).
+    // El tenant B ÚNICO de esta corrida NO contrató `correctivo` (solo
+    // referencia/activos) — aislado del semilla `deltaops` que el seed reescribe.
     const c = crearCliente();
-    await c.req("POST", "/deltaops/auth/login", { email: "admin@deltaops.dev", password: PASS_PLAT, tenantId: "deltaops" });
+    await c.req("POST", "/deltaops/auth/login", { email: EMAIL_PLAT, password: PASS_PLAT, tenantId: TENANT_B });
     const m = await c.req("GET", "/deltaops/correctivo/solicitudes");
     expect(m.status).toBe(403);
     expect(m.json.code).toBe("MODULE_NOT_ENTITLED");
@@ -236,10 +266,10 @@ describe("E2E · estado global del proveedor de correo exige SUPER_ADMIN", () =>
     expect(r.json.code).toBe("FORBIDDEN");
   });
 
-  it("SUPER_ADMIN (admin@deltaops.dev) ⇒ 200 con payload redactado (sin secretos)", async () => {
+  it("SUPER_ADMIN (admin de plataforma) ⇒ 200 con payload redactado (sin secretos)", async () => {
     const c = crearCliente();
     const login = await c.req("POST", "/deltaops/auth/login", {
-      email: "admin@deltaops.dev", password: PASS_PLAT, tenantId: "deltaops",
+      email: EMAIL_PLAT, password: PASS_PLAT, tenantId: TENANT_B,
     });
     expect(login.status).toBe(200);
     expect(login.json.rol).toBe("SUPER_ADMIN");
@@ -258,18 +288,18 @@ describe("E2E · estado global del proveedor de correo exige SUPER_ADMIN", () =>
 
 describe("E2E · AISLAMIENTO CRÍTICO de sesiones concurrentes A/B (misma identidad)", () => {
   it("A no adopta el tenant/rol de B ni tras login/switch-tenant en B", async () => {
-    // Sesión A: identidad `ab@delta.test` en tenant A (delta-demo) como TENANT_ADMIN.
+    // Sesión A: identidad A/B en tenant A (delta-demo) como TENANT_ADMIN.
     const A = crearCliente();
-    const loginA = await A.req("POST", "/deltaops/auth/login", { email: "ab@delta.test", password: PASS_AB, tenantId: "delta-demo" });
+    const loginA = await A.req("POST", "/deltaops/auth/login", { email: EMAIL_AB, password: PASS_AB, tenantId: "delta-demo" });
     expect(loginA.status).toBe(200);
     expect(loginA.json.tenant.id).toBe("delta-demo");
     expect(loginA.json.rol).toBe("TENANT_ADMIN");
 
-    // Sesión B (cookie independiente): MISMA identidad en tenant B (deltaops) como SUPERVISOR.
+    // Sesión B (cookie independiente): MISMA identidad en el tenant B único como SUPERVISOR.
     const B = crearCliente();
-    const loginB = await B.req("POST", "/deltaops/auth/login", { email: "ab@delta.test", password: PASS_AB, tenantId: "deltaops" });
+    const loginB = await B.req("POST", "/deltaops/auth/login", { email: EMAIL_AB, password: PASS_AB, tenantId: TENANT_B });
     expect(loginB.status).toBe(200);
-    expect(loginB.json.tenant.id).toBe("deltaops");
+    expect(loginB.json.tenant.id).toBe(TENANT_B);
     expect(loginB.json.rol).toBe("SUPERVISOR");
 
     // La sesión A NO puede haber adoptado el contexto de B. Como el login de B
@@ -286,7 +316,7 @@ describe("E2E · AISLAMIENTO CRÍTICO de sesiones concurrentes A/B (misma identi
     // B sigue siendo coherente con SU propio tenant/rol.
     const sesB = await B.req("GET", "/deltaops/auth/session");
     expect(sesB.status).toBe(200);
-    expect(sesB.json.tenant.id).toBe("deltaops");
+    expect(sesB.json.tenant.id).toBe(TENANT_B);
     expect(sesB.json.rol).toBe("SUPERVISOR");
 
     // Un switch-tenant en B (a delta-demo) NO afecta el aislamiento: B pasa a A,
@@ -298,7 +328,7 @@ describe("E2E · AISLAMIENTO CRÍTICO de sesiones concurrentes A/B (misma identi
 
     // Re-login de A restablece una sesión válida y correcta para tenant A.
     const A2 = crearCliente();
-    const reloginA = await A2.req("POST", "/deltaops/auth/login", { email: "ab@delta.test", password: PASS_AB, tenantId: "delta-demo" });
+    const reloginA = await A2.req("POST", "/deltaops/auth/login", { email: EMAIL_AB, password: PASS_AB, tenantId: "delta-demo" });
     expect(reloginA.status).toBe(200);
     expect(reloginA.json.tenant.id).toBe("delta-demo");
     expect(reloginA.json.rol).toBe("TENANT_ADMIN"); // nunca SUPERVISOR de B

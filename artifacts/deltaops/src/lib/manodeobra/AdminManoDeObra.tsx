@@ -237,11 +237,12 @@ function PanelTarifas() {
   async function guardar() {
     setError(null);
     if (!sujetoId) { setError("Selecciona una categoría."); return; }
-    // El DINERO se envía como CADENA decimal (PUNTO FIJO): validamos formato y
-    // rango con Number pero NUNCA enviamos el float — el backend valida ≤6 dec.
+    // El DINERO se envía como CADENA decimal (PUNTO FIJO). La validación se basa
+    // SÓLO en el patrón string canónico (mismo RE_DINERO del dominio/contrato):
+    // no negativo, sin notación científica, ≤6 decimales, ≤12 enteros. NUNCA se
+    // convierte a float — el backend rechaza cualquier número.
     const crudo = valor.trim();
-    const num = Number(crudo);
-    if (!crudo || !/^\d+(\.\d{1,6})?$/.test(crudo) || !Number.isFinite(num) || num < 0) {
+    if (!/^\d{1,12}(\.\d{1,6})?$/.test(crudo)) {
       setError("Indica un valor de tarifa válido (hasta 6 decimales).");
       return;
     }
