@@ -700,6 +700,13 @@ export interface MotorStore {
   slaUpsert(uow: UnitOfWork, tenantId: string, s: Sla, expectedVersion: number | null): Promise<Result<void, KernelError>>;
   relacionExiste(tenantId: string, categoria: string, tipo: string, ordenId: string, destinoId: string): Promise<Result<boolean, KernelError>>;
   relacionInsert(uow: UnitOfWork, tenantId: string, r: RelacionArista): Promise<Result<void, KernelError>>;
+  /**
+   * DGP-020.2 — ¿La identidad canónica está asignada VIGENTE a la OT (fuente de
+   * verdad `ord_asignaciones`, no read model)? Se usa para autorizar la apertura
+   * de una sesión de trabajo: el técnico DEBE estar asignado a la OT (§6). El
+   * `identityId` proviene SIEMPRE del contexto autenticado, nunca del frontend.
+   */
+  asignacionVigenteDeIdentidad(tenantId: string, ordenId: string, identityId: string): Promise<Result<boolean, KernelError>>;
 }
 
 export class FakeMotorStore implements MotorStore {
@@ -755,6 +762,14 @@ export class FakeMotorStore implements MotorStore {
     if (this.relaciones.has(this.k(t, r.id))) return fail(KernelErrors.conflict(`Relación ${r.id} ya existe`));
     this.relaciones.set(this.k(t, r.id), r);
     return ok(undefined);
+  }
+  async asignacionVigenteDeIdentidad(t: string, ordenId: string, identityId: string) {
+    for (const [k, a] of this.asign) {
+      if (k.startsWith(`${t}::`) && a.ordenId === ordenId && a.vigente && a.tipo === "persona" && a.asignadoIdentityId === identityId) {
+        return ok(true);
+      }
+    }
+    return ok(false);
   }
 }
 
@@ -904,6 +919,19 @@ export class PgMotorStore implements MotorStore {
       if ((err as { code?: string }).code === "23505") return fail(KernelErrors.conflict(`Relación duplicada (${r.categoria}/${r.tipo} ${r.ordenId}→${r.destinoId})`));
       return fail(KernelErrors.infrastructure("relacionInsert falló", err));
     }
+  }
+  async asignacionVigenteDeIdentidad(tenantId: string, ordenId: string, identityId: string) {
+    try {
+      const res = await withTenantRead(this.pool, tenantId, (c) =>
+        c.query(
+          `SELECT 1 FROM deltaops.ord_asignaciones
+           WHERE tenant_id=$1 AND orden_id=$2 AND vigente=true AND tipo='persona' AND asignado_identity_id=$3
+           LIMIT 1`,
+          [tenantId, ordenId, identityId],
+        ),
+      );
+      return ok(res.rows.length > 0);
+    } catch (err) { return fail(KernelErrors.infrastructure("asignacionVigenteDeIdentidad falló", err)); }
   }
 }
 

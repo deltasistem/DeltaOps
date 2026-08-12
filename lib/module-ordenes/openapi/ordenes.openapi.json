@@ -40,6 +40,9 @@
       "name": "Bitácora"
     },
     {
+      "name": "Sesiones"
+    },
+    {
       "name": "Catálogos"
     },
     {
@@ -3038,6 +3041,680 @@
         }
       }
     },
+    "/api/deltaops/ordenes/{id}/sesion/abrir": {
+      "post": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesion.abrir",
+        "summary": "Abrir sesión de trabajo (primer tramo de trabajo)",
+        "description": "El identityId proviene SIEMPRE del contexto autenticado (nunca del cuerpo); el activoId se deriva de la OT. La duración se calcula EXCLUSIVAMENTE desde los tramos append-only. Idempotente por opId; despachable por /sync offline.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComandoSesion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoSesion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/{id}/sesion/pausar": {
+      "post": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesion.pausar",
+        "summary": "Pausar la sesión de trabajo abierta",
+        "description": "El identityId proviene SIEMPRE del contexto autenticado (nunca del cuerpo); el activoId se deriva de la OT. La duración se calcula EXCLUSIVAMENTE desde los tramos append-only. Idempotente por opId; despachable por /sync offline.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComandoSesion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoSesion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/{id}/sesion/reanudar": {
+      "post": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesion.reanudar",
+        "summary": "Reanudar la sesión de trabajo pausada",
+        "description": "El identityId proviene SIEMPRE del contexto autenticado (nunca del cuerpo); el activoId se deriva de la OT. La duración se calcula EXCLUSIVAMENTE desde los tramos append-only. Idempotente por opId; despachable por /sync offline.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComandoSesion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoSesion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/{id}/sesion/cerrar": {
+      "post": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesion.cerrar",
+        "summary": "Cerrar la sesión de trabajo (estado final, sin reapertura)",
+        "description": "El identityId proviene SIEMPRE del contexto autenticado (nunca del cuerpo); el activoId se deriva de la OT. La duración se calcula EXCLUSIVAMENTE desde los tramos append-only. Idempotente por opId; despachable por /sync offline.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComandoSesion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoSesion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/{id}/sesion/activa": {
+      "get": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesion.activa",
+        "summary": "Sesión activa (no cerrada) de la OT (read model)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la OT"
+          },
+          {
+            "name": "identityId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrar por identidad (opcional)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sesion": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/sesiones": {
+      "get": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesiones",
+        "summary": "Listar sesiones por OT/identidad/activo (read model)",
+        "parameters": [
+          {
+            "name": "ordenId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrar por OT"
+          },
+          {
+            "name": "identityId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrar por identidad"
+          },
+          {
+            "name": "activoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrar por activo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sesiones": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/sesiones/{sesionId}/tramos": {
+      "get": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesion.tramos",
+        "summary": "Tramos append-only de una sesión (read model)",
+        "parameters": [
+          {
+            "name": "sesionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador de la sesión"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tramos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/ordenes/sesiones/duraciones": {
+      "get": {
+        "tags": [
+          "Sesiones"
+        ],
+        "operationId": "ordenes.sesion.duraciones",
+        "summary": "Duraciones (efectivo/pausado/transcurrido) por sesión u OT (read model; el cliente NO calcula duración)",
+        "parameters": [
+          {
+            "name": "sesionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Duraciones de una sesión"
+          },
+          {
+            "name": "ordenId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Duraciones de todas las sesiones de la OT"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "duraciones": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/deltaops/ordenes/reproyectar": {
       "post": {
         "tags": [
@@ -4062,6 +4739,126 @@
             "type": "object",
             "properties": {},
             "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "ComandoSesion": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string",
+            "description": "Opcional; sólo en abrir para idempotencia de cliente"
+          },
+          "ocurridoAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante en el dispositivo (device-time); nunca se reemplaza"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline"
+            ]
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResultadoSesion": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "ordenId": {
+            "type": "string"
+          },
+          "activoId": {
+            "type": "string",
+            "nullable": true
+          },
+          "identityId": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ABIERTA",
+              "PAUSADA",
+              "CERRADA"
+            ]
+          },
+          "ocurridoAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "anomaliaReloj": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "idempotente": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sesionId",
+          "ordenId",
+          "identityId",
+          "estado"
+        ],
+        "additionalProperties": false
+      },
+      "Duraciones": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "ordenId": {
+            "type": "string"
+          },
+          "activoId": {
+            "type": "string",
+            "nullable": true
+          },
+          "identityId": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "efectivoMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pausadoMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "transcurridoMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pausas": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "abierta": {
+            "type": "boolean"
+          },
+          "iniciadoAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cerradoAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false

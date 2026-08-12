@@ -35,6 +35,7 @@ const ALL_PERMISSIONS = [
       motor: null as never,
       syncReceipts: null as never,
       consola: null as never,
+      sesiones: null as never,
     }).permissions,
     "modulo.ordenes.workflow.read",
     "modulo.ordenes.workflow.operar",
@@ -92,6 +93,8 @@ suite("Módulo Órdenes · PostgreSQL", () => {
         "ord_historial_read", "ord_bitacora_read", "ord_documentacion_read",
         "ord_planificacion", "ord_asignaciones", "ord_recursos", "ord_sla",
         "ord_relaciones", "ord_recibos", "ord_sync_receipts",
+        "ord_sesion_tramos", "ord_sesiones", "ord_sesion_tramos_read",
+        "ord_sesion_duraciones_read", "ord_sesiones_read",
       ]) {
         await conTenant(t, `delete from deltaops.${tabla}`).catch(() => undefined);
       }

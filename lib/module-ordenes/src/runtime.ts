@@ -61,6 +61,7 @@ import {
   FakeOrdenRepository,
   FakeRecibos,
 } from "./infrastructure/fakes";
+import { FakeSesionStore, PgSesionStore, type SesionStore } from "./infrastructure/sesiones";
 import { plantillasDesdeRuntime } from "./infrastructure/plantillas-runtime";
 import type { IdentidadPort, OrdenRepository, PlantillasPort } from "./domain/ports";
 import { procesarCola, type OperacionSync, type ResumenSync } from "./sincronizacion";
@@ -100,6 +101,7 @@ export function crearOrdenesRuntime(options: OrdenesRuntimeOptions = {}): Ordene
   const proyecciones: ProyeccionesStore = pool ? new PgProyeccionesStore(pool) : new FakeProyeccionesStore();
   const motor: MotorStore = pool ? new PgMotorStore(pool) : new FakeMotorStore();
   const syncReceipts: SyncReceiptStore = pool ? new PgSyncReceiptStore(pool) : new FakeSyncReceiptStore();
+  const sesiones: SesionStore = pool ? new PgSesionStore(pool) : new FakeSesionStore();
 
   // Consola técnica: en PG lee el outbox del Kernel por SQL; en memoria lee los
   // registros del outbox in-memory mediante accesor perezoso (el store se
@@ -136,6 +138,7 @@ export function crearOrdenesRuntime(options: OrdenesRuntimeOptions = {}): Ordene
     motor,
     syncReceipts,
     consola,
+    sesiones,
   };
 
   const platform = createPlatformRuntime({

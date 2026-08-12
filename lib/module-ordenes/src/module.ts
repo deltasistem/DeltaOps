@@ -139,8 +139,27 @@ import type {
 import {
   aplicarEventoAggregate,
   aplicarEventoOperacional,
+  aplicarEventoSesion,
   handlerProyeccion,
 } from "./projection";
+import {
+  EVENTOS_SESION,
+  evaluarReloj,
+  SESION_CERRADA,
+  SESION_INICIADA,
+  SESION_PAUSADA,
+  SESION_REANUDADA,
+  transicion,
+  type ComandoSesion,
+  type EstadoSesion,
+  type OrigenTramo,
+  type TipoTramo,
+} from "./domain/sesion";
+import type {
+  SesionCabecera,
+  SesionStore,
+  TramoFila,
+} from "./infrastructure/sesiones";
 
 export { MODULO };
 
@@ -164,6 +183,8 @@ export interface ModuleAdapters {
   readonly motor: MotorStore;
   readonly syncReceipts: SyncReceiptStore;
   readonly consola: ConsolaStore;
+  /** DGP-020.2 — Sesiones de trabajo (cabecera + tramos append-only + reads). */
+  readonly sesiones: SesionStore;
 }
 
 /* ------------------------------ Configuración ---------------------------- */
@@ -197,9 +218,14 @@ async function emitirEvento(
   ctx: ExecutionContext,
   uow: UnitOfWork,
   tenantId: string,
-  evento: { tipo: string; payload: Record<string, unknown> },
+  evento: { tipo: string; payload: Record<string, unknown>; eventId?: string },
 ): Promise<Result<void, KernelError>> {
-  const dominio = createDomainEvent(evento.tipo, evento.payload, ctx.correlationId);
+  const dominio = createDomainEvent(
+    evento.tipo,
+    evento.payload,
+    ctx.correlationId,
+    evento.eventId ? { idGenerator: () => evento.eventId! } : {},
+  );
   const logged = await adapters.eventLog.append(uow, {
     tenantId,
     eventId: dominio.id,
@@ -331,6 +357,221 @@ async function reclamarOpId(
     proceder: false,
     cortocircuito: fail(KernelErrors.conflict(`Operación ${opId} en curso; reintente`)),
   };
+}
+
+/* --------------------- Sesiones de trabajo (DGP-020.2) ------------------- */
+
+/**
+ * Estados de OT INCOMPATIBLES con iniciar trabajo. La apertura de una sesión NO
+ * cambia el estado de la OT (§7): sólo se rechaza cuando la OT está en un estado
+ * en el que no cabe trabajar (borrador o final). El resto (asignada, planificada,
+ * en ejecución, pausada, abierta, o estados de extensión del tenant) se admiten.
+ */
+const ESTADOS_OT_INCOMPATIBLES_SESION = new Set(["BORRADOR", "CERRADA", "CANCELADA"]);
+
+/** ¿El principal es supervisor/admin (capacidades EXISTENTES, sin permisos nuevos)? */
+function esSupervisorOAdmin(ctx: ExecutionContext): boolean {
+  const caps = (ctx.principal.capacidades ?? []) as string[];
+  const perms = (ctx.principal.permisos ?? []) as string[];
+  return (
+    caps.includes("*") ||
+    caps.includes("validar-ordenes") ||
+    caps.includes("administrar-ordenes") ||
+    perms.includes("*") ||
+    perms.includes(`${MODULO}.admin`) ||
+    perms.includes(`${MODULO}.validar`)
+  );
+}
+
+/** Mapea el error de NEGOCIO de la máquina de sesión a un KernelError (nunca 500). */
+function errorSesion(codigo: string, mensaje: string): Result<never, KernelError> {
+  // Bordes huérfanos / sesión inexistente ⇒ notFound; el resto ⇒ conflicto de negocio.
+  if (codigo === "sin-sesion") return fail(KernelErrors.notFound("sesion", mensaje));
+  return fail(KernelErrors.conflict(mensaje));
+}
+
+/**
+ * Núcleo COMPARTIDO de los 4 comandos de sesión (`abrir/pausar/reanudar/cerrar`).
+ * Reutiliza el patrón canónico: claim opId durable ANTES de efectos → OT válida
+ * (mismo tenant, estado compatible, SIN mutarla) → activoId derivado de la OT →
+ * identityId del contexto (NUNCA del frontend) + asignación a la OT → tramo
+ * append-only con ocurridoAt(device)/registradoAt(server) y marca de anomalía de
+ * reloj → cabecera → evento autosuficiente → auditoría → sellar recibo.
+ */
+async function ejecutarSesion(
+  deps: ServiceDeps,
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
+  comando: ComandoSesion,
+  input: {
+    ordenId: string;
+    sesionId?: string;
+    ocurridoAt?: string;
+    origen?: string;
+    opId?: string;
+  },
+): Promise<Result<Record<string, unknown>, KernelError>> {
+  const tenant = tenantOf(ctx);
+  if (!tenant.ok) return tenant;
+  const nombreComando = `${MODULO}.sesion.${comando === "iniciar" ? "abrir" : comando}`;
+  const reclamo = await reclamarOpId(adapters, ctx, uow, tenant.value, nombreComando, input.opId);
+  if (!reclamo.proceder) return reclamo.cortocircuito;
+
+  // OT válida (mismo tenant por RLS/repo), NO se muta su estado.
+  const orden = await adapters.repository.findById(tenant.value, input.ordenId);
+  if (!orden.ok) return orden;
+  if (!orden.value) return fail(KernelErrors.notFound("orden-trabajo", input.ordenId));
+  if (ESTADOS_OT_INCOMPATIBLES_SESION.has(String(orden.value.estado))) {
+    return fail(KernelErrors.conflict(
+      `La OT ${input.ordenId} está en estado "${orden.value.estado}" y no admite registro de trabajo`,
+    ));
+  }
+
+  // Activo SIEMPRE derivado de la OT (nunca del frontend).
+  const activoId = orden.value.activoPrincipal?.activoId ?? null;
+  // Identidad SIEMPRE del contexto autenticado (nunca del frontend).
+  const identityId = ctx.principal.id;
+
+  const registradoAt = new Date();
+  const ocurridoAt = input.ocurridoAt ? new Date(input.ocurridoAt) : new Date(registradoAt.getTime());
+  const origen = input.origen === "offline" ? "offline" : "online";
+
+  if (comando === "iniciar") {
+    // Sólo un técnico ASIGNADO a la OT puede abrir sesión (§6); excepción para
+    // supervisor/admin con capacidades EXISTENTES (sin permisos nuevos).
+    if (!esSupervisorOAdmin(ctx)) {
+      const asignado = await adapters.motor.asignacionVigenteDeIdentidad(tenant.value, input.ordenId, identityId);
+      if (!asignado.ok) return asignado;
+      if (!asignado.value) {
+        return fail(KernelErrors.forbidden(
+          `sesión de trabajo: la identidad ${identityId} no está asignada a la OT ${input.ordenId}`,
+        ));
+      }
+    }
+    const trans = transicion(null, "iniciar");
+    if (!trans.ok) return errorSesion(trans.error.codigo, trans.error.mensaje);
+
+    const sesionId = input.sesionId ?? crypto.randomUUID();
+    const anomalia = evaluarReloj({ ocurridoAt, registradoAt, previoOcurridoAt: null });
+    const cabecera: SesionCabecera = {
+      id: sesionId, ordenId: input.ordenId, activoId, identityId,
+      estado: "ABIERTA", origen, iniciadoAt: ocurridoAt, cerradoAt: null,
+      registradoAt, actualizadoAt: registradoAt, opId: input.opId ?? null,
+    };
+    // El índice único parcial garantiza a lo sumo una sesión abierta por
+    // (tenant, OT, identidad): la carrera de dos aperturas la resuelve la base.
+    const ins = await adapters.sesiones.abrirCabecera(uow, tenant.value, cabecera);
+    if (!ins.ok) return ins;
+    const tramo: TramoFila = {
+      sesionId, secuencia: 0, tipo: "trabajo", origen: "iniciar",
+      ocurridoAt, registradoAt, anomaliaReloj: anomalia, identityId, opId: input.opId ?? null, eventId: "",
+    };
+    return finalizarSesion(deps, adapters, ctx, uow, tenant.value, {
+      comando, nombreComando, cabecera, tramo, estadoNuevo: "ABIERTA", cerradoAt: null, opId: input.opId,
+    });
+  }
+
+  // pausar / reanudar / cerrar: requiere una sesión NO cerrada (borde huérfano ⇒ negocio).
+  const abierta = await adapters.sesiones.getAbierta(tenant.value, input.ordenId, identityId);
+  if (!abierta.ok) return abierta;
+  const trans = transicion(abierta.value ? abierta.value.estado : null, comando);
+  if (!trans.ok) return errorSesion(trans.error.codigo, trans.error.mensaje);
+  const sesion = abierta.value!;
+
+  // Monotonicidad: comparar contra el ocurridoAt del último tramo.
+  const tramosR = await adapters.sesiones.tramosDe(tenant.value, sesion.id);
+  if (!tramosR.ok) return tramosR;
+  const previos = tramosR.value;
+  const previoOcurridoAt = previos.length ? previos[previos.length - 1]!.ocurridoAt : sesion.iniciadoAt;
+  const anomalia = evaluarReloj({ ocurridoAt, registradoAt, previoOcurridoAt });
+  const secuencia = previos.length;
+  const origenTramo: OrigenTramo = comando;
+  const tipoTramo: TipoTramo = trans.tipo;
+  const estadoNuevo = trans.estado;
+  const cerradoAt = comando === "cerrar" ? ocurridoAt : null;
+
+  const cabecera: SesionCabecera = { ...sesion, estado: estadoNuevo, cerradoAt, actualizadoAt: registradoAt };
+  const tramo: TramoFila = {
+    sesionId: sesion.id, secuencia, tipo: tipoTramo, origen: origenTramo,
+    ocurridoAt, registradoAt, anomaliaReloj: anomalia, identityId, opId: input.opId ?? null, eventId: "",
+  };
+  return finalizarSesion(deps, adapters, ctx, uow, tenant.value, {
+    comando, nombreComando, cabecera, tramo, estadoNuevo, cerradoAt, opId: input.opId,
+  });
+}
+
+/** Persiste tramo + cabecera + emite el evento de sesión + audita + sella. */
+async function finalizarSesion(
+  deps: ServiceDeps,
+  adapters: ModuleAdapters,
+  ctx: ExecutionContext,
+  uow: UnitOfWork,
+  tenantId: string,
+  args: {
+    comando: ComandoSesion;
+    nombreComando: string;
+    cabecera: SesionCabecera;
+    tramo: TramoFila;
+    estadoNuevo: EstadoSesion;
+    cerradoAt: Date | null;
+    opId?: string;
+  },
+): Promise<Result<Record<string, unknown>, KernelError>> {
+  const { cabecera, tramo } = args;
+  // Tipo de evento por comando.
+  const tipoEvento =
+    args.comando === "iniciar" ? SESION_INICIADA
+      : args.comando === "pausar" ? SESION_PAUSADA
+        : args.comando === "reanudar" ? SESION_REANUDADA
+          : SESION_CERRADA;
+
+  // El event_id del tramo append-only == id del evento de dominio (trazabilidad
+  // 1:1 tramo↔evento; misma clave que usa la proyección del read model).
+  const eventId = crypto.randomUUID();
+
+  // Tramo APPEND-ONLY (fuente de verdad de la duración). En 'iniciar' la cabecera
+  // ya se insertó; en el resto se actualiza tras registrar el tramo.
+  const insTramo = await adapters.sesiones.agregarTramo(uow, tenantId, { ...tramo, eventId });
+  if (!insTramo.ok) return insTramo;
+  if (args.comando !== "iniciar") {
+    const upd = await adapters.sesiones.actualizarCabecera(uow, tenantId, cabecera.id, {
+      estado: args.estadoNuevo, cerradoAt: args.cerradoAt, actualizadoAt: cabecera.actualizadoAt,
+    });
+    if (!upd.ok) return upd;
+  }
+
+  const payload: Record<string, unknown> = {
+    tenantId, ordenId: cabecera.ordenId, sesionId: cabecera.id, entityRef: `orden:${cabecera.ordenId}`,
+    activoId: cabecera.activoId, identityId: cabecera.identityId, estado: args.estadoNuevo, origen: cabecera.origen,
+    iniciadoAt: cabecera.iniciadoAt.toISOString(),
+    cerradoAt: args.cerradoAt ? args.cerradoAt.toISOString() : null,
+    ocurridoAt: tramo.ocurridoAt.toISOString(),
+    registradoAt: tramo.registradoAt.toISOString(),
+    actualizadoAt: tramo.registradoAt.toISOString(),
+    secuencia: tramo.secuencia, tipoTramo: tramo.tipo, origenTramo: tramo.origen,
+    anomaliaReloj: tramo.anomaliaReloj,
+    actorId: ctx.principal.id,
+  };
+  const emit = await emitirEvento(adapters, ctx, uow, tenantId, { tipo: tipoEvento, payload, eventId });
+  if (!emit.ok) return emit;
+  const audited = await audit(deps.audit, uow, ctx, tenantId, MODULO, `sesion:${args.comando}`, cabecera.id, {
+    ordenId: cabecera.ordenId, estado: args.estadoNuevo, secuencia: tramo.secuencia,
+    anomalia: tramo.anomaliaReloj ? tramo.anomaliaReloj.tipo : null,
+  });
+  if (!audited.ok) return audited;
+
+  const resultado: Record<string, unknown> = {
+    sesionId: cabecera.id, ordenId: cabecera.ordenId, activoId: cabecera.activoId,
+    identityId: cabecera.identityId, estado: args.estadoNuevo,
+    ocurridoAt: tramo.ocurridoAt.toISOString(),
+    anomaliaReloj: tramo.anomaliaReloj,
+  };
+  if (args.opId) {
+    const rec = await adapters.recibos.sellar(uow, tenantId, { opId: args.opId, comando: args.nombreComando, resultado }, ctx.principal.id);
+    if (!rec.ok) return rec;
+  }
+  return ok({ ...resultado, idempotente: false });
 }
 
 /* ----------------------- Orquestación de Workflow ------------------------ */
@@ -565,7 +806,7 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
       "platform.config",
       "platform.timeline",
     ],
-    events: [...EVENTOS_MODULO, ...EVENTOS_OPERACIONALES],
+    events: [...EVENTOS_MODULO, ...EVENTOS_OPERACIONALES, ...EVENTOS_SESION],
     recordTypes: [
       "orden-trabajo",
       "secuencia",
@@ -1760,6 +2001,67 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           },
         };
       },
+      /* ============ SESIONES DE TRABAJO (DGP-020.2) ====================== */
+      // Comandos operacionales del registro de tiempo real. `identityId` y
+      // `activoId` NUNCA vienen del frontend (se derivan del ctx y de la OT).
+      // Gobernados por la máquina de sesión PURA (no por el Workflow Engine).
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.sesion.abrir`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            sesionId: z.string().min(1).optional(),
+            ocurridoAt: z.string().min(1).optional(),
+            origen: z.enum(["online", "offline"]).optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.operar`] },
+          handle: (ctx, input, uow) => ejecutarSesion(deps, adapters, ctx, uow, "iniciar", input),
+        };
+      },
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.sesion.pausar`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            ocurridoAt: z.string().min(1).optional(),
+            origen: z.enum(["online", "offline"]).optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.operar`] },
+          handle: (ctx, input, uow) => ejecutarSesion(deps, adapters, ctx, uow, "pausar", input),
+        };
+      },
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.sesion.reanudar`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            ocurridoAt: z.string().min(1).optional(),
+            origen: z.enum(["online", "offline"]).optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.operar`] },
+          handle: (ctx, input, uow) => ejecutarSesion(deps, adapters, ctx, uow, "reanudar", input),
+        };
+      },
+      (deps) => {
+        conPolicies(deps);
+        return {
+          name: `${MODULO}.sesion.cerrar`,
+          inputSchema: z.object({
+            ordenId: z.string().min(1),
+            ocurridoAt: z.string().min(1).optional(),
+            origen: z.enum(["online", "offline"]).optional(),
+            opId: z.string().optional(),
+          }),
+          authorization: { permissions: [`${MODULO}.operar`] },
+          handle: (ctx, input, uow) => ejecutarSesion(deps, adapters, ctx, uow, "cerrar", input),
+        };
+      },
       /* ==================== REPROYECCIÓN (replay) ========================= */
       (deps) => {
         conPolicies(deps);
@@ -1775,16 +2077,21 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             if (!c1.ok) return c1;
             const c2 = await adapters.proyecciones.clear(uow, tenant.value);
             if (!c2.ok) return c2;
+            const c3 = await adapters.sesiones.clear(uow, tenant.value);
+            if (!c3.ok) return c3;
             // Fuente del replay: la BITÁCORA DURABLE (`ord_eventos`), NO el outbox.
             const stream = await adapters.eventLog.stream(tenant.value);
             if (!stream.ok) return stream;
             let eventos = 0;
             const operacionales = new Set<string>(EVENTOS_OPERACIONALES);
+            const sesionales = new Set<string>(EVENTOS_SESION);
             for (const ev of stream.value) {
               const evento = { id: ev.eventId, type: ev.tipo, payload: ev.payload };
-              const r = operacionales.has(ev.tipo)
-                ? await aplicarEventoOperacional(adapters, uow, evento)
-                : await aplicarEventoAggregate(adapters, uow, evento);
+              const r = sesionales.has(ev.tipo)
+                ? await aplicarEventoSesion(adapters, uow, evento)
+                : operacionales.has(ev.tipo)
+                  ? await aplicarEventoOperacional(adapters, uow, evento)
+                  : await aplicarEventoAggregate(adapters, uow, evento);
               if (!r.ok) return r;
               eventos += 1;
             }
@@ -2071,10 +2378,79 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
                 "ord_agenda_read", "ord_asignaciones_read", "ord_responsables_read", "ord_relaciones_read",
                 "ord_historial_read", "ord_bitacora_read", "ord_documentacion_read",
                 "ord_planificacion", "ord_asignaciones", "ord_recursos", "ord_sla", "ord_relaciones",
+                "ord_sesiones", "ord_sesion_tramos", "ord_sesiones_read", "ord_sesion_tramos_read", "ord_sesion_duraciones_read",
               ],
               aislamiento: "app.tenant_id (RLS por tenant, lecturas y escrituras)",
             },
           });
+        },
+      }),
+      /* ============ CQRS: SESIONES DE TRABAJO (DGP-020.2) =============== */
+      // El frontend NUNCA calcula duración: la lee de estos read models.
+      () => ({
+        name: `${MODULO}.sesion.activa`,
+        inputSchema: z.object({ ordenId: z.string().min(1), identityId: z.string().optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.sesiones.sesionActiva(tenant.value, input.ordenId, input.identityId ?? null);
+          if (!r.ok) return r;
+          return ok({ sesion: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.sesiones`,
+        inputSchema: z.object({
+          ordenId: z.string().optional(),
+          identityId: z.string().optional(),
+          activoId: z.string().optional(),
+        }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = input.ordenId
+            ? await adapters.sesiones.sesionesPorOrden(tenant.value, input.ordenId)
+            : input.identityId
+              ? await adapters.sesiones.sesionesPorIdentidad(tenant.value, input.identityId)
+              : input.activoId
+                ? await adapters.sesiones.sesionesPorActivo(tenant.value, input.activoId)
+                : fail(KernelErrors.validation("Especifique ordenId, identityId o activoId"));
+          if (!r.ok) return r;
+          return ok({ sesiones: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.sesion.tramos`,
+        inputSchema: z.object({ sesionId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.sesiones.tramosRead(tenant.value, input.sesionId);
+          if (!r.ok) return r;
+          return ok({ tramos: r.value });
+        },
+      }),
+      () => ({
+        name: `${MODULO}.sesion.duraciones`,
+        inputSchema: z.object({ sesionId: z.string().optional(), ordenId: z.string().optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          if (input.sesionId) {
+            const r = await adapters.sesiones.duracionesDeSesion(tenant.value, input.sesionId);
+            if (!r.ok) return r;
+            return ok({ duraciones: r.value });
+          }
+          if (input.ordenId) {
+            const r = await adapters.sesiones.duracionesPorOrden(tenant.value, input.ordenId);
+            if (!r.ok) return r;
+            return ok({ duraciones: r.value });
+          }
+          return fail(KernelErrors.validation("Especifique sesionId u ordenId"));
         },
       }),
     ],
@@ -2096,10 +2472,19 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
         handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
           handlerProyeccion(adapters, true)(deps)(event, eventType),
       })),
+      // Proyección CQRS de los eventos de SESIÓN (DGP-020.2): cabecera de sesión,
+      // tramos append-only y resumen de duraciones (recalculado sólo desde los
+      // tramos). Payload-only, idempotente por (tenant, id)/event_id.
+      ...EVENTOS_SESION.map((eventType) => ({
+        eventType,
+        handlerName: `proyectar-sesion:${eventType}`,
+        handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown> }) =>
+          handlerProyeccion(adapters, "sesion")(deps)(event, eventType),
+      })),
       // Shared Timeline CANÓNICO (platform.timeline): cada evento del módulo
-      // (aggregate y operacional) se registra vía COMANDO (nunca escritura
-      // directa), idempotente por entryId=event.id.
-      ...[...EVENTOS_MODULO, ...EVENTOS_OPERACIONALES].map((eventType) => ({
+      // (aggregate, operacional y de sesión) se registra vía COMANDO (nunca
+      // escritura directa), idempotente por entryId=event.id.
+      ...[...EVENTOS_MODULO, ...EVENTOS_OPERACIONALES, ...EVENTOS_SESION].map((eventType) => ({
         eventType,
         handlerName: `timeline:${eventType}`,
         handle: (deps: ServiceDeps) => (event: { id: string; payload: Record<string, unknown>; correlationId: string }) =>

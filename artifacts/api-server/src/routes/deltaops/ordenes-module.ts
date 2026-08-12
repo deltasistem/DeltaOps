@@ -134,6 +134,21 @@ router.get(`${BASE}/catalogos/:catalogo`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.catalogo.opciones`, { catalogo: req.params.catalogo }));
 });
 
+// DGP-020.2 · Sesiones de trabajo — read models (rutas específicas antes de /:id).
+router.get(`${BASE}/sesiones/duraciones`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.sesion.duraciones`, {
+    sesionId: strQuery(req.query.sesionId), ordenId: strQuery(req.query.ordenId),
+  }));
+});
+router.get(`${BASE}/sesiones/:sesionId/tramos`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.sesion.tramos`, { sesionId: req.params.sesionId }));
+});
+router.get(`${BASE}/sesiones`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.sesiones`, {
+    ordenId: strQuery(req.query.ordenId), identityId: strQuery(req.query.identityId), activoId: strQuery(req.query.activoId),
+  }));
+});
+
 // Read models operacionales por OT (rutas específicas antes de /:id).
 router.get(`${BASE}/:id/asignaciones`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.asignaciones`, { ordenId: req.params.id }));
@@ -166,6 +181,11 @@ router.get(`${BASE}/:id/formularios`, async (req, res) => {
 });
 router.get(`${BASE}/:id/checklists`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.checklists`, { ordenId: req.params.id }));
+});
+router.get(`${BASE}/:id/sesion/activa`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.sesion.activa`, {
+    ordenId: req.params.id, identityId: strQuery(req.query.identityId),
+  }));
 });
 
 /**
@@ -281,6 +301,27 @@ router.post(`${BASE}/:id/evidencias`, async (req, res) => {
   await drain();
   send(res, r);
 });
+
+/**
+ * DGP-020.2 · Sesiones de trabajo. El `identityId` proviene SIEMPRE del contexto
+ * autenticado (jamás del cuerpo) y el `activoId` se deriva de la OT en el
+ * dominio; el cuerpo sólo aporta `ocurridoAt` (device-time), `origen` y `opId`.
+ * Idempotentes por `opId` y despachables por `/sync` (Offline First).
+ */
+for (const accion of ["abrir", "pausar", "reanudar", "cerrar"] as const) {
+  router.post(`${BASE}/:id/sesion/${accion}`, async (req, res) => {
+    const b = (req.body ?? {}) as { sesionId?: string; ocurridoAt?: string; origen?: string; opId?: string };
+    const r = await exec(ctxOf(res), `${MODULO}.sesion.${accion}`, {
+      ordenId: req.params.id,
+      ...(b.sesionId ? { sesionId: b.sesionId } : {}),
+      ...(b.ocurridoAt ? { ocurridoAt: b.ocurridoAt } : {}),
+      ...(b.origen ? { origen: b.origen } : {}),
+      ...(b.opId ? { opId: b.opId } : {}),
+    });
+    await drain();
+    send(res, r);
+  });
+}
 
 /**
  * Registro de evidencia REFERENCIA-ONLY (patrón Attachment Service, igual que

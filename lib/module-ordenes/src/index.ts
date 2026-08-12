@@ -14,6 +14,7 @@ export * from "./domain/catalogos";
 export * from "./domain/maquina-estados";
 export * from "./domain/orden";
 export * from "./domain/operacional";
+export * from "./domain/sesion";
 export * from "./domain/policies";
 export * from "./domain/ports";
 // FAKES en memoria de los puertos (para pruebas de dominio y para 009.2 hasta
@@ -48,6 +49,16 @@ export {
   type SyncReceipt,
   type SyncReceiptStore,
 } from "./infrastructure/operacional";
+export {
+  FakeSesionStore,
+  PgSesionStore,
+  type DuracionesReadRow,
+  type SesionCabecera,
+  type SesionReadRow,
+  type SesionStore,
+  type TramoFila,
+  type TramoReadRow,
+} from "./infrastructure/sesiones";
 export * from "./projection";
 export { ordenesModule, type ModuleAdapters } from "./module";
 export { crearOrdenesRuntime, type OrdenesRuntime, type OrdenesRuntimeOptions } from "./runtime";

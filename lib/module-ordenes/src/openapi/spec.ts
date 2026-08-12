@@ -188,6 +188,36 @@ export function construirOpenApi(): Record<string, unknown> {
       readModels: obj({}, []), eventLog: obj({}, []), outbox: obj({}, []),
       sincronizacion: obj({}, []), rls: obj({}, []),
     }),
+    // DGP-020.2 — Sesiones de trabajo. `identityId` y `activoId` NUNCA se envían
+    // (se derivan del contexto autenticado y de la OT); `ocurridoAt` es device-time.
+    ComandoSesion: obj(
+      {
+        sesionId: str({ description: "Opcional; sólo en abrir para idempotencia de cliente" }),
+        ocurridoAt: str({ format: "date-time", description: "Instante en el dispositivo (device-time); nunca se reemplaza" }),
+        origen: str({ enum: ["online", "offline"] }),
+        opId: str(),
+      },
+      [],
+    ),
+    ResultadoSesion: obj(
+      {
+        sesionId: str(), ordenId: str(), activoId: str({ nullable: true }), identityId: str(),
+        estado: str({ enum: ["ABIERTA", "PAUSADA", "CERRADA"] }),
+        ocurridoAt: str({ format: "date-time" }),
+        anomaliaReloj: obj({}, []),
+        idempotente: bool(),
+      },
+      ["sesionId", "ordenId", "identityId", "estado"],
+    ),
+    Duraciones: obj(
+      {
+        sesionId: str(), ordenId: str(), activoId: str({ nullable: true }), identityId: str(),
+        estado: str(), efectivoMs: int({ minimum: 0 }), pausadoMs: int({ minimum: 0 }),
+        transcurridoMs: int({ minimum: 0 }), pausas: int({ minimum: 0 }), abierta: bool(),
+        iniciadoAt: str({ format: "date-time" }), cerradoAt: str({ format: "date-time", nullable: true }),
+      },
+      [],
+    ),
   };
 
   const paths: Record<string, Record<string, unknown>> = {};
@@ -424,6 +454,41 @@ export function construirOpenApi(): Record<string, unknown> {
     responses: { "200": jsonOk(obj({}, [])), ...errores("400", "401", "403", "404") },
   });
 
+  // ---- Sesiones de trabajo (DGP-020.2) ----
+  const sesionOp = (accion: "abrir" | "pausar" | "reanudar" | "cerrar", resumen: string): Record<string, unknown> => ({
+    tags: ["Sesiones"], operationId: `ordenes.sesion.${accion}`, summary: resumen,
+    description:
+      "El identityId proviene SIEMPRE del contexto autenticado (nunca del cuerpo); el activoId se deriva de la OT. " +
+      "La duración se calcula EXCLUSIVAMENTE desde los tramos append-only. Idempotente por opId; despachable por /sync offline.",
+    parameters: [idParam], requestBody: jsonBody(ref("ComandoSesion")),
+    responses: { "200": jsonOk(ref("ResultadoSesion")), ...errores("400", "401", "403", "404", "409") },
+  });
+  add(`${BASE}/{id}/sesion/abrir`, "post", sesionOp("abrir", "Abrir sesión de trabajo (primer tramo de trabajo)"));
+  add(`${BASE}/{id}/sesion/pausar`, "post", sesionOp("pausar", "Pausar la sesión de trabajo abierta"));
+  add(`${BASE}/{id}/sesion/reanudar`, "post", sesionOp("reanudar", "Reanudar la sesión de trabajo pausada"));
+  add(`${BASE}/{id}/sesion/cerrar`, "post", sesionOp("cerrar", "Cerrar la sesión de trabajo (estado final, sin reapertura)"));
+  add(`${BASE}/{id}/sesion/activa`, "get", {
+    tags: ["Sesiones"], operationId: "ordenes.sesion.activa", summary: "Sesión activa (no cerrada) de la OT (read model)",
+    parameters: [idParam, queryParam("identityId", "Filtrar por identidad (opcional)")],
+    responses: { "200": jsonOk(obj({ sesion: obj({}, []) }, [])), ...errores("401", "403") },
+  });
+  add(`${BASE}/sesiones`, "get", {
+    tags: ["Sesiones"], operationId: "ordenes.sesiones", summary: "Listar sesiones por OT/identidad/activo (read model)",
+    parameters: [queryParam("ordenId", "Filtrar por OT"), queryParam("identityId", "Filtrar por identidad"), queryParam("activoId", "Filtrar por activo")],
+    responses: { "200": jsonOk(obj({ sesiones: arr(obj({}, [])) }, [])), ...errores("400", "401", "403") },
+  });
+  add(`${BASE}/sesiones/{sesionId}/tramos`, "get", {
+    tags: ["Sesiones"], operationId: "ordenes.sesion.tramos", summary: "Tramos append-only de una sesión (read model)",
+    parameters: [pathParam("sesionId", "Identificador de la sesión")],
+    responses: { "200": jsonOk(obj({ tramos: arr(obj({}, [])) }, [])), ...errores("401", "403") },
+  });
+  add(`${BASE}/sesiones/duraciones`, "get", {
+    tags: ["Sesiones"], operationId: "ordenes.sesion.duraciones",
+    summary: "Duraciones (efectivo/pausado/transcurrido) por sesión u OT (read model; el cliente NO calcula duración)",
+    parameters: [queryParam("sesionId", "Duraciones de una sesión"), queryParam("ordenId", "Duraciones de todas las sesiones de la OT")],
+    responses: { "200": jsonOk(obj({ duraciones: obj({}, []) }, [])), ...errores("400", "401", "403") },
+  });
+
   // ---- Reproyección / sync / consola ----
   add(`${BASE}/reproyectar`, "post", {
     tags: ["Administración"], operationId: "ordenes.reproyectar",
@@ -455,6 +520,7 @@ export function construirOpenApi(): Record<string, unknown> {
       { name: "Órdenes" }, { name: "Ciclo de vida" }, { name: "Documentación" },
       { name: "Planificación" }, { name: "Asignaciones" }, { name: "Recursos" },
       { name: "SLA" }, { name: "Relaciones" }, { name: "Bitácora" },
+      { name: "Sesiones" },
       { name: "Catálogos" }, { name: "Sincronización" }, { name: "Administración" },
     ],
     paths,

@@ -42,6 +42,7 @@ import {
   FakeProyeccionesStore,
   FakeSyncReceiptStore,
 } from "./operacional";
+import { FakeSesionStore } from "./sesiones";
 
 const clone = <T>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
 const key = (tenant: string, id: string) => `${tenant}::${id}`;
@@ -314,6 +315,7 @@ export interface FakeAdapters {
   readonly motor: FakeMotorStore;
   readonly syncReceipts: FakeSyncReceiptStore;
   readonly consola: FakeConsolaStore;
+  readonly sesiones: FakeSesionStore;
 }
 
 /**
@@ -338,5 +340,6 @@ export function crearFakeAdapters(
     motor: new FakeMotorStore(),
     syncReceipts: new FakeSyncReceiptStore(),
     consola: new FakeConsolaStore(outboxRecords),
+    sesiones: new FakeSesionStore(),
   };
 }

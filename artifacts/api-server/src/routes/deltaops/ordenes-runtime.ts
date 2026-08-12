@@ -94,6 +94,7 @@ const MODULE_PERMISSIONS = [
     motor: null as never,
     syncReceipts: null as never,
     consola: null as never,
+    sesiones: null as never,
   }).permissions,
 ];
 

@@ -1,0 +1,1232 @@
+DIRECTIVA DE DIRECCIÓN — DGP-020.2
+SESIONES DE TRABAJO Y DURACIÓN REAL DE ÓRDENES DE TRABAJO
+
+Programa DeltaOps
+
+==================================================
+ESTADO DEL PROGRAMA
+==================================================
+
+DGP-020 — Discovery: CERRADO / PASS
+DGP-020.1 — Contrato de identidad en asignación: CERRADO / PASS
+
+G-1 YA ESTÁ RESUELTO.
+
+Las asignaciones nuevas de OT disponen de:
+
+OT
+→ asignado_identity_id
+→ identidad canónica DeltaOps
+→ tenant
+
+También están disponibles:
+
+OT
+→ activoId
+→ Timeline
+→ Workflow
+→ Offline First
+→ idempotencia/opId
+
+DGP-020.2 queda AUTORIZADO para implementación.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Implementar un mecanismo confiable, auditable y offline-first para registrar las SESIONES REALES DE TRABAJO de una Orden de Trabajo.
+
+El objetivo es poder determinar posteriormente:
+
+- cuándo comenzó una sesión;
+- cuándo se pausó;
+- cuándo se reanudó;
+- cuándo terminó;
+- cuánto tiempo estuvo activa;
+- cuánto tiempo estuvo pausada;
+- cuánto tiempo transcurrió;
+- qué identidad realizó la sesión;
+- sobre qué OT;
+- sobre qué activo;
+- en qué tenant;
+- cuándo ocurrió en el dispositivo;
+- cuándo fue registrada por el servidor.
+
+La información debe permitir posteriormente calcular:
+
+TIEMPO EFECTIVO
+
+TIEMPO PAUSADO
+
+TIEMPO TRANSCURRIDO
+
+sin depender de inferencias posteriores.
+
+==================================================
+2. PRINCIPIO DE FUENTE DE VERDAD
+==================================================
+
+La fuente de verdad futura para los intervalos de trabajo serán:
+
+TRAMOS DE SESIÓN APPEND-ONLY
+
+Los eventos de Workflow y la bitácora de la OT:
+
+NO serán la fuente de verdad para calcular intervalos.
+
+Pueden utilizarse como:
+
+- señal auxiliar;
+- evidencia de consistencia;
+- diagnóstico;
+- Timeline.
+
+No reconstruir sesiones únicamente desde:
+
+`ocurridoAt` de bitácora.
+
+Esto fue identificado como GAP-CLOCK en DGP-020.
+
+==================================================
+3. MODELO PROPUESTO
+==================================================
+
+Implementar el modelo aprobado durante Discovery:
+
+Sesión:
+
+- sessionId;
+- tenantId;
+- otId;
+- activoId;
+- identityId;
+- estado;
+- iniciadoAt;
+- cerradoAt;
+- createdAt/registradoAt;
+- opId;
+- origen;
+- metadata necesaria.
+
+Tramos append-only:
+
+- tramoId;
+- sessionId;
+- tipo;
+- ocurridoAt;
+- registradoAt;
+- opId;
+- identityId;
+- tenantId;
+- información de origen/dispositivo necesaria.
+
+Los nombres definitivos deben adaptarse a las convenciones reales del corpus.
+
+NO copiar literalmente estos nombres si el código tiene una convención diferente.
+
+==================================================
+4. ESTADOS
+==================================================
+
+La sesión debe tener un ciclo inequívoco.
+
+Evaluar y utilizar el diseño aprobado:
+
+ABIERTA
+PAUSADA
+CERRADA
+
+Una sesión:
+
+ABIERTA
+→ PAUSADA
+→ ABIERTA
+→ PAUSADA
+→ ABIERTA
+→ CERRADA
+
+Debe permitir múltiples ciclos de pausa/reanudación.
+
+No permitir:
+
+ABIERTA → ABIERTA
+PAUSADA → PAUSADA
+CERRADA → cualquier estado operativo
+
+salvo que exista una operación explícita y autorizada definida por contrato.
+
+No inventar reapertura.
+
+==================================================
+5. COMANDOS
+==================================================
+
+Implementar únicamente los comandos necesarios:
+
+- abrir sesión;
+- pausar sesión;
+- reanudar sesión;
+- cerrar sesión.
+
+Utilizar los nombres y namespaces canónicos existentes.
+
+El Discovery propuso como referencia:
+
+`modulo.tiempos.sesion.abrir`
+`modulo.tiempos.sesion.pausar`
+`modulo.tiempos.sesion.reanudar`
+`modulo.tiempos.sesion.cerrar`
+
+Si el namespace definitivo debe ajustarse a la arquitectura existente, documentar la decisión.
+
+No crear comandos redundantes.
+
+==================================================
+6. VALIDACIÓN DE IDENTIDAD
+==================================================
+
+Una sesión de trabajo debe estar vinculada a una identidad canónica.
+
+Al abrir una sesión:
+
+1. obtener identidad desde la sesión autenticada;
+2. no aceptar identityId arbitrario desde frontend como autoridad;
+3. verificar que la identidad está activa;
+4. verificar membresía activa;
+5. verificar tenant;
+6. verificar que la identidad está asignada a la OT según el contrato vigente;
+7. verificar que el usuario tiene capacidad para operar la OT.
+
+No permitir que un técnico abra una sesión sobre una OT asignada a otro técnico.
+
+Si el contrato actual contempla una excepción legítima para supervisor/administrador:
+
+respetarla según las capacidades existentes.
+
+No inventar nuevos permisos.
+
+==================================================
+7. RELACIÓN CON OT
+==================================================
+
+Una sesión debe pertenecer a una OT válida.
+
+Validar:
+
+- OT existente;
+- tenant correcto;
+- estado de OT compatible con iniciar trabajo;
+- activoId de la OT;
+- identityId asignado.
+
+No modificar silenciosamente el estado de la OT para crear una sesión.
+
+Si para abrir una sesión es necesario cambiar el estado de la OT:
+
+detenerse y documentar el contrato requerido.
+
+No inventar una transición.
+
+==================================================
+8. RELACIÓN CON ACTIVO
+==================================================
+
+La sesión debe conservar:
+
+OT
++
+activoId
+
+El activo debe provenir del contexto de la OT.
+
+No aceptar un activo arbitrario enviado desde frontend.
+
+Esto permitirá posteriormente:
+
+Activo
+→ OT
+→ sesión
+→ tiempo efectivo
+
+y posteriormente:
+
+Activo
+→ costo de mantenimiento.
+
+No crear una segunda relación OT-Activo.
+
+==================================================
+9. TIMESTAMPS — CRÍTICO
+==================================================
+
+Cada evento de sesión debe distinguir:
+
+A. `ocurridoAt`
+
+Hora real en que el evento ocurrió en el dispositivo/campo.
+
+B. `registradoAt`
+
+Hora en que el servidor recibió/registró el hecho.
+
+No utilizar únicamente la hora de sincronización.
+
+Para operaciones online:
+
+ocurridoAt puede ser generado por cliente con validación.
+
+Para operaciones offline:
+
+ocurridoAt debe conservar la hora del dispositivo.
+
+registradoAt será la hora del servidor cuando sincronice.
+
+Nunca reemplazar ocurridoAt por registradoAt.
+
+==================================================
+10. RELOJ DEL DISPOSITIVO
+==================================================
+
+Implementar las reglas definidas en Discovery para reloj sospechoso.
+
+Evaluar y aplicar la política aprobada:
+
+- detectar timestamps futuros;
+- detectar retrocesos;
+- detectar inconsistencias;
+- marcar anomalías sin destruir el hecho.
+
+NO modificar silenciosamente timestamps.
+
+Si un timestamp es sospechoso:
+
+el hecho puede conservarse con marca de anomalía según el diseño aprobado.
+
+No convertirlo automáticamente en una hora de servidor.
+
+==================================================
+11. MONOTONICIDAD
+==================================================
+
+Dentro de una sesión:
+
+Los timestamps de eventos deben respetar el orden temporal lógico.
+
+Ejemplo válido:
+
+09:00 ABRIR
+10:00 PAUSAR
+10:15 REANUDAR
+11:00 CERRAR
+
+Ejemplo inválido:
+
+09:00 ABRIR
+10:00 PAUSAR
+09:45 REANUDAR
+
+Debe existir una regla determinista.
+
+No borrar el evento inválido.
+
+Debe quedar registrado como inconsistencia/rechazo según el contrato.
+
+==================================================
+12. TRAMOS
+==================================================
+
+La duración debe calcularse desde tramos.
+
+Ejemplo:
+
+ABRIR
+09:00
+
+PAUSAR
+10:00
+
+REANUDAR
+10:15
+
+CERRAR
+11:00
+
+Resultado:
+
+Tiempo transcurrido = 2h
+Tiempo pausado = 15m
+Tiempo efectivo = 1h45m
+
+No calcular:
+
+11:00 - 09:00 = 2h
+
+como tiempo efectivo.
+
+==================================================
+13. MÚLTIPLES PAUSAS
+==================================================
+
+Debe soportarse:
+
+ABRIR
+PAUSAR
+REANUDAR
+PAUSAR
+REANUDAR
+CERRAR
+
+El cálculo debe sumar todos los tramos.
+
+Ejemplo:
+
+Trabajo:
+09:00–10:00 = 1h
+Pausa:
+10:00–10:10 = 10m
+Trabajo:
+10:10–11:30 = 1h20m
+Pausa:
+11:30–11:45 = 15m
+Trabajo:
+11:45–12:00 = 15m
+
+Tiempo efectivo = 2h35m
+Tiempo pausado = 25m
+Tiempo transcurrido = 3h
+
+Los resultados deben derivarse de los hechos almacenados.
+
+==================================================
+14. IDEMPOTENCIA
+==================================================
+
+CRÍTICO.
+
+Cada operación debe tener:
+
+opId
+
+y debe utilizar el patrón durable de idempotencia existente.
+
+Dos solicitudes simultáneas con el mismo opId deben producir:
+
+EXACTAMENTE UN HECHO.
+
+Probar carrera real contra PostgreSQL.
+
+No confiar únicamente en:
+
+- frontend;
+- debounce;
+- bloqueo visual;
+- memoria.
+
+La protección debe existir en backend/BD.
+
+==================================================
+15. CONCURRENCIA
+==================================================
+
+Probar escenarios como:
+
+Dos `abrir` simultáneos.
+
+Dos `pausar` simultáneos.
+
+`pausar` + `cerrar` simultáneos.
+
+Dos `cerrar` simultáneos.
+
+Dos operaciones diferentes con opId diferente sobre la misma sesión.
+
+El resultado debe ser determinista.
+
+No permitir dos estados finales incompatibles.
+
+==================================================
+16. SESIONES DUPLICADAS
+==================================================
+
+Determinar la política:
+
+¿Puede una identidad tener dos sesiones abiertas simultáneamente para la misma OT?
+
+La recomendación de Dirección es:
+
+NO permitir sesiones abiertas concurrentes para la misma combinación:
+
+tenant + OT + identity.
+
+Si el contrato requiere otra política:
+
+documentarla y justificarla.
+
+No permitir solapes silenciosos.
+
+==================================================
+17. SOLAPES
+==================================================
+
+Detectar y controlar:
+
+- dos tramos activos superpuestos;
+- dos sesiones activas superpuestas;
+- pausas fuera de una sesión;
+- reanudaciones sin pausa;
+- cierre sin apertura;
+- apertura después de cierre.
+
+Debe existir comportamiento determinista.
+
+No reparar silenciosamente datos históricos.
+
+==================================================
+18. BORDES HUÉRFANOS
+==================================================
+
+Detectar:
+
+PAUSAR sin ABRIR
+REANUDAR sin PAUSAR
+CERRAR sin ABRIR
+
+Estas operaciones deben ser rechazadas como errores de negocio.
+
+No producir 500.
+
+==================================================
+19. OFFLINE FIRST
+==================================================
+
+Las operaciones deben poder ejecutarse en el flujo offline existente si la arquitectura actual lo permite:
+
+- abrir;
+- pausar;
+- reanudar;
+- cerrar.
+
+NO crear una segunda cola.
+
+Utilizar:
+
+OfflineProvider
++
+cola existente
++
+opId
++
+sync existente.
+
+Cada operación offline debe conservar:
+
+- ocurridoAt;
+- opId;
+- identityId;
+- tenant;
+- tipo de operación;
+- información necesaria para reproducir el comando.
+
+==================================================
+20. SINCRONIZACIÓN
+==================================================
+
+Al sincronizar:
+
+1. verificar tenant;
+2. verificar identityId;
+3. verificar OT;
+4. verificar asignación;
+5. verificar opId;
+6. aplicar operación;
+7. registrar registradoAt del servidor;
+8. conservar ocurridoAt;
+9. actualizar read models.
+
+Si una operación offline ya no es válida:
+
+no ejecutarla parcialmente.
+
+Registrar conflicto/error de manera visible.
+
+No perder el hecho.
+
+==================================================
+21. READ MODELS
+==================================================
+
+Crear/actualizar read models específicos para consultas de sesiones.
+
+Como mínimo evaluar:
+
+- sesión activa;
+- sesiones por OT;
+- sesiones por identidad;
+- sesiones por activo;
+- resumen de duración;
+- tramos.
+
+El frontend NO debe calcular duración compleja recorriendo eventos crudos si puede evitarse.
+
+Preferir read models derivados.
+
+==================================================
+22. DURACIONES
+==================================================
+
+Exponer como mínimo:
+
+TIEMPO TRANSCURRIDO
+
+TIEMPO PAUSADO
+
+TIEMPO EFECTIVO
+
+Cuando exista una sesión cerrada.
+
+Para sesión abierta:
+
+mostrar:
+
+- tiempo transcurrido hasta ahora;
+- tiempo pausado acumulado;
+- tiempo efectivo acumulado.
+
+No presentar valores como definitivos mientras la sesión continúe abierta.
+
+==================================================
+23. FUENTE DE VERDAD
+==================================================
+
+La duración debe derivarse de:
+
+TRAMOS DE SESIÓN
+
+NO de:
+
+- fechas de OT;
+- estado de OT;
+- bitácora;
+- Timeline;
+- timestamps de sincronización.
+
+Estos pueden utilizarse para contraste/diagnóstico.
+
+==================================================
+24. WORKFLOW
+==================================================
+
+No modificar Workflow Engine.
+
+No crear una segunda máquina de estados de la OT.
+
+La sesión es un concepto operacional compuesto.
+
+Si el estado de OT debe condicionar el inicio/cierre:
+
+utilizar el contrato existente.
+
+No modificar las transiciones de OT en esta fase salvo que sea estrictamente imprescindible y previamente justificado.
+
+==================================================
+25. TIMELINE
+==================================================
+
+Publicar eventos de sesión utilizando Shared Timeline existente.
+
+Por ejemplo:
+
+▶ Sesión iniciada
+⏸ Sesión pausada
+▶ Sesión reanudada
+■ Sesión finalizada
+
+La Timeline es una representación histórica.
+
+No utilizarla como fuente de cálculo.
+
+==================================================
+26. AUDITORÍA
+==================================================
+
+Cada operación debe conservar:
+
+- quién;
+- qué;
+- cuándo ocurrió;
+- cuándo se registró;
+- sobre qué OT;
+- sobre qué activo;
+- tenant;
+- opId;
+- origen.
+
+Debe ser posible reconstruir una sesión sin depender de logs efímeros.
+
+==================================================
+27. SEGURIDAD
+==================================================
+
+Backend como única autoridad.
+
+Probar:
+
+Técnico A
+→ OT A
+→ puede abrir sesión.
+
+Técnico A
+→ OT B asignada a Técnico B
+→ rechazo.
+
+Consulta
+→ abrir sesión
+→ rechazo.
+
+Tenant A
+→ OT Tenant B
+→ rechazo.
+
+Identity A
+→ OT Tenant B
+→ rechazo.
+
+Manipulación de identityId desde frontend
+→ rechazo.
+
+==================================================
+28. EXPERIENCIA DE USUARIO
+==================================================
+
+Integrar la funcionalidad dentro de la experiencia existente de Órdenes.
+
+No crear una aplicación paralela.
+
+Para TECNICO:
+
+Cuando tenga una OT asignada:
+
+[INICIAR TRABAJO]
+
+Durante trabajo:
+
+[PAUSAR]
+[FINALIZAR]
+
+Durante pausa:
+
+[REANUDAR]
+
+Mostrar siempre:
+
+- estado de sesión;
+- tiempo efectivo;
+- tiempo pausado;
+- tiempo transcurrido.
+
+La interfaz debe ser muy clara y usable a 390px.
+
+==================================================
+29. EXPERIENCIA MÓVIL
+==================================================
+
+Prioridad alta.
+
+En móvil:
+
+- botón principal grande;
+- estado claramente visible;
+- cronómetro/tiempo legible;
+- acciones ≥48px;
+- sin overflow;
+- no exigir tablas.
+
+Ejemplo conceptual:
+
+--------------------------------
+OT-000125
+
+CAT 950M
+
+🟢 TRABAJANDO
+
+Tiempo efectivo
+02:23:14
+
+Tiempo pausado
+00:15:00
+
+[ PAUSAR ]
+
+[ FINALIZAR ]
+--------------------------------
+
+No copiar literalmente este diseño.
+
+Utilizar el Design System existente.
+
+==================================================
+30. EXPERIENCIA DESKTOP
+==================================================
+
+En desktop:
+
+mostrar información contextual adicional:
+
+- OT;
+- activo;
+- técnico;
+- estado;
+- sesión actual;
+- resumen;
+- historial de sesiones;
+- Timeline.
+
+No crear dashboard independiente.
+
+==================================================
+31. PERMISOS
+==================================================
+
+No crear permisos nuevos salvo necesidad estrictamente justificada.
+
+Utilizar capacidades existentes de Órdenes.
+
+La sesión debe respetar:
+
+- asignación;
+- capacidad de operar;
+- tenant;
+- estado de identidad.
+
+CONSULTA:
+
+solo lectura.
+
+TECNICO:
+
+operación de su sesión.
+
+SUPERVISOR/TENANT_ADMIN:
+
+según capacidades existentes.
+
+No inventar privilegios.
+
+==================================================
+32. MULTITENANCY
+==================================================
+
+Todas las sesiones deben estar tenant-scoped.
+
+Nunca confiar en tenantId enviado por frontend.
+
+RLS debe proteger:
+
+- sesiones;
+- tramos;
+- read models.
+
+Probar explícitamente cross-tenant.
+
+==================================================
+33. MIGRACIÓN / DATOS EXISTENTES
+==================================================
+
+No intentar reconstruir sesiones históricas de OTs antiguas.
+
+DGP-020 Discovery determinó que no existe información suficientemente confiable.
+
+Las sesiones comienzan a existir desde la activación del nuevo mecanismo.
+
+No inventar horas históricas.
+
+No recalcular tiempos antiguos con timestamps de servidor.
+
+==================================================
+34. RELACIÓN CON UTILIZACIÓN
+==================================================
+
+La sesión debe conservar:
+
+activoId.
+
+NO modificar todavía module-utilizacion.
+
+No calcular disponibilidad del activo en esta fase.
+
+No calcular utilización global.
+
+Solamente dejar disponible:
+
+OT
+→ activo
+→ sesión
+→ tiempo.
+
+DGP-019 y module-utilizacion deben permanecer funcionales.
+
+==================================================
+35. RELACIÓN CON COSTOS
+==================================================
+
+NO implementar costos.
+
+Pero dejar disponible la información necesaria para una futura fase:
+
+OT
+→ identityId
+→ tiempo efectivo
+→ activoId.
+
+Esto será utilizado posteriormente por DGP-020.3 / DGP-021.
+
+==================================================
+36. CONTRATOS Y OPENAPI
+==================================================
+
+Todo endpoint/comando nuevo debe:
+
+- tener contrato;
+- validación;
+- tenant isolation;
+- RBAC;
+- OpenAPI;
+- drift test.
+
+No exponer endpoints experimentales.
+
+==================================================
+37. TESTS OBLIGATORIOS
+==================================================
+
+Crear tests para:
+
+1. Abrir sesión.
+2. Pausar.
+3. Reanudar.
+4. Cerrar.
+5. Múltiples pausas.
+6. Cálculo de tiempo efectivo.
+7. Cálculo de tiempo pausado.
+8. Tiempo transcurrido.
+9. Sesión abierta.
+10. Operación inválida.
+11. Pausar sin sesión.
+12. Reanudar sin pausa.
+13. Cerrar sin sesión.
+14. Doble operación.
+15. Idempotencia.
+16. Concurrencia real PG.
+17. Offline.
+18. Sincronización.
+19. Conflicto offline.
+20. IdentityId.
+21. Cross-tenant.
+22. RBAC.
+23. Manipulación frontend.
+24. Read models.
+25. Timeline.
+26. Refresh.
+27. Logout/re-login.
+
+==================================================
+38. E2E REAL
+==================================================
+
+Validar con navegador real:
+
+TENANT_ADMIN
+SUPERVISOR
+TECNICO
+CONSULTA
+
+Casos:
+
+TECNICO asignado:
+→ abrir
+→ pausar
+→ reanudar
+→ cerrar
+→ verificar tiempos.
+
+TECNICO no asignado:
+→ no puede iniciar sesión.
+
+CONSULTA:
+→ puede consultar
+→ no puede iniciar/pausar/cerrar.
+
+SUPERVISOR:
+→ comportamiento según capacidades reales.
+
+Verificar:
+
+- refresh;
+- logout;
+- re-login;
+- cambio de identidad;
+- persistencia;
+- sin datos residuales.
+
+==================================================
+39. OFFLINE E2E
+==================================================
+
+Realizar al menos una prueba real de:
+
+ABRIR offline
+→ PAUSAR offline
+→ REANUDAR offline
+→ CERRAR offline
+→ recuperar conexión
+→ sincronizar.
+
+Verificar que:
+
+ocurridoAt ≠ registradoAt
+
+cuando exista diferencia de tiempo.
+
+Verificar que los tiempos calculados correspondan a los timestamps de campo.
+
+No aceptar un PASS basado únicamente en mocks.
+
+==================================================
+40. RESPONSIVE
+==================================================
+
+Verificar:
+
+1280px
+768px
+390px
+
+Sin:
+
+- overflow;
+- botones pequeños;
+- texto cortado;
+- controles inaccesibles.
+
+==================================================
+41. TEMA
+==================================================
+
+Respetar:
+
+Claro
+Oscuro
+Automático
+
+No crear ThemeProvider local.
+
+No fijar:
+
+data-do-theme="light"
+
+==================================================
+42. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Ronda 1 debe buscar especialmente:
+
+- uso incorrecto de timestamps;
+- derivación desde Workflow;
+- pérdida de ocurridoAt;
+- identidad manipulable;
+- cross-tenant;
+- sesiones duplicadas;
+- solapes;
+- idempotencia insegura;
+- bypass RBAC;
+- acceso directo a tablas de identidad;
+- duplicación de cola offline;
+- cálculo de duración en frontend;
+- modificación indebida de Workflow.
+
+Corregir hallazgos.
+
+Ronda 2 debe finalizar:
+
+PASS
+
+sin CRÍTICOS ni MAYORES.
+
+==================================================
+43. REVISIÓN VISUAL
+==================================================
+
+Evaluar:
+
+- claridad;
+- jerarquía;
+- facilidad de uso para técnico;
+- visibilidad del estado;
+- botones;
+- móvil;
+- claro/oscuro;
+- consistencia con DeltaOps.
+
+La funcionalidad debe ser entendible sin capacitación extensa.
+
+==================================================
+44. CALIDAD
+==================================================
+
+Antes de declarar cierre:
+
+- tests PASS;
+- 0 skipped;
+- typecheck PASS;
+- build PASS;
+- OpenAPI PASS;
+- drift PASS;
+- migraciones PASS;
+- RLS PASS;
+- E2E PASS;
+- offline PASS;
+- revisión arquitectónica PASS;
+- revisión visual PASS.
+
+==================================================
+45. GOBIERNO
+==================================================
+
+Si para implementar esto se necesita modificar:
+
+- Workflow Engine;
+- Identity;
+- RLS;
+- Activos;
+- module-utilizacion;
+- contratos congelados;
+
+DETENERSE.
+
+Documentar el GAP.
+
+No realizar cambios estructurales por iniciativa propia.
+
+==================================================
+46. INFORME DE CIERRE
+==================================================
+
+Entregar:
+
+# INFORME OFICIAL DE CIERRE — DGP-020.2
+
+Debe incluir:
+
+1. Modelo de sesiones.
+2. Tramos.
+3. Comandos.
+4. Estados.
+5. Fuente de verdad.
+6. Timestamps.
+7. Política de reloj.
+8. Idempotencia.
+9. Concurrencia.
+10. Offline.
+11. Sincronización.
+12. Read models.
+13. Duraciones.
+14. Identidad.
+15. RBAC.
+16. RLS.
+17. Timeline.
+18. UX.
+19. Responsive.
+20. Tema.
+21. Tests.
+22. E2E.
+23. Offline E2E.
+24. Revisión arquitectónica.
+25. Revisión visual.
+26. Gaps.
+27. Deuda técnica.
+28. Migraciones.
+29. Commits.
+
+==================================================
+47. CRITERIO DE CIERRE
+==================================================
+
+DGP-020.2 solo queda CERRADO cuando:
+
+SESIONES REALES IMPLEMENTADAS
++
+TRAMOS APPEND-ONLY
++
+OCURRIDO_AT CONSERVADO
++
+REGISTRADO_AT CONSERVADO
++
+TIEMPO EFECTIVO CORRECTO
++
+TIEMPO PAUSADO CORRECTO
++
+TIEMPO TRANSCURRIDO CORRECTO
++
+IDENTITY_ID CORRECTO
++
+OT CORRECTA
++
+ACTIVO CORRECTO
++
+OFFLINE FUNCIONAL
++
+IDEMPOTENCIA
++
+CONCURRENCIA
++
+RLS
++
+RBAC
++
+TIMELINE
++
+E2E REAL
++
+RESPONSIVE
++
+REVISIÓN VISUAL PASS
++
+REVISIÓN ARQUITECTÓNICA PASS
++
+TESTS PASS
++
+BUILD PASS
+
+No iniciar DGP-020.3 automáticamente.
+
+Esperar aprobación explícita de la Dirección.
+
+==================================================
+REGLA FINAL DE DIRECCIÓN
+==================================================
+
+No queremos "un cronómetro".
+
+Queremos un REGISTRO OPERACIONAL AUDITABLE DEL TRABAJO.
+
+Debe poder responderse con evidencia:
+
+¿Quién trabajó?
+¿Sobre qué OT?
+¿Sobre qué activo?
+¿Cuándo empezó realmente?
+¿Cuándo pausó?
+¿Cuándo retomó?
+¿Cuándo terminó?
+¿Cuánto tiempo estuvo trabajando?
+¿Cuánto tiempo estuvo detenido?
+¿Cuándo llegó la información al servidor?
+¿La operación ocurrió offline?
+¿El dato fue modificado o duplicado?
+
+Si la arquitectura no puede responder esas preguntas de manera confiable:
+
+NO declarar PASS.
+
+La prioridad es la integridad del dato, no la velocidad de implementación.

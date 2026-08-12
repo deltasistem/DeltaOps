@@ -42,11 +42,23 @@ import type {
   ProyeccionesStore,
   RelacionRow,
 } from "./infrastructure/operacional";
+import {
+  SESION_CERRADA,
+  SESION_INICIADA,
+  SESION_PAUSADA,
+  SESION_REANUDADA,
+  calcularDuraciones,
+  type EstadoSesion,
+  type Tramo,
+} from "./domain/sesion";
+import type { SesionStore } from "./infrastructure/sesiones";
 
 /** Adaptadores que la proyección necesita (subconjunto de ModuleAdapters). */
 export interface ProyeccionAdapters {
   readonly readModel: OrdenReadModel;
   readonly proyecciones: ProyeccionesStore;
+  /** DGP-020.2 — Read models de sesiones/tramos/duraciones. */
+  readonly sesiones: SesionStore;
 }
 
 export interface EventoLike {
@@ -383,13 +395,96 @@ async function histOperacional(
   return r.ok ? ok(undefined) : r;
 }
 
-/* ----------------------------- Handler wrapper --------------------------- */
+/* ----------------------------- Sesiones (DGP-020.2) ---------------------- */
 
 /**
- * Crea el handler de proyección para un evento (aggregate u operacional). Abre
- * su propia UoW de sistema tenant-scoped y aplica idempotentemente.
+ * Proyecta un evento de SESIÓN a los read models (`ord_sesiones_read`,
+ * `ord_sesion_tramos_read`, `ord_sesion_duraciones_read`). Payload-only e
+ * idempotente. La DURACIÓN se recalcula EXCLUSIVAMENTE desde los tramos
+ * append-only (fuente de verdad, ya confirmados en la UoW del comando), NUNCA
+ * desde el workflow/bitácora/Timeline. Para una sesión abierta se usa el
+ * `registradoAt` del evento como frontera "hasta ahora" (determinista en replay).
  */
-export function handlerProyeccion(adapters: ProyeccionAdapters, esOperacional: boolean) {
+export async function aplicarEventoSesion(
+  adapters: ProyeccionAdapters,
+  uow: UnitOfWork,
+  ev: EventoLike,
+): Promise<Result<void, KernelError>> {
+  const p = ev.payload;
+  const tenantId = String(p["tenantId"] ?? "");
+  const sesionId = String(p["sesionId"] ?? "");
+  const ordenId = String(p["ordenId"] ?? "");
+  if (!tenantId || !sesionId || !ordenId) return ok(undefined);
+
+  const estado = String(p["estado"] ?? "ABIERTA") as EstadoSesion;
+  const activoId = s(p["activoId"]);
+  const identityId = String(p["identityId"] ?? "");
+  const origen = String(p["origen"] ?? "online");
+  const iniciadoAt = new Date(String(p["iniciadoAt"] ?? p["ocurridoAt"] ?? new Date().toISOString()));
+  const cerradoAt = ev.type === SESION_CERRADA ? new Date(String(p["cerradoAt"] ?? p["ocurridoAt"])) : null;
+  const registradoAt = new Date(String(p["registradoAt"] ?? new Date().toISOString()));
+
+  // Cabecera FUENTE DE VERDAD: da estado/cerradoAt/iniciadoAt definitivos, para
+  // que la proyección converja igual sea cual sea el orden de replay.
+  const cabR = await adapters.sesiones.getCabecera(tenantId, sesionId);
+  if (!cabR.ok) return cabR;
+  const cab = cabR.value;
+  const estadoActual = cab ? cab.estado : estado;
+  const cerradoActual = cab ? cab.cerradoAt : cerradoAt;
+  const iniciadoActual = cab ? cab.iniciadoAt : iniciadoAt;
+
+  // 1) Cabecera de sesión (upsert idempotente por (tenant, id) con guarda de evento).
+  const sr = await adapters.sesiones.aplicarSesionRead(uow, tenantId, {
+    id: sesionId, ordenId, activoId, identityId, estado: estadoActual, origen,
+    iniciadoAt: iniciadoActual, cerradoAt: cerradoActual, registradoAt, lastEventId: ev.id, actualizadoAt: registradoAt,
+  });
+  if (!sr.ok) return sr;
+
+  // 2) Tramo append-only (una fila por evento; idempotente por event_id).
+  const tr = await adapters.sesiones.aplicarTramoRead(uow, tenantId, {
+    eventId: ev.id, sesionId, ordenId,
+    secuencia: Number(p["secuencia"] ?? 0),
+    tipo: String(p["tipoTramo"] ?? "trabajo"),
+    origen: String(p["origenTramo"] ?? "iniciar"),
+    ocurridoAt: new Date(String(p["ocurridoAt"] ?? iniciadoAt.toISOString())),
+    registradoAt,
+    anomaliaReloj: (p["anomaliaReloj"] as Tramo["anomaliaReloj"]) ?? null,
+    identityId,
+  });
+  if (!tr.ok) return tr;
+
+  // 3) DURACIONES recalculadas SÓLO desde los tramos append-only (fuente de
+  //    verdad) y la CABECERA fuente-de-verdad (estado/cerradoAt); la proyección
+  //    es ORDEN-INDEPENDIENTE en replay: converge al mismo valor cualquiera que
+  //    sea el orden de aplicación de los eventos.
+  const tramosR = await adapters.sesiones.tramosDe(tenantId, sesionId);
+  if (!tramosR.ok) return tramosR;
+  const tramos: Tramo[] = tramosR.value.map((t) => ({
+    sesionId: t.sesionId, secuencia: t.secuencia, tipo: t.tipo, origen: t.origen,
+    ocurridoAt: t.ocurridoAt, registradoAt: t.registradoAt, anomaliaReloj: t.anomaliaReloj,
+  }));
+  const dur = calcularDuraciones(tramos, cerradoActual, registradoAt);
+  const dr = await adapters.sesiones.aplicarDuracionesRead(uow, tenantId, {
+    sesionId, ordenId, activoId, identityId, estado: estadoActual,
+    efectivoMs: dur.efectivoMs, pausadoMs: dur.pausadoMs, transcurridoMs: dur.transcurridoMs,
+    pausas: dur.pausas, abierta: dur.abierta, iniciadoAt: iniciadoActual, cerradoAt: cerradoActual,
+    lastEventId: ev.id, actualizadoAt: registradoAt,
+  });
+  if (!dr.ok) return dr;
+  void SESION_INICIADA; void SESION_PAUSADA; void SESION_REANUDADA;
+  return ok(undefined);
+}
+
+/* ----------------------------- Handler wrapper --------------------------- */
+
+export type ModoProyeccion = "aggregate" | "operacional" | "sesion";
+
+/**
+ * Crea el handler de proyección para un evento (aggregate, operacional o
+ * sesión). Abre su propia UoW de sistema tenant-scoped y aplica idempotentemente.
+ */
+export function handlerProyeccion(adapters: ProyeccionAdapters, modo: ModoProyeccion | boolean) {
+  const m: ModoProyeccion = modo === true ? "operacional" : modo === false ? "aggregate" : modo;
   return (deps: ServiceDeps) =>
     async (event: { id: string; payload: Record<string, unknown> }, eventType: string): Promise<Result<void, KernelError>> => {
       const tenantId = String(event.payload["tenantId"] ?? "");
@@ -397,9 +492,11 @@ export function handlerProyeccion(adapters: ProyeccionAdapters, esOperacional: b
       const uowPort = deps.runtime.container.resolve(KernelTokens.unitOfWork);
       const ctx = createExecutionContext({ principal: SYSTEM_PRINCIPAL, metadata: { tenantId } });
       const applied = await uowPort.execute(ctx, (uow) =>
-        esOperacional
-          ? aplicarEventoOperacional(adapters, uow, { ...event, type: eventType })
-          : aplicarEventoAggregate(adapters, uow, { ...event, type: eventType }),
+        m === "sesion"
+          ? aplicarEventoSesion(adapters, uow, { ...event, type: eventType })
+          : m === "operacional"
+            ? aplicarEventoOperacional(adapters, uow, { ...event, type: eventType })
+            : aplicarEventoAggregate(adapters, uow, { ...event, type: eventType }),
       );
       return applied.ok ? ok(undefined) : applied;
     };
