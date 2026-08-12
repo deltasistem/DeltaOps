@@ -59,7 +59,8 @@ Distinción central verificada: el corpus tiene **referencia de artículo** y **
 - Naturaleza del costo: **comprometido = PARCIAL** (total de OC por estado, sin ledger); **recibido = CONFIRMADO** (cost-engine); **adquirido/facturado = NO EXISTE** (sin facturas); **consumido = NO EXISTE** (el consumo ocurre en inventario, sin costo).
 - Relación con inventario: recepción→inventario solo vía comando explícito `abastecimiento.materializar-recepcion` → `materializador.ingresar` idempotente con costo unitario/moneda y dedup durable (`module.ts:1327-1403`) — **CONFIRMADA condicional**, no automática. **Este es el único punto del corpus donde un costo unitario viaja hacia un movimiento de inventario** (entrada; nunca salida).
 - Compra→OT: PARCIAL (origen opaco `orden-trabajo` en solicitud, sin FK); compra→activo: NO EXISTE (GAP-COST-03).
-- **Riesgo de precisión:** el VO `Dinero` del dominio usa `number` JS con redondeo (`value-objects.ts:18-40`) aunque persista `numeric`. Divergente del patrón string/BigInt de mano de obra. Cualquier composición de costos DEBE tratar los montos de abastecimiento como cadenas leídas de PG, no re-aritmetizar con floats (GAP-COST-10).
+- **Riesgo de precisión:** el VO `Dinero` del dominio usa `number` JS con redondeo (`value-objects.ts:18-40`) aunque persista `numeric`. Divergente del patrón string/BigInt de mano de obra (GAP-COST-10).
+- **GAP-COST-14 (BLOQUEANTE para materiales):** hoy **no existe camino permitido para obtener el costo de referencia con precisión exacta**. La única query pública de costos, `modulo.abastecimiento.costos`, devuelve `costoUnitario` y cantidades como `number` JS (`module.ts:1667-1680`) — consumirla reintroduce la contaminación float; y `abs_costos_read` es un read model **interno** de abastecimiento, prohibido para lectura cross-módulo por otro módulo. El snapshot de costo del consumo de materiales requiere primero un contrato público de costos en cadena decimal canónica (o una excepción §45 aprobada por Dirección), documentado como prerrequisito de fase en §19.
 
 ### 4.4 Combustible (contrastado con DGP-019) — HECHO SNAPSHOT CONFIRMADO, MONEDA DÉBIL
 
@@ -127,7 +128,7 @@ Existen en el corpus, con evidencia: **estimado** (costoEstimado de OT; costo es
 
 Un módulo nuevo `lib/module-costos` con **dos responsabilidades estrictamente separadas**:
 
-1. **Materializar SOLO los hechos económicos que no existen en ninguna fuente** — inicialmente el **consumo valorizado de repuestos**: hecho snapshot `CONSUMO_MATERIAL` (tenantId, hechoId, origen=`inventario`, ordenId, activoId, itemId, cantidad, unidad, costoUnitario snapshot desde `abs_costos_read` al momento del consumo, costoTotal, moneda, identityId, opId, estado, referencia al movimiento físico, timestamps). Creado por **orquestación en api-server** tras el drain del comando de salida/consumo de inventario (patrón fail-safe + comando idempotente + query de pendientes, idéntico a DGP-020.3). La devolución genera un hecho **compensatorio negativo referenciando el hecho original** (nunca edición del snapshot).
+1. **Materializar SOLO los hechos económicos que no existen en ninguna fuente** — inicialmente el **consumo valorizado de repuestos**: hecho snapshot `CONSUMO_MATERIAL` (tenantId, hechoId, origen=`inventario`, ordenId, activoId, itemId, cantidad, unidad, costoUnitario snapshot al momento del consumo, costoTotal, moneda, identityId, opId, estado, referencia al movimiento físico, timestamps). El costo de referencia se obtiene **únicamente vía un contrato público de abastecimiento en cadena decimal canónica que HOY NO EXISTE** (GAP-COST-14, prerrequisito de §19); queda **prohibido** leer `abs_costos_read` directamente desde otro módulo y prohibido consumir la query pública actual mientras exponga `number` JS. Creado por **orquestación en api-server** tras el drain del comando de salida/consumo de inventario (patrón fail-safe + comando idempotente + query de pendientes, idéntico a DGP-020.3). La devolución genera un hecho **compensatorio negativo referenciando el hecho original** (nunca edición del snapshot).
 2. **Componer, sin copiar, los hechos que ya existen**: valoraciones de mano de obra y tanqueos se consultan por sus queries públicas y se agregan en read models de composición (`costo por OT`, `costo acumulado por activo`, `costo por período`) que almacenan referencias + totales por moneda + componentes con nivel de confianza, recalculables desde las fuentes (no fuente de verdad paralela).
 
 La entidad genérica «HECHO ECONÓMICO» de §9 **se adopta como contrato interno del módulo de costos únicamente para los hechos que él origina** (hoy: consumo de materiales; mañana: otros costos). **No** se re-modelan valoraciones ni tanqueos como hechos económicos duplicados: ya son snapshots auditables en sus módulos y duplicarlos crearía dos fuentes de verdad.
@@ -238,11 +239,12 @@ No se asume «OT abierta = activo fuera de servicio». El corpus no registra par
 | GAP-COST-11 OT sin activo principal | **NUEVO** — activo opcional/editable ⇒ costos no atribuibles a activo | §4.5 |
 | GAP-COST-12 Consumo de repuestos offline | **NUEVO** — salidas de inventario no están en el catálogo offline | §10 |
 | GAP-COST-13 Unidad en movimientos | **NUEVO** — movimiento aplica unidad base implícita; el hecho económico debe copiar la unidad snapshot | §4.2 |
+| GAP-COST-14 Contrato público de costos con precisión exacta | **NUEVO — BLOQUEANTE** — `modulo.abastecimiento.costos` expone floats JS (`module.ts:1667-1680`); `abs_costos_read` es interno; sin contrato string-decimal no hay snapshot legal de costo de materiales | §4.3, §7.2 |
 
 ## 18. Riesgos
 
 1. Doble fuente de verdad si el módulo de costos copia hechos ya snapshot (mitigación: componer, no copiar — §7.2).
-2. Floats de abastecimiento contaminando composición (mitigación: frontera string desde PG, patrón DGP-020.3).
+2. Floats de abastecimiento contaminando composición: la query pública actual ya es float y no hay fuente exacta accesible (GAP-COST-14). Mitigación única válida: nuevo contrato público string-decimal (decisión de Dirección) antes de cualquier snapshot de materiales; jamás adaptadores provisionales sobre tablas internas ajenas.
 3. Monedas mixtas silenciosamente sumadas (mitigación: agregación por moneda, nunca conversión).
 4. `costoReal` manual conviviendo con costo compuesto y confundiendo al usuario (decisión de Dirección pendiente).
 5. Fan-out de composición sobre activos con muchas OTs (mitigación: read models de composición recalculables, no consultas en caliente).
@@ -250,13 +252,14 @@ No se asume «OT abierta = activo fuera de servicio». El corpus no registra par
 
 ## 19. Fases futuras propuestas (§24) — derivadas de los gaps
 
-1. **DGP-021.1 — Fundación de hechos económicos (module-costos)**: hecho `CONSUMO_MATERIAL` snapshot + estados económicos mínimos + RLS + OpenAPI + reproceso/pendientes. Depende de: nada nuevo (patrones existentes). Ataca GAP-COST-02/-13.
-2. **DGP-021.2 — Atribución e integración de inventario**: camino oficial «consumir para OT» (orquestación post-drain sobre salida/consumo con referencia OT + activo derivado de la OT; devolución compensatoria). Depende de 021.1. Ataca GAP-COST-01/-08 (materiales); decide GAP-COST-12 (offline).
+0. **DGP-021.0 — Contrato público exacto de costos de abastecimiento (PRERREQUISITO BLOQUEANTE)**: exponer costos de referencia (promedio/último/estándar, cantidad, moneda) como cadenas decimales canónicas leídas de `numeric` sin pasar por el VO float, vía query pública nueva del propio module-abastecimiento (módulo congelado ⇒ **requiere excepción §45 aprobada por Dirección**; alcance mínimo: solo lectura, aditivo, sin tocar dominio ni cost-engine). Sin esta fase, 021.1–021.2 no pueden snapshotear costos de materiales. Resuelve GAP-COST-14.
+1. **DGP-021.1 — Fundación de hechos económicos (module-costos)**: hecho `CONSUMO_MATERIAL` snapshot + estados económicos mínimos + RLS + OpenAPI + reproceso/pendientes. Depende de **021.0**. Ataca GAP-COST-02/-13.
+2. **DGP-021.2 — Atribución e integración de inventario**: camino oficial «consumir para OT» (orquestación post-drain sobre salida/consumo con referencia OT + activo derivado de la OT; devolución compensatoria). Depende de 021.0–021.1. Ataca GAP-COST-01/-08 (materiales); decide GAP-COST-12 (offline).
 3. **DGP-021.3 — Composición costo OT / costo activo**: read models de composición por moneda + integración combustible al costo de activo + estimado-vs-compuesto. Depende de 021.1–2 (parcial solo-mano-de-obra posible antes, etiquetada). Ataca GAP-COST-05 parcialmente.
 4. **DGP-021.4 — Costo por hora/km y datasets Analytics**: composición con denominadores de utilización (`sin-datos` estricto) + registro de fuentes Analytics. Depende de 021.3. Ataca GAP-COST-07.
 5. **Fuera de secuencia (requieren decisión/contratos nuevos)**: moneda por defecto en tanqueos (§45), disponibilidad/downtime (GAP-COST-06), otros costos (GAP-COST-09), facturación.
 
-Bloqueantes transversales: ninguno técnico para 021.1–021.4; sí decisiones de Dirección (§21 abajo).
+Bloqueantes transversales: **GAP-COST-14 bloquea 021.1–021.4 en su componente de materiales** (021.0 lo resuelve, previa excepción §45); la composición solo-mano-de-obra + combustible de 021.3–021.4 no está bloqueada. Resto: decisiones de Dirección (§21).
 
 ## 20. Criterios de aceptación (§25) — verificación
 
@@ -269,4 +272,5 @@ Bloqueantes transversales: ninguno técnico para 021.1–021.4; sí decisiones d
 3. ¿Excepción §45 para que el tanqueo herede la moneda del tenant por defecto, o convivir con moneda opcional documentada?
 4. ¿Priorizar el consumo de repuestos offline (GAP-COST-12) en 021.2 o diferirlo?
 5. ¿Qué costo de referencia usar como snapshot del consumo: promedio ponderado (recomendado, es el que mantiene el cost-engine), último costo o estándar?
-6. Confirmar que combustible se atribuye al activo (no a la OT) y que facturación/impuestos/conversión de moneda quedan fuera del programa hasta nueva directiva.
+6. **Aprobar la excepción §45 para DGP-021.0** (query pública aditiva de costos exactos en module-abastecimiento) — sin ella no existe camino legal hacia el costo de materiales.
+7. Confirmar que combustible se atribuye al activo (no a la OT) y que facturación/impuestos/conversión de moneda quedan fuera del programa hasta nueva directiva.
