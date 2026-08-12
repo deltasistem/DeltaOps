@@ -1,0 +1,728 @@
+DIRECTIVA DE DIRECCIÓN — DGP-020.1
+CONTRATO DE IDENTIDAD EN ASIGNACIÓN DE ÓRDENES DE TRABAJO
+
+Programa DeltaOps
+
+ESTADO DEL PROGRAMA
+
+DGP-020 — Discovery: CERRADO / PASS.
+
+El Discovery confirmó:
+
+- `asignado_id` actualmente es texto libre.
+- No existe FK ni validación fuerte contra la identidad canónica.
+- Órdenes no dispone actualmente de un puerto de Identidad.
+- G-1 de DGP-018 continúa vigente.
+- La asignación fuerte por `identityId` es prerrequisito para:
+  - Mis órdenes;
+  - duración real;
+  - trazabilidad de técnicos;
+  - mano de obra;
+  - costos;
+  - productividad.
+
+DGP-020.1 queda AUTORIZADO para implementación.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Resolver G-1 de forma arquitectónicamente correcta.
+
+Una Orden de Trabajo debe poder identificar de manera inequívoca al responsable/técnico asignado mediante la identidad canónica de DeltaOps.
+
+Debe existir una relación fuerte:
+
+OT
+↓
+identityId
+↓
+idn_identities / identidad canónica
+
+El objetivo NO es crear un nuevo sistema de usuarios.
+
+El objetivo NO es importar usuarios de Microsoft 365.
+
+El objetivo NO es modificar el modelo de autenticación.
+
+El objetivo es que Órdenes pueda decir:
+
+"Esta OT está asignada a esta identidad DeltaOps."
+
+==================================================
+2. PRINCIPIO FUNDAMENTAL
+==================================================
+
+IDENTIDAD DELTAOPS ES LA ÚNICA FUENTE DE VERDAD.
+
+No utilizar:
+
+- Microsoft Entra ID;
+- Microsoft Graph;
+- correo electrónico como identificador;
+- nombre del usuario;
+- texto libre;
+- username como clave de negocio.
+
+El identificador canónico debe ser `identityId` o el identificador equivalente ya definido por el contrato de identidad.
+
+No inventar otro identificador.
+
+==================================================
+3. AUDITAR PRIMERO
+==================================================
+
+Antes de modificar el código, inspeccionar el corpus real y determinar:
+
+- estructura actual de `asignado_id`;
+- dónde se escribe;
+- dónde se lee;
+- qué comandos lo reciben;
+- qué read models lo exponen;
+- qué frontend lo utiliza;
+- qué tests dependen de él;
+- qué rutas lo utilizan;
+- cómo se representan actualmente los responsables;
+- cómo se resuelve actualmente la identidad autenticada.
+
+No asumir.
+
+Documentar exactamente qué componentes serán afectados.
+
+Si existe un patrón canónico de referencia a identidad en otro módulo, reutilizarlo.
+
+No crear un patrón paralelo.
+
+==================================================
+4. PUERTO DE IDENTIDAD
+==================================================
+
+Si el módulo Órdenes necesita consultar identidad para validar una asignación:
+
+crear o utilizar el mecanismo arquitectónico mínimo necesario.
+
+Preferencia:
+
+Órdenes
+→ puerto/adaptador de identidad
+→ identidad canónica
+
+No permitir:
+
+Órdenes
+→ acceso directo a tablas internas de identidad
+
+si eso viola las reglas arquitectónicas existentes.
+
+Si ya existe un puerto de identidad reutilizable:
+
+UTILIZARLO.
+
+No duplicarlo.
+
+==================================================
+5. MODELO DE ASIGNACIÓN
+==================================================
+
+La asignación debe quedar representada con un identificador canónico.
+
+Evaluar la mejor solución entre:
+
+A. reemplazar `asignado_id`;
+
+B. introducir `asignado_identity_id`;
+
+C. mantener compatibilidad temporal y agregar el nuevo campo.
+
+Elegir según el contrato real existente y justificar la decisión.
+
+No romper consumidores innecesariamente.
+
+La solución final debe evitar que una OT pueda quedar asignada únicamente mediante texto libre.
+
+==================================================
+6. VALIDACIÓN
+==================================================
+
+Al asignar una OT:
+
+1. Obtener identidad canónica.
+2. Verificar que existe.
+3. Verificar que está activa.
+4. Verificar que pertenece al tenant correcto.
+5. Verificar que tiene las condiciones/capacidades necesarias para ser asignada según las reglas actuales.
+6. Persistir `identityId`.
+
+Nunca confiar en un `tenantId` enviado desde frontend.
+
+El tenant debe derivarse del contexto autenticado/backend.
+
+==================================================
+7. TENANT ISOLATION
+==================================================
+
+CRÍTICO.
+
+No permitir:
+
+Tenant A
+→ asignar OT
+→ identidad perteneciente a Tenant B.
+
+La validación debe comprobar pertenencia de la identidad al mismo tenant de la OT.
+
+Debe existir una prueba explícita de este escenario.
+
+==================================================
+8. ESTADO DE IDENTIDAD
+==================================================
+
+Determinar qué estados de identidad/membresía existen realmente.
+
+Una identidad:
+
+- inexistente;
+- inactiva;
+- suspendida;
+- sin membresía vigente;
+
+no debe poder recibir una nueva asignación si el contrato actual lo impide.
+
+No inventar estados.
+
+Utilizar el modelo canónico existente.
+
+==================================================
+9. CAMBIO DE ASIGNACIÓN
+==================================================
+
+Debe soportarse de manera auditable:
+
+OT
+→ Técnico A
+
+posteriormente:
+
+OT
+→ Técnico B
+
+La operación debe conservar trazabilidad de:
+
+- quién realizó el cambio;
+- identidad anterior;
+- identidad nueva;
+- fecha/hora;
+- tenant;
+- correlación/opId según patrón existente.
+
+No destruir el historial.
+
+No utilizar solamente el estado final.
+
+==================================================
+10. DESASIGNACIÓN
+==================================================
+
+Determinar si el contrato actual permite desasignar una OT.
+
+Si existe:
+
+debe quedar auditado.
+
+Si no existe:
+
+NO inventar la funcionalidad.
+
+Documentar el GAP y detener únicamente esa parte.
+
+==================================================
+11. BACKWARD COMPATIBILITY
+==================================================
+
+Analizar las OTs existentes que actualmente tienen:
+
+`asignado_id`
+
+como texto.
+
+No borrar datos históricos.
+
+No convertir automáticamente texto en identidad mediante heurísticas como:
+
+- nombre;
+- email;
+- username.
+
+Si existe una correspondencia segura y determinista definida por el contrato, puede proponerse.
+
+Si no existe:
+
+mantener el histórico y documentar una estrategia de migración/regularización.
+
+IMPORTANTE:
+
+NO realizar migraciones destructivas.
+
+==================================================
+12. LECTURAS / READ MODELS
+==================================================
+
+Actualizar los read models necesarios para que puedan exponer:
+
+- `identityId`;
+- nombre visible;
+- email visible si el contrato lo permite;
+- información mínima necesaria para UI.
+
+El `identityId` es el identificador.
+
+El nombre/email son atributos de presentación.
+
+No utilizar nombre/email como clave.
+
+==================================================
+13. "MIS ÓRDENES"
+==================================================
+
+Este cambio debe dejar preparada la base para que posteriormente pueda existir:
+
+"Mis órdenes"
+
+mediante:
+
+identityId de sesión
+=
+identityId de asignación.
+
+NO implementar todavía el sistema completo de duración real de DGP-020.2.
+
+No mezclar responsabilidades.
+
+En esta fase únicamente debe quedar correctamente determinada la identidad asignada.
+
+==================================================
+14. FRONTEND
+==================================================
+
+Actualizar únicamente lo necesario.
+
+Al asignar una OT, el selector debe trabajar con identidades reales.
+
+No utilizar un input de texto libre para elegir técnico.
+
+La UI debe mostrar algo como:
+
+Carlos Pacheco
+Técnico de mantenimiento
+
+pero internamente enviar:
+
+identityId = ...
+
+No confiar en el nombre mostrado.
+
+Las capacidades actuales deben mantenerse.
+
+==================================================
+15. ROLES Y CAPACIDADES
+==================================================
+
+Mantener intacto el RBAC existente.
+
+No crear permisos nuevos salvo que sea estrictamente necesario.
+
+Si se requiere una capacidad nueva:
+
+- documentarla;
+- justificarla;
+- seguir el namespace canónico existente;
+- actualizar tests.
+
+No duplicar autorización.
+
+Backend continúa siendo la autoridad.
+
+==================================================
+16. MULTITENANCY Y RLS
+==================================================
+
+Mantener RLS.
+
+Toda consulta de identidades elegibles debe estar tenant-scoped.
+
+No permitir consultas globales desde un tenant.
+
+Probar explícitamente:
+
+Tenant A no puede:
+
+- listar identidades de B;
+- asignar una identidad de B;
+- modificar una OT de B.
+
+==================================================
+17. AUDITORÍA / TIMELINE
+==================================================
+
+Si el patrón actual de Órdenes ya publica eventos hacia Shared Timeline:
+
+la asignación/cambio de asignación debe utilizar ese mecanismo existente.
+
+No crear una timeline paralela.
+
+Si actualmente no existe un evento adecuado:
+
+documentar el gap.
+
+No inventar un sistema paralelo.
+
+==================================================
+18. OFFLINE
+==================================================
+
+Auditar si la asignación de OT puede ocurrir offline.
+
+Si actualmente NO puede:
+
+no inventar soporte offline.
+
+Si SÍ puede:
+
+garantizar que la operación conserve:
+
+- identityId;
+- tenant;
+- opId;
+- timestamp;
+- idempotencia.
+
+Documentar exactamente el comportamiento.
+
+==================================================
+19. MIGRACIÓN DE DATOS
+==================================================
+
+Debe existir una estrategia segura para datos existentes.
+
+Clasificar:
+
+A. OTs cuyo `asignado_id` puede mapearse de forma inequívoca.
+
+B. OTs cuyo responsable no puede determinarse.
+
+No utilizar heurísticas peligrosas.
+
+Los registros ambiguos deben quedar:
+
+"requiere regularización"
+
+o equivalente soportado por el dominio.
+
+NO inventar identidades.
+
+NO modificar silenciosamente históricos.
+
+==================================================
+20. SEGURIDAD
+==================================================
+
+Realizar pruebas de:
+
+1. Identidad válida.
+2. Identidad inexistente.
+3. Identidad inactiva.
+4. Identidad de otro tenant.
+5. Usuario sin capacidad.
+6. Usuario autorizado.
+7. Cambio de asignación.
+8. Desasignación si existe.
+9. Acceso directo por API.
+10. Manipulación del identityId desde frontend.
+
+El backend debe rechazar cualquier intento inválido.
+
+==================================================
+21. PRUEBAS OBLIGATORIAS
+==================================================
+
+Agregar tests unitarios/integración/e2e según corresponda para:
+
+- asignación válida;
+- persistencia de identityId;
+- lectura de identityId;
+- identidad inexistente;
+- identidad inactiva;
+- identidad de otro tenant;
+- usuario sin permisos;
+- cambio de responsable;
+- aislamiento tenant;
+- read model;
+- UI de selección;
+- refresh;
+- logout/re-login;
+- compatibilidad con OTs históricas.
+
+Especialmente:
+
+TENANT A
+OT-A
+IDENTIDAD-A
+
+debe funcionar.
+
+TENANT A
+OT-A
+IDENTIDAD-B de TENANT B
+
+debe fallar.
+
+==================================================
+22. CRITERIO DE NO DUPLICACIÓN
+==================================================
+
+NO crear:
+
+- nueva tabla de usuarios;
+- nueva tabla de técnicos independiente;
+- nuevo sistema de login;
+- nuevo RBAC;
+- nuevo tenant resolver;
+- nueva identidad;
+- nueva sesión.
+
+Todo debe utilizar los mecanismos canónicos de DeltaOps.
+
+==================================================
+23. COMPATIBILIDAD CON DGP-019
+==================================================
+
+No romper:
+
+- module-utilizacion;
+- Ficha Operacional 360°;
+- Offline;
+- Timeline;
+- QR;
+- Activos;
+- Inventario;
+- Planes;
+- Preventivo;
+- Correctivo.
+
+La nueva identidad debe quedar disponible para futuras fases.
+
+==================================================
+24. PREPARACIÓN PARA DGP-020.2
+==================================================
+
+La implementación debe dejar preparada la siguiente relación:
+
+identityId
++
+OT
++
+activoId
++
+timestamp de sesión
+
+para que DGP-020.2 pueda implementar posteriormente:
+
+- abrir sesión;
+- pausar;
+- reanudar;
+- cerrar;
+- tiempo efectivo;
+- tiempo pausado.
+
+NO implementar esas sesiones todavía.
+
+==================================================
+25. GOBIERNO DEL CAMBIO
+==================================================
+
+Si durante la implementación se descubre que para resolver G-1 correctamente es necesario modificar:
+
+- Identity;
+- Workflow Engine;
+- RLS;
+- contratos congelados;
+- módulo Activos;
+- module-utilizacion;
+
+DETENERSE.
+
+Documentar:
+
+- archivo;
+- contrato;
+- motivo;
+- impacto;
+- alternativa.
+
+Esperar autorización de Dirección.
+
+No realizar cambios estructurales por cuenta propia.
+
+==================================================
+26. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Realizar al menos dos revisiones:
+
+Ronda 1:
+
+buscar:
+
+- acceso directo indebido a identidad;
+- bypass RBAC;
+- cross-tenant;
+- email/nombre usado como identidad;
+- duplicación de usuarios;
+- pérdida de historial;
+- regresiones;
+- incompatibilidades.
+
+Corregir.
+
+Ronda 2:
+
+debe terminar PASS sin hallazgos CRÍTICOS ni MAYORES.
+
+==================================================
+27. VALIDACIÓN E2E REAL
+==================================================
+
+Utilizar usuarios reales DEMO disponibles.
+
+Verificar:
+
+TENANT_ADMIN
+→ asigna OT a identidad válida.
+
+TECNICO
+→ ve solamente las OTs que realmente corresponden a su identityId cuando la superficie actual lo permita.
+
+CONSULTA
+→ no puede modificar asignaciones.
+
+Verificar también:
+
+logout
+→ login con otra identidad
+→ no aparecen datos del usuario anterior.
+
+Refresh debe conservar correctamente la sesión.
+
+==================================================
+28. CALIDAD
+==================================================
+
+Antes del cierre:
+
+- tests verdes;
+- 0 tests omitidos;
+- typecheck limpio;
+- build verde;
+- OpenAPI sin drift si aplica;
+- migraciones verificadas si existen;
+- RLS verificado;
+- git diff auditado;
+- corpus congelado respetado.
+
+==================================================
+29. INFORME DE CIERRE
+==================================================
+
+Entregar:
+
+# INFORME OFICIAL DE CIERRE — DGP-020.1
+
+Debe incluir:
+
+1. Causa raíz de G-1.
+2. Diseño implementado.
+3. Contrato de identidad.
+4. Archivos modificados.
+5. Migraciones.
+6. Comandos modificados.
+7. Read models.
+8. Validaciones.
+9. RBAC.
+10. RLS.
+11. Tenant isolation.
+12. Migración/compatibilidad histórica.
+13. UI.
+14. Offline.
+15. Timeline.
+16. Pruebas.
+17. E2E.
+18. Revisión arquitectónica R1/R2.
+19. Gaps restantes.
+20. Riesgos.
+21. Commits.
+
+==================================================
+30. CRITERIO DE CIERRE
+==================================================
+
+DGP-020.1 solo puede declararse PASS cuando:
+
+G-1 RESUELTO
++
+identityId canónico
++
+tenant isolation
++
+RBAC correcto
++
+auditoría
++
+compatibilidad histórica
++
+read models correctos
++
+E2E PASS
++
+tests PASS
++
+typecheck PASS
++
+build PASS
++
+revisión arquitectónica PASS
+
+No iniciar DGP-020.2 automáticamente.
+
+Esperar aprobación explícita de la Dirección.
+
+==================================================
+REGLA FINAL DE DIRECCIÓN
+==================================================
+
+El objetivo NO es simplemente cambiar un campo de texto.
+
+El objetivo es establecer una relación empresarial confiable:
+
+ORDEN DE TRABAJO
+        ↓
+IDENTIDAD CANÓNICA DELTAOPS
+        ↓
+TÉCNICO RESPONSABLE
+
+Esta relación será posteriormente la base para:
+
+- Mis órdenes;
+- sesiones de trabajo;
+- duración real;
+- horas de mano de obra;
+- costos;
+- productividad;
+- trazabilidad.
+
+Resolverlo correctamente ahora es mucho más importante que resolverlo rápido.
+
+Si el contrato actual no permite una implementación segura:
+
+DETENERSE Y REPORTAR EL GAP.
+
+No improvisar.

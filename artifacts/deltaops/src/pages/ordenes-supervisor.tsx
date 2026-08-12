@@ -24,9 +24,9 @@ import {
   useToast,
 } from "@workspace/design-system";
 import { ShellOrdenes } from "../lib/ordenes/Shell";
-import { useListado } from "../lib/ordenes/hooks";
+import { useListado, useIdentidadesElegibles } from "../lib/ordenes/hooks";
 import { useOffline } from "../lib/offline/contexto";
-import { asignar, aprobarCierre } from "../lib/ordenes/mutaciones";
+import { asignar, asignarRecursoHumano, aprobarCierre } from "../lib/ordenes/mutaciones";
 import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/FormularioDinamico";
 import { plantillaAsignacion } from "../lib/forms/plantillas-ordenes";
 import { BadgeEstado, esCritica, proximaAVencer } from "../lib/ordenes/componentes";
@@ -201,21 +201,39 @@ function TarjetaAsignacion({ orden, onCambio, onAbrir }: { orden: OrdenRow; onCa
 
 function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenRow; onCerrar: () => void; onGuardado: () => void }) {
   const { cola } = useOffline();
-  const def = useMemo(() => plantillaAsignacion([], []), []);
-  const form = useFormularioDinamico(def, {}, { responsable: orden.responsable ?? "", supervisor: orden.supervisor ?? "" });
+  // DGP-020.1 · Identidades canónicas del tenant (fuente de verdad). El selector
+  // muestra nombre+rol y ENVÍA únicamente el identityId; nunca texto libre.
+  const elegibles = useIdentidadesElegibles();
+  const opciones = useMemo(
+    () => (elegibles.datos ?? []).map((i) => ({ valor: i.identityId, etiqueta: `${i.nombre} · ${i.rol}` })),
+    [elegibles.datos],
+  );
+  // Responsable como select de identidades; supervisor sigue el flujo de agregado.
+  const def = useMemo(() => plantillaAsignacion(opciones, []), [opciones]);
+  const form = useFormularioDinamico(def, {}, { responsable: "", supervisor: orden.supervisor ?? "" });
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function guardar() {
     setGuardando(true);
     setErr(null);
-    const r = await asignar(cola, orden.id, orden.version, {
-      responsable: form.valores.responsable ? String(form.valores.responsable) : null,
-      supervisor: form.valores.supervisor ? String(form.valores.supervisor) : null,
-    });
+    const responsableId = form.valores.responsable ? String(form.valores.responsable) : null;
+    // Asignación FUERTE por identidad canónica (resuelve G-1): el backend valida
+    // existencia/actividad/membresía y persiste la referencia a idn_identities.
+    if (responsableId) {
+      const r = await asignarRecursoHumano(cola, orden.id, {
+        tipo: "persona", asignadoId: responsableId, rol: "responsable", reemplazaVigentes: true,
+      });
+      if (r.error) { setGuardando(false); setErr(r.error.message); return; }
+    }
+    // Supervisor: campo de agregado (texto), sin cambio de contrato en esta fase.
+    const supervisor = form.valores.supervisor ? String(form.valores.supervisor) : null;
+    if (supervisor !== (orden.supervisor ?? null)) {
+      const r = await asignar(cola, orden.id, orden.version, { supervisor });
+      if (r.error) { setGuardando(false); setErr(r.error.message); return; }
+    }
     setGuardando(false);
-    if (r.error) setErr(r.error.message);
-    else onGuardado();
+    onGuardado();
   }
 
   return (

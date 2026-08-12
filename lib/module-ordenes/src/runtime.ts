@@ -57,11 +57,12 @@ import {
 import {
   FakeCatalogos,
   FakeConsecutivo,
+  FakeIdentidad,
   FakeOrdenRepository,
   FakeRecibos,
 } from "./infrastructure/fakes";
 import { plantillasDesdeRuntime } from "./infrastructure/plantillas-runtime";
-import type { OrdenRepository, PlantillasPort } from "./domain/ports";
+import type { IdentidadPort, OrdenRepository, PlantillasPort } from "./domain/ports";
 import { procesarCola, type OperacionSync, type ResumenSync } from "./sincronizacion";
 
 export interface OrdenesRuntimeOptions
@@ -70,6 +71,12 @@ export interface OrdenesRuntimeOptions
   readonly pool?: Pool;
   /** Puerto de plantillas (Dynamic Forms). Por defecto: motor REAL del runtime. */
   readonly plantillas?: PlantillasPort;
+  /**
+   * DGP-020.1 · Puerto hacia la Identidad canónica. El adaptador de PRODUCCIÓN se
+   * inyecta desde el api-server (respaldado por el servicio público de Identidad
+   * DGP-017). Si no se provee, se usa un Fake en memoria (offline/pruebas).
+   */
+  readonly identidad?: IdentidadPort;
 }
 
 export interface OrdenesRuntime {
@@ -122,6 +129,7 @@ export function crearOrdenesRuntime(options: OrdenesRuntimeOptions = {}): Ordene
     consecutivo: pool ? new PgConsecutivoStore(pool) : new FakeConsecutivo(),
     recibos: pool ? new PgReciboStore(pool) : new FakeRecibos(),
     plantillas,
+    identidad: options.identidad ?? new FakeIdentidad(),
     readModel,
     eventLog,
     proyecciones,

@@ -21,6 +21,9 @@ import type {
   ClasePlantilla,
   ConfigCodigo,
   ConsecutivoPort,
+  IdentidadElegible,
+  IdentidadPort,
+  IdentidadVerificada,
   OpcionCatalogo,
   OrdenFiltro,
   OrdenRepository,
@@ -224,6 +227,58 @@ export class FakePlantillas implements PlantillasPort {
   }
 }
 
+/* ------------------- Fake del puerto de Identidad ------------------------ */
+
+export interface IdentidadFake {
+  readonly identityId: string;
+  readonly tenantId: string;
+  readonly nombre: string;
+  readonly email: string;
+  readonly estado?: string;           // identidad: default ACTIVO
+  readonly estadoMembresia?: string;  // membresía:  default ACTIVO
+  readonly rol?: string;              // default TECNICO
+}
+
+/**
+ * Catálogo en memoria de identidades para pruebas de dominio puras. Modela el
+ * aislamiento cross-tenant: `verificar` sólo devuelve la identidad si tiene una
+ * entrada para ESE tenant (una identidad de otro tenant se ve inexistente).
+ */
+export class FakeIdentidad implements IdentidadPort {
+  private readonly identidades: IdentidadFake[] = [];
+
+  registrar(i: IdentidadFake): this { this.identidades.push(i); return this; }
+
+  async verificar(tenantId: string, identityId: string): Promise<Result<IdentidadVerificada | null, KernelError>> {
+    const i = this.identidades.find((x) => x.identityId === identityId && x.tenantId === tenantId);
+    if (!i) return ok(null);
+    return ok({
+      identityId: i.identityId,
+      tenantId: i.tenantId,
+      nombre: i.nombre,
+      email: i.email,
+      estado: i.estado ?? "ACTIVO",
+      estadoMembresia: i.estadoMembresia ?? "ACTIVO",
+      rol: i.rol ?? "TECNICO",
+    });
+  }
+
+  async elegibles(tenantId: string, filtro?: { q?: string }): Promise<Result<IdentidadElegible[], KernelError>> {
+    const q = filtro?.q?.toLowerCase();
+    const rows = this.identidades
+      .filter((i) => i.tenantId === tenantId)
+      .filter((i) => !q || i.nombre.toLowerCase().includes(q) || i.email.toLowerCase().includes(q))
+      .map((i) => ({
+        identityId: i.identityId,
+        nombre: i.nombre,
+        email: i.email,
+        rol: i.rol ?? "TECNICO",
+        estadoMembresia: i.estadoMembresia ?? "ACTIVO",
+      }));
+    return ok(rows);
+  }
+}
+
 /** Estados de negocio canónicos (para pruebas que necesiten el mapa base). */
 export const ESTADOS_NEGOCIO_BASE = NEUTRO_A_NEGOCIO_BASE;
 export const CATALOGO_HABILITADO = ESTADO_HABILITADO;
@@ -236,6 +291,7 @@ export interface FakeAdapters {
   readonly consecutivo: FakeConsecutivo;
   readonly recibos: FakeRecibos;
   readonly plantillas: PlantillasPort;
+  readonly identidad: FakeIdentidad;
   readonly readModel: FakeOrdenReadModel;
   readonly eventLog: FakeEventLogStore;
   readonly proyecciones: FakeProyeccionesStore;
@@ -259,6 +315,7 @@ export function crearFakeAdapters(
     consecutivo: new FakeConsecutivo(),
     recibos: new FakeRecibos(),
     plantillas,
+    identidad: new FakeIdentidad(),
     readModel: new FakeOrdenReadModel(),
     eventLog: new FakeEventLogStore(),
     proyecciones: new FakeProyeccionesStore(),

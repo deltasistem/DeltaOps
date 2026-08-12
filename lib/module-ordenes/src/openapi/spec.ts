@@ -344,6 +344,18 @@ export function construirOpenApi(): Record<string, unknown> {
     tags: ["Asignaciones"], operationId: "ordenes.responsables", summary: "Histórico de responsables (read model)",
     parameters: [idParam], responses: { "200": jsonOk(obj({ responsables: arr(obj({}, [])) }, [])), ...errores("401", "403") },
   });
+  add(`${BASE}/identidades-elegibles`, "get", {
+    tags: ["Asignaciones"], operationId: "ordenes.identidades-elegibles",
+    summary: "Identidades canónicas elegibles del tenant (selector de asignación)",
+    parameters: [{ name: "q", in: "query", required: false, schema: { type: "string" } }],
+    responses: {
+      "200": jsonOk(obj({ identidades: arr(obj({
+        identityId: { type: "string" }, nombre: { type: "string" }, email: { type: "string" },
+        rol: { type: "string" }, estadoMembresia: { type: "string" },
+      }, ["identityId", "nombre", "email", "rol", "estadoMembresia"])) }, ["identidades"])),
+      ...errores("401", "403"),
+    },
+  });
   add(`${BASE}/{id}/recursos`, "post", {
     tags: ["Recursos"], operationId: "ordenes.registrar-recurso", summary: "Registrar recurso (referencia-only, sin inventario)",
     parameters: [idParam], requestBody: jsonBody(ref("RegistrarRecurso")),

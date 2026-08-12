@@ -124,6 +124,12 @@ router.get(`${BASE}/consola`, async (_req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.consola`, {}));
 });
 
+// DGP-020.1 · Identidades canónicas elegibles del tenant (selector de asignación).
+// Ruta específica antes de /:id. Tenant-scoped por el contexto autenticado.
+router.get(`${BASE}/identidades-elegibles`, async (req, res) => {
+  send(res, await query(ctxOf(res), `${MODULO}.identidades-elegibles`, { q: strQuery(req.query.q) }));
+});
+
 router.get(`${BASE}/catalogos/:catalogo`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.catalogo.opciones`, { catalogo: req.params.catalogo }));
 });

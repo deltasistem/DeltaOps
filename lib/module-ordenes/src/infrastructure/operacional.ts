@@ -496,7 +496,7 @@ export class PgProyeccionesStore implements ProyeccionesStore {
   async aplicarAsignacion(uow: UnitOfWork, row: FilaAppend) {
     try {
       return await this.appendGeneric(uow, "deltaops.ord_asignaciones_read",
-        ["tenant_id", "event_id", "orden_id", "tipo", "asignado_id", "rol", "vigente", "version", "actor_id", "registrado_at"], row);
+        ["tenant_id", "event_id", "orden_id", "tipo", "asignado_id", "asignado_identity_id", "asignado_nombre", "asignado_email", "rol", "vigente", "version", "actor_id", "registrado_at"], row);
     } catch (err) { return fail(KernelErrors.infrastructure("asignacion apply falló", err)); }
   }
   async aplicarResponsable(uow: UnitOfWork, row: FilaAppend) {
@@ -664,6 +664,12 @@ export interface Planificacion {
 }
 export interface Asignacion {
   readonly id: string; readonly ordenId: string; readonly tipo: string; readonly asignadoId: string;
+  /**
+   * DGP-020.1 — Referencia FUERTE a la identidad canónica (`idn_identities`).
+   * Presente y validado cuando `tipo='persona'`; null para tipos no-persona
+   * (grupo/cuadrilla/contratista) y para asignaciones históricas por texto libre.
+   */
+  readonly asignadoIdentityId: string | null;
   readonly rol: string | null; readonly vigente: boolean; readonly datos: Record<string, unknown>;
   readonly createdBy: string; readonly createdAt: Date;
 }
@@ -798,9 +804,9 @@ export class PgMotorStore implements MotorStore {
     try {
       await setTenant(uow, tenantId);
       await pgSessionOf(uow).query(
-        `INSERT INTO deltaops.ord_asignaciones (tenant_id, id, orden_id, tipo, asignado_id, rol, vigente, datos, created_by, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [tenantId, a.id, a.ordenId, a.tipo, a.asignadoId, a.rol, a.vigente, JSON.stringify(a.datos), a.createdBy, a.createdAt],
+        `INSERT INTO deltaops.ord_asignaciones (tenant_id, id, orden_id, tipo, asignado_id, asignado_identity_id, rol, vigente, datos, created_by, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [tenantId, a.id, a.ordenId, a.tipo, a.asignadoId, a.asignadoIdentityId, a.rol, a.vigente, JSON.stringify(a.datos), a.createdBy, a.createdAt],
       );
       return ok(undefined);
     } catch (err) {

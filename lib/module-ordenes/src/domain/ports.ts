@@ -117,6 +117,62 @@ export interface ReciboPort {
   sellar(uow: UnitOfWork, tenantId: TenantId, recibo: Recibo, actorId: string): Promise<Result<void, KernelError>>;
 }
 
+/* ------------------- Puerto hacia Identidad canónica --------------------- */
+
+/**
+ * Proyección MÍNIMA de la identidad canónica de DeltaOps (DGP-017,
+ * `idn_identities` + `idn_memberships`) que el dominio de Órdenes necesita para
+ * VALIDAR una asignación de recurso humano (DGP-020.1, resuelve G-1).
+ *
+ * `identityId` es la ÚNICA clave de negocio. `nombre`/`email` son atributos de
+ * PRESENTACIÓN (nunca clave). `estado` es el de la IDENTIDAD y
+ * `estadoMembresia` el de la MEMBRESÍA en el tenant; ambos deben estar activos
+ * para admitir una nueva asignación (el dominio no inventa estados: usa los que
+ * el contrato de Identidad ya declara).
+ */
+export interface IdentidadVerificada {
+  readonly identityId: string;
+  readonly tenantId: TenantId;
+  readonly nombre: string;
+  readonly email: string;
+  /** Estado de la IDENTIDAD canónica ("ACTIVO" | "DESHABILITADO" | "PENDIENTE"). */
+  readonly estado: string;
+  /** Estado de la MEMBRESÍA en el tenant ("ACTIVO" | "DESHABILITADO"). */
+  readonly estadoMembresia: string;
+  /** Rol canónico de la membresía (presentación/futuras reglas). */
+  readonly rol: string;
+}
+
+export interface IdentidadElegible {
+  readonly identityId: string;
+  readonly nombre: string;
+  readonly email: string;
+  readonly rol: string;
+  readonly estadoMembresia: string;
+}
+
+/**
+ * Puerto hacia la Identidad canónica. Órdenes NUNCA accede a las tablas internas
+ * de Identidad: consulta este puerto, cuyo adaptador de producción se respalda
+ * en las consultas PÚBLICAS del servicio de Identidad (DGP-017). El tenant se
+ * deriva SIEMPRE del contexto autenticado del backend (nunca del frontend).
+ *
+ * Contrato FAIL-SAFE (como `WorkflowPort` de DGP-011.1): ante cualquier fallo de
+ * infraestructura devuelve `Result.fail`; la ausencia de identidad/membresía se
+ * representa como `Result.ok(null)` para que el comando decida el error de
+ * negocio (identidad inexistente ⇒ validación, no 500).
+ */
+export interface IdentidadPort {
+  /**
+   * Verifica una identidad DENTRO del tenant indicado. Devuelve `ok(null)` si la
+   * identidad no existe o no tiene membresía en ESE tenant (aislamiento
+   * cross-tenant: una identidad de otro tenant se ve como inexistente aquí).
+   */
+  verificar(tenantId: TenantId, identityId: string): Promise<Result<IdentidadVerificada | null, KernelError>>;
+  /** Identidades ELEGIBLES del tenant (para el selector del frontend). */
+  elegibles(tenantId: TenantId, filtro?: { q?: string }): Promise<Result<IdentidadElegible[], KernelError>>;
+}
+
 /* ---------------- Puerto hacia Dynamic Forms (plantillas) ---------------- */
 
 export type ClasePlantilla = "formulario" | "checklist";

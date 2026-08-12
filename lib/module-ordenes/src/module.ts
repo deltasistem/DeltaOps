@@ -91,6 +91,7 @@ import {
   type CatalogoPort,
   type ConfigCodigo,
   type ConsecutivoPort,
+  type IdentidadPort,
   type OrdenRepository,
   type PlantillasPort,
   type ReciboPort,
@@ -155,6 +156,8 @@ export interface ModuleAdapters {
   readonly consecutivo: ConsecutivoPort;
   readonly recibos: ReciboPort;
   readonly plantillas: PlantillasPort;
+  /** DGP-020.1 — Puerto hacia la Identidad canónica (validación de asignación). */
+  readonly identidad: IdentidadPort;
   readonly readModel: OrdenReadModel;
   readonly eventLog: EventLogStore;
   readonly proyecciones: ProyeccionesStore;
@@ -1445,6 +1448,33 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             const pol = evaluar(deps, ctx, POLICY_PUEDE_ASIGNAR, { estado: orden.value.estado });
             if (!pol.ok) return pol;
 
+            // DGP-020.1 · Contrato de identidad. Para una asignación de PERSONA,
+            // `asignadoId` DEBE ser un identityId canónico: existe, identidad y
+            // membresía ACTIVAS y pertenece al MISMO tenant de la OT (derivado
+            // del contexto autenticado, nunca del frontend). Los tipos no-persona
+            // (grupo/cuadrilla/contratista) no se validan contra Identidad.
+            let asignadoIdentityId: string | null = null;
+            let asignadoNombre: string | null = null;
+            let asignadoEmail: string | null = null;
+            if (input.tipo === "persona") {
+              const ver = await adapters.identidad.verificar(tenant.value, input.asignadoId);
+              if (!ver.ok) return ver; // fallo de infraestructura ⇒ 500 explícito
+              const idn = ver.value;
+              if (!idn) {
+                return fail(KernelErrors.validation(
+                  `La identidad "${input.asignadoId}" no existe o no pertenece a la empresa; asigne una identidad canónica válida`,
+                ));
+              }
+              if (idn.estado !== "ACTIVO" || idn.estadoMembresia !== "ACTIVO") {
+                return fail(KernelErrors.validation(
+                  `La identidad "${input.asignadoId}" no está activa en la empresa y no puede recibir asignaciones`,
+                ));
+              }
+              asignadoIdentityId = idn.identityId;
+              asignadoNombre = idn.nombre;
+              asignadoEmail = idn.email;
+            }
+
             if (input.reemplazaVigentes) {
               const cerrar = await adapters.motor.asignacionCerrarVigentes(uow, tenant.value, input.ordenId, input.rol ?? null);
               if (!cerrar.ok) return cerrar;
@@ -1453,6 +1483,7 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             const ahora = new Date();
             const asignacion: Asignacion = {
               id, ordenId: input.ordenId, tipo: input.tipo, asignadoId: input.asignadoId,
+              asignadoIdentityId,
               rol: input.rol ?? null, vigente: true, datos: {}, createdBy: ctx.principal.id, createdAt: ahora,
             };
             const ins = await adapters.motor.asignacionInsert(uow, tenant.value, asignacion);
@@ -1462,14 +1493,16 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
               tipo: ASIGNACION_REGISTRADA,
               payload: {
                 tenantId: tenant.value, ordenId: input.ordenId, id, entityRef: `orden:${input.ordenId}`,
-                tipoAsignacion: input.tipo, asignadoId: input.asignadoId, rol: input.rol ?? null,
+                tipoAsignacion: input.tipo, asignadoId: input.asignadoId,
+                asignadoIdentityId, asignadoNombre, asignadoEmail,
+                rol: input.rol ?? null,
                 actorId: ctx.principal.id, actualizadoAt: ahora.toISOString(),
               },
             });
             if (!emit.ok) return emit;
-            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "asignar-recurso", input.ordenId, { tipo: input.tipo, asignadoId: input.asignadoId });
+            const audited = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "asignar-recurso", input.ordenId, { tipo: input.tipo, asignadoId: input.asignadoId, asignadoIdentityId });
             if (!audited.ok) return audited;
-            const resultado = { id, ordenId: input.ordenId, tipo: input.tipo, asignadoId: input.asignadoId };
+            const resultado = { id, ordenId: input.ordenId, tipo: input.tipo, asignadoId: input.asignadoId, asignadoIdentityId };
             if (input.opId) {
               const rec = await adapters.recibos.sellar(uow, tenant.value, { opId: input.opId, comando: `${MODULO}.asignar-recurso-humano`, resultado }, ctx.principal.id);
               if (!rec.ok) return rec;
@@ -1823,6 +1856,25 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           const r = await adapters.proyecciones.listarResponsables(tenant.value, input.ordenId);
           if (!r.ok) return r;
           return ok({ responsables: r.value });
+        },
+      }),
+      /* ============ CQRS: identidades elegibles (selector) =============== */
+      /**
+       * DGP-020.1 · Identidades canónicas ELEGIBLES del tenant para asignar como
+       * recurso humano. Tenant-scoped: el tenant se deriva del contexto
+       * autenticado (nunca del frontend). Alimenta el selector del frontend
+       * (nombre/rol visibles; el frontend envía SOLO identityId).
+       */
+      () => ({
+        name: `${MODULO}.identidades-elegibles`,
+        inputSchema: z.object({ q: z.string().optional() }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          const r = await adapters.identidad.elegibles(tenant.value, input.q ? { q: input.q } : undefined);
+          if (!r.ok) return r;
+          return ok({ identidades: r.value });
         },
       }),
       /* =============== CQRS: activos relacionados / dependencias ========== */

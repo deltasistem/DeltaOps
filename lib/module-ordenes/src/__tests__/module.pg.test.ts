@@ -28,6 +28,7 @@ const ALL_PERMISSIONS = [
       consecutivo: null as never,
       recibos: null as never,
       plantillas: null as never,
+      identidad: null as never,
       readModel: null as never,
       eventLog: null as never,
       proyecciones: null as never,

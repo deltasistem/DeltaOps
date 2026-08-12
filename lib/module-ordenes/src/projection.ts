@@ -285,6 +285,10 @@ export async function aplicarEventoOperacional(
         tenantId, eventId: ev.id, ordenId,
         tipo: String(p["tipoAsignacion"] ?? "persona"),
         asignadoId: String(p["asignadoId"] ?? ""),
+        // DGP-020.1 — referencia fuerte + atributos de presentación (desde el payload).
+        asignadoIdentityId: p["asignadoIdentityId"] ? String(p["asignadoIdentityId"]) : null,
+        asignadoNombre: s(p["asignadoNombre"]),
+        asignadoEmail: s(p["asignadoEmail"]),
         rol: s(p["rol"]), vigente: true, version: Number(p["version"] ?? 1),
         actorId: String(p["actorId"] ?? SYSTEM_PRINCIPAL.id),
         registradoAt: actualizadoAt(p),

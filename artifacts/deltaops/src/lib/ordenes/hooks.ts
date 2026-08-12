@@ -13,6 +13,7 @@ import type {
   DocumentoOrden,
   OpcionCatalogo,
   Asignacion,
+  IdentidadElegible,
   RelacionOrden,
 } from "./tipos";
 
@@ -227,5 +228,26 @@ export function useAsignaciones(id: string): EstadoAsync<Asignacion[]> {
       return r?.asignaciones ?? [];
     },
     [id],
+  );
+}
+
+/**
+ * DGP-020.1 · Identidades canónicas elegibles del tenant (GET
+ * /identidades-elegibles). Tenant-scoped por la sesión del backend. Alimenta el
+ * selector de asignación de recurso humano: muestra nombre/rol y ENVÍA sólo el
+ * identityId. Degrada con elegancia (404) si el endpoint no está desplegado.
+ */
+export function useIdentidadesElegibles(q?: string): EstadoAsync<IdentidadElegible[]> {
+  const query = q ? `?q=${encodeURIComponent(q)}` : "";
+  return useConsulta<IdentidadElegible[]>(
+    async (signal) => {
+      const r = await ordenesFetch<{ identidades?: IdentidadElegible[] } | IdentidadElegible[]>(
+        `/identidades-elegibles${query}`,
+        { signal, toleraNoEncontrado: true },
+      );
+      if (Array.isArray(r)) return r;
+      return r?.identidades ?? [];
+    },
+    [q ?? ""],
   );
 }

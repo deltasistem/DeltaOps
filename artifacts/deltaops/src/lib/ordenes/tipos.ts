@@ -115,5 +115,22 @@ export interface Asignacion {
   readonly nombre?: string;
   readonly rol?: string;
   readonly tipo?: string;
+  /** DGP-020.1 · Referencia fuerte a la identidad canónica (tipo persona). */
+  readonly asignadoIdentityId?: string | null;
+  readonly asignadoNombre?: string | null;
+  readonly asignadoEmail?: string | null;
   readonly [k: string]: unknown;
+}
+
+/**
+ * DGP-020.1 · Identidad canónica ELEGIBLE para asignación de recurso humano.
+ * El frontend muestra `nombre`/`rol` y ENVÍA únicamente `identityId` (jamás
+ * nombre/email como clave). Tenant-scoped por la sesión del backend.
+ */
+export interface IdentidadElegible {
+  readonly identityId: string;
+  readonly nombre: string;
+  readonly email: string;
+  readonly rol: string;
+  readonly estadoMembresia: string;
 }

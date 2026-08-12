@@ -2033,6 +2033,94 @@
         }
       }
     },
+    "/api/deltaops/ordenes/identidades-elegibles": {
+      "get": {
+        "tags": [
+          "Asignaciones"
+        ],
+        "operationId": "ordenes.identidades-elegibles",
+        "summary": "Identidades canónicas elegibles del tenant (selector de asignación)",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "identidades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "identityId": {
+                            "type": "string"
+                          },
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "rol": {
+                            "type": "string"
+                          },
+                          "estadoMembresia": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "identityId",
+                          "nombre",
+                          "email",
+                          "rol",
+                          "estadoMembresia"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "identidades"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/deltaops/ordenes/{id}/recursos": {
       "post": {
         "tags": [

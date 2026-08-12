@@ -6,17 +6,76 @@
 import { pool } from "@workspace/db";
 import {
   createExecutionContext,
+  KernelErrors,
+  ok,
   type ExecutionContext,
+  type KernelError,
   type Principal,
+  type Result,
 } from "@workspace/kernel";
 import { officialServices } from "@workspace/platform";
-import { ordenesModule, crearOrdenesRuntime, type OrdenesRuntime } from "@workspace/module-ordenes";
+import {
+  ordenesModule,
+  crearOrdenesRuntime,
+  type IdentidadElegible,
+  type IdentidadPort,
+  type IdentidadVerificada,
+  type OrdenesRuntime,
+} from "@workspace/module-ordenes";
+import { membresia, obtenerIdentidad, listarUsuariosDeTenant } from "../../deltaops/identity/service";
 import { DELTAOPS_TENANT } from "./reference-runtime";
+
+/**
+ * DGP-020.1 · Adaptador de PRODUCCIÓN del puerto de Identidad de Órdenes.
+ * Órdenes NUNCA accede a las tablas de Identidad: usa exclusivamente las
+ * consultas PÚBLICAS del servicio de Identidad (DGP-017). El aislamiento
+ * cross-tenant es DOBLE: `membresia(identityId, tenantId)` sólo devuelve la
+ * membresía si la identidad pertenece a ESE tenant; y `elegibles` usa
+ * `listarUsuariosDeTenant` (tenant-scoped por membresía).
+ */
+const identidadPort: IdentidadPort = {
+  async verificar(tenantId: string, identityId: string): Promise<Result<IdentidadVerificada | null, KernelError>> {
+    try {
+      const m = await membresia(identityId, tenantId);
+      if (!m) return ok(null); // inexistente o de otro tenant ⇒ null (aislamiento)
+      const idn = await obtenerIdentidad(identityId);
+      if (!idn) return ok(null);
+      return ok({
+        identityId: idn.identityId,
+        tenantId,
+        nombre: idn.nombre,
+        email: idn.email,
+        estado: idn.estado,
+        estadoMembresia: m.estado,
+        rol: m.rol,
+      });
+    } catch (err) {
+      return { ok: false, error: KernelErrors.infrastructure("verificación de identidad falló", err) } as Result<never, KernelError>;
+    }
+  },
+  async elegibles(tenantId: string, filtro?: { q?: string }): Promise<Result<IdentidadElegible[], KernelError>> {
+    try {
+      const usuarios = await listarUsuariosDeTenant(tenantId, { q: filtro?.q, estado: "ACTIVO" });
+      const rows: IdentidadElegible[] = usuarios
+        .filter((u) => u.estado === "ACTIVO")
+        .map((u) => ({
+          identityId: u.identityId,
+          nombre: u.nombre,
+          email: u.email,
+          rol: u.rol,
+          estadoMembresia: u.estadoMembresia,
+        }));
+      return ok(rows);
+    } catch (err) {
+      return { ok: false, error: KernelErrors.infrastructure("listado de identidades elegibles falló", err) } as Result<never, KernelError>;
+    }
+  },
+};
 
 let runtime: OrdenesRuntime | null = null;
 
 export function ordenesRuntime(): OrdenesRuntime {
-  if (!runtime) runtime = crearOrdenesRuntime({ pool });
+  if (!runtime) runtime = crearOrdenesRuntime({ pool, identidad: identidadPort });
   return runtime;
 }
 
@@ -28,6 +87,7 @@ const MODULE_PERMISSIONS = [
     consecutivo: null as never,
     recibos: null as never,
     plantillas: null as never,
+    identidad: null as never,
     readModel: null as never,
     eventLog: null as never,
     proyecciones: null as never,
