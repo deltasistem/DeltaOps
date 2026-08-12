@@ -1,0 +1,416 @@
+DGP-021.0 — CONTRATO PÚBLICO DE COSTOS EXACTOS DE ABASTECIMIENTO
+
+DIRECTIVA DE DIRECCIÓN
+
+Implementar ÚNICAMENTE el prerrequisito identificado como GAP-COST-14 durante DGP-021 Discovery.
+
+Objetivo:
+
+Crear una capacidad pública, tenant-scoped y auditable para consultar los costos exactos de materiales/repuestos que actualmente existen internamente en Abastecimiento, utilizando representación decimal string-safe.
+
+ESTA FASE NO IMPLEMENTA EL MÓDULO DE COSTOS.
+
+NO implementar todavía:
+
+- module-costos completo.
+- hechos económicos.
+- consumo valorizado.
+- integración Inventario→Costos.
+- integración OT→Costos.
+- costo total OT.
+- costo total Activo.
+- costo por hora.
+- Analytics.
+- dashboards.
+- frontend nuevo de costos.
+- combustible→costos.
+- mano de obra→costos.
+
+El único objetivo es resolver el contrato bloqueante GAP-COST-14.
+
+==================================================
+1. REGLA DE FUENTE DE VERDAD
+==================================================
+
+Antes de modificar código:
+
+Revisar nuevamente el Discovery DGP-021 y verificar contra el corpus real:
+
+- cómo Abastecimiento calcula actualmente costos;
+- qué datos de costo existen realmente;
+- dónde existe actualmente abs_costos_read;
+- qué query pública existe;
+- qué tipos utiliza actualmente;
+- qué parte del costo puede exponerse legalmente mediante contrato público.
+
+NO asumir nombres ni campos que no existan.
+
+NO acceder desde otros módulos directamente a abs_costos_read.
+
+NO exponer tablas internas.
+
+NO convertir numeric/decimal a number JavaScript.
+
+==================================================
+2. CONTRATO PÚBLICO
+==================================================
+
+Crear una capacidad pública y tenant-scoped de Abastecimiento para obtener el costo exacto necesario por el futuro módulo de costos.
+
+El contrato debe devolver valores monetarios como STRING DECIMAL.
+
+Ejemplo conceptual:
+
+{
+  costoUnitario: "35000.1234",
+  moneda: "COP",
+  unidad: "...",
+  fuente: "...",
+  ...
+}
+
+El ejemplo anterior es conceptual.
+
+Utilizar exclusivamente los campos que realmente existan en el corpus.
+
+Todo valor decimal monetario debe permanecer como string desde:
+
+DB
+→ repository
+→ dominio
+→ aplicación
+→ API
+→ consumidor.
+
+PROHIBIDO:
+
+parseFloat()
+Number()
+conversiones implícitas a number
+JSON numeric para dinero
+notación científica.
+
+==================================================
+3. PRECISIÓN
+==================================================
+
+Conservar la precisión real disponible en la fuente.
+
+No redondear innecesariamente.
+
+No truncar.
+
+No convertir a float.
+
+Si la fuente usa numeric/decimal PostgreSQL, conservarlo como string.
+
+El contrato debe documentar:
+
+- precisión;
+- escala;
+- patrón;
+- moneda;
+- unidad;
+- semántica del costo.
+
+==================================================
+4. SEMÁNTICA DEL COSTO
+==================================================
+
+Determinar exactamente qué representa el costo retornado.
+
+Por ejemplo, podría ser:
+
+- costo recibido;
+- costo unitario;
+- costo promedio ponderado;
+- último costo;
+- costo de adquisición;
+- otro.
+
+NO elegir por conveniencia.
+
+Usar únicamente la semántica demostrable del cost-engine existente.
+
+El contrato debe dejar explícito:
+
+"Este costo representa ________."
+
+Si existe más de una interpretación posible:
+
+detenerse y documentar el GAP.
+
+==================================================
+5. TENANT / RLS
+==================================================
+
+La consulta debe derivar tenant exclusivamente del contexto autenticado.
+
+Nunca aceptar tenantId como mecanismo de autorización desde el frontend.
+
+Verificar:
+
+Tenant A no puede consultar costos de Tenant B.
+
+Si el corpus utiliza RLS, conservarla.
+
+No crear bypass administrativo.
+
+SUPER_ADMIN debe seguir las reglas globales existentes, sin introducir permisos nuevos innecesarios.
+
+==================================================
+6. AUTORIZACIÓN
+==================================================
+
+Reutilizar capacidades existentes de Abastecimiento siempre que sea posible.
+
+NO crear permisos nuevos salvo que el contrato actual realmente lo exija.
+
+Documentar:
+
+- qué capacidad permite consultar;
+- qué roles tienen acceso;
+- qué ocurre sin sesión;
+- qué ocurre con otro tenant.
+
+Backend = autoridad.
+
+Frontend no participa en la seguridad.
+
+==================================================
+7. IDENTIDAD
+==================================================
+
+No introducir ninguna dependencia nueva con Microsoft 365.
+
+No utilizar email como identidad técnica.
+
+No utilizar nombres como identificador.
+
+No modificar Identity.
+
+==================================================
+8. API / PUERTO
+==================================================
+
+Crear o extender el puerto público de Abastecimiento únicamente si es necesario.
+
+Preferir una extensión aditiva.
+
+No romper consumidores existentes.
+
+El contrato debe permitir que DGP-021.1 consuma el costo sin conocer:
+
+- tablas internas;
+- SQL interno;
+- cost-engine interno;
+- detalles de implementación de Abastecimiento.
+
+==================================================
+9. READ MODEL
+==================================================
+
+Evaluar si el contrato puede exponerse mediante un read model público existente.
+
+Si se requiere un nuevo read model:
+
+justificarlo.
+
+No duplicar información innecesariamente.
+
+No crear un segundo sistema de costos.
+
+No materializar hechos económicos todavía.
+
+La única finalidad es exponer de manera segura el costo exacto que ya existe en Abastecimiento.
+
+==================================================
+10. OPENAPI
+==================================================
+
+El contrato público debe estar documentado en OpenAPI.
+
+Debe incluir:
+
+- request;
+- response;
+- tipos;
+- decimal como string;
+- errores;
+- autorización;
+- tenant scope;
+- semántica del costo.
+
+Ejemplo conceptual de schema:
+
+type: string
+pattern: ^\d{1,12}(\.\d{1,6})?$
+
+Pero NO utilizar este patrón literalmente si la precisión real del corpus es diferente.
+
+El patrón debe derivarse del contrato real.
+
+==================================================
+11. ERRORES
+==================================================
+
+Definir comportamiento determinista para:
+
+- recurso inexistente;
+- costo inexistente;
+- costo ambiguo;
+- tenant incorrecto;
+- sin autorización;
+- datos corruptos.
+
+No convertir "costo inexistente" en:
+
+"0".
+
+Debe poder distinguirse:
+
+SIN COSTO
+vs
+COSTO = 0
+
+Si el contrato actual no permite distinguirlos, documentar el problema.
+
+==================================================
+12. COMPATIBILIDAD
+==================================================
+
+Todos los consumidores actuales de Abastecimiento deben continuar funcionando.
+
+No modificar semántica existente.
+
+No modificar costos históricos.
+
+No modificar precios.
+
+No modificar inventario.
+
+No modificar órdenes.
+
+No modificar activos.
+
+No modificar combustible.
+
+No modificar mano de obra.
+
+==================================================
+13. PRUEBAS OBLIGATORIAS
+==================================================
+
+Agregar pruebas deterministas para:
+
+1. costo exacto.
+2. decimal como string.
+3. precisión.
+4. valores grandes.
+5. valores con decimales.
+6. cero real.
+7. ausencia de costo.
+8. tenant A vs tenant B.
+9. usuario sin permiso.
+10. identidad inexistente/no autenticada.
+11. contrato OpenAPI.
+12. no conversión a float.
+13. regresión de consumidores existentes.
+
+Si existe PostgreSQL real en la suite:
+
+probar también lectura/escritura del numeric como string.
+
+==================================================
+14. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Realizar revisión independiente antes del cierre.
+
+El revisor debe buscar especialmente:
+
+- exposición directa de tablas internas;
+- floats;
+- pérdida de precisión;
+- tenantId recibido desde frontend;
+- bypass de RLS;
+- duplicación de cost-engine;
+- semántica incorrecta del costo;
+- endpoint demasiado específico para DGP-021;
+- permisos innecesarios;
+- ruptura de contratos existentes.
+
+Si encuentra un problema:
+
+R1 FAIL
+→ corregir
+→ R2.
+
+No declarar PASS con hallazgos CRÍTICOS o MAYORES.
+
+==================================================
+15. CRITERIOS DE CIERRE
+==================================================
+
+DGP-021.0 solo puede cerrarse PASS cuando:
+
+- existe contrato público;
+- el costo decimal es string-safe;
+- no existe float en la cadena;
+- tenant isolation está probado;
+- RLS se conserva;
+- autorización backend funciona;
+- OpenAPI está actualizado;
+- no se creó todavía module-costos;
+- no se creó consumo valorizado;
+- no se modificaron contratos congelados salvo la extensión aprobada;
+- no se alteraron costos existentes;
+- las pruebas están verdes;
+- la revisión independiente está en PASS.
+
+==================================================
+16. ENTREGABLE
+==================================================
+
+Actualizar/agregar únicamente la documentación estrictamente necesaria del contrato.
+
+No crear un informe inventado.
+
+Al finalizar entregar un informe:
+
+DGP-021.0 — CONTRATO PÚBLICO DE COSTOS EXACTOS
+
+Incluyendo:
+
+- problema resuelto;
+- contrato creado/modificado;
+- semántica exacta del costo;
+- precisión;
+- endpoint/puerto;
+- autorización;
+- RLS;
+- pruebas;
+- OpenAPI;
+- revisión arquitectónica;
+- deuda o gaps restantes;
+- commits.
+
+==================================================
+17. REGLA FINAL
+==================================================
+
+DGP-021.0 NO ES DGP-021.1.
+
+No comenzar la fundación de module-costos.
+
+No comenzar la integración de Inventario.
+
+No comenzar la composición de costos.
+
+Solo resolver GAP-COST-14.
+
+Al terminar:
+
+DETENERSE.
+
+Esperar aprobación explícita de Dirección para DGP-021.1.
