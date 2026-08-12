@@ -19,6 +19,7 @@ import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { VistaPanelSesion } from "../lib/ordenes/PanelSesion";
 import { capacidadesOrdenes } from "../lib/ordenes/capacidades";
 import { formatearDuracion, extrapolar } from "../lib/ordenes/duracion";
+import { derivarSesionOptimista, opsSesionPendientes } from "../lib/ordenes/sesion-optimista";
 import { abrirSesion, pausarSesion, reanudarSesion, cerrarSesion } from "../lib/ordenes/mutaciones";
 import { ColaSync } from "../lib/offline/cola";
 import { MODULO } from "../lib/ordenes/constantes";
@@ -256,5 +257,151 @@ describe("Offline First · encola conservando ocurridoAt (§19)", () => {
       expect(o.input.ocurridoAt).toBe("2024-06-06T00:00:00.000Z");
       expect(o.input.origen).toBe("offline");
     }
+  });
+});
+
+/* ============= §39 · Cadena offline completa + estado optimista =========== */
+
+/** Construye una operación de cola de sesión ya encolada (pendiente). */
+function opCola(accion: string, ordenId: string, ocurridoAt: string): OperacionCola {
+  return {
+    opId: `op-${accion}-${ocurridoAt}`,
+    comando: `${MODULO}.sesion.${accion}`,
+    input: { id: ordenId, ordenId, ocurridoAt, origen: "offline", opId: `op-${accion}` },
+    descripcion: accion,
+    encoladaAt: ocurridoAt,
+    estado: "pendiente",
+    intentos: 0,
+  };
+}
+
+describe("§39 · cadena offline ABRIR→PAUSAR→REANUDAR→CERRAR (estado optimista)", () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("encola las 4 operaciones en ORDEN FIFO con ocurridoAt crecientes de los clicks", async () => {
+    const cola = new ColaSync("deltaops", async () => reciboOk([]), localStorage, "ordenes");
+    // Todas offline (fetch falla): cada click conserva su hora de dispositivo.
+    const clicks: Array<[(c: ColaSync, id: string, o: { ocurridoAtIso: string }) => Promise<unknown>, string]> = [
+      [abrirSesion as never, "2024-07-01T08:00:00.000Z"],
+      [pausarSesion as never, "2024-07-01T08:30:00.000Z"],
+      [reanudarSesion as never, "2024-07-01T08:45:00.000Z"],
+      [cerrarSesion as never, "2024-07-01T09:15:00.000Z"],
+    ];
+    for (const [fn, iso] of clicks) {
+      vi.spyOn(global, "fetch").mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      await fn(cola, "ot-39", { ocurridoAtIso: iso });
+      vi.restoreAllMocks();
+    }
+    const ops = cola.getSnapshot();
+    expect(ops.map((o) => o.comando)).toEqual([
+      `${MODULO}.sesion.abrir`,
+      `${MODULO}.sesion.pausar`,
+      `${MODULO}.sesion.reanudar`,
+      `${MODULO}.sesion.cerrar`,
+    ]);
+    const horas = ops.map((o) => String(o.input.ocurridoAt));
+    expect(horas).toEqual([
+      "2024-07-01T08:00:00.000Z",
+      "2024-07-01T08:30:00.000Z",
+      "2024-07-01T08:45:00.000Z",
+      "2024-07-01T09:15:00.000Z",
+    ]);
+    // Crecientes (device-time del click, no de sync).
+    const ms = horas.map((h) => Date.parse(h));
+    expect(ms).toEqual([...ms].sort((a, b) => a - b));
+  });
+
+  it("opsSesionPendientes: filtra por OT, ignora aplicadas y preserva orden", () => {
+    const ops: OperacionCola[] = [
+      opCola("abrir", "ot-A", "2024-07-01T08:00:00.000Z"),
+      { ...opCola("pausar", "ot-B", "2024-07-01T08:10:00.000Z") }, // otra OT
+      { ...opCola("cerrar", "ot-A", "2024-07-01T09:00:00.000Z"), estado: "aplicada" }, // ya aplicada
+      opCola("pausar", "ot-A", "2024-07-01T08:30:00.000Z"),
+    ];
+    const r = opsSesionPendientes(ops, "ot-A");
+    expect(r.map((o) => o.accion)).toEqual(["abrir", "pausar"]);
+  });
+
+  it("derivarSesionOptimista: pliega la cadena y deriva estado + duraciones de campo", () => {
+    const ops = [
+      opCola("abrir", "ot-39", "2024-07-01T08:00:00.000Z"),
+      opCola("pausar", "ot-39", "2024-07-01T08:30:00.000Z"),
+      opCola("reanudar", "ot-39", "2024-07-01T08:45:00.000Z"),
+      opCola("cerrar", "ot-39", "2024-07-01T09:15:00.000Z"),
+    ];
+    const ahora = Date.parse("2024-07-01T10:00:00.000Z");
+    const r = derivarSesionOptimista(ops, "ot-39", null, null, ahora);
+    expect(r.pendienteSync).toBe(true);
+    expect(r.sesion?.estado).toBe("CERRADA");
+    expect(r.sesion?.cerradoAt).toBe("2024-07-01T09:15:00.000Z");
+    // efectivo = (08:30-08:00) + (09:15-08:45) = 30m + 30m = 60m
+    expect(r.duraciones?.efectivoMs).toBe(60 * 60_000);
+    // pausado = (08:45-08:30) = 15m
+    expect(r.duraciones?.pausadoMs).toBe(15 * 60_000);
+    expect(r.duraciones?.transcurridoMs).toBe(75 * 60_000);
+    expect(r.duraciones?.pausas).toBe(1);
+  });
+
+  it("derivarSesionOptimista: estados INTERMEDIOS coherentes (abre → abierta; pausa → pausada)", () => {
+    const ahora = Date.parse("2024-07-01T08:20:00.000Z");
+    const soloAbrir = derivarSesionOptimista(
+      [opCola("abrir", "ot-39", "2024-07-01T08:00:00.000Z")],
+      "ot-39",
+      null,
+      null,
+      ahora,
+    );
+    expect(soloAbrir.sesion?.estado).toBe("ABIERTA");
+    // efectivo en vivo hasta ahora = 20m
+    expect(soloAbrir.duraciones?.efectivoMs).toBe(20 * 60_000);
+
+    const abiertaYPausada = derivarSesionOptimista(
+      [
+        opCola("abrir", "ot-39", "2024-07-01T08:00:00.000Z"),
+        opCola("pausar", "ot-39", "2024-07-01T08:10:00.000Z"),
+      ],
+      "ot-39",
+      null,
+      null,
+      ahora,
+    );
+    expect(abiertaYPausada.sesion?.estado).toBe("PAUSADA");
+    expect(abiertaYPausada.duraciones?.efectivoMs).toBe(10 * 60_000); // 08:00→08:10
+    expect(abiertaYPausada.duraciones?.pausadoMs).toBe(10 * 60_000); // 08:10→ahora(08:20)
+  });
+
+  it("derivarSesionOptimista: sin ops encoladas → devuelve el estado del servidor sin marca", () => {
+    const r = derivarSesionOptimista([], "ot-39", SESION_ABIERTA, DURACIONES, Date.parse("2024-07-01T10:00:00.000Z"));
+    expect(r.pendienteSync).toBe(false);
+    expect(r.sesion).toBe(SESION_ABIERTA);
+    expect(r.duraciones).toBe(DURACIONES);
+  });
+
+  it("VistaPanelSesion con pendienteSync: muestra distintivo, estado local y CTAs coherentes", () => {
+    const puede = capacidadesOrdenes({ rol: "TECNICO" }).ejecutar;
+    const optimista = derivarSesionOptimista(
+      [opCola("abrir", "ot-39", "2024-07-01T08:00:00.000Z")],
+      "ot-39",
+      null,
+      null,
+      Date.parse("2024-07-01T08:20:00.000Z"),
+    );
+    wrap(
+      <VistaPanelSesion
+        puedeOperar={puede}
+        esPropia={true}
+        sesion={optimista.sesion}
+        duraciones={optimista.duraciones}
+        pendienteSync={optimista.pendienteSync}
+      />,
+    );
+    // Estado local ABIERTA con distintivo de pendiente.
+    expect(screen.getByText("Pendiente de sincronizar")).toBeInTheDocument();
+    expect(screen.getByText("En curso")).toBeInTheDocument();
+    // CTAs de sesión abierta disponibles offline.
+    expect(screen.getByRole("button", { name: "Pausar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finalizar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Iniciar trabajo" })).not.toBeInTheDocument();
   });
 });
