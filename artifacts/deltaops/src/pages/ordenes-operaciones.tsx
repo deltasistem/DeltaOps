@@ -31,6 +31,7 @@ import { TarjetaOrden, esCritica, proximaAVencer } from "../lib/ordenes/componen
 import type { OrdenRow } from "../lib/ordenes/tipos";
 import { useSesion } from "../lib/identidad/sesion";
 import { capacidadesOrdenes } from "../lib/ordenes/capacidades";
+import { MiManoDeObra } from "../lib/manodeobra/MiManoDeObra";
 
 export default function OrdenesOperacionesPage() {
   return (
@@ -154,6 +155,12 @@ function Bandeja({
         </div>
       }
     >
+      {/* DGP-020.3 · «Mi mano de obra» del técnico en su bandeja de OTs. */}
+      {bandeja.id === "mis" && (
+        <div style={{ marginBottom: "var(--do-sp-4)" }}>
+          <MiManoDeObra />
+        </div>
+      )}
       {cargando ? (
         <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-6)" }}><Spinner /></div>
       ) : error ? (

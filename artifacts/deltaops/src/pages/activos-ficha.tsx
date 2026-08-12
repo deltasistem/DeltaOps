@@ -38,6 +38,7 @@ import { plantillaEdicion, plantillaTipoEtiqueta } from "../lib/forms/plantillas
 import { TabTimeline } from "./ficha/tab-timeline";
 import { TabDocumentacion } from "./ficha/tab-documentacion";
 import { TabRelaciones } from "./ficha/tab-relaciones";
+import { ManoDeObraActivo } from "../lib/manodeobra/ManoDeObraActivo";
 import { TabHistoricos } from "./ficha/tab-historicos";
 import { TabComentarios } from "./ficha/tab-comentarios";
 import { TabOrdenes } from "./ficha/tab-ordenes";
@@ -140,6 +141,7 @@ function Ficha({ id }: { id: string }) {
           { id: "planes", etiqueta: "Planes", contenido: <TabPlanes activoId={id} activoNombre={a.nombre} /> },
           { id: "preventivo", etiqueta: "Preventivo", contenido: <TabPreventivo activoId={id} activoNombre={a.nombre} /> },
           { id: "correctivo", etiqueta: "Correctivo", contenido: <TabCorrectivo activoId={id} activoNombre={a.nombre} /> },
+          { id: "manodeobra", etiqueta: "Mano de obra", contenido: <ManoDeObraActivo activoId={id} /> },
           { id: "timeline", etiqueta: "Timeline", contenido: <TabTimeline id={id} /> },
           { id: "documentacion", etiqueta: "Documentación", contenido: <TabDocumentacion id={id} /> },
           { id: "relaciones", etiqueta: "Relaciones", contenido: <TabRelaciones id={id} nombre={a.nombre} onNavegar={(x) => navegar(`/activos/${x}`)} /> },

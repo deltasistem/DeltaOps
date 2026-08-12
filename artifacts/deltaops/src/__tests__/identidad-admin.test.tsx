@@ -14,6 +14,7 @@ import { memoryLocation } from "wouter/memory-location";
 import AdministracionUsuarios from "../pages/administracion-usuarios";
 import AdministracionConfiguracion from "../pages/administracion-configuracion";
 import AdministracionSaaS from "../pages/administracion-saas";
+import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { SesionProvider } from "../lib/identidad/sesion";
 import type { Sesion } from "../lib/identidad/tipos";
 
@@ -57,13 +58,17 @@ function renderPagina(Comp: React.ComponentType, { ses = sesion(), handler }: Ru
   const { hook } = memoryLocation({ path: "/", static: false, record: true });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <QueryClientProvider client={qc}>
-      <Router hook={hook}>
-        <SesionProvider>
-          <Comp />
-        </SesionProvider>
-      </Router>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <ToastProvider>
+        <QueryClientProvider client={qc}>
+          <Router hook={hook}>
+            <SesionProvider>
+              <Comp />
+            </SesionProvider>
+          </Router>
+        </QueryClientProvider>
+      </ToastProvider>
+    </ThemeProvider>,
   );
   return { capturas };
 }

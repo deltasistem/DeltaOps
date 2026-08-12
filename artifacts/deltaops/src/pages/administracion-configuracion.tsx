@@ -38,6 +38,7 @@ import { MODULOS_META } from "@/lib/identidad/rbac";
 import { colorSeguro } from "@/lib/identidad/branding";
 import { mensajeDeError } from "@/lib/identidad/api";
 import type { Modulo } from "@/lib/identidad/tipos";
+import { AdminManoDeObra } from "@/lib/manodeobra/AdminManoDeObra";
 
 const IDIOMAS = [
   { v: "es", t: "Español" },
@@ -326,6 +327,7 @@ export default function AdministracionConfiguracion() {
             { id: "general", etiqueta: "Regional", contenido: <PanelGeneral /> },
             { id: "branding", etiqueta: "Branding", contenido: <PanelBranding /> },
             { id: "modulos", etiqueta: "Módulos", contenido: <PanelModulos /> },
+            { id: "manodeobra", etiqueta: "Mano de obra", contenido: <AdminManoDeObra /> },
             { id: "notificaciones", etiqueta: "Notificaciones", contenido: <PanelNotificaciones /> },
             { id: "auditoria", etiqueta: "Auditoría", contenido: <PanelAuditoria /> },
           ]}
