@@ -50,7 +50,14 @@ const ADMIN: Principal = { id: "999", rol: "admin", permisos: PERMS, capacidades
 // `principal.id` = ID ESPEJO legacy (entero) ≠ identityId canónico (UUID/idn).
 const tecnico = (mirrorId: string): Principal => ({ id: mirrorId, rol: "tecnico", permisos: ["modulo.ordenes.operar", "modulo.ordenes.read"], capacidades: [] });
 
-suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", () => {
+// Timeout explícito para ESTA suite de integración PG: cada test hace decenas de
+// idas y vueltas SECUENCIALES contra PostgreSQL (crear OT, transiciones del motor,
+// asignación, comandos de sesión y drenajes del outbox COMPARTIDO). Contra una BD
+// remota/compartida bajo contención cruzada (p.ej. la suite api-server en paralelo)
+// esa latencia acumulada puede superar el testTimeout por defecto de 5 s de Vitest
+// sin que exista fallo funcional alguno. 30 s da margen holgado y determinista; el
+// resto de patrones de integración PG del repo hacen lo propio.
+suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", { timeout: 30_000 }, () => {
   let pool: pg.Pool;
   let rt: OrdenesRuntime;
 
@@ -66,7 +73,25 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", () => {
     ctx(tenantId, tecnico(canonId === TEC ? MIRROR_TEC : MIRROR_OTRO), canonId);
   const exec = (c: ExecutionContext, name: string, input: unknown) => rt.platform.kernel.commands.execute(c, name, input);
   const query = (c: ExecutionContext, name: string, input: unknown) => rt.platform.kernel.queries.execute(c, name, input);
-  const drenar = () => rt.platform.kernel.outboxProcessor.processPending();
+  /**
+   * Drena el outbox de forma DETERMINISTA: `processPending` reclama como mucho
+   * un lote (batchSize=50) por llamada, así que una sola invocación NO garantiza
+   * que los eventos de ESTE test queden proyectados cuando el `deltaops.kernel_outbox`
+   * COMPARTIDO acumula pendientes de otros files/suites (o cuando un procesador
+   * concurrente arrebata parte del lote vía `FOR UPDATE SKIP LOCKED`). Iteramos
+   * hasta que un ciclo no procese nada, con un tope de seguridad para no colgarnos
+   * si otro procesador va drenando en paralelo. Así las aserciones sobre read
+   * models (duraciones, idempotencia, replay) leen SIEMPRE un estado asentado.
+   */
+  const drenar = async () => {
+    let last: Awaited<ReturnType<typeof rt.platform.kernel.outboxProcessor.processPending>> | undefined;
+    for (let i = 0; i < 40; i += 1) {
+      last = await rt.platform.kernel.outboxProcessor.processPending();
+      if (!last.ok) return last;
+      if (last.value.processed === 0 && last.value.failed === 0) break;
+    }
+    return last!;
+  };
 
   async function conTenant<R extends pg.QueryResultRow = pg.QueryResultRow>(t: string, sql: string, params: unknown[] = []): Promise<R[]> {
     const c = await pool.connect();
