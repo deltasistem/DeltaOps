@@ -1,0 +1,819 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DeltaOps · Fundación del Módulo de Costos (DGP-021.1)",
+    "version": "1.0.0",
+    "description": "Contrato OpenAPI generado (contract-first) desde los esquemas del módulo. Materializa HECHOS ECONÓMICOS exactos con snapshot inmutable (ACTIVO/ANULADO); no calcula agregados/KPIs ni duplica fuentes de verdad. El costo exacto de materiales proviene del contrato público de Abastecimiento (DGP-021.0). Dinero string-safe. Errores kernel→HTTP: AUTH→403, NF→404, CFL→409, VAL→400, INF→500."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "API DeltaOps"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Materialización"
+    },
+    {
+      "name": "Consulta"
+    }
+  ],
+  "paths": {
+    "/api/deltaops/costos/hechos/material": {
+      "post": {
+        "tags": [
+          "Materialización"
+        ],
+        "operationId": "costos.hecho.materializar-material",
+        "summary": "Materializa un hecho económico MATERIAL con snapshot del costo exacto (DGP-021.0)",
+        "description": "Verifica la OT por contrato público, DERIVA el activo de la relación canónica OT→activo (nunca del frontend) y CONGELA el costo unitario exacto de Abastecimiento. Idempotente por opId. Snapshot inmutable: cambiar el costo origen luego NO altera el hecho.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterializarMaterial"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Hecho"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/hechos/otros": {
+      "post": {
+        "tags": [
+          "Materialización"
+        ],
+        "operationId": "costos.hecho.materializar-otros",
+        "summary": "Materializa un hecho económico OTROS (costo manual autorizado)",
+        "description": "El importe unitario lo aporta el autorizante (string-safe). La identidad canónica del autorizante se toma de la SESIÓN (nunca del frontend). Verifica la OT y deriva el activo. Idempotente por opId.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterializarOtros"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Hecho"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/hechos/{costoId}/anular": {
+      "post": {
+        "tags": [
+          "Materialización"
+        ],
+        "operationId": "costos.hecho.anular",
+        "summary": "Anula un hecho económico (append-only, auditable; snapshot intacto)",
+        "description": "Ruta anidada tenant-scoped: un costoId de otro tenant devuelve 404 (aislamiento/IDOR). No borra ni edita el snapshot; sólo cambia el estado a ANULADO con motivo/autor/fecha.",
+        "parameters": [
+          {
+            "name": "costoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del hecho a anular"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnularHecho"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Hecho"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/hechos/{costoId}": {
+      "get": {
+        "tags": [
+          "Consulta"
+        ],
+        "operationId": "costos.hecho.detalle",
+        "summary": "Detalle de un hecho económico (por read model tenant-scoped)",
+        "description": "Ruta anidada: un costoId de otro tenant devuelve 404 (aislamiento/IDOR).",
+        "parameters": [
+          {
+            "name": "costoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del hecho"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hecho": {
+                      "$ref": "#/components/schemas/Hecho"
+                    }
+                  },
+                  "required": [
+                    "hecho"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/hechos": {
+      "get": {
+        "tags": [
+          "Consulta"
+        ],
+        "operationId": "costos.hechos",
+        "summary": "Listar hechos económicos (por OT/activo/tipo/moneda/período/estado)",
+        "parameters": [
+          {
+            "name": "otId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por OT"
+          },
+          {
+            "name": "activoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por activo"
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "MATERIAL | COMBUSTIBLE | MANO_DE_OBRA | OTROS"
+          },
+          {
+            "name": "moneda",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por moneda (serie por moneda; nunca se suman)"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ACTIVO | ANULADO"
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ocurridoAt >= (ISO)"
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ocurridoAt < (ISO)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hechos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Hecho"
+                      }
+                    }
+                  },
+                  "required": [
+                    "hechos"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/hechos/por-moneda": {
+      "get": {
+        "tags": [
+          "Consulta"
+        ],
+        "operationId": "costos.hechos.por-moneda",
+        "summary": "Hechos AGRUPADOS por moneda como SERIES SEPARADAS (nunca suma COP+USD)",
+        "parameters": [
+          {
+            "name": "otId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por OT"
+          },
+          {
+            "name": "activoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por activo"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ACTIVO | ANULADO"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monedas": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SerieMoneda"
+                      }
+                    }
+                  },
+                  "required": [
+                    "monedas"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "KRN-VAL-001"
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "ResultadoComando": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "idempotente": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MaterializarMaterial": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string",
+            "description": "Idempotencia durable del comando"
+          },
+          "costoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "otId": {
+            "type": "string",
+            "description": "OT verificada por contrato público; el activo se DERIVA de la relación canónica"
+          },
+          "articuloId": {
+            "type": "string",
+            "description": "Artículo cuyo costo EXACTO se snapshotea (DGP-021.0)"
+          },
+          "cantidad": {
+            "type": "string",
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Monto/cantidad en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado."
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "moneda": {
+            "type": "string",
+            "description": "Moneda del hecho; debe existir costo exacto en esa moneda (SIN COSTO ≠ 0)"
+          },
+          "ocurridoAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "otId",
+          "articuloId",
+          "cantidad",
+          "unidad",
+          "moneda"
+        ],
+        "additionalProperties": false
+      },
+      "MaterializarOtros": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string"
+          },
+          "costoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "otId": {
+            "type": "string"
+          },
+          "concepto": {
+            "type": "string",
+            "description": "Concepto auditable del costo manual (origen no es texto libre suelto)"
+          },
+          "cantidad": {
+            "type": "string",
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Monto/cantidad en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado."
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "costoUnitario": {
+            "type": "string",
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Monto/cantidad en PUNTO FIJO como CADENA decimal (string-only; \\d{1,12}(\\.\\d{1,6})?). Un número JSON es rechazado."
+          },
+          "moneda": {
+            "type": "string"
+          },
+          "ocurridoAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "otId",
+          "concepto",
+          "cantidad",
+          "unidad",
+          "costoUnitario",
+          "moneda"
+        ],
+        "additionalProperties": false
+      },
+      "AnularHecho": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string"
+          },
+          "motivo": {
+            "type": "string",
+            "description": "Motivo auditable de la anulación"
+          }
+        },
+        "required": [
+          "motivo"
+        ],
+        "additionalProperties": false
+      },
+      "Hecho": {
+        "type": "object",
+        "properties": {
+          "costoId": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "MATERIAL",
+              "COMBUSTIBLE",
+              "MANO_DE_OBRA",
+              "OTROS"
+            ]
+          },
+          "originType": {
+            "type": "string"
+          },
+          "originId": {
+            "type": "string"
+          },
+          "otId": {
+            "type": "string"
+          },
+          "activoId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Derivado de la OT; null si la OT no tiene activo principal"
+          },
+          "identityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "opId": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "ANULADO"
+            ]
+          },
+          "cantidad": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales)."
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "costoUnitario": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales)."
+          },
+          "costoTotal": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales)."
+          },
+          "moneda": {
+            "type": "string"
+          },
+          "fuente": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "ocurridoAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "registradoAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "registradoPor": {
+            "type": "string"
+          },
+          "anuladoAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "anuladoPor": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivoAnulacion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "costoId",
+          "tipo",
+          "otId",
+          "estado",
+          "cantidad",
+          "costoUnitario",
+          "costoTotal",
+          "moneda"
+        ],
+        "additionalProperties": false
+      },
+      "SerieMoneda": {
+        "type": "object",
+        "properties": {
+          "moneda": {
+            "type": "string"
+          },
+          "hechos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hecho"
+            }
+          }
+        },
+        "required": [
+          "moneda",
+          "hechos"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

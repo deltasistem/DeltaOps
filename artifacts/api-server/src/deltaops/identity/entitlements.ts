@@ -21,6 +21,7 @@ export const MODULOS_CONOCIDOS = [
   "analytics",
   "utilizacion",
   "manodeobra",
+  "costos",
 ] as const;
 
 export type ModuloClave = (typeof MODULOS_CONOCIDOS)[number];
@@ -46,6 +47,7 @@ export const RUTA_A_MODULO: Record<string, ModuloClave> = {
   analytics: "analytics",
   utilizacion: "utilizacion",
   manodeobra: "manodeobra",
+  costos: "costos",
 };
 
 export function esModuloConocido(v: string): v is ModuloClave {
