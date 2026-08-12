@@ -28,6 +28,7 @@
     "@workspace/module-analytics": "workspace:*",
     "@workspace/module-utilizacion": "workspace:*",
     "@workspace/module-ordenes": "workspace:*",
+    "@workspace/module-manodeobra": "workspace:*",
     "@workspace/platform": "workspace:*",
     "bcryptjs": "^3.0.3",
     "connect-pg-simple": "^10.0.0",

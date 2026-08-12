@@ -1,0 +1,1114 @@
+DIRECTIVA DE DIRECCIÓN — DGP-020.3
+FUNDACIÓN DE MANO DE OBRA
+
+Programa DeltaOps
+
+==================================================
+ESTADO DEL PROGRAMA
+==================================================
+
+DGP-020 — Discovery: CERRADO / PASS
+DGP-020.1 — Identidad en asignación: CERRADO / PASS
+DGP-020.2 — Sesiones y duración real: CERRADO / PASS
+
+La cadena operacional actualmente disponible es:
+
+OT
+→ identityId
+→ activoId
+→ sesión de trabajo
+→ tramos append-only
+→ tiempo efectivo
+
+DGP-020.3 queda AUTORIZADO.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Construir la FUNDACIÓN DE MANO DE OBRA de DeltaOps.
+
+El objetivo es poder determinar de forma auditable:
+
+- quién realizó el trabajo;
+- sobre qué OT;
+- sobre qué activo;
+- cuánto tiempo efectivo trabajó;
+- qué unidad de mano de obra aplica;
+- qué tarifa corresponde, si existe;
+- qué costo de mano de obra puede derivarse;
+- en qué tenant ocurrió;
+- cuándo fue registrado;
+- cuál es la fuente del tiempo.
+
+La información debe quedar preparada para DGP-021 — Costos de Mantenimiento.
+
+IMPORTANTE:
+
+DGP-020.3 NO es todavía el módulo completo de costos.
+
+No implementar contabilidad, facturación, presupuestos ni costos financieros generales.
+
+==================================================
+2. PRINCIPIO FUNDAMENTAL
+==================================================
+
+La fuente de verdad del TIEMPO DE MANO DE OBRA será:
+
+SESIONES DE TRABAJO DE DGP-020.2
+
+Por tanto:
+
+OT
+→ identityId
+→ sesión
+→ tiempo efectivo
+
+No reconstruir horas desde:
+
+- fecha de creación de OT;
+- fecha de cierre;
+- Workflow;
+- Timeline;
+- bitácora;
+- timestamps de servidor;
+- estimaciones.
+
+El tiempo efectivo persistido por las sesiones es la fuente operacional.
+
+==================================================
+3. NO DUPLICAR EL CONCEPTO DE TIEMPO
+==================================================
+
+NO crear otra entidad que almacene:
+
+"horas trabajadas"
+
+si eso duplica el tiempo efectivo de DGP-020.2.
+
+La mano de obra debe referenciar/componer:
+
+- sesión;
+- tiempo efectivo;
+- identidad;
+- OT;
+- activo.
+
+Si se necesita un snapshot para auditoría o costos históricos, documentarlo explícitamente y no convertirlo en una segunda fuente de verdad.
+
+==================================================
+4. CONCEPTO DE RECURSO HUMANO
+==================================================
+
+Evaluar la necesidad de una entidad/read model de recurso humano de mantenimiento.
+
+Debe utilizar identidad canónica:
+
+identityId
+
+Nunca:
+
+- nombre como identificador;
+- correo como identificador;
+- usuario legacy;
+- documento como FK.
+
+La identidad debe provenir del servicio/puerto canónico existente.
+
+No acceder directamente a tablas `idn_*`.
+
+==================================================
+5. PERFIL OPERACIONAL
+==================================================
+
+Determinar qué atributos son realmente necesarios para mano de obra.
+
+Como mínimo evaluar:
+
+- identityId;
+- tenant;
+- nombre de presentación;
+- rol/capacidad;
+- estado;
+- categoría de mano de obra;
+- unidad de costo;
+- tarifa;
+- vigencia.
+
+No agregar atributos que el corpus no soporte sin declarar GAP.
+
+==================================================
+6. CATEGORÍA DE MANO DE OBRA
+==================================================
+
+Necesitamos poder diferenciar, si el contrato lo permite:
+
+Ejemplo:
+
+- Técnico mecánico;
+- Técnico eléctrico;
+- Soldador;
+- Operador;
+- Supervisor;
+- Ayudante;
+- Especialista.
+
+PERO:
+
+No inventar el catálogo definitivo.
+
+Si actualmente no existe catálogo de categorías de mano de obra:
+
+crear el contrato mínimo necesario o declarar el GAP correspondiente.
+
+La categoría debe ser un concepto estable, no texto libre en cada OT.
+
+==================================================
+7. UNIDAD DE TARIFA
+==================================================
+
+Evaluar explícitamente la unidad de tarifa.
+
+Ejemplos posibles:
+
+- hora;
+- jornada;
+- turno.
+
+La recomendación de Dirección para esta fase:
+
+PRIMERA UNIDAD SOPORTADA:
+
+HORA
+
+No implementar jornada/turno hasta que exista contrato real que lo justifique.
+
+La tarifa debe poder expresarse como:
+
+COP / hora
+
+sin asumir otra moneda.
+
+Si el sistema ya posee configuración monetaria por tenant:
+
+reutilizarla.
+
+No crear un sistema monetario paralelo.
+
+==================================================
+8. TARIFA
+==================================================
+
+La tarifa debe ser versionable.
+
+No sobrescribir una tarifa histórica que ya haya sido utilizada.
+
+Modelo conceptual:
+
+Tarifa:
+- identity/categoría;
+- valor;
+- moneda;
+- unidad;
+- vigenciaDesde;
+- vigenciaHasta;
+- tenant;
+- estado;
+- auditoría.
+
+Si el corpus actual no permite determinar si la tarifa pertenece a:
+
+PERSONA
+o
+CATEGORÍA
+
+detenerse en ese punto de diseño y documentar la decisión.
+
+La arquitectura debe soportar posteriormente la evolución sin romper costos históricos.
+
+==================================================
+9. COSTO DE MANO DE OBRA
+==================================================
+
+El costo operacional futuro debe poder derivarse:
+
+TIEMPO EFECTIVO
+×
+TARIFA VIGENTE
+
+Ejemplo:
+
+2.5 horas
+×
+$35.000 COP/hora
+
+=
+$87.500 COP
+
+PERO:
+
+No redondear ni alterar el tiempo de la sesión.
+
+Definir explícitamente política de precisión monetaria.
+
+No usar floating point para dinero si la arquitectura existente utiliza decimal/numeric.
+
+Reutilizar la convención monetaria existente.
+
+==================================================
+10. SNAPSHOT HISTÓRICO
+==================================================
+
+Este punto es CRÍTICO.
+
+Si mañana una tarifa cambia:
+
+$35.000/h
+→
+$40.000/h
+
+una OT cerrada ayer no puede cambiar su costo histórico automáticamente.
+
+Por tanto, evaluar un snapshot auditable de:
+
+- tarifa aplicada;
+- moneda;
+- unidad;
+- identidad/categoría;
+- tiempo utilizado;
+- cálculo resultante.
+
+La fuente de verdad del tiempo continúa siendo DGP-020.2.
+
+El snapshot únicamente preserva la valoración histórica utilizada.
+
+==================================================
+11. ESTADO DEL RECURSO
+==================================================
+
+Evaluar estados mínimos:
+
+ACTIVO
+INACTIVO
+
+No permitir que un recurso inactivo sea seleccionado para nuevas operaciones si el contrato lo exige.
+
+No eliminar físicamente históricos.
+
+La identidad canónica sigue existiendo aunque cambie el estado operacional.
+
+==================================================
+12. RELACIÓN CON OT
+==================================================
+
+La mano de obra debe quedar relacionada con:
+
+tenant
++
+OT
++
+identityId
++
+sesión
++
+activoId
+
+El activo debe derivarse de la OT/sesión.
+
+No aceptar un activo arbitrario desde frontend.
+
+No crear una segunda relación OT-Activo.
+
+==================================================
+13. RELACIÓN CON SESIONES
+
+Una sesión cerrada proporciona:
+
+identityId
+OT
+activoId
+tiempo efectivo
+
+La mano de obra debe consumir esa información.
+
+No permitir que frontend envíe:
+
+"trabajé 8 horas"
+
+como fuente de verdad.
+
+El frontend puede mostrar datos.
+
+El backend debe derivarlos de las sesiones.
+
+==================================================
+14. SESIONES ABIERTAS
+
+No valorar definitivamente una sesión abierta como costo final.
+
+Puede mostrarse:
+
+"costo estimado"
+
+si el contrato lo permite.
+
+Pero debe diferenciarse claramente:
+
+COSTO ESTIMADO
+vs
+COSTO FINAL
+
+Una sesión cerrada puede producir valoración definitiva.
+
+No inventar costos para sesiones sin tarifa.
+
+==================================================
+15. AUSENCIA DE TARIFA
+
+Si existe tiempo efectivo pero no existe tarifa:
+
+NO asumir cero.
+
+NO ocultar el problema.
+
+Mostrar/registrar:
+
+"Tarifa no configurada"
+
+y permitir que el dato operacional exista sin inventar un costo.
+
+Esto es especialmente importante:
+
+SIN TARIFA ≠ COSTO $0
+
+==================================================
+16. CAMBIO DE TARIFA
+
+Definir comportamiento cuando una tarifa cambia mientras una sesión está abierta.
+
+La recomendación inicial:
+
+La valoración histórica debe utilizar la política de vigencia definida por el contrato.
+
+No aplicar automáticamente una nueva tarifa a tiempo trabajado antes de su vigencia.
+
+Si el tiempo de una sesión cruza dos períodos tarifarios:
+
+NO inventar una política.
+
+Documentar el GAP si no existe contrato.
+
+==================================================
+17. MANO DE OBRA POR OT
+
+La vista de una OT debe poder mostrar:
+
+MANO DE OBRA
+
+Ejemplo conceptual:
+
+Técnico
+Carlos Pacheco
+
+Tiempo efectivo
+02:35:00
+
+Tarifa
+$35.000/h
+
+Costo
+$90.416,67
+
+No copiar literalmente el diseño.
+
+Utilizar Design System.
+
+==================================================
+18. MANO DE OBRA POR ACTIVO
+
+La arquitectura debe permitir posteriormente consultar:
+
+Activo
+→ OTs
+→ sesiones
+→ técnicos
+→ tiempo
+→ costo de mano de obra
+
+Esto será fundamental para:
+
+costo por activo;
+costo por hora de operación;
+costo por OT;
+costo de mantenimiento.
+
+No construir todavía los dashboards de costos.
+
+==================================================
+19. MANO DE OBRA POR IDENTIDAD
+
+Debe poder consultarse:
+
+Técnico
+→ sesiones
+→ tiempo efectivo
+→ OTs
+→ costo asociado
+
+Siempre tenant-scoped.
+
+No exponer información cross-tenant.
+
+==================================================
+20. READ MODELS
+
+Crear read models específicos únicamente si son necesarios.
+
+Como mínimo evaluar:
+
+- mano de obra por OT;
+- mano de obra por activo;
+- mano de obra por identidad;
+- resumen de tiempo;
+- valoración de mano de obra.
+
+Evitar cálculos complejos en React.
+
+El frontend debe consumir datos derivados del backend.
+
+==================================================
+21. RLS
+==================================================
+
+Todas las entidades nuevas deben estar protegidas por RLS.
+
+Probar:
+
+Tenant A
+→ no ve mano de obra de Tenant B.
+
+Identidad A
+→ no ve información privada de Tenant B.
+
+Supervisor A
+→ solo tenant A.
+
+==================================================
+22. RBAC
+==================================================
+
+No inventar permisos si no son necesarios.
+
+Utilizar capacidades existentes.
+
+Como mínimo evaluar:
+
+TENANT_ADMIN
+→ administración y consulta según contrato.
+
+SUPERVISOR
+→ consulta/gestión según capacidades.
+
+PLANIFICADOR
+→ consulta según contrato.
+
+TECNICO
+→ consulta de su propia mano de obra y sesiones.
+
+CONSULTA
+→ solo lectura.
+
+No permitir que CONSULTA:
+
+- cree;
+- modifique;
+- elimine;
+- configure tarifas.
+
+==================================================
+23. TARIFAS — SEGURIDAD
+
+La configuración de tarifas debe ser una operación administrativa.
+
+Un técnico NO puede modificar su propia tarifa.
+
+Un usuario NO puede alterar una tarifa para modificar retroactivamente un costo.
+
+Todo cambio debe ser auditable.
+
+==================================================
+24. AUDITORÍA
+
+Registrar:
+
+- quién creó;
+- quién modificó;
+- cuándo;
+- tenant;
+- tarifa anterior;
+- tarifa nueva;
+- vigencia;
+- motivo si el contrato lo contempla.
+
+No depender únicamente de logs.
+
+==================================================
+25. IDEMPOTENCIA
+
+Toda mutación nueva debe utilizar:
+
+opId
+
+y el patrón durable existente.
+
+Probar concurrencia real.
+
+No aceptar doble creación de:
+
+- tarifa;
+- recurso;
+- valoración.
+
+==================================================
+26. OFFLINE
+
+No crear una segunda cola.
+
+Las sesiones continúan siendo la fuente de tiempo.
+
+Si la valoración de mano de obra depende de información que solo existe online:
+
+la operación offline debe conservar el hecho y calcular posteriormente al sincronizar.
+
+No inventar tarifas offline si no están disponibles.
+
+==================================================
+27. DINERO
+
+CRÍTICO:
+
+Usar la representación monetaria existente del proyecto.
+
+No usar:
+
+JavaScript floating point
+
+para cálculos monetarios persistidos.
+
+Utilizar:
+
+numeric/decimal
+o
+la abstracción monetaria existente.
+
+Definir precisión y redondeo.
+
+Documentar:
+
+- precisión interna;
+- redondeo;
+- momento del redondeo.
+
+Nunca redondear el tiempo efectivo para calcular el costo.
+
+==================================================
+28. MONEDA
+
+No crear múltiples monedas en esta fase si el corpus no las necesita.
+
+La plataforma está orientada inicialmente a Colombia.
+
+La configuración inicial puede utilizar:
+
+COP
+
+pero debe quedar explícito que:
+
+COP es configuración inicial,
+no hardcode global de dominio.
+
+==================================================
+29. COSTO ESTIMADO
+
+Si se implementa costo estimado para sesión abierta:
+
+Debe mostrar:
+
+"Estimado"
+
+y recalcularse con la información disponible.
+
+No convertirlo en costo final.
+
+Si no existe tarifa:
+
+"Sin tarifa configurada"
+
+No mostrar:
+
+$0
+
+==================================================
+30. HISTÓRICOS
+
+No modificar históricos existentes.
+
+No intentar reconstruir mano de obra de OTs antiguas.
+
+No inventar sesiones.
+
+La mano de obra formal comienza a partir de la activación de este mecanismo.
+
+==================================================
+31. INTEGRACIÓN CON UTILIZACIÓN
+
+No modificar module-utilizacion.
+
+La cadena futura será:
+
+ACTIVO
+→ UTILIZACIÓN
+→ OT
+→ SESIÓN
+→ MANO DE OBRA
+
+Esto permitirá posteriormente:
+
+costo de combustible
++
+costo de mano de obra
++
+costo de repuestos
+=
+costo operacional de mantenimiento.
+
+No implementar todavía esa suma global.
+
+==================================================
+32. INTEGRACIÓN CON ABASTECIMIENTO/INVENTARIO
+
+No modificar los módulos de Abastecimiento/Inventario salvo que exista un contrato imprescindible.
+
+DGP-021 será responsable de composición de:
+
+- mano de obra;
+- repuestos;
+- combustible.
+
+No duplicar costos de artículos.
+
+==================================================
+33. API / OPENAPI
+
+Todo contrato nuevo debe:
+
+- documentarse;
+- validarse;
+- tenant-scope;
+- RBAC;
+- OpenAPI;
+- drift test.
+
+No crear endpoints experimentales.
+
+==================================================
+34. FRONTEND
+
+Integrar la mano de obra dentro de:
+
+DETALLE DE OT
+
+y, si corresponde:
+
+DETALLE DE ACTIVO.
+
+No crear una aplicación paralela.
+
+El usuario debe poder entender:
+
+quién trabajó;
+cuánto tiempo;
+qué tarifa;
+qué costo;
+qué está pendiente de valorar.
+
+==================================================
+35. EXPERIENCIA DEL TÉCNICO
+
+El técnico debe ver:
+
+Mis sesiones
+Mis OTs
+Tiempo efectivo
+Estado de valoración
+
+No debe poder:
+
+- modificar tarifas;
+- valorar manualmente horas;
+- alterar sesiones cerradas.
+
+==================================================
+36. EXPERIENCIA DEL SUPERVISOR
+
+Debe poder consultar:
+
+- OTs;
+- técnicos;
+- tiempo;
+- valoración.
+
+Si el contrato actual permite gestión administrativa:
+
+mostrar CTAs correspondientes.
+
+No inventar capacidades.
+
+==================================================
+37. EXPERIENCIA ADMINISTRATIVA
+
+El TENANT_ADMIN debe poder administrar la configuración de mano de obra que el contrato soporte:
+
+- categorías;
+- tarifas;
+- vigencias;
+- estados.
+
+Todo debe ser tenant-scoped.
+
+==================================================
+38. RESPONSIVE
+
+Validar:
+
+1280
+768
+390
+
+Sin overflow.
+
+En móvil:
+
+tarjetas en lugar de tablas cuando sea necesario.
+
+Acciones táctiles ≥48px.
+
+==================================================
+39. TEMA
+
+Respetar:
+
+Claro
+Oscuro
+Automático
+
+Sin ThemeProvider local.
+
+Sin `data-do-theme` hardcodeado.
+
+==================================================
+40. TESTS OBLIGATORIOS
+
+Crear pruebas para:
+
+1. recurso humano;
+2. identityId;
+3. categoría;
+4. tarifa;
+5. vigencia;
+6. cambio de tarifa;
+7. snapshot;
+8. sesión → mano de obra;
+9. tiempo efectivo;
+10. costo;
+11. ausencia de tarifa;
+12. costo estimado;
+13. costo final;
+14. precisión monetaria;
+15. redondeo;
+16. idempotencia;
+17. concurrencia;
+18. RLS;
+19. RBAC;
+20. cross-tenant;
+21. técnico;
+22. supervisor;
+23. tenant admin;
+24. consulta;
+25. histórico;
+26. refresh;
+27. logout/re-login;
+28. responsive;
+29. OpenAPI;
+30. drift.
+
+==================================================
+41. E2E REAL
+
+Validar con navegador real:
+
+TENANT_ADMIN
+SUPERVISOR
+TECNICO
+CONSULTA
+
+Escenario mínimo:
+
+1. Crear/configurar categoría.
+2. Configurar tarifa.
+3. Asignar técnico.
+4. Abrir sesión.
+5. Trabajar.
+6. Pausar.
+7. Reanudar.
+8. Cerrar.
+9. Consultar mano de obra.
+10. Ver tiempo efectivo.
+11. Ver tarifa.
+12. Ver costo.
+13. Cambiar tarifa.
+14. Verificar que el histórico no cambia.
+15. Refresh.
+16. Logout/re-login.
+
+Si alguna operación no está soportada por el contrato:
+
+documentar GAP y no inventarla.
+
+==================================================
+42. PRUEBA MONETARIA REAL
+
+Usar un caso determinista.
+
+Ejemplo:
+
+Tiempo efectivo:
+2 horas 30 minutos
+
+Tarifa:
+$40.000 COP/h
+
+Resultado esperado:
+
+$100.000 COP
+
+Probarlo contra PostgreSQL real.
+
+Agregar también:
+
+1h 20m × $35.000/h
+
+y verificar precisión y redondeo.
+
+==================================================
+43. REVISIÓN ARQUITECTÓNICA
+
+La R1 debe buscar especialmente:
+
+- duplicación del tiempo;
+- identityId incorrecto;
+- uso del ID legacy;
+- tarifas sobrescribiendo históricos;
+- floating point;
+- ausencia de snapshot;
+- cross-tenant;
+- bypass RBAC;
+- frontend enviando costo/hora como autoridad;
+- costo $0 ante ausencia de tarifa;
+- acceso directo a idn_*;
+- duplicación de inventario/abastecimiento;
+- modificación de module-utilizacion;
+- creación de otra cola offline.
+
+Corregir todos los hallazgos CRÍTICOS/MAYORES.
+
+La R2 debe terminar PASS.
+
+==================================================
+44. REVISIÓN VISUAL
+
+Evaluar:
+
+- jerarquía;
+- claridad;
+- lenguaje de negocio;
+- coherencia con DeltaOps;
+- móvil;
+- desktop;
+- claro;
+- oscuro;
+- estados vacíos;
+- ausencia de tarifa;
+- costo estimado;
+- costo final.
+
+No crear dashboards ejecutivos.
+
+==================================================
+45. GOBIERNO
+
+Si para completar DGP-020.3 es necesario modificar:
+
+- Identity;
+- Workflow;
+- Utilización;
+- Inventario;
+- Abastecimiento;
+- RLS;
+- contratos congelados;
+
+DETENERSE.
+
+Documentar GAP.
+
+No modificar estructuras por iniciativa propia.
+
+==================================================
+46. CRITERIO DE CIERRE
+
+DGP-020.3 solo queda PASS cuando:
+
+IDENTIDAD CANÓNICA
++
+SESIÓN REAL
++
+TIEMPO EFECTIVO
++
+CATEGORÍA
++
+TARIFA
++
+VIGENCIA
++
+SNAPSHOT HISTÓRICO
++
+PRECISIÓN MONETARIA
++
+COSTO CORRECTO
++
+AUSENCIA DE TARIFA DIFERENCIADA DE $0
++
+RLS
++
+RBAC
++
+IDEMPOTENCIA
++
+CONCURRENCIA
++
+OFFLINE
++
+E2E
++
+RESPONSIVE
++
+TEMA
++
+OPENAPI
++
+DRIFT
++
+REVISIÓN ARQUITECTÓNICA
++
+REVISIÓN VISUAL
++
+TESTS
++
+BUILD
+
+Todo en PASS.
+
+==================================================
+47. INFORME DE CIERRE
+
+Entregar:
+
+# INFORME OFICIAL DE CIERRE — DGP-020.3
+FUNDACIÓN DE MANO DE OBRA
+
+Debe incluir:
+
+1. arquitectura;
+2. entidades;
+3. identidad;
+4. sesiones;
+5. categorías;
+6. tarifas;
+7. vigencias;
+8. snapshots;
+9. cálculo;
+10. precisión;
+11. redondeo;
+12. RLS;
+13. RBAC;
+14. API;
+15. OpenAPI;
+16. offline;
+17. auditoría;
+18. histórico;
+19. frontend;
+20. E2E;
+21. tests;
+22. revisión arquitectónica;
+23. revisión visual;
+24. migraciones;
+25. gaps;
+26. deuda técnica;
+27. commits.
+
+==================================================
+48. REGLA FINAL DE DIRECCIÓN
+==================================================
+
+NO queremos un simple campo:
+
+"horas trabajadas".
+
+Queremos una FUNDACIÓN AUDITABLE DE MANO DE OBRA.
+
+Debe poder responderse con evidencia:
+
+¿Quién trabajó?
+¿En qué OT?
+¿Sobre qué activo?
+¿Cuánto tiempo efectivo trabajó?
+¿Qué tarifa aplicaba?
+¿Por qué esa tarifa?
+¿Desde cuándo estaba vigente?
+¿Cuánto costó?
+¿El costo es estimado o final?
+¿Cambió posteriormente la tarifa?
+¿El histórico permaneció intacto?
+¿Quién modificó la tarifa?
+¿En qué tenant ocurrió?
+¿De dónde salió el tiempo?
+
+Si la arquitectura no puede responder esas preguntas:
+
+NO declarar PASS.
+
+==================================================
+49. REGLA DE NO ADELANTAR DGP-021
+==================================================
+
+DGP-020.3 NO debe implementar el costo integral de mantenimiento.
+
+No sumar todavía:
+
+MANO DE OBRA
++
+REPUESTOS
++
+COMBUSTIBLE
++
+OTROS
+
+Eso corresponde a DGP-021.
+
+DGP-020.3 debe dejar una base limpia y componible para que DGP-021 pueda realizar esa integración sin rehacer mano de obra.
+
+Al finalizar:
+
+NO iniciar DGP-021 automáticamente.
+
+Esperar aprobación explícita de la Dirección.

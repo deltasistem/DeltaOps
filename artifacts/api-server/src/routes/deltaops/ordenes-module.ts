@@ -10,6 +10,7 @@ import { db, deltaopsUsersTable } from "@workspace/db";
 import type { ExecutionContext, KernelError, Result } from "@workspace/kernel";
 import { ColaSyncSchema, MODULO } from "@workspace/module-ordenes";
 import { ordenesRuntime, contextForOrdenes } from "./ordenes-runtime";
+import { valorarSesionFailSafe } from "./manodeobra-runtime";
 import { aRolCanonico } from "../../deltaops/identity/rbac";
 
 const router: IRouter = Router();
@@ -44,6 +45,7 @@ router.use(BASE, async (req, res, next): Promise<void> => {
   // comportamiento cuando la sesión no trae `rolCanonico`.
   const rolCanonico = req.session?.rolCanonico ?? aRolCanonico(user.rol);
   res.locals.ctx = contextForOrdenes(String(user.id), rolCanonico, user.tenant, req.session?.identityId);
+  res.locals.tenant = user.tenant;
   next();
 });
 
@@ -332,6 +334,14 @@ for (const accion of ["abrir", "pausar", "reanudar", "cerrar"] as const) {
       ...(b.opId ? { opId: b.opId } : {}),
     });
     await drain();
+    // DGP-020.3 · Integración por ORQUESTACIÓN (Opción B, ver decisiones.md §2):
+    // al CERRAR una sesión, dispara la valoración de mano de obra FAIL-SAFE (nunca
+    // rompe el cierre; idempotente por (tenant, sesión); recuperable si falla).
+    if (accion === "cerrar" && r.ok) {
+      const v = r.value as { sesionId?: string; ordenId?: string };
+      const tenant = res.locals.tenant as string | undefined;
+      if (tenant && v?.sesionId) await valorarSesionFailSafe(tenant, v.sesionId, v.ordenId);
+    }
     send(res, r);
   });
 }
@@ -476,6 +486,20 @@ router.post(`${BASE}/sync`, async (req, res) => {
     return;
   }
   const resumen = await ordenesRuntime().sincronizar(ctxOf(res), parsed.data);
+  // DGP-020.3 · Tras sincronizar la cola offline, dispara la valoración FAIL-SAFE
+  // de mano de obra para CADA operación de cierre de sesión (aplicada o
+  // idempotente). Idempotente por (tenant, sesión); jamás rompe la sincronización.
+  const tenant = res.locals.tenant as string | undefined;
+  if (tenant) {
+    for (const rs of resumen.resultados) {
+      const suf = rs.comando.startsWith(`${MODULO}.`) ? rs.comando.slice(MODULO.length + 1) : rs.comando;
+      if (suf !== "sesion.cerrar") continue;
+      const payload = (rs.resultado ?? rs.actual) as { sesionId?: string; ordenId?: string; estado?: string } | undefined;
+      if (payload?.sesionId && payload.estado === "CERRADA") {
+        await valorarSesionFailSafe(tenant, payload.sesionId, payload.ordenId);
+      }
+    }
+  }
   res.json(resumen);
 });
 

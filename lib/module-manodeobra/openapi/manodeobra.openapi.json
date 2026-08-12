@@ -1,0 +1,1881 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DeltaOps · Fundación de Mano de Obra (DGP-020.3)",
+    "version": "1.0.0",
+    "description": "Contrato OpenAPI generado (contract-first) desde los esquemas del módulo. El tiempo efectivo proviene de las sesiones de Órdenes (DGP-020.2); el módulo no recalcula tramos ni lee tablas de otros módulos. Errores kernel→HTTP: AUTH→403, NF→404, CFL→409, VAL→400, INF→500."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "API DeltaOps"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Catálogo"
+    },
+    {
+      "name": "Recursos"
+    },
+    {
+      "name": "Tarifas"
+    },
+    {
+      "name": "Valoración"
+    },
+    {
+      "name": "Consulta"
+    }
+  ],
+  "paths": {
+    "/api/deltaops/manodeobra/catalogo": {
+      "get": {
+        "tags": [
+          "Catálogo"
+        ],
+        "operationId": "manodeobra.catalogo.opciones",
+        "summary": "Opciones del catálogo de categorías (vacío ⇒ canónicas por defecto) y unidades soportadas",
+        "parameters": [
+          {
+            "name": "catalogo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nombre del catálogo (categorias-mdo)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpcionesCatalogo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Catálogo"
+        ],
+        "operationId": "manodeobra.catalogo.upsert",
+        "summary": "Alta/edición de una categoría (idempotente por clave)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertCategoria"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/catalogo/habilitar": {
+      "post": {
+        "tags": [
+          "Catálogo"
+        ],
+        "operationId": "manodeobra.catalogo.habilitar",
+        "summary": "Habilitar/deshabilitar una categoría",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabilitarCategoria"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/recursos": {
+      "get": {
+        "tags": [
+          "Recursos"
+        ],
+        "operationId": "manodeobra.recursos",
+        "summary": "Listar recursos humanos (con nombre resuelto por Identidad)",
+        "parameters": [
+          {
+            "name": "categoriaClave",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por categoría"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ACTIVO | INACTIVO"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recursos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Recurso"
+                      }
+                    }
+                  },
+                  "required": [
+                    "recursos"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Recursos"
+        ],
+        "operationId": "manodeobra.recurso.definir",
+        "summary": "Definir/actualizar un recurso (upsert idempotente por identityId; reactiva INACTIVO)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefinirRecurso"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/recursos/estado": {
+      "post": {
+        "tags": [
+          "Recursos"
+        ],
+        "operationId": "manodeobra.recurso.estado",
+        "summary": "Cambiar el estado de un recurso (ACTIVO/INACTIVO)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstadoRecurso"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/tarifas": {
+      "get": {
+        "tags": [
+          "Tarifas"
+        ],
+        "operationId": "manodeobra.tarifas",
+        "summary": "Listar tarifas de un sujeto (histórico versionado)",
+        "parameters": [
+          {
+            "name": "sujetoTipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "CATEGORIA | IDENTIDAD"
+          },
+          {
+            "name": "sujetoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Categoría o identidad"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "VIGENTE | CERRADA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tarifas": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Tarifa"
+                      }
+                    }
+                  },
+                  "required": [
+                    "tarifas"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tarifas"
+        ],
+        "operationId": "manodeobra.tarifa.crear",
+        "summary": "Crear tarifa (no-solape de vigencias; unidad sólo HORA; moneda explícita o de config)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearTarifa"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/tarifas/actualizar": {
+      "post": {
+        "tags": [
+          "Tarifas"
+        ],
+        "operationId": "manodeobra.tarifa.actualizar",
+        "summary": "Versionar tarifa: cierra la vigente y crea una nueva en UNA sola UoW",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarTarifa"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/tarifas/cerrar": {
+      "post": {
+        "tags": [
+          "Tarifas"
+        ],
+        "operationId": "manodeobra.tarifa.cerrar",
+        "summary": "Cerrar la vigencia abierta de un sujeto",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CerrarTarifa"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoComando"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/valoraciones": {
+      "get": {
+        "tags": [
+          "Valoración"
+        ],
+        "operationId": "manodeobra.valoraciones",
+        "summary": "Listar valoraciones (por OT/activo/identidad/estado)",
+        "parameters": [
+          {
+            "name": "ordenId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por OT"
+          },
+          {
+            "name": "activoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por activo"
+          },
+          {
+            "name": "identityId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por identidad"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "VALORADA | SIN_TARIFA | SIN_RECURSO"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valoraciones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Valoracion"
+                      }
+                    }
+                  },
+                  "required": [
+                    "valoraciones"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/valoraciones/procesar-sesion": {
+      "post": {
+        "tags": [
+          "Valoración"
+        ],
+        "operationId": "manodeobra.valoracion.procesar-sesion",
+        "summary": "Valorar una sesión CERRADA (idempotente por (tenant, sesión); orquestado tras el cierre de la OT)",
+        "description": "Snapshot inmutable: lee `modulo.ordenes.sesion.duraciones` (autoridad del tiempo), resuelve recurso + tarifa vigente en el inicio y persiste el costo. Reprocesar NO duplica (una valoración por sesión). Red de seguridad del cierre fail-safe.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcesarSesion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoValoracion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/valoraciones/revalorar": {
+      "post": {
+        "tags": [
+          "Valoración"
+        ],
+        "operationId": "manodeobra.valoracion.revalorar",
+        "summary": "Revalorar (sólo SIN_TARIFA/SIN_RECURSO; VALORADA es inmutable)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Revalorar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoValoracion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia/duplicado (KRN-CFL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/valoraciones/pendientes": {
+      "get": {
+        "tags": [
+          "Valoración"
+        ],
+        "operationId": "manodeobra.valoraciones.pendientes",
+        "summary": "Sesiones CERRADAS sin valoración (red de seguridad de la orquestación)",
+        "parameters": [
+          {
+            "name": "ordenId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por OT"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pendientes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Pendiente"
+                      }
+                    }
+                  },
+                  "required": [
+                    "pendientes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/mias": {
+      "get": {
+        "tags": [
+          "Consulta"
+        ],
+        "operationId": "manodeobra.mias",
+        "summary": "Mis valoraciones (identidad del contexto autenticado; match canónico estricto)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valoraciones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Valoracion"
+                      }
+                    }
+                  },
+                  "required": [
+                    "valoraciones"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/resumen": {
+      "get": {
+        "tags": [
+          "Consulta"
+        ],
+        "operationId": "manodeobra.resumen",
+        "summary": "Resumen de mano de obra por OT (agregado + pendientes)",
+        "parameters": [
+          {
+            "name": "ordenId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "OT a resumir"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resumen"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/manodeobra/costo-estimado": {
+      "get": {
+        "tags": [
+          "Consulta"
+        ],
+        "operationId": "manodeobra.costo-estimado",
+        "summary": "Costo estimado de una sesión en curso (tarifa vigente × tiempo actual; sinTarifa nunca 0)",
+        "parameters": [
+          {
+            "name": "sesionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Sesión abierta a estimar"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostoEstimado"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "KRN-VAL-001"
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "ResultadoComando": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "idempotente": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpsertCategoria": {
+        "type": "object",
+        "properties": {
+          "catalogo": {
+            "type": "string",
+            "enum": [
+              "categorias-mdo"
+            ]
+          },
+          "clave": {
+            "type": "string"
+          },
+          "etiqueta": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "integer"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave"
+        ],
+        "additionalProperties": false
+      },
+      "HabilitarCategoria": {
+        "type": "object",
+        "properties": {
+          "catalogo": {
+            "type": "string",
+            "enum": [
+              "categorias-mdo"
+            ]
+          },
+          "clave": {
+            "type": "string"
+          },
+          "habilitado": {
+            "type": "boolean"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "habilitado"
+        ],
+        "additionalProperties": false
+      },
+      "OpcionesCatalogo": {
+        "type": "object",
+        "properties": {
+          "catalogo": {
+            "type": "string"
+          },
+          "opciones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "habilitado": {
+                  "type": "boolean"
+                },
+                "canonica": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "value",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "unidades": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "HORA"
+              ]
+            }
+          }
+        },
+        "required": [
+          "catalogo",
+          "opciones",
+          "unidades"
+        ],
+        "additionalProperties": false
+      },
+      "DefinirRecurso": {
+        "type": "object",
+        "properties": {
+          "identityId": {
+            "type": "string"
+          },
+          "categoriaClave": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "identityId",
+          "categoriaClave"
+        ],
+        "additionalProperties": false
+      },
+      "EstadoRecurso": {
+        "type": "object",
+        "properties": {
+          "identityId": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ]
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "identityId",
+          "estado"
+        ],
+        "additionalProperties": false
+      },
+      "Recurso": {
+        "type": "object",
+        "properties": {
+          "identityId": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoriaClave": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ]
+          },
+          "creadoAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actualizadoAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "identityId",
+          "categoriaClave",
+          "estado"
+        ],
+        "additionalProperties": false
+      },
+      "CrearTarifa": {
+        "type": "object",
+        "properties": {
+          "sujetoTipo": {
+            "type": "string",
+            "enum": [
+              "CATEGORIA",
+              "IDENTIDAD"
+            ],
+            "description": "Hoy sólo CATEGORIA"
+          },
+          "sujetoId": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number",
+            "minimum": 0
+          },
+          "moneda": {
+            "type": "string",
+            "description": "ISO-4217; explícita o de la config del tenant"
+          },
+          "unidad": {
+            "type": "string",
+            "enum": [
+              "HORA"
+            ]
+          },
+          "vigenciaDesde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sujetoId",
+          "valor"
+        ],
+        "additionalProperties": false
+      },
+      "ActualizarTarifa": {
+        "type": "object",
+        "properties": {
+          "sujetoTipo": {
+            "type": "string",
+            "enum": [
+              "CATEGORIA",
+              "IDENTIDAD"
+            ]
+          },
+          "sujetoId": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number",
+            "minimum": 0
+          },
+          "moneda": {
+            "type": "string"
+          },
+          "unidad": {
+            "type": "string",
+            "enum": [
+              "HORA"
+            ]
+          },
+          "vigenciaDesde": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante de corte: cierra la vigente y abre la nueva (una UoW)"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sujetoId",
+          "valor",
+          "vigenciaDesde"
+        ],
+        "additionalProperties": false
+      },
+      "CerrarTarifa": {
+        "type": "object",
+        "properties": {
+          "sujetoTipo": {
+            "type": "string",
+            "enum": [
+              "CATEGORIA",
+              "IDENTIDAD"
+            ]
+          },
+          "sujetoId": {
+            "type": "string"
+          },
+          "vigenciaHasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sujetoId",
+          "vigenciaHasta"
+        ],
+        "additionalProperties": false
+      },
+      "Tarifa": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sujetoTipo": {
+            "type": "string"
+          },
+          "sujetoId": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          },
+          "moneda": {
+            "type": "string"
+          },
+          "unidad": {
+            "type": "string",
+            "enum": [
+              "HORA"
+            ]
+          },
+          "vigenciaDesde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "vigenciaHasta": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "VIGENTE",
+              "CERRADA"
+            ]
+          },
+          "valorAnterior": {
+            "type": "number",
+            "nullable": true
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sujetoId",
+          "valor",
+          "moneda",
+          "unidad",
+          "estado"
+        ],
+        "additionalProperties": false
+      },
+      "ProcesarSesion": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "ordenId": {
+            "type": "string",
+            "description": "Opcional; se deriva de la sesión si se omite"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sesionId"
+        ],
+        "additionalProperties": false
+      },
+      "Revalorar": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sesionId"
+        ],
+        "additionalProperties": false
+      },
+      "Valoracion": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "ordenId": {
+            "type": "string"
+          },
+          "activoId": {
+            "type": "string",
+            "nullable": true
+          },
+          "identityId": {
+            "type": "string"
+          },
+          "categoriaClave": {
+            "type": "string",
+            "nullable": true
+          },
+          "tarifaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "tarifaValor": {
+            "type": "number",
+            "nullable": true
+          },
+          "moneda": {
+            "type": "string",
+            "nullable": true
+          },
+          "unidad": {
+            "type": "string",
+            "nullable": true
+          },
+          "efectivoMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "costo": {
+            "type": "number",
+            "description": "Monto en la moneda de la tarifa (numeric(18,6)); NULL cuando no hay tarifa"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "VALORADA",
+              "SIN_TARIFA",
+              "SIN_RECURSO"
+            ]
+          },
+          "cruzaPeriodos": {
+            "type": "boolean"
+          },
+          "iniciadoAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cerradoAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "valoradoAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "sesionId",
+          "ordenId",
+          "identityId",
+          "efectivoMs",
+          "estado"
+        ],
+        "additionalProperties": false
+      },
+      "ResultadoValoracion": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "VALORADA",
+              "SIN_TARIFA",
+              "SIN_RECURSO"
+            ]
+          },
+          "costo": {
+            "type": "number",
+            "description": "Monto en la moneda de la tarifa (numeric(18,6)); NULL cuando no hay tarifa"
+          },
+          "moneda": {
+            "type": "string",
+            "nullable": true
+          },
+          "yaExistia": {
+            "type": "boolean"
+          },
+          "idempotente": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sesionId",
+          "estado"
+        ],
+        "additionalProperties": false
+      },
+      "Pendiente": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "ordenId": {
+            "type": "string"
+          },
+          "identityId": {
+            "type": "string"
+          },
+          "efectivoMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cerradoAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "sesionId",
+          "ordenId",
+          "identityId"
+        ],
+        "additionalProperties": false
+      },
+      "CostoEstimado": {
+        "type": "object",
+        "properties": {
+          "sesionId": {
+            "type": "string"
+          },
+          "estimado": {
+            "type": "boolean"
+          },
+          "sinTarifa": {
+            "type": "boolean"
+          },
+          "costo": {
+            "type": "number",
+            "description": "Monto en la moneda de la tarifa (numeric(18,6)); NULL cuando no hay tarifa"
+          },
+          "moneda": {
+            "type": "string",
+            "nullable": true
+          },
+          "efectivoMs": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "sesionId",
+          "estimado",
+          "sinTarifa"
+        ],
+        "additionalProperties": false
+      },
+      "Resumen": {
+        "type": "object",
+        "properties": {
+          "ordenId": {
+            "type": "string"
+          },
+          "efectivoMsTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "costoPorMoneda": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "moneda": {
+                  "type": "string"
+                },
+                "costo": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "moneda",
+                "costo"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "valoraciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Valoracion"
+            }
+          },
+          "pendientes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pendiente"
+            }
+          }
+        },
+        "required": [
+          "ordenId"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

@@ -49,6 +49,9 @@
       "path": "./lib/module-analytics"
     },
     {
+      "path": "./lib/module-manodeobra"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

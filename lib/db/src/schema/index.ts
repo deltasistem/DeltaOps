@@ -19,4 +19,5 @@ export * from "./deltaops-preventivo";
 export * from "./deltaops-correctivo";
 export * from "./deltaops-utilizacion";
 export * from "./deltaops-analytics";
+export * from "./deltaops-manodeobra";
 export * from "./deltaops-identity";

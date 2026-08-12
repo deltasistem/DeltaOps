@@ -33,6 +33,8 @@ import { correctivoRuntime, principalCorrectivo, formulariosRuntime, contextForF
 import { analyticsRuntime, principalAnalytics } from "../routes/deltaops/analytics-runtime";
 import { utilizacionRuntime, principalUtilizacion } from "../routes/deltaops/utilizacion-runtime";
 import { MODULO as MODULO_UTL } from "@workspace/module-utilizacion";
+import { manodeobraRuntime, principalManodeobra } from "../routes/deltaops/manodeobra-runtime";
+import { MODULO as MODULO_MDO, CATEGORIAS_CANONICAS } from "@workspace/module-manodeobra";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -191,6 +193,7 @@ async function seedEnterpriseIdentity(): Promise<void> {
   const modulosDemo = [
     "referencia", "activos", "ordenes", "inventario", "planes",
     "abastecimiento", "preventivo", "correctivo", "analytics", "utilizacion",
+    "manodeobra",
   ];
   await crearTenant({
     tenantId: DEMO_TENANT,
@@ -1986,6 +1989,56 @@ async function seedUtilizacion(activoIds: Map<string, string>): Promise<void> {
   log(`Utilización: ${lecturasHoro.length + lecturasOdo.length} lecturas + ${tanqueos.length} tanqueos (MAQ-001, CAM-001)`);
 }
 
+/* --------------------------- Mano de Obra (DGP-020.3) -------------------- */
+
+/**
+ * Fundación de Mano de Obra: categorías canónicas HABILITADAS, un recurso humano
+ * DEMO (Ana Soto → tecnico-mecanico) y una tarifa vigente 40000/HORA en la moneda
+ * del tenant DEMO (CLP; NUNCA hardcode de otra moneda). Idempotente: catálogo por
+ * clave, recurso por identityId, tarifa por opId (no-solape). Fail-safe si Ana no
+ * existe todavía (no rompe el seed).
+ */
+async function seedManoDeObra(): Promise<void> {
+  const { obtenerIdentidadPorEmail } = await import("../deltaops/identity/service");
+  const rt = manodeobraRuntime();
+  const ctx = ctxCon(principalManodeobra("seed-demo", "TENANT_ADMIN"));
+  const drain = () => drenarCompleto(rt.platform.kernel);
+  const cmd = (name: string, input: Record<string, unknown>) => rt.platform.kernel.commands.execute(ctx, name, input);
+
+  // 1) Categorías canónicas habilitadas (upsert por clave + habilitar).
+  for (const cat of CATEGORIAS_CANONICAS) {
+    unwrap(await cmd(`${MODULO_MDO}.catalogo.upsert`, {
+      opId: `seed:mdo:cat:${cat.clave}`, catalogo: "categorias-mdo", clave: cat.clave, etiqueta: cat.etiqueta, posicion: cat.posicion,
+    }), `mdo.catalogo ${cat.clave}`);
+    unwrap(await cmd(`${MODULO_MDO}.catalogo.habilitar`, {
+      opId: `seed:mdo:cat-hab:${cat.clave}`, catalogo: "categorias-mdo", clave: cat.clave, habilitado: true,
+    }), `mdo.catalogo.habilitar ${cat.clave}`);
+  }
+  await drain();
+
+  // 2) Recurso DEMO: Ana Soto (TECNICO) como tecnico-mecanico.
+  const ana = await obtenerIdentidadPorEmail("tecnico@delta.demo");
+  if (!ana) {
+    log("Mano de Obra: identidad DEMO 'tecnico@delta.demo' no encontrada; se omite recurso/tarifa (fail-safe)");
+    return;
+  }
+  unwrap(await cmd(`${MODULO_MDO}.recurso.definir`, {
+    opId: "seed:mdo:recurso:ana", identityId: ana.identityId, categoriaClave: "tecnico-mecanico",
+  }), "mdo.recurso Ana Soto");
+  await drain();
+
+  // 3) Tarifa vigente 40000/HORA para tecnico-mecanico en la moneda del tenant (CLP).
+  unwrap(await cmd(`${MODULO_MDO}.tarifa.crear`, {
+    opId: "seed:mdo:tarifa:tecnico-mecanico",
+    sujetoTipo: "CATEGORIA", sujetoId: "tecnico-mecanico",
+    valor: 40000, moneda: "CLP", unidad: "HORA", vigenciaDesde: "2026-01-01T00:00:00.000Z",
+    motivo: "Tarifa base DEMO",
+  }), "mdo.tarifa tecnico-mecanico");
+  await drain();
+
+  log(`Mano de Obra: ${CATEGORIAS_CANONICAS.length} categorías canónicas + recurso Ana Soto (tecnico-mecanico) + tarifa 40000 CLP/HORA`);
+}
+
 export async function seedDeltaDemo(): Promise<void> {
   console.log(`\nSeed DEMO oficial DGP-011.3 — tenant "${DEMO_TENANT}" (${DEMO_EMPRESA})`);
   await wipeDeltaDemo();
@@ -2000,6 +2053,7 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedPreventivo(activoIds);
   await seedCorrectivo(activoIds, invIds);
   await seedUtilizacion(activoIds);
+  await seedManoDeObra();
   await seedPlataforma(activoIds);
   await seedAnalytics();
   console.log("Seed DEMO completado.\n");
