@@ -30,6 +30,8 @@ let PLANES: any[] = [];
 let TIMELINE: any[] = [];
 let PENDIENTES = 0;
 let EN_LINEA = true;
+let PERMISOS: string[] | undefined;
+let CAPS: string[] | undefined;
 
 const val = (v: number) => ({ tipo: "valor" as const, valor: v });
 const sd = { tipo: "sin-datos" as const };
@@ -54,7 +56,7 @@ vi.mock("../lib/planes/hooks", () => ({
   usePlanesDeActivo: () => ({ datos: PLANES, cargando: false, error: null, recargar: () => {} }),
 }));
 vi.mock("../lib/identidad/sesion", () => ({
-  useSesion: () => ({ sesion: { rol: ROL, modulos: ["utilizacion"] } }),
+  useSesion: () => ({ sesion: { rol: ROL, modulos: ["utilizacion"], permisos: PERMISOS, capacidades: CAPS } }),
 }));
 vi.mock("../lib/offline/contexto", () => ({
   OfflineProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -93,6 +95,8 @@ function wrap(ui: React.ReactNode, oscuro = false) {
 
 beforeEach(() => {
   ROL = "TENANT_ADMIN";
+  PERMISOS = undefined;
+  CAPS = undefined;
   RESUMEN_TOTAL = { deltaHorometro: val(12), deltaOdometro: sd, litrosPorHora: val(4.5), litrosPor100Km: sd, litrosTotal: 120, costoTotal: 900 } as ResumenActivo;
   RESUMEN_ACTUAL = { deltaHorometro: val(12), deltaOdometro: sd, litrosPorHora: val(4.5), litrosPor100Km: sd, litrosTotal: 120, costoTotal: 900 } as ResumenActivo;
   RESUMEN_ANTERIOR = { deltaHorometro: val(10), deltaOdometro: sd, litrosPorHora: val(4.0), litrosPor100Km: sd, litrosTotal: 100, costoTotal: 800 } as ResumenActivo;
@@ -270,6 +274,30 @@ describe("Ficha Operacional 360° · RBAC de creación de Órdenes (ocultar CTAs
       expect(screen.getByRole("button", { name: /Ver todas las órdenes/ })).toBeInTheDocument();
       unmount();
     }
+  });
+
+  it("señal EXPLÍCITA read+write (permiso real de crear) MUESTRA ambos CTAs aun con rol lector", () => {
+    ROL = "CONSULTA";
+    PERMISOS = ["modulo.ordenes.read", "modulo.ordenes.write"];
+    wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
+    expect(screen.getByRole("button", { name: /Crear orden/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Nueva orden/ })).toBeInTheDocument();
+  });
+
+  it("señal EXPLÍCITA de SOLO read OCULTA ambos CTAs aun con rol operador", () => {
+    ROL = "SUPERVISOR";
+    PERMISOS = ["modulo.ordenes.read"];
+    wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
+    expect(screen.queryByRole("button", { name: /Crear orden/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Nueva orden/ })).not.toBeInTheDocument();
+  });
+
+  it("capacidad corta gestionar-ordenes MUESTRA ambos CTAs", () => {
+    ROL = "CONSULTA";
+    CAPS = ["gestionar-ordenes"];
+    wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
+    expect(screen.getByRole("button", { name: /Crear orden/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Nueva orden/ })).toBeInTheDocument();
   });
 });
 

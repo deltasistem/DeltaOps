@@ -42,19 +42,42 @@ describe("capacidadesOrdenes · mapeo por rol (réplica aRolLegacy→principalOr
   });
 });
 
-describe("capacidadesOrdenes · override por señal explícita del namespace", () => {
-  it("comodín global concede crear aunque el rol sea lector", () => {
-    expect(capacidadesOrdenes(s("CONSULTA", { permisos: ["*"] })).crear).toBe(true);
-    expect(capacidadesOrdenes(s("CONSULTA", { capacidades: ["*"] })).crear).toBe(true);
+describe("capacidadesOrdenes · override por PERMISOS REALES del contrato", () => {
+  it("read+write (permiso real de crear) ⇒ crear visible aunque el rol sea lector", () => {
+    const c = capacidadesOrdenes(s("CONSULTA", { permisos: ["modulo.ordenes.read", "modulo.ordenes.write"] }));
+    expect(c.crear).toBe(true);
+    // write no concede operar/validar/admin.
+    expect(c).toMatchObject({ leer: true, ejecutar: false, validar: false, administrar: false });
   });
 
-  it("comodín de módulo modulo.ordenes.* concede crear", () => {
+  it("SOLO read ⇒ crear oculto (señal presente pero sin write)", () => {
+    const c = capacidadesOrdenes(s("SUPERVISOR", { permisos: ["modulo.ordenes.read"] }));
+    expect(c.crear).toBe(false);
+    expect(c.ejecutar).toBe(false);
+  });
+
+  it("mapea cada permiso REAL a su acción (operar/validar/admin)", () => {
+    expect(capacidadesOrdenes(s("CONSULTA", { permisos: ["modulo.ordenes.read", "modulo.ordenes.operar"] })).ejecutar).toBe(true);
+    expect(capacidadesOrdenes(s("CONSULTA", { permisos: ["modulo.ordenes.read", "modulo.ordenes.validar"] })).validar).toBe(true);
+    // admin es super-permiso: concede TODAS las acciones.
+    const adminPerm = capacidadesOrdenes(s("CONSULTA", { permisos: ["modulo.ordenes.admin"] }));
+    expect(adminPerm).toMatchObject({ crear: true, ejecutar: true, validar: true, administrar: true });
+  });
+
+  it("capacidades cortas ⇒ crear visible (gestionar-ordenes)", () => {
+    expect(capacidadesOrdenes(s("CONSULTA", { capacidades: ["gestionar-ordenes"] })).crear).toBe(true);
+    expect(capacidadesOrdenes(s("CONSULTA", { capacidades: ["ejecutar-ordenes"] })).ejecutar).toBe(true);
+  });
+
+  it("comodín global / de módulo concede crear aunque el rol sea lector", () => {
+    expect(capacidadesOrdenes(s("CONSULTA", { permisos: ["*"] })).crear).toBe(true);
+    expect(capacidadesOrdenes(s("CONSULTA", { capacidades: ["*"] })).crear).toBe(true);
     expect(capacidadesOrdenes(s("CONSULTA", { permisos: ["modulo.ordenes.*"] })).crear).toBe(true);
   });
 
   it("señal explícita del módulo puede RESTRINGIR crear a un admin", () => {
-    // Hay señal del namespace órdenes pero NO gestionar-ordenes → crear=false.
-    const c = capacidadesOrdenes(s("TENANT_ADMIN", { capacidades: ["ejecutar-ordenes"] }));
+    // Hay señal del namespace (operar) pero NO write/gestionar → crear=false.
+    const c = capacidadesOrdenes(s("TENANT_ADMIN", { permisos: ["modulo.ordenes.read", "modulo.ordenes.operar"] }));
     expect(c.crear).toBe(false);
     expect(c.ejecutar).toBe(true);
   });

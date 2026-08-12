@@ -63,45 +63,73 @@ function aRolLegacy(rol: string): RolLegacy {
   }
 }
 
-/** Sufijos/capacidades canónicas del namespace `modulo.ordenes`. */
-const CAP = {
-  gestionar: "gestionar-ordenes",
-  ejecutar: "ejecutar-ordenes",
-  validar: "validar-ordenes",
-  administrar: "administrar-ordenes",
+/**
+ * Contrato REAL del módulo Órdenes: cada acción exige un permiso concreto del
+ * namespace `modulo.ordenes.*` (verificado en `lib/module-ordenes/src/module.ts`
+ * y `artifacts/api-server/.../ordenes-runtime.ts`), y además existe una capacidad
+ * corta que agrupa `[read, <permiso>]`:
+ *
+ *   acción      permiso REAL             capacidad corta
+ *   ----------  -----------------------  ----------------------
+ *   crear       modulo.ordenes.write     gestionar-ordenes
+ *   ejecutar    modulo.ordenes.operar    ejecutar-ordenes
+ *   validar     modulo.ordenes.validar   validar-ordenes
+ *   administrar modulo.ordenes.admin     administrar-ordenes
+ *
+ * El permiso `admin` es super-permiso: concede todas las acciones.
+ */
+const ACCIONES = {
+  crear: { permiso: `${MODULO}.write`, capacidadCorta: "gestionar-ordenes" },
+  ejecutar: { permiso: `${MODULO}.operar`, capacidadCorta: "ejecutar-ordenes" },
+  validar: { permiso: `${MODULO}.validar`, capacidadCorta: "validar-ordenes" },
+  administrar: { permiso: `${MODULO}.admin`, capacidadCorta: "administrar-ordenes" },
 } as const;
 
 /**
- * ¿La sesión declara EXPLÍCITAMENTE esta capacidad DEL MÓDULO Órdenes?
- * Sólo cuenta como "señal" si el payload trae permisos/capacidades del namespace
- * `modulo.ordenes.*` (o un comodín de módulo/global). Sin señal del módulo se
- * devuelve `undefined` para delegar en el rol (el payload real de un
- * TENANT_ADMIN NO trae capacidades de órdenes, por eso no debe ser `false`).
+ * ¿La sesión declara EXPLÍCITAMENTE autorización para esta acción del módulo
+ * Órdenes? Devuelve:
+ *  - `true`  si el payload concede la acción (permiso REAL del contrato,
+ *            `modulo.ordenes.admin`, la capacidad corta equivalente o un comodín);
+ *  - `false` si HAY señal del namespace `modulo.ordenes.*` pero NO concede la
+ *            acción (p.ej. sólo `read`);
+ *  - `undefined` si NO hay ninguna señal del módulo → delegar en el rol (el
+ *            payload real de un TENANT_ADMIN NO trae permisos de órdenes, por eso
+ *            la ausencia total no debe interpretarse como denegación).
  */
 function declara(
   sesion: Pick<Sesion, "capacidades" | "permisos">,
-  capacidad: string,
+  accion: { permiso: string; capacidadCorta: string },
 ): boolean | undefined {
   const prefijo = `${MODULO}.`; // modulo.ordenes.
   const caps = sesion.capacidades ?? [];
   const perms = sesion.permisos ?? [];
 
+  // Comodines globales / de módulo → conceden todo.
   if (perms.includes("*") || caps.includes("*") || perms.includes(`${MODULO}.*`) || caps.includes(`${MODULO}.*`)) {
     return true;
   }
 
+  // ¿Hay ALGUNA señal específica del namespace órdenes (permiso o capacidad corta)?
   const haySenalModulo =
     perms.some((p) => p.startsWith(prefijo)) ||
-    caps.some((c) => c === capacidad || c.endsWith("-ordenes") || c.startsWith(prefijo));
+    caps.some((c) => c.endsWith("-ordenes") || c.startsWith(prefijo));
   if (!haySenalModulo) return undefined;
 
-  return caps.includes(capacidad) || perms.includes(`${prefijo}${capacidad}`);
+  // Concesión por el PERMISO REAL del contrato, por `admin` (super-permiso) o por
+  // la capacidad corta equivalente. Un permiso de sólo lectura aislado NO concede
+  // la acción, pero tampoco la deniega si además está presente el permiso válido.
+  return (
+    perms.includes(accion.permiso) ||
+    perms.includes(`${MODULO}.admin`) ||
+    caps.includes(accion.capacidadCorta)
+  );
 }
 
 /**
  * Capacidades del módulo Órdenes para una sesión. `rol` es la fuente primaria
  * (réplica de la cadena `aRolLegacy` → `principalOrdenes` del backend); una señal
- * explícita del namespace `modulo.ordenes.*` la sobreescribe.
+ * explícita del namespace `modulo.ordenes.*` la sobreescribe con los permisos
+ * REALES del contrato.
  */
 export function capacidadesOrdenes(
   sesion: Pick<Sesion, "rol" | "capacidades" | "permisos">,
@@ -113,23 +141,23 @@ export function capacidadesOrdenes(
   // Mapeo por rol (réplica de `principalOrdenes`).
   const porRol: CapacidadesOrdenes = {
     leer: true, // todo rol con acceso al módulo tiene `modulo.ordenes.read`
-    crear: admin || operador, // gestionar-ordenes (write)
-    ejecutar: admin || operador, // ejecutar-ordenes (operar)
-    validar: admin, // validar-ordenes
-    administrar: admin, // administrar-ordenes / admin
+    crear: admin || operador, // write / gestionar-ordenes
+    ejecutar: admin || operador, // operar / ejecutar-ordenes
+    validar: admin, // validar / validar-ordenes
+    administrar: admin, // admin / administrar-ordenes
   };
 
-  const conSenal = (capacidad: string, fallback: boolean): boolean => {
-    const d = declara(sesion, capacidad);
+  const conSenal = (accion: { permiso: string; capacidadCorta: string }, fallback: boolean): boolean => {
+    const d = declara(sesion, accion);
     return d === undefined ? fallback : d;
   };
 
   return {
     leer: true,
-    crear: conSenal(CAP.gestionar, porRol.crear),
-    ejecutar: conSenal(CAP.ejecutar, porRol.ejecutar),
-    validar: conSenal(CAP.validar, porRol.validar),
-    administrar: conSenal(CAP.administrar, porRol.administrar),
+    crear: conSenal(ACCIONES.crear, porRol.crear),
+    ejecutar: conSenal(ACCIONES.ejecutar, porRol.ejecutar),
+    validar: conSenal(ACCIONES.validar, porRol.validar),
+    administrar: conSenal(ACCIONES.administrar, porRol.administrar),
   };
 }
 
