@@ -91,10 +91,21 @@ function normalizarDuracion(row: Record<string, unknown>): DuracionSesion | null
   };
 }
 
+/**
+ * Normaliza el shape de respuesta del contrato público `sesion.duraciones` a
+ * una lista de filas. CRÍTICO: la query devuelve DOS shapes distintas según el
+ * criterio (ver `module-ordenes` §sesion.duraciones):
+ *   - por `sesionId`  ⇒ `{ duraciones: <fila | null> }`  (objeto O null)
+ *   - por `ordenId`   ⇒ `{ duraciones: <fila[]> }`         (arreglo)
+ * Aceptar SÓLO el arreglo (bug histórico) hacía que la valoración por sesión
+ * nunca encontrara la sesión ⇒ `procesar-sesion` fallaba con 404 sesion y la
+ * orquestación fail-safe jamás materializaba la valoración. Se toleran ambos.
+ */
 function filasDuraciones(valor: unknown): Record<string, unknown>[] {
   if (valor && typeof valor === "object") {
     const d = (valor as Record<string, unknown>)["duraciones"];
     if (Array.isArray(d)) return d as Record<string, unknown>[];
+    if (d && typeof d === "object") return [d as Record<string, unknown>];
   }
   return [];
 }
