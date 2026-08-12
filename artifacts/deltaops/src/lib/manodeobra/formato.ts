@@ -23,28 +23,46 @@ export function formatearTiempo(ms: number | null | undefined): string {
 }
 
 /**
+ * El DINERO viaja desde el backend como CADENA decimal exacta (PUNTO FIJO,
+ * numeric(18,6)) — jamás como number JS. Para formatear NO parseamos con
+ * `parseFloat`/`Number` (introduciría error de coma flotante en montos grandes o
+ * con muchos decimales): pasamos la CADENA directamente a `Intl.NumberFormat`,
+ * que la interpreta como decimal exacto. Se valida que sea un decimal canónico.
+ */
+const RE_DECIMAL = /^-?\d+(\.\d+)?$/;
+
+function montoNormalizado(monto: string | number | null | undefined): string | null {
+  if (monto == null) return null;
+  const s = typeof monto === "number" ? (Number.isFinite(monto) ? String(monto) : "") : monto.trim();
+  if (!s || !RE_DECIMAL.test(s)) return null;
+  return s;
+}
+
+/**
  * Formatea un monto YA CALCULADO por el backend con `Intl.NumberFormat` en la
- * moneda dada. No hace aritmética monetaria: sólo presentación. Devuelve `null`
- * si no hay monto/moneda (el llamador debe mostrar «Sin tarifa configurada»).
+ * moneda dada. No hace aritmética monetaria ni conversión a float: sólo
+ * presentación. Devuelve `null` si no hay monto/moneda (el llamador debe mostrar
+ * «Sin tarifa configurada»).
  */
 export function formatearMoneda(
-  monto: number | null | undefined,
+  monto: string | number | null | undefined,
   moneda: string | null | undefined,
   locale = "es-CO",
 ): string | null {
-  if (monto == null || !Number.isFinite(monto)) return null;
+  const dec = montoNormalizado(monto);
+  if (dec == null) return null;
   const cod = (moneda ?? "").trim();
   if (!cod) return null;
   try {
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: cod,
-      // El backend ya redondeó/valoró; presentamos hasta 2 decimales.
+      // El backend ya valoró en PUNTO FIJO; presentamos hasta 2 decimales.
       maximumFractionDigits: 2,
-    }).format(monto);
+    }).format(dec as unknown as number);
   } catch {
     // Moneda no reconocida por Intl: presentación segura sin inventar símbolo.
-    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(monto)} ${cod}`;
+    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(dec as unknown as number)} ${cod}`;
   }
 }
 
@@ -57,7 +75,7 @@ export const SIN_TARIFA_TEXTO = "Sin tarifa configurada";
  * monto viniera como 0 (defensa contra costo $0 ante ausencia de tarifa).
  */
 export function costoPresentacion(
-  monto: number | null | undefined,
+  monto: string | number | null | undefined,
   moneda: string | null | undefined,
   hayTarifa: boolean,
   locale?: string,
@@ -69,7 +87,7 @@ export function costoPresentacion(
 
 /** Formatea una tarifa como `valor moneda/unidad` (p. ej. «$40.000 COP/h»). */
 export function formatearTarifa(
-  valor: number | null | undefined,
+  valor: string | number | null | undefined,
   moneda: string | null | undefined,
   unidad: string | null | undefined,
   locale?: string,

@@ -53,11 +53,11 @@ const valorada: Valoracion = {
   nombre: "Ana Soto",
   categoriaClave: "tecnico-mecanico",
   tarifaId: "t-1",
-  tarifaValor: 40000,
+  tarifaValor: "40000.000000",
   moneda: "CLP",
   unidad: "HORA",
   efectivoMs: MS_2H30,
-  costo: 100000,
+  costo: "100000.000000",
   estado: "VALORADA",
 };
 
@@ -90,21 +90,34 @@ describe("formato · tiempo y dinero", () => {
   });
 
   it("formatea el monto (calculado por backend) con su moneda", () => {
-    const f = formatearMoneda(100000, "CLP");
+    const f = formatearMoneda("100000.000000", "CLP");
     expect(f).toBeTruthy();
     expect(f).toMatch(/100[.,\s]?000/);
   });
 
   it("formatea la tarifa como valor moneda/hora", () => {
-    expect(formatearTarifa(40000, "CLP", "HORA")).toMatch(/\/h$/);
+    expect(formatearTarifa("40000.000000", "CLP", "HORA")).toMatch(/\/h$/);
+  });
+
+  it("el DINERO se formatea desde CADENA decimal (PUNTO FIJO) sin pasar por float", () => {
+    // Monto grande donde Number/parseFloat perdería precisión: aquí se presenta
+    // el entero exacto (Intl recibe la cadena decimal, no un float).
+    const grande = formatearMoneda("9007199254740993.000000", "CLP");
+    expect(grande).toMatch(/9[.,\s]?007[.,\s]?199[.,\s]?254[.,\s]?740[.,\s]?993/);
+    // Fraccional half-up del backend: se muestra hasta 2 decimales.
+    const frac = formatearMoneda("46666.666700", "CLP");
+    expect(frac).toMatch(/46[.,\s]?666/);
+    // Cadena no decimal ⇒ null (no formatea basura).
+    expect(formatearMoneda("abc", "CLP")).toBeNull();
+    expect(formatearMoneda("35000.1234", "CLP")).toBeTruthy();
   });
 
   it("AUSENCIA DE TARIFA nunca es $0: devuelve el texto de negocio", () => {
     expect(costoPresentacion(null, "CLP", false)).toBe(SIN_TARIFA_TEXTO);
     // Aunque llegara un 0 espurio con hayTarifa=false, jamás muestra $0.
-    expect(costoPresentacion(0, "CLP", false)).toBe(SIN_TARIFA_TEXTO);
+    expect(costoPresentacion("0.000000", "CLP", false)).toBe(SIN_TARIFA_TEXTO);
     expect(formatearMoneda(null, "CLP")).toBeNull();
-    expect(formatearMoneda(100, "")).toBeNull();
+    expect(formatearMoneda("100.000000", "")).toBeNull();
   });
 
   it("nombrePresentacion cae al id abreviado cuando no hay nombre", () => {
@@ -154,7 +167,7 @@ describe("VistaSeccionManoDeObra", () => {
     const resumen: Resumen = {
       ordenId: "OT-1",
       efectivoMsTotal: MS_2H30,
-      costoPorMoneda: [{ moneda: "CLP", costo: 100000 }],
+      costoPorMoneda: [{ moneda: "CLP", costo: "100000.000000" }],
       valoraciones: [valorada],
       pendientes: [],
     };
@@ -200,7 +213,7 @@ describe("VistaSeccionManoDeObra", () => {
     wrap(
       <VistaSeccionManoDeObra
         resumen={resumen}
-        estimado={{ sesionId: "s-live", estimado: true, sinTarifa: false, costo: 12345, moneda: "CLP", efectivoMs: 900_000 }}
+        estimado={{ sesionId: "s-live", estimado: true, sinTarifa: false, costo: "12345.000000", moneda: "CLP", efectivoMs: 900_000 }}
       />,
     );
     expect(screen.getByText("Estimado")).toBeInTheDocument();

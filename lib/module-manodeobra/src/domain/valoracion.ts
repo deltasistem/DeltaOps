@@ -17,7 +17,7 @@
  *  - SIN_RECURSO : la identidad de la sesión no es un recurso ⇒ costo NULL.
  */
 import { fail, KernelErrors, ok, type KernelError, type Result } from "@workspace/kernel";
-import { calcularCosto, type UnidadTarifa } from "./dinero";
+import { calcularCosto, type Dinero, type UnidadTarifa } from "./dinero";
 import { cruzaPeriodos, tarifaVigenteEn, type Tarifa } from "./tarifa";
 import type { RecursoHumano } from "./recurso";
 
@@ -35,11 +35,11 @@ export interface Valoracion {
   readonly identityId: string;
   readonly categoriaClave: string | null;
   readonly tarifaId: string | null;
-  readonly tarifaValor: number | null;
+  readonly tarifaValor: Dinero | null; // cadena decimal exacta
   readonly moneda: string | null;
   readonly unidad: UnidadTarifa | null;
   readonly efectivoMs: number; // snapshot copiado de DGP-020.2 (autoridad externa)
-  readonly costo: number | null; // NULL cuando SIN_TARIFA/SIN_RECURSO (§15)
+  readonly costo: Dinero | null; // cadena decimal exacta; NULL si SIN_TARIFA/SIN_RECURSO (§15)
   readonly estado: EstadoValoracion;
   readonly vigenciaDesde: Date | null; // vigencia de la tarifa aplicada
   readonly vigenciaHasta: Date | null;
@@ -169,10 +169,10 @@ export interface CostoEstimado {
   readonly efectivoMs: number;
   readonly estimado: true;
   readonly sinTarifa: boolean;
-  readonly tarifaValor: number | null;
+  readonly tarifaValor: Dinero | null;
   readonly moneda: string | null;
   readonly unidad: UnidadTarifa | null;
-  readonly costo: number | null;
+  readonly costo: Dinero | null;
 }
 
 export function costoEstimado(

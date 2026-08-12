@@ -17,7 +17,7 @@
  * Sin reloj interno: fecha/actor llegan como INPUT.
  */
 import { fail, KernelErrors, ok, type KernelError, type Result } from "@workspace/kernel";
-import { esUnidadSoportada, redondear, type UnidadTarifa } from "./dinero";
+import { esUnidadSoportada, normalizarTarifa, type Dinero, type UnidadTarifa } from "./dinero";
 
 export const SUJETOS_TARIFA = ["CATEGORIA", "IDENTIDAD"] as const;
 export type SujetoTarifa = (typeof SUJETOS_TARIFA)[number];
@@ -30,7 +30,7 @@ export interface Tarifa {
   readonly tenantId: string;
   readonly sujetoTipo: SujetoTarifa;
   readonly sujetoId: string;
-  readonly valor: number; // numeric(18,6) en PG; hasta 6 decimales
+  readonly valor: Dinero; // cadena decimal exacta (numeric(18,6) en PG; hasta 6 dec)
   readonly moneda: string;
   readonly unidad: UnidadTarifa;
   readonly vigenciaDesde: Date;
@@ -41,7 +41,7 @@ export interface Tarifa {
   readonly actualizadoAt: Date;
   readonly actualizadoPor: string;
   /** Auditoría del cambio que la cerró/creó (§24). */
-  readonly valorAnterior: number | null;
+  readonly valorAnterior: Dinero | null;
   readonly motivo: string | null;
 }
 
@@ -50,14 +50,14 @@ export interface CrearTarifaInput {
   readonly tenantId: string;
   readonly sujetoTipo: SujetoTarifa;
   readonly sujetoId: string;
-  readonly valor: number;
+  readonly valor: string | number; // se normaliza a cadena decimal exacta
   readonly moneda: string;
   readonly unidad: string;
   readonly vigenciaDesde: Date;
   readonly vigenciaHasta?: Date | null;
   readonly actorId: string;
   readonly ahora: Date;
-  readonly valorAnterior?: number | null;
+  readonly valorAnterior?: Dinero | null;
   readonly motivo?: string | null;
   /** Todas las tarifas EXISTENTES del mismo sujeto (para detectar solape). */
   readonly existentes: readonly Tarifa[];
@@ -80,9 +80,8 @@ export function crearTarifa(input: CrearTarifaInput): Result<Tarifa, KernelError
   if (!esUnidadSoportada(input.unidad)) {
     return fail(KernelErrors.validation(`Unidad de tarifa no soportada: "${input.unidad}" (sólo HORA)`));
   }
-  if (!Number.isFinite(input.valor) || input.valor < 0) {
-    return fail(KernelErrors.validation("El valor de tarifa debe ser finito y no negativo"));
-  }
+  const valorNorm = normalizarTarifa(input.valor);
+  if (!valorNorm.ok) return valorNorm;
   if (input.moneda.trim() === "") return fail(KernelErrors.validation("moneda es obligatoria"));
   if (input.vigenciaHasta && input.vigenciaHasta.getTime() <= input.vigenciaDesde.getTime()) {
     return fail(KernelErrors.validation("vigenciaHasta debe ser posterior a vigenciaDesde"));
@@ -104,7 +103,7 @@ export function crearTarifa(input: CrearTarifaInput): Result<Tarifa, KernelError
       tenantId: input.tenantId,
       sujetoTipo: input.sujetoTipo,
       sujetoId: input.sujetoId,
-      valor: redondear(input.valor, 6),
+      valor: valorNorm.value,
       moneda: input.moneda,
       unidad: input.unidad,
       vigenciaDesde: input.vigenciaDesde,

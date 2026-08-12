@@ -71,26 +71,48 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
     await pool.end();
   });
 
-  async function prep(t: string, valor = 40000) {
+  async function prep(t: string, valor: string | number = "40000") {
     must(await exec(ctx(t), `${MODULO}.recurso.definir`, { identityId: "u1", categoriaClave: "soldador" }));
     must(await exec(ctx(t), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
   }
 
-  it("precisión monetaria en numeric(18,6): 2h30m×40000=100000, 1h20m×35000=46666.6667", async () => {
-    await prep(T_A, 40000);
+  it("precisión monetaria en numeric(18,6) EXACTA (dígito a dígito, sin float)", async () => {
+    await prep(T_A, "40000");
     cerrada(T_A, "s1", "o1", "u1", 9_000_000);
     const v = must(await exec(ctx(T_A), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" })) as Record<string, unknown>;
-    expect(Number(v["costo"])).toBe(100000);
-    // Segundo sujeto con tarifa 35000 para el caso fraccionario.
+    // §42 · 2h30m × 40000 = 100000.0000 (cadena canónica, sin Number con pérdida).
+    expect(v["costo"]).toBe("100000.000000");
+    // Segundo sujeto con tarifa 35000 para el caso fraccionario half-up.
     identidad.registrar(T_A, "u2", "Beto");
     must(await exec(ctx(T_A), `${MODULO}.recurso.definir`, { identityId: "u2", categoriaClave: "operador" }));
-    must(await exec(ctx(T_A), `${MODULO}.tarifa.crear`, { sujetoId: "operador", valor: 35000, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
+    must(await exec(ctx(T_A), `${MODULO}.tarifa.crear`, { sujetoId: "operador", valor: "35000", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
     cerrada(T_A, "s2", "o1", "u2", 4_800_000);
     const v2 = must(await exec(ctx(T_A), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s2" })) as Record<string, unknown>;
-    expect(Number(v2["costo"])).toBe(46666.6667);
-    // Verifica que la BD conserva la escala numeric(18,6).
-    const rows = (await pool.query(`SELECT costo FROM deltaops.mdo_valoraciones WHERE tenant_id=$1 AND sesion_id='s2'`, [T_A])).rows;
-    expect(Number(rows[0]["costo"])).toBe(46666.6667);
+    // §42 · 1h20m × 35000 = 46666.6667 (half-up), como cadena canónica.
+    expect(v2["costo"]).toBe("46666.666700");
+    // La BD conserva la escala EXACTA numeric(18,6): comparar como STRING.
+    const rows = (await pool.query(`SELECT costo::text AS costo FROM deltaops.mdo_valoraciones WHERE tenant_id=$1 AND sesion_id='s2'`, [T_A])).rows;
+    expect(rows[0]["costo"]).toBe("46666.666700");
+  });
+
+  it("tarifa FRACCIONAL 35000.1234: persistencia y lectura EXACTAS dígito a dígito", async () => {
+    identidad.registrar(T_A, "u9", "Frac");
+    must(await exec(ctx(T_A), `${MODULO}.recurso.definir`, { identityId: "u9", categoriaClave: "especialista" }));
+    must(await exec(ctx(T_A), `${MODULO}.tarifa.crear`, { sujetoId: "especialista", valor: "35000.1234", moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
+    // La tarifa persiste con sus 6 decimales exactos.
+    const tRow = (await pool.query(`SELECT valor::text AS valor FROM deltaops.mdo_tarifas WHERE tenant_id=$1 AND sujeto_id='especialista'`, [T_A])).rows[0];
+    expect(tRow["valor"]).toBe("35000.123400");
+    // 1h × 35000.1234 = 35000.1234 → 4 dec = 35000.123400 (exacto).
+    cerrada(T_A, "sfrac", "ofrac", "u9", 3_600_000);
+    const v = must(await exec(ctx(T_A), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "sfrac" })) as Record<string, unknown>;
+    expect(v["costo"]).toBe("35000.123400");
+    expect(v["tarifaValor"]).toBe("35000.123400");
+    const cRow = (await pool.query(`SELECT costo::text AS costo, tarifa_valor::text AS tv FROM deltaops.mdo_valoraciones WHERE tenant_id=$1 AND sesion_id='sfrac'`, [T_A])).rows[0];
+    expect(cRow["costo"]).toBe("35000.123400");
+    expect(cRow["tv"]).toBe("35000.123400");
+    // Agregado por moneda en el resumen: exacto como cadena.
+    const res = must(await query(ctx(T_A), `${MODULO}.resumen`, { ordenId: "ofrac" })) as { costoPorMoneda: { moneda: string; costo: string }[] };
+    expect(res.costoPorMoneda).toEqual([{ moneda: "CLP", costo: "35000.123400" }]);
   });
 
   it("aislamiento cross-tenant: las valoraciones de T_A no se ven desde T_B", async () => {
@@ -140,7 +162,7 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
     must(await exec(ctx(T_A), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: 90000, moneda: "CLP", vigenciaDesde: "2024-08-01T00:00:00Z" }));
     const again = must(await exec(ctx(T_A), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "shist" })) as Record<string, unknown>;
     expect(again["yaExistia"]).toBe(true);
-    expect(Number(again["costo"])).toBe(100000); // sigue con la tarifa histórica
+    expect(again["costo"]).toBe("100000.000000"); // sigue con la tarifa histórica (exacto)
     const n = (await pool.query(`SELECT count(*)::int AS n FROM deltaops.mdo_tarifas WHERE tenant_id=$1 AND sujeto_id='soldador'`, [T_A])).rows[0]["n"];
     expect(n).toBeGreaterThanOrEqual(2);
   });
@@ -154,7 +176,7 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
     cerrada(T_A, "srec", "orec", "u1", 3_600_000);
     const ok = must(await exec(ctx(T_A), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "srec" })) as Record<string, unknown>;
     expect(ok["estado"]).toBe("VALORADA");
-    expect(Number(ok["costo"])).toBe(40000);
+    expect(ok["costo"]).toBe("40000.000000");
   });
 
   it("pendientes: sesiones CERRADAS de la OT sin valoración se reportan como pendientes", async () => {

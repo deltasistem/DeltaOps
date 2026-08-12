@@ -48,7 +48,14 @@ const jsonOk = (schema: Schema, description = "OK"): Schema => ({ description, c
 const queryParam = (name: string, description: string): Schema => ({ name, in: "query", required: false, schema: str(), description });
 
 export function construirOpenApi(): Record<string, unknown> {
-  const dinero = num({ description: "Monto en la moneda de la tarifa (numeric(18,6)); NULL cuando no hay tarifa" });
+  // DGP-020.3 · el DINERO viaja como CADENA decimal exacta (PUNTO FIJO, hasta 6
+  // decimales) — nunca como number JS, para no perder precisión en JSON.
+  const dinero = str({
+    nullable: true,
+    pattern: "^\\d+\\.\\d{6}$",
+    description: "Monto en PUNTO FIJO como cadena decimal (numeric(18,6)); NULL cuando no hay tarifa/costo",
+  });
+  const dineroReq = str({ pattern: "^\\d+(\\.\\d{1,6})?$", description: "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)" });
 
   const schemas: Record<string, Schema> = {
     Error: obj({ error: str(), code: str({ example: "KRN-VAL-001" }) }, ["error", "code"]),
@@ -94,7 +101,7 @@ export function construirOpenApi(): Record<string, unknown> {
     CrearTarifa: obj(
       {
         sujetoTipo: str({ enum: ["CATEGORIA", "IDENTIDAD"], description: "Hoy sólo CATEGORIA" }),
-        sujetoId: str(), valor: num({ minimum: 0 }), moneda: str({ description: "ISO-4217; explícita o de la config del tenant" }),
+        sujetoId: str(), valor: dineroReq, moneda: str({ description: "ISO-4217; explícita o de la config del tenant" }),
         unidad: str({ enum: ["HORA"] }), vigenciaDesde: str({ format: "date-time" }), motivo: str(), opId: str(),
       },
       ["sujetoId", "valor"],
@@ -102,7 +109,7 @@ export function construirOpenApi(): Record<string, unknown> {
     ActualizarTarifa: obj(
       {
         sujetoTipo: str({ enum: ["CATEGORIA", "IDENTIDAD"] }), sujetoId: str(),
-        valor: num({ minimum: 0 }), moneda: str(), unidad: str({ enum: ["HORA"] }),
+        valor: dineroReq, moneda: str(), unidad: str({ enum: ["HORA"] }),
         vigenciaDesde: str({ format: "date-time", description: "Instante de corte: cierra la vigente y abre la nueva (una UoW)" }),
         motivo: str(), opId: str(),
       },
@@ -114,9 +121,9 @@ export function construirOpenApi(): Record<string, unknown> {
     ),
     Tarifa: obj(
       {
-        id: str(), sujetoTipo: str(), sujetoId: str(), valor: num(), moneda: str(), unidad: str({ enum: ["HORA"] }),
+        id: str(), sujetoTipo: str(), sujetoId: str(), valor: dineroReq, moneda: str(), unidad: str({ enum: ["HORA"] }),
         vigenciaDesde: str({ format: "date-time" }), vigenciaHasta: str({ format: "date-time", nullable: true }),
-        estado: str({ enum: ["VIGENTE", "CERRADA"] }), valorAnterior: num({ nullable: true }), motivo: str({ nullable: true }),
+        estado: str({ enum: ["VIGENTE", "CERRADA"] }), valorAnterior: dinero, motivo: str({ nullable: true }),
       },
       ["id", "sujetoId", "valor", "moneda", "unidad", "estado"],
     ),
@@ -131,7 +138,7 @@ export function construirOpenApi(): Record<string, unknown> {
       {
         sesionId: str(), ordenId: str(), activoId: str({ nullable: true }), identityId: str(),
         categoriaClave: str({ nullable: true }), tarifaId: str({ nullable: true }),
-        tarifaValor: num({ nullable: true }), moneda: str({ nullable: true }), unidad: str({ nullable: true }),
+        tarifaValor: dinero, moneda: str({ nullable: true }), unidad: str({ nullable: true }),
         efectivoMs: int({ minimum: 0 }), costo: dinero,
         estado: str({ enum: ["VALORADA", "SIN_TARIFA", "SIN_RECURSO"] }),
         cruzaPeriodos: bool(),
@@ -158,7 +165,7 @@ export function construirOpenApi(): Record<string, unknown> {
     Resumen: obj(
       {
         ordenId: str(), efectivoMsTotal: int({ minimum: 0 }),
-        costoPorMoneda: arr(obj({ moneda: str(), costo: num() }, ["moneda", "costo"])),
+        costoPorMoneda: arr(obj({ moneda: str(), costo: dineroReq }, ["moneda", "costo"])),
         valoraciones: arr(ref("Valoracion")), pendientes: arr(ref("Pendiente")),
       },
       ["ordenId"],

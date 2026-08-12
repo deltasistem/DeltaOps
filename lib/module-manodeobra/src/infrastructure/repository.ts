@@ -48,9 +48,24 @@ export async function withTenantRead<T>(pool: Pool, tenantId: string, fn: (clien
 }
 
 const num = (v: unknown): number => Number(v);
-const numN = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
 const dt = (v: unknown): Date => new Date(String(v));
 const dtN = (v: unknown): Date | null => (v === null || v === undefined ? null : new Date(String(v)));
+
+/**
+ * DINERO en PUNTO FIJO: `numeric(18,6)` llega desde node-pg como CADENA exacta.
+ * Se normaliza a la cadena canónica del dominio (6 decimales) SIN `Number()` con
+ * pérdida. Nunca se convierte a float.
+ */
+const money = (v: unknown): string => normalizarMoney(String(v));
+const moneyN = (v: unknown): string | null => (v === null || v === undefined ? null : normalizarMoney(String(v)));
+function normalizarMoney(s: string): string {
+  const t = s.trim();
+  const neg = t.startsWith("-");
+  const abs = neg ? t.slice(1) : t;
+  const [entero, frac = ""] = abs.split(".");
+  const fracPad = (frac + "000000").slice(0, 6);
+  return `${neg ? "-" : ""}${entero || "0"}.${fracPad}`;
+}
 
 /* ------------------------------- Recursos -------------------------------- */
 
@@ -113,7 +128,7 @@ function tarifaDeFila(row: Record<string, unknown>): Tarifa {
     tenantId: String(row["tenant_id"]),
     sujetoTipo: String(row["sujeto_tipo"]) as SujetoTarifa,
     sujetoId: String(row["sujeto_id"]),
-    valor: num(row["valor"]),
+    valor: money(row["valor"]),
     moneda: String(row["moneda"]),
     unidad: String(row["unidad"]) as UnidadTarifa,
     vigenciaDesde: dt(row["vigencia_desde"]),
@@ -123,7 +138,7 @@ function tarifaDeFila(row: Record<string, unknown>): Tarifa {
     creadoPor: String(row["creado_por"]),
     actualizadoAt: dt(row["actualizado_at"]),
     actualizadoPor: String(row["actualizado_por"]),
-    valorAnterior: numN(row["valor_anterior"]),
+    valorAnterior: moneyN(row["valor_anterior"]),
     motivo: row["motivo"] == null ? null : String(row["motivo"]),
   };
 }
@@ -200,11 +215,11 @@ function valoracionDeFila(row: Record<string, unknown>): Valoracion {
     identityId: String(row["identity_id"]),
     categoriaClave: row["categoria_clave"] == null ? null : String(row["categoria_clave"]),
     tarifaId: row["tarifa_id"] == null ? null : String(row["tarifa_id"]),
-    tarifaValor: numN(row["tarifa_valor"]),
+    tarifaValor: moneyN(row["tarifa_valor"]),
     moneda: row["moneda"] == null ? null : String(row["moneda"]),
     unidad: row["unidad"] == null ? null : (String(row["unidad"]) as UnidadTarifa),
     efectivoMs: num(row["efectivo_ms"]),
-    costo: numN(row["costo"]),
+    costo: moneyN(row["costo"]),
     estado: String(row["estado"]) as EstadoValoracion,
     vigenciaDesde: dtN(row["vigencia_desde"]),
     vigenciaHasta: dtN(row["vigencia_hasta"]),

@@ -1457,8 +1457,9 @@
             "type": "string"
           },
           "valor": {
-            "type": "number",
-            "minimum": 0
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d{1,6})?$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
           },
           "moneda": {
             "type": "string",
@@ -1501,8 +1502,9 @@
             "type": "string"
           },
           "valor": {
-            "type": "number",
-            "minimum": 0
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d{1,6})?$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
           },
           "moneda": {
             "type": "string"
@@ -1575,7 +1577,9 @@
             "type": "string"
           },
           "valor": {
-            "type": "number"
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d{1,6})?$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
           },
           "moneda": {
             "type": "string"
@@ -1603,8 +1607,10 @@
             ]
           },
           "valorAnterior": {
-            "type": "number",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d+\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (numeric(18,6)); NULL cuando no hay tarifa/costo"
           },
           "motivo": {
             "type": "string",
@@ -1680,8 +1686,10 @@
             "nullable": true
           },
           "tarifaValor": {
-            "type": "number",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d+\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (numeric(18,6)); NULL cuando no hay tarifa/costo"
           },
           "moneda": {
             "type": "string",
@@ -1696,8 +1704,10 @@
             "minimum": 0
           },
           "costo": {
-            "type": "number",
-            "description": "Monto en la moneda de la tarifa (numeric(18,6)); NULL cuando no hay tarifa"
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d+\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (numeric(18,6)); NULL cuando no hay tarifa/costo"
           },
           "estado": {
             "type": "string",
@@ -1748,8 +1758,10 @@
             ]
           },
           "costo": {
-            "type": "number",
-            "description": "Monto en la moneda de la tarifa (numeric(18,6)); NULL cuando no hay tarifa"
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d+\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (numeric(18,6)); NULL cuando no hay tarifa/costo"
           },
           "moneda": {
             "type": "string",
@@ -1810,8 +1822,10 @@
             "type": "boolean"
           },
           "costo": {
-            "type": "number",
-            "description": "Monto en la moneda de la tarifa (numeric(18,6)); NULL cuando no hay tarifa"
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d+\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO como cadena decimal (numeric(18,6)); NULL cuando no hay tarifa/costo"
           },
           "moneda": {
             "type": "string",
@@ -1848,7 +1862,9 @@
                   "type": "string"
                 },
                 "costo": {
-                  "type": "number"
+                  "type": "string",
+                  "pattern": "^\\d+(\\.\\d{1,6})?$",
+                  "description": "Monto en PUNTO FIJO como cadena decimal (hasta 6 decimales)"
                 }
               },
               "required": [

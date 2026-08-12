@@ -237,15 +237,21 @@ function PanelTarifas() {
   async function guardar() {
     setError(null);
     if (!sujetoId) { setError("Selecciona una categoría."); return; }
-    const num = Number(valor);
-    if (!Number.isFinite(num) || num < 0) { setError("Indica un valor de tarifa válido."); return; }
+    // El DINERO se envía como CADENA decimal (PUNTO FIJO): validamos formato y
+    // rango con Number pero NUNCA enviamos el float — el backend valida ≤6 dec.
+    const crudo = valor.trim();
+    const num = Number(crudo);
+    if (!crudo || !/^\d+(\.\d{1,6})?$/.test(crudo) || !Number.isFinite(num) || num < 0) {
+      setError("Indica un valor de tarifa válido (hasta 6 decimales).");
+      return;
+    }
     setOcupado(true);
     // Si ya hay una vigente, versionar (cierra la vigente y abre nueva en 1 UoW);
     // si no, crear. En ambos casos la vigencia arranca AHORA.
     const ahora = new Date().toISOString();
     const r = vigente
-      ? await actualizarTarifa({ sujetoTipo: "CATEGORIA", sujetoId, valor: num, vigenciaDesde: ahora, moneda: monedaTenant, motivo: motivo.trim() || undefined })
-      : await crearTarifa({ sujetoTipo: "CATEGORIA", sujetoId, valor: num, moneda: monedaTenant, motivo: motivo.trim() || undefined });
+      ? await actualizarTarifa({ sujetoTipo: "CATEGORIA", sujetoId, valor: crudo, vigenciaDesde: ahora, moneda: monedaTenant, motivo: motivo.trim() || undefined })
+      : await crearTarifa({ sujetoTipo: "CATEGORIA", sujetoId, valor: crudo, moneda: monedaTenant, motivo: motivo.trim() || undefined });
     setOcupado(false);
     if (r.ok) {
       toast.mostrar({ variant: "exito", titulo: vigente ? "Nueva vigencia creada" : "Tarifa creada", mensaje: sujetoId });

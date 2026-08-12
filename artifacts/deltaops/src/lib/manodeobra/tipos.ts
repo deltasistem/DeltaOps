@@ -51,13 +51,14 @@ export interface Tarifa {
   readonly id: string;
   readonly sujetoTipo?: string;
   readonly sujetoId: string;
-  readonly valor: number;
+  /** DINERO en PUNTO FIJO: CADENA decimal exacta (numeric(18,6)), nunca number. */
+  readonly valor: string;
   readonly moneda: string;
   readonly unidad: UnidadTarifa;
   readonly vigenciaDesde?: string;
   readonly vigenciaHasta?: string | null;
   readonly estado: EstadoTarifa;
-  readonly valorAnterior?: number | null;
+  readonly valorAnterior?: string | null;
   readonly motivo?: string | null;
 }
 
@@ -69,11 +70,13 @@ export interface Valoracion {
   readonly identityId: string;
   readonly categoriaClave?: string | null;
   readonly tarifaId?: string | null;
-  readonly tarifaValor?: number | null;
+  /** DINERO en PUNTO FIJO: CADENA decimal exacta (numeric(18,6)), nunca number. */
+  readonly tarifaValor?: string | null;
   readonly moneda?: string | null;
   readonly unidad?: string | null;
   readonly efectivoMs: number;
-  readonly costo?: number | null;
+  /** DINERO en PUNTO FIJO: CADENA decimal exacta (numeric(18,6)), nunca number. */
+  readonly costo?: string | null;
   readonly estado: EstadoValoracion;
   readonly cruzaPeriodos?: boolean;
   readonly iniciadoAt?: string;
@@ -98,7 +101,8 @@ export interface CostoEstimado {
   readonly sesionId: string;
   readonly estimado: boolean;
   readonly sinTarifa: boolean;
-  readonly costo?: number | null;
+  /** DINERO en PUNTO FIJO: CADENA decimal exacta (numeric(18,6)), nunca number. */
+  readonly costo?: string | null;
   readonly moneda?: string | null;
   readonly efectivoMs?: number;
 }
@@ -106,7 +110,8 @@ export interface CostoEstimado {
 /** Costo agregado por moneda (el resumen puede mezclar monedas históricas). */
 export interface CostoPorMoneda {
   readonly moneda: string;
-  readonly costo: number;
+  /** DINERO en PUNTO FIJO: CADENA decimal exacta (numeric(18,6)), nunca number. */
+  readonly costo: string;
 }
 
 /** Resumen de mano de obra de una OT (agregado + pendientes). */

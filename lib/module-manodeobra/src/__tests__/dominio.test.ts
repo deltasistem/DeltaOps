@@ -6,7 +6,7 @@
  * costo NULL ≠ 0, inmutabilidad de VALORADA).
  */
 import { describe, expect, it } from "vitest";
-import { calcularCosto, esUnidadSoportada, redondear } from "../domain/dinero";
+import { aMicros, calcularCosto, esUnidadSoportada, microsACadena, normalizarTarifa } from "../domain/dinero";
 import { crearTarifa, cerrarTarifa, cruzaPeriodos, tarifaVigenteEn, type Tarifa } from "../domain/tarifa";
 import { costoEstimado, esRevalorable, valorarSesion, type Valoracion } from "../domain/valoracion";
 import type { RecursoHumano } from "../domain/recurso";
@@ -19,33 +19,47 @@ const recurso: RecursoHumano = {
 };
 
 const tarifaBase = (over: Partial<Tarifa> = {}): Tarifa => ({
-  id: "T1", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: 40000, moneda: "CLP", unidad: "HORA",
+  id: "T1", tenantId: "t", sujetoTipo: "CATEGORIA", sujetoId: "soldador", valor: "40000.000000", moneda: "CLP", unidad: "HORA",
   vigenciaDesde: D("2024-01-01T00:00:00Z"), vigenciaHasta: null, estado: "VIGENTE",
   creadoAt: D("2024-01-01T00:00:00Z"), creadoPor: "a", actualizadoAt: D("2024-01-01T00:00:00Z"), actualizadoPor: "a",
   valorAnterior: null, motivo: null, ...over,
 });
 
-describe("DGP-020.3 · precisión monetaria", () => {
-  it("2h30m × 40000 = 100000.0000 (exacto)", () => {
-    const r = calcularCosto(9_000_000, 40000);
-    expect(r.ok && r.value).toBe(100000);
+describe("DGP-020.3 · precisión monetaria (PUNTO FIJO decimal)", () => {
+  it("2h30m × 40000 = 100000.0000 (exacto, cadena canónica)", () => {
+    const r = calcularCosto(9_000_000, "40000");
+    expect(r.ok && r.value).toBe("100000.000000");
   });
-  it("1h20m × 35000 = 46666.6667 (redondeo a 4 decimales)", () => {
-    const r = calcularCosto(4_800_000, 35000);
-    expect(r.ok && r.value).toBe(46666.6667);
+  it("1h20m × 35000 = 46666.6667 (half-up a 4 decimales)", () => {
+    const r = calcularCosto(4_800_000, "35000");
+    // 46666.66666… → half-up 4 dec = 46666.6667; los 2 últimos dígitos en 0.
+    expect(r.ok && r.value).toBe("46666.666700");
   });
   it("el tiempo NO se redondea antes de multiplicar", () => {
-    // 1h20m = 1.3333... h; redondear el tiempo a 2 dec daría 1.33×35000=46550.
-    const r = calcularCosto(4_800_000, 35000);
-    expect(r.ok && r.value).not.toBe(46550);
+    const r = calcularCosto(4_800_000, "35000");
+    expect(r.ok && r.value).not.toBe("46550.000000");
   });
-  it("redondear es determinista", () => {
-    expect(redondear(46666.66666667, 4)).toBe(46666.6667);
+  it("acepta cadena o number equivalentes (sin pérdida)", () => {
+    expect(calcularCosto(9_000_000, "40000")).toEqual(calcularCosto(9_000_000, 40000));
   });
-  it("SIN_TARIFA no es 0: calcularCosto sólo se invoca con tarifa", () => {
-    // El costo NULL lo produce valorarSesion (ver más abajo), no calcularCosto.
-    const r = calcularCosto(0, 40000);
-    expect(r.ok && r.value).toBe(0); // 0 tiempo = 0 costo (distinto de SIN_TARIFA)
+  it("tarifa fraccional 35000.1234 se conserva exacta y se calcula sin float", () => {
+    expect(normalizarTarifa("35000.1234")).toEqual({ ok: true, value: "35000.123400" });
+    // 1h × 35000.1234 = 35000.1234 → 4 dec = 35000.123400
+    const r = calcularCosto(3_600_000, "35000.1234");
+    expect(r.ok && r.value).toBe("35000.123400");
+  });
+  it("rechaza más de 6 decimales y valores negativos", () => {
+    expect(normalizarTarifa("1.1234567").ok).toBe(false);
+    expect(normalizarTarifa("-1").ok).toBe(false);
+    expect(aMicros("abc").ok).toBe(false);
+  });
+  it("microsACadena/aMicros son inversos exactos", () => {
+    const m = aMicros("46666.6667");
+    expect(m.ok && microsACadena(m.value)).toBe("46666.666700");
+  });
+  it("0 tiempo = 0 costo (distinto de SIN_TARIFA null)", () => {
+    const r = calcularCosto(0, "40000");
+    expect(r.ok && r.value).toBe("0.000000");
   });
 });
 
@@ -79,8 +93,8 @@ describe("DGP-020.3 · tarifa versionable", () => {
     expect(nueva.ok).toBe(true);
   });
   it("tarifaVigenteEn selecciona por intervalo [desde, hasta)", () => {
-    const t1 = tarifaBase({ id: "T1", valor: 40000, vigenciaDesde: D("2024-01-01T00:00:00Z"), vigenciaHasta: D("2024-06-01T00:00:00Z"), estado: "CERRADA" });
-    const t2 = tarifaBase({ id: "T2", valor: 50000, vigenciaDesde: D("2024-06-01T00:00:00Z"), vigenciaHasta: null });
+    const t1 = tarifaBase({ id: "T1", valor: "40000.000000", vigenciaDesde: D("2024-01-01T00:00:00Z"), vigenciaHasta: D("2024-06-01T00:00:00Z"), estado: "CERRADA" });
+    const t2 = tarifaBase({ id: "T2", valor: "50000.000000", vigenciaDesde: D("2024-06-01T00:00:00Z"), vigenciaHasta: null });
     expect(tarifaVigenteEn([t1, t2], D("2024-03-01T00:00:00Z"))?.id).toBe("T1");
     expect(tarifaVigenteEn([t1, t2], D("2024-07-01T00:00:00Z"))?.id).toBe("T2");
     expect(tarifaVigenteEn([t1, t2], D("2023-12-01T00:00:00Z"))).toBeNull();
@@ -102,8 +116,8 @@ describe("DGP-020.3 · valoración (snapshot)", () => {
     expect(v.ok).toBe(true);
     if (!v.ok) return;
     expect(v.value.estado).toBe("VALORADA");
-    expect(v.value.costo).toBe(100000);
-    expect(v.value.tarifaValor).toBe(40000);
+    expect(v.value.costo).toBe("100000.000000");
+    expect(v.value.tarifaValor).toBe("40000.000000");
     expect(v.value.efectivoMs).toBe(9_000_000);
     const rev = esRevalorable(v.value);
     expect(rev.ok).toBe(false); // inmutable
@@ -130,8 +144,8 @@ describe("DGP-020.3 · valoración (snapshot)", () => {
     const est = costoEstimado({ sesionId: "s1", efectivoMs: 4_800_000, iniciadoAt: D("2024-03-01T00:00:00Z") }, []);
     expect(est.ok && est.value.sinTarifa).toBe(true);
     expect(est.ok && est.value.costo).toBeNull();
-    const est2 = costoEstimado({ sesionId: "s1", efectivoMs: 4_800_000, iniciadoAt: D("2024-03-01T00:00:00Z") }, [tarifaBase({ valor: 35000 })]);
+    const est2 = costoEstimado({ sesionId: "s1", efectivoMs: 4_800_000, iniciadoAt: D("2024-03-01T00:00:00Z") }, [tarifaBase({ valor: "35000.000000" })]);
     expect(est2.ok && est2.value.estimado).toBe(true);
-    expect(est2.ok && est2.value.costo).toBe(46666.6667);
+    expect(est2.ok && est2.value.costo).toBe("46666.666700");
   });
 });

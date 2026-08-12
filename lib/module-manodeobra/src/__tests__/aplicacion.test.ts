@@ -62,7 +62,7 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     sesionCerrada("s1", "o1", "u1", 9_000_000); // 2h30m
     const r = must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1", ordenId: "o1" })) as Record<string, unknown>;
     expect(r["estado"]).toBe("VALORADA");
-    expect(r["costo"]).toBe(100000);
+    expect(r["costo"]).toBe("100000.000000");
     expect(r["moneda"]).toBe("CLP");
   });
 
@@ -107,13 +107,13 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     await definirRecursoYTarifa(40000);
     sesionCerrada("s1", "o1", "u1", 9_000_000);
     const v = must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" })) as Record<string, unknown>;
-    expect(v["costo"]).toBe(100000);
+    expect(v["costo"]).toBe("100000.000000");
     // Sube la tarifa: cierra la vigente y crea una nueva.
     must(await exec(ctx(), `${MODULO}.tarifa.actualizar`, { sujetoId: "soldador", valor: 80000, moneda: "CLP", vigenciaDesde: "2024-07-01T00:00:00Z" }));
     // Reprocesar la MISMA sesión: sigue siendo la valoración original (VALORADA inmutable).
     const again = must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" })) as Record<string, unknown>;
     expect(again["yaExistia"]).toBe(true);
-    expect(again["costo"]).toBe(100000);
+    expect(again["costo"]).toBe("100000.000000");
     // Hay 2 filas de tarifa (histórico versionado).
     const tarifas = must(await query(ctx(), `${MODULO}.tarifas`, { sujetoId: "soldador" })) as { tarifas: unknown[] };
     expect(tarifas.tarifas.length).toBe(2);
@@ -127,7 +127,7 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     must(await exec(ctx(), `${MODULO}.tarifa.crear`, { sujetoId: "soldador", valor: 40000, moneda: "CLP", vigenciaDesde: "2024-01-01T00:00:00Z" }));
     const rev = must(await exec(ctx(), `${MODULO}.valoracion.revalorar`, { sesionId: "s1" })) as Record<string, unknown>;
     expect(rev["estado"]).toBe("VALORADA");
-    expect(rev["costo"]).toBe(100000);
+    expect(rev["costo"]).toBe("100000.000000");
     // Ahora VALORADA ⇒ revalorar rechaza.
     const r2 = await exec(ctx(), `${MODULO}.valoracion.revalorar`, { sesionId: "s1" });
     expect(r2.ok).toBe(false);
@@ -142,7 +142,7 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     expect((res["valoraciones"] as unknown[]).length).toBe(1);
     expect((res["pendientes"] as unknown[]).length).toBe(1);
     expect(res["efectivoMsTotal"]).toBe(13_800_000);
-    expect(res["costoPorMoneda"]).toEqual([{ moneda: "CLP", costo: 100000 }]);
+    expect(res["costoPorMoneda"]).toEqual([{ moneda: "CLP", costo: "100000.000000" }]);
   });
 
   it("costo-estimado de sesión ABIERTA usa duraciones actuales × tarifa vigente", async () => {
@@ -150,7 +150,7 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     ordenes.set(TENANT, { sesionId: "sa", ordenId: "o1", activoId: "act1", identityId: "u1", estado: "ABIERTA", efectivoMs: 4_800_000, abierta: true, iniciadoAt: D("2024-03-01T00:00:00Z"), cerradoAt: null });
     const est = must(await query(ctx(), `${MODULO}.costo-estimado`, { sesionId: "sa" })) as Record<string, unknown>;
     expect(est["estimado"]).toBe(true);
-    expect(est["costo"]).toBe(46666.6667);
+    expect(est["costo"]).toBe("46666.666700");
     expect(est["sinTarifa"]).toBe(false);
   });
 
@@ -180,6 +180,56 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     // 'mias' de OTRA identidad no ve las de u1.
     const otras = must(await query(ctx(tec, "u2"), `${MODULO}.mias`, {})) as { valoraciones: unknown[] };
     expect(otras.valoraciones.length).toBe(0);
+  });
+
+  it("RBAC same-tenant: técnico SÓLO ve/estima lo SUYO en las 4 queries; supervisor ve todo", async () => {
+    // Dos técnicos del mismo tenant, cada uno con una sesión CERRADA valorada.
+    identidad.registrar(TENANT, "u2", "Beto Díaz");
+    await definirRecursoYTarifa(); // recurso u1 + tarifa soldador
+    must(await exec(ctx(), `${MODULO}.recurso.definir`, { identityId: "u2", categoriaClave: "soldador" }));
+    sesionCerrada("s1", "o1", "u1", 9_000_000);
+    sesionCerrada("s2", "o1", "u2", 4_800_000); // misma OT, otra identidad
+    must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" }));
+    must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s2" }));
+
+    const tec = tecnico([`${MODULO}.read`, `${MODULO}.mias`]); // técnico = u1 (id espejo mirror-1, identidad u1)
+
+    // (a) valoraciones por OT: el técnico VE SÓLO su propia fila (filtrado), no la de u2.
+    const porOT = must(await query(ctx(tec, "u1"), `${MODULO}.valoraciones`, { ordenId: "o1" })) as { valoraciones: { identityId: string }[] };
+    expect(porOT.valoraciones.length).toBe(1);
+    expect(porOT.valoraciones.every((v) => v.identityId === "u1")).toBe(true);
+
+    // (b) valoraciones por identityId AJENO ⇒ RECHAZO explícito (no fuga).
+    const ajena = await query(ctx(tec, "u1"), `${MODULO}.valoraciones`, { identityId: "u2" });
+    expect(ajena.ok).toBe(false);
+
+    // (b') valoraciones por activo (vía indirecta): filtrado a lo propio.
+    const porActivo = must(await query(ctx(tec, "u1"), `${MODULO}.valoraciones`, { activoId: "act1" })) as { valoraciones: { identityId: string }[] };
+    expect(porActivo.valoraciones.every((v) => v.identityId === "u1")).toBe(true);
+
+    // (c) resumen de la OT: el técnico ve SÓLO sus filas y sus pendientes.
+    const resumen = must(await query(ctx(tec, "u1"), `${MODULO}.resumen`, { ordenId: "o1" })) as { valoraciones: { identityId: string }[]; efectivoMsTotal: number };
+    expect(resumen.valoraciones.every((v) => v.identityId === "u1")).toBe(true);
+    expect(resumen.efectivoMsTotal).toBe(9_000_000); // sólo el tiempo de u1
+
+    // (d) costo-estimado de una sesión AJENA (u2) ⇒ RECHAZO.
+    ordenes.set(TENANT, { sesionId: "sa2", ordenId: "o1", activoId: "act1", identityId: "u2", estado: "ABIERTA", efectivoMs: 3_600_000, abierta: true, iniciadoAt: D("2024-03-01T00:00:00Z"), cerradoAt: null });
+    const estAjeno = await query(ctx(tec, "u1"), `${MODULO}.costo-estimado`, { sesionId: "sa2" });
+    expect(estAjeno.ok).toBe(false);
+
+    // (e) modo 'mias' sin identidad canónica en el contexto ⇒ fail-closed (nunca lectura amplia).
+    const sinId = await query(ctx(tec), `${MODULO}.valoraciones`, { ordenId: "o1" });
+    expect(sinId.ok).toBe(false);
+
+    // (f) SUPERVISOR (P_READ sin P_MIAS) ve TODO el tenant en la OT.
+    const sup = tecnico([`${MODULO}.read`]);
+    const todo = must(await query(ctx(sup, "sup-1"), `${MODULO}.valoraciones`, { ordenId: "o1" })) as { valoraciones: unknown[] };
+    expect(todo.valoraciones.length).toBe(2);
+    const supResumen = must(await query(ctx(sup, "sup-1"), `${MODULO}.resumen`, { ordenId: "o1" })) as { efectivoMsTotal: number };
+    expect(supResumen.efectivoMsTotal).toBe(13_800_000);
+    // Supervisor puede consultar por identityId ajeno sin rechazo.
+    const supAjena = must(await query(ctx(sup, "sup-1"), `${MODULO}.valoraciones`, { identityId: "u2" })) as { valoraciones: unknown[] };
+    expect(supAjena.valoraciones.length).toBe(1);
   });
 
   it("catálogo vacío expone categorías canónicas; unidad no soportada rechazada", async () => {

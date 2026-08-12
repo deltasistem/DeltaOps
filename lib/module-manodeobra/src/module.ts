@@ -47,7 +47,7 @@ import {
 import { cambiarEstadoRecurso, definirRecurso, type EstadoRecurso } from "./domain/recurso";
 import { cerrarTarifa, crearTarifa, type SujetoTarifa, type Tarifa } from "./domain/tarifa";
 import { costoEstimado, esRevalorable, valorarSesion, type Valoracion } from "./domain/valoracion";
-import { UNIDADES_TARIFA } from "./domain/dinero";
+import { aMicros, microsACadena, UNIDADES_TARIFA } from "./domain/dinero";
 import type { CatalogoService } from "./infrastructure/catalogo-service";
 import type {
   DuracionSesion,
@@ -164,6 +164,53 @@ async function sellarSi(
 function identidadDeSesionSuave(ctx: ExecutionContext): string | null {
   const id = ctx.metadata["identityId"];
   return typeof id === "string" && id.length > 0 ? id : null;
+}
+
+/**
+ * DGP-020.3 · Autoridad de ALCANCE de lectura (fail-closed, patrón DGP-020.2).
+ *
+ * El BACKEND es la autoridad, NO la presentación. Un principal con `P_MIAS`
+ * (técnico) SÓLO puede ver SUS PROPIAS valoraciones — incluso al consultar por
+ * OT/activo/sesión (acceso indirecto). SUPERVISOR/PLANIFICADOR/CONSULTA/ADMIN
+ * NO portan `P_MIAS`: conservan lectura completa del tenant.
+ *
+ * `soloMias(ctx)` es verdadero cuando el principal tiene `P_MIAS`. En ese modo,
+ * la identidad canónica de sesión (`metadata.identityId`) es OBLIGATORIA: si
+ * falta, se rechaza (fail-closed), nunca se degrada a lectura amplia.
+ */
+function soloMias(ctx: ExecutionContext): boolean {
+  const perms = (ctx.principal.permisos ?? []) as string[];
+  const caps = (ctx.principal.capacidades ?? []) as string[];
+  if (!perms.includes(P_MIAS)) return false;
+  // Un principal ADMIN/SERVICIO puede portar TODOS los permisos (incluido P_MIAS)
+  // y NO debe restringirse: se reconoce por capacidad comodín o por poseer
+  // permisos administrativos (config/tarifas/valorar). El TÉCNICO porta P_MIAS +
+  // P_READ pero NINGUNO de los administrativos ⇒ lectura restringida a lo suyo.
+  if (caps.includes("*")) return false;
+  if (perms.includes("*") || perms.includes(P_CONFIG) || perms.includes(P_TARIFAS) || perms.includes(P_VALORAR)) return false;
+  return true;
+}
+
+/**
+ * Resuelve el alcance de lectura. Devuelve:
+ *  - `{ restringido: false }` para lectores amplios (tenant completo).
+ *  - `{ restringido: true, identityId }` para técnicos (SÓLO su identidad).
+ *  - un `Result` de error (forbidden) si es modo 'mías' pero falta la identidad
+ *    canónica (fail-closed).
+ */
+function alcanceLectura(
+  ctx: ExecutionContext,
+): { restringido: false } | { restringido: true; identityId: string } | { error: Result<never, KernelError> } {
+  if (!soloMias(ctx)) return { restringido: false };
+  const yo = identidadDeSesionSuave(ctx);
+  if (!yo) {
+    return {
+      error: fail(
+        KernelErrors.forbidden("mano de obra: falta la identidad canónica autenticada (identityId) para lectura restringida"),
+      ) as Result<never, KernelError>,
+    };
+  }
+  return { restringido: true, identityId: yo };
 }
 
 /* -------------------------- Serialización de VOs ------------------------- */
@@ -307,33 +354,44 @@ async function resumenPorOrden(
   tenant: string,
   ordenId: string,
   yo: string | null,
+  restringirA: string | null = null,
 ): Promise<Result<Record<string, unknown>, KernelError>> {
   const vals = await adapters.valoraciones.listarPorOrden(tenant, ordenId);
   if (!vals.ok) return vals;
   const dur = await adapters.ordenes.duracionesPorOrden(tenant, ordenId);
   if (!dur.ok) return dur;
 
-  const valoradas = vals.value;
+  // DGP-020.3 · técnico (P_MIAS): el resumen de la OT muestra SÓLO SUS filas
+  // (decisión documentada: un técnico asignado ve la sección de mano de obra de
+  // esa OT, pero acotada a su propia identidad; nunca las de otros).
+  const valoradas = restringirA ? vals.value.filter((v) => v.identityId === restringirA) : vals.value;
   const porSesion = new Map(valoradas.map((v) => [v.sesionId, v] as const));
-  const cerradas = dur.value.filter((s) => s.estado === "CERRADA" && !s.abierta);
+  const cerradasRaw = dur.value.filter((s) => s.estado === "CERRADA" && !s.abierta);
+  const cerradas = restringirA ? cerradasRaw.filter((s) => s.identityId === restringirA) : cerradasRaw;
   const pendientes: DuracionSesion[] = cerradas.filter((s) => !porSesion.has(s.sesionId));
 
   const ids = [...new Set(valoradas.map((v) => v.identityId).concat(pendientes.map((p) => p.identityId)))];
   const nombres = await adapters.identidad.resolverVarios(tenant, ids);
   if (!nombres.ok) return nombres;
 
+  // Agregación de costo en PUNTO FIJO exacto (BigInt micros) por moneda; jamás
+  // se suma como float. El total se serializa como cadena decimal canónica.
   let efectivoMsTotal = 0;
-  const porMoneda = new Map<string, number>();
+  const porMoneda = new Map<string, bigint>();
   for (const v of valoradas) {
     efectivoMsTotal += v.efectivoMs;
-    if (v.costo !== null && v.moneda) porMoneda.set(v.moneda, (porMoneda.get(v.moneda) ?? 0) + v.costo);
+    if (v.costo !== null && v.moneda) {
+      const m = aMicros(v.costo);
+      if (!m.ok) return m;
+      porMoneda.set(v.moneda, (porMoneda.get(v.moneda) ?? 0n) + m.value);
+    }
   }
   for (const p of pendientes) efectivoMsTotal += p.efectivoMs;
 
   return ok({
     ordenId,
     efectivoMsTotal,
-    costoPorMoneda: [...porMoneda.entries()].map(([moneda, costo]) => ({ moneda, costo })),
+    costoPorMoneda: [...porMoneda.entries()].map(([moneda, micros]) => ({ moneda, costo: microsACadena(micros) })),
     valoraciones: valoradas.map((v) => ({
       ...valoracionAResultado(v),
       nombre: nombres.value[v.identityId] ?? null,
@@ -352,6 +410,23 @@ async function resumenPorOrden(
 }
 
 /* ------------------------------ El servicio ------------------------------ */
+
+/**
+ * DGP-020.3 · Schema de DINERO de entrada (PUNTO FIJO). Acepta CADENA decimal
+ * (preferida, sin pérdida) o `number` legado; valida no-negativo y a lo sumo 6
+ * decimales. La normalización a micros exactos ocurre en el dominio (`aMicros`).
+ */
+const dineroSchema = z
+  .union([z.string(), z.number()])
+  .superRefine((v, ctx) => {
+    const s = typeof v === "number" ? (Number.isFinite(v) ? String(v) : "NaN") : v.trim();
+    if (!/^\d+(\.\d+)?$/.test(s)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "importe decimal inválido (no negativo, sin notación científica)" });
+      return;
+    }
+    const frac = s.split(".")[1] ?? "";
+    if (frac.length > 6) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "el importe admite a lo sumo 6 decimales" });
+  });
 
 export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefinition {
   const catalogoEnum = z.enum([...CATALOGOS] as [string, ...string[]]);
@@ -512,7 +587,7 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           id: z.string().uuid().optional(),
           sujetoTipo: z.enum(["CATEGORIA", "IDENTIDAD"]).optional(),
           sujetoId: z.string().min(1),
-          valor: z.number().finite().nonnegative(),
+          valor: dineroSchema,
           moneda: z.string().optional(),
           unidad: z.string().optional(),
           vigenciaDesde: z.string().min(1).optional(),
@@ -568,7 +643,7 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           nuevaId: z.string().uuid().optional(),
           sujetoTipo: z.enum(["CATEGORIA", "IDENTIDAD"]).optional(),
           sujetoId: z.string().min(1),
-          valor: z.number().finite().nonnegative(),
+          valor: dineroSchema,
           moneda: z.string().optional(),
           vigenciaDesde: z.string().min(1).optional(),
           motivo: z.string().nullable().optional(),
@@ -778,16 +853,26 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           void deps;
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
+          const alcance = alcanceLectura(ctx);
+          if ("error" in alcance) return alcance.error;
+          // Modo técnico (P_MIAS): pedir identityId AJENO ⇒ rechazo explícito; el
+          // resto de vías (OT/activo) se FILTRAN a las filas propias (fail-closed).
+          if (alcance.restringido && input.identityId && input.identityId !== alcance.identityId) {
+            return fail(KernelErrors.forbidden("mano de obra: sólo puede consultar sus propias valoraciones"));
+          }
           const r = input.ordenId
             ? await adapters.valoraciones.listarPorOrden(tenant.value, input.ordenId)
             : input.activoId
               ? await adapters.valoraciones.listarPorActivo(tenant.value, input.activoId)
               : input.identityId
                 ? await adapters.valoraciones.listarPorIdentidad(tenant.value, input.identityId)
-                : fail(KernelErrors.validation("Especifique ordenId, activoId o identityId"));
+                : alcance.restringido
+                  ? await adapters.valoraciones.listarPorIdentidad(tenant.value, alcance.identityId)
+                  : fail(KernelErrors.validation("Especifique ordenId, activoId o identityId"));
           if (!r.ok) return r;
-          const yo = identidadDeSesionSuave(ctx);
-          return ok({ valoraciones: r.value.map((v) => ({ ...valoracionAResultado(v), esPropia: yo !== null && v.identityId === yo })) });
+          const yo = alcance.restringido ? alcance.identityId : identidadDeSesionSuave(ctx);
+          const filas = alcance.restringido ? r.value.filter((v) => v.identityId === alcance.identityId) : r.value;
+          return ok({ valoraciones: filas.map((v) => ({ ...valoracionAResultado(v), esPropia: yo !== null && v.identityId === yo })) });
         },
       }),
       /* -------------------- mias (técnico: SOLO su identidad canónica) -------------------- */
@@ -815,7 +900,10 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           void deps;
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
-          return resumenPorOrden(adapters, tenant.value, input.ordenId, identidadDeSesionSuave(ctx));
+          const alcance = alcanceLectura(ctx);
+          if ("error" in alcance) return alcance.error;
+          const restringirA = alcance.restringido ? alcance.identityId : null;
+          return resumenPorOrden(adapters, tenant.value, input.ordenId, restringirA ?? identidadDeSesionSuave(ctx), restringirA);
         },
       }),
       /* -------------------- valoraciones.pendientes (red de seguridad) -------------------- */
@@ -846,10 +934,16 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           void deps;
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
+          const alcance = alcanceLectura(ctx);
+          if ("error" in alcance) return alcance.error;
           const dur = await adapters.ordenes.duracionesDeSesion(tenant.value, input.sesionId);
           if (!dur.ok) return dur;
           const s = dur.value;
           if (!s) return fail(KernelErrors.notFound("sesion", input.sesionId));
+          // Técnico (P_MIAS): sólo puede estimar el costo de SUS propias sesiones.
+          if (alcance.restringido && s.identityId !== alcance.identityId) {
+            return fail(KernelErrors.forbidden("mano de obra: sólo puede estimar el costo de sus propias sesiones"));
+          }
           const recurso = await adapters.recursos.buscar(tenant.value, s.identityId);
           if (!recurso.ok) return recurso;
           if (!recurso.value) {
