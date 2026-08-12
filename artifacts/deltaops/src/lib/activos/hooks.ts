@@ -69,9 +69,44 @@ export function useDetalle(id: string): EstadoAsync<DetalleActivo> {
   return useConsulta<DetalleActivo>((signal) => activosFetch<DetalleActivo>(`/${id}`, { signal }), [id]);
 }
 
+/**
+ * Forma REAL del read model del backend `activos.catalogo.opciones`
+ * (`CatalogoService.opciones`): `{ value, label, posicion, padre }`. El contrato
+ * del servidor usa `value/label`; la UI consume `OpcionCatalogo {valor,etiqueta}`.
+ * Esta normalización de FRONTERA evita que opciones con `valor/etiqueta`
+ * `undefined` lleguen al validador Zod de Dynamic Forms (`z.string().min(1)`),
+ * que reventaba el listado con un overlay de runtime. No relaja la validación:
+ * mapea el contrato real a la forma esperada por la UI.
+ */
+interface OpcionCatalogoBackend {
+  value?: string;
+  label?: string;
+  posicion?: number;
+  padre?: string | null;
+  // Tolerancia: si algún consumidor ya devolviera la forma UI.
+  valor?: string;
+  etiqueta?: string;
+  habilitado?: boolean;
+}
+
+/** Normaliza la respuesta del backend (`{value,label}`) a `OpcionCatalogo`. */
+export function normalizarOpcionesCatalogo(datos: unknown): OpcionCatalogo[] {
+  if (!Array.isArray(datos)) return [];
+  const out: OpcionCatalogo[] = [];
+  for (const raw of datos as OpcionCatalogoBackend[]) {
+    if (raw == null || typeof raw !== "object") continue;
+    const valor = String(raw.valor ?? raw.value ?? "");
+    const etiqueta = String(raw.etiqueta ?? raw.label ?? valor);
+    if (valor === "") continue; // descarta opciones sin clave (no válidas para un <select>)
+    out.push({ valor, etiqueta, habilitado: raw.habilitado });
+  }
+  return out;
+}
+
 export function useCatalogo(nombre: string): EstadoAsync<OpcionCatalogo[]> {
   return useConsulta<OpcionCatalogo[]>(
-    (signal) => activosFetch<OpcionCatalogo[]>(`/catalogos/${nombre}`, { signal }),
+    (signal) =>
+      activosFetch<unknown>(`/catalogos/${nombre}`, { signal }).then(normalizarOpcionesCatalogo),
     [nombre],
   );
 }
