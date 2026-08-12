@@ -23,6 +23,7 @@ import {
   type OrdenesRuntime,
 } from "@workspace/module-ordenes";
 import { membresia, obtenerIdentidad, listarUsuariosDeTenant } from "../../deltaops/identity/service";
+import { aRolCanonico } from "../../deltaops/identity/rbac";
 import { DELTAOPS_TENANT } from "./reference-runtime";
 
 /**
@@ -98,7 +99,21 @@ const MODULE_PERMISSIONS = [
   }).permissions,
 ];
 
-/** Mapa rol → permisos (admin: todo; operador: sin admin; lector: lectura). */
+/**
+ * Mapa rol → permisos/capacidades del Módulo Órdenes.
+ *
+ * DGP-020.2 · La verificación de asignación para ABRIR sesión (§6) admite UNA
+ * excepción: supervisor/administrador "según capacidades existentes". El colapso
+ * legacy hace que SUPERVISOR, PLANIFICADOR y TECNICO compartan el rol de espejo
+ * `operador`; por eso NO podemos derivar la excepción del bucket legacy (haría
+ * que PLANIFICADOR/TECNICO no asignados saltaran la verificación — bug §27/§38).
+ * Normalizamos al ROL CANÓNICO (`aRolCanonico`, misma fuente que Utilización) y
+ * concedemos las capacidades administrativas EXISTENTES (`validar-ordenes` /
+ * `administrar-ordenes` y el permiso `modulo.ordenes.validar`) SÓLO a los roles
+ * realmente elevados (TENANT_ADMIN/SUPER_ADMIN y SUPERVISOR). PLANIFICADOR y
+ * TECNICO conservan la operación (`.operar`/`.write`) pero NO el bypass: si no
+ * están asignados, abrir sesión ⇒ 403 de negocio.
+ */
 export function principalOrdenes(userId: string, rol: string): Principal {
   // Permisos de Dynamic Forms necesarios para la ejecución de la OT:
   //  - plantilla.read: RENDERIZAR la plantilla asociada (clave+versión exacta).
@@ -109,7 +124,9 @@ export function principalOrdenes(userId: string, rol: string): Principal {
   const RESP_READ = "modulo.formularios.respuesta.read";
   const RESP_WRITE = "modulo.formularios.respuesta.write";
   const RESP_SEND = "modulo.formularios.respuesta.enviar";
-  if (rol === "admin" || rol === "platform_admin") {
+  const canonico = aRolCanonico(rol);
+
+  if (canonico === "TENANT_ADMIN" || canonico === "SUPER_ADMIN") {
     return {
       id: userId,
       rol,
@@ -117,7 +134,11 @@ export function principalOrdenes(userId: string, rol: string): Principal {
       capacidades: ["gestionar-ordenes", "ejecutar-ordenes", "validar-ordenes", "administrar-ordenes"],
     };
   }
-  if (rol === "operador") {
+
+  // SUPERVISOR: gestión operativa completa CON la excepción §6 (validar/cerrar
+  // gobernado). Mantiene `modulo.ordenes.validar` y la capacidad `validar-ordenes`
+  // que habilita el bypass legítimo de asignación al abrir sesión.
+  if (canonico === "SUPERVISOR") {
     return {
       id: userId,
       rol,
@@ -127,9 +148,31 @@ export function principalOrdenes(userId: string, rol: string): Principal {
         "platform.timeline.read", "platform.config.read",
         FORMS_READ, RESP_READ, RESP_WRITE, RESP_SEND,
       ],
+      capacidades: ["gestionar-ordenes", "ejecutar-ordenes", "validar-ordenes"],
+    };
+  }
+
+  // PLANIFICADOR / TECNICO: operan el ciclo de vida y registran ejecución, pero
+  // SIN capacidades administrativas ⇒ SIN bypass de asignación (§6). Se les retira
+  // `modulo.ordenes.validar` y `modulo.ordenes.admin` para que `esSupervisorOAdmin`
+  // no los eleve. Un no-asignado que intente abrir sesión recibe 403 de negocio.
+  if (canonico === "PLANIFICADOR" || canonico === "TECNICO") {
+    return {
+      id: userId,
+      rol,
+      permisos: [
+        ...MODULE_PERMISSIONS.filter(
+          (p) => p !== "modulo.ordenes.admin" && p !== "modulo.ordenes.validar",
+        ),
+        "platform.attachment.read", "platform.attachment.write",
+        "platform.timeline.read", "platform.config.read",
+        FORMS_READ, RESP_READ, RESP_WRITE, RESP_SEND,
+      ],
       capacidades: ["gestionar-ordenes", "ejecutar-ordenes"],
     };
   }
+
+  // CONSULTA y cualquier otro: sólo lectura.
   return {
     id: userId,
     rol,

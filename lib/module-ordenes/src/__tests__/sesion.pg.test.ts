@@ -48,7 +48,16 @@ const MIRROR_OTRO = "1002";
 const ADMIN: Principal = { id: "999", rol: "admin", permisos: PERMS, capacidades: ["*"] };
 // Técnico: SÓLO operar, sin capacidades de supervisor (obliga a validar asignación).
 // `principal.id` = ID ESPEJO legacy (entero) ≠ identityId canónico (UUID/idn).
+// Modela el principal que `principalOrdenes` construye para TECNICO/PLANIFICADOR:
+// puede operar pero NO tiene `modulo.ordenes.validar` ni capacidad administrativa
+// ⇒ `esSupervisorOAdmin` es false ⇒ debe estar asignado para abrir sesión (§6).
 const tecnico = (mirrorId: string): Principal => ({ id: mirrorId, rol: "tecnico", permisos: ["modulo.ordenes.operar", "modulo.ordenes.read"], capacidades: [] });
+// PLANIFICADOR: idéntico plano de operación al técnico (sin capacidades admin).
+// El bug §27/§38 era que el mapeo legacy le colaba `modulo.ordenes.validar`.
+const planificador = (mirrorId: string): Principal => ({ id: mirrorId, rol: "planificador", permisos: ["modulo.ordenes.operar", "modulo.ordenes.read"], capacidades: [] });
+// SUPERVISOR: excepción §6 — capacidad EXISTENTE `validar-ordenes` habilita el
+// bypass legítimo de asignación (mismo principal que `principalOrdenes` da a SUPERVISOR).
+const supervisor = (mirrorId: string): Principal => ({ id: mirrorId, rol: "supervisor", permisos: ["modulo.ordenes.operar", "modulo.ordenes.read", "modulo.ordenes.validar"], capacidades: ["validar-ordenes"] });
 
 // Timeout explícito para ESTA suite de integración PG: cada test hace decenas de
 // idas y vueltas SECUENCIALES contra PostgreSQL (crear OT, transiciones del motor,
@@ -129,6 +138,30 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", { timeout: 30_000 }, () 
     return id;
   }
 
+  /**
+   * Igual que `otAsignada` pero la OT nace CON activo principal, para verificar
+   * la derivación del `activoId` (§8): el dominio lo toma del agregado, jamás del
+   * frontend. Devuelve { ordenId, activoId }.
+   */
+  async function otAsignadaConActivo(tenantId: string, identityId: string, activoId: string): Promise<{ ordenId: string; activoId: string }> {
+    const c = await exec(ctx(tenantId), `${MODULO}.crear`, {
+      titulo: "OT sesión con activo", tipo: "correctiva",
+      activoPrincipal: { activoId, entityRef: `activo:${activoId}` },
+    });
+    if (!c.ok) throw new Error(`crear OT c/activo falló: ${c.error.message}`);
+    const id = (c.value as { id: string }).id;
+    await drenar();
+    for (const comando of ["abrir", "planificar", "asignar"]) {
+      const t = await exec(ctx(tenantId), `${MODULO}.transicionar`, { id, comando });
+      if (!t.ok) throw new Error(`transición ${comando} falló: ${t.error.message}`);
+      await drenar();
+    }
+    const a = await exec(ctx(tenantId), `${MODULO}.asignar-recurso-humano`, { ordenId: id, tipo: "persona", asignadoId: identityId });
+    if (!a.ok) throw new Error(`asignar falló: ${a.error.message}`);
+    await drenar();
+    return { ordenId: id, activoId };
+  }
+
   beforeAll(() => {
     // Pool holgado: las lecturas de sesión (`getAbierta`, `tramosDe`, …) abren
     // una conexión propia MIENTRAS el comando mantiene abierta la UoW; con la
@@ -204,6 +237,43 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", { timeout: 30_000 }, () 
     const r = await exec(ctxTec(T_A, OTRO), `${MODULO}.sesion.abrir`, { ordenId, opId: "op-noasig" });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toContain("KRN-AUTH");
+  });
+
+  it("§6/§27 · PLANIFICADOR no asignado NO puede abrir sesión (rechazo de negocio, sin bypass)", async () => {
+    // Regresión del bug E2E: un planificador (rol canónico PLANIFICADOR ⇒ operador
+    // legacy) NO tiene capacidades administrativas, así que NO salta la verificación
+    // de asignación. OT asignada a TEC; el planificador (OTRO) no está asignado.
+    const ordenId = await otAsignada(T_A, TEC);
+    const ctxPlan = ctx(T_A, planificador(MIRROR_OTRO), OTRO);
+    const r = await exec(ctxPlan, `${MODULO}.sesion.abrir`, { ordenId, opId: "op-plan-noasig" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toContain("KRN-AUTH"); // 403 de negocio
+  });
+
+  it("§6 · TECNICO no asignado NO puede abrir sesión (rechazo de negocio)", async () => {
+    const ordenId = await otAsignada(T_A, TEC);
+    // OTRO es técnico y NO está asignado a la OT (sólo TEC lo está).
+    const r = await exec(ctx(T_A, tecnico(MIRROR_OTRO), OTRO), `${MODULO}.sesion.abrir`, { ordenId, opId: "op-tec-noasig" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toContain("KRN-AUTH");
+  });
+
+  it("§6 · SUPERVISOR NO asignado SÍ puede abrir sesión (excepción por capacidad existente)", async () => {
+    // La OT está asignada a TEC; el supervisor (OTRO) NO está asignado, pero su
+    // capacidad EXISTENTE `validar-ordenes` habilita el bypass legítimo (§6).
+    const ordenId = await otAsignada(T_A, TEC);
+    const r = await exec(ctx(T_A, supervisor(MIRROR_OTRO), OTRO), `${MODULO}.sesion.abrir`, { ordenId, opId: "op-sup-noasig" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { identityId: string }).identityId).toBe(OTRO);
+    await drenar();
+  });
+
+  it("§6 · ADMINISTRADOR NO asignado SÍ puede abrir sesión (capacidad `*`)", async () => {
+    // ADMIN tiene capacidades `*` (TENANT_ADMIN/SUPER_ADMIN). Identidad canónica OTRO.
+    const ordenId = await otAsignada(T_A, TEC);
+    const r = await exec(ctx(T_A, ADMIN, OTRO), `${MODULO}.sesion.abrir`, { ordenId, opId: "op-adm-noasig" });
+    expect(r.ok).toBe(true);
+    await drenar();
   });
 
   it("FALLA CERRADO si el contexto no trae identidad canónica (login legacy)", async () => {
@@ -301,5 +371,45 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", { timeout: 30_000 }, () 
       expect(dd.efectivoMs).toBe(da.efectivoMs);
       expect(dd.efectivoMs).toBe(60 * 60_000);
     }
+  });
+
+  it("§8 · deriva y CONSERVA el activoId de la OT (respuesta, cabecera fuente-de-verdad y read models)", async () => {
+    const ACTIVO = `activo-${RUN}`;
+    const { ordenId } = await otAsignadaConActivo(T_A, TEC, ACTIVO);
+
+    // (1) La respuesta del comando trae el activoId DERIVADO de la OT (no null).
+    const abrir = await exec(ctxTec(T_A, TEC), `${MODULO}.sesion.abrir`, { ordenId, ocurridoAt: "2024-05-01T08:00:00Z", opId: "act-abrir" });
+    expect(abrir.ok).toBe(true);
+    if (!abrir.ok) return;
+    const sesionId = (abrir.value as { sesionId: string; activoId: string | null }).sesionId;
+    expect((abrir.value as { activoId: string | null }).activoId).toBe(ACTIVO);
+    await drenar();
+
+    // (2) Cabecera FUENTE DE VERDAD: `ord_sesiones.activo_id` persistido.
+    const cab = await conTenant<{ activo_id: string | null }>(T_A, "select activo_id from deltaops.ord_sesiones where id=$1", [sesionId]);
+    expect(cab[0]?.activo_id).toBe(ACTIVO);
+
+    // (3) Read model CQRS `ord_sesiones_read` (vía capa de consultas por OT).
+    const porOrden = await query(ctxTec(T_A, TEC), `${MODULO}.sesiones`, { ordenId });
+    expect(porOrden.ok).toBe(true);
+    if (porOrden.ok) {
+      const s = (porOrden.value as { sesiones: { activoId: string | null }[] }).sesiones[0];
+      expect(s?.activoId).toBe(ACTIVO);
+    }
+
+    // (4) La sesión es localizable POR activo (índice del read model por activo).
+    const porActivo = await query(ctxTec(T_A, TEC), `${MODULO}.sesiones`, { activoId: ACTIVO });
+    expect(porActivo.ok).toBe(true);
+    if (porActivo.ok) {
+      const rows = (porActivo.value as { sesiones: { sesionId?: string; activoId: string | null }[] }).sesiones;
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+      expect(rows.every((r) => r.activoId === ACTIVO)).toBe(true);
+    }
+
+    // (5) Read model de duraciones (`ord_sesion_duraciones_read`) conserva el activoId.
+    const dur = await query(ctxTec(T_A, TEC), `${MODULO}.sesion.duraciones`, { sesionId });
+    expect(dur.ok).toBe(true);
+    if (dur.ok) expect((dur.value as { duraciones: { activoId: string | null } }).duraciones.activoId).toBe(ACTIVO);
+    await drenar();
   });
 });

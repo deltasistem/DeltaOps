@@ -10,6 +10,7 @@ import { db, deltaopsUsersTable } from "@workspace/db";
 import type { ExecutionContext, KernelError, Result } from "@workspace/kernel";
 import { ColaSyncSchema, MODULO } from "@workspace/module-ordenes";
 import { ordenesRuntime, contextForOrdenes } from "./ordenes-runtime";
+import { aRolCanonico } from "../../deltaops/identity/rbac";
 
 const router: IRouter = Router();
 const BASE = "/deltaops/ordenes";
@@ -34,7 +35,15 @@ router.use(BASE, async (req, res, next): Promise<void> => {
   // dominio usa para atribuir sesiones de trabajo y verificar asignaciones. El
   // `user.id` legacy sólo alimenta `principal.id` (permisos/recibos). Si no hay
   // identidad canónica en la sesión, los comandos de sesión fallan CERRADO.
-  res.locals.ctx = contextForOrdenes(String(user.id), user.rol, user.tenant, req.session?.identityId);
+  //
+  // DGP-020.2 · Usamos el ROL CANÓNICO de la sesión (misma fuente/normalización
+  // que Utilización). Es imprescindible: el rol de espejo `operador` colapsa
+  // SUPERVISOR/PLANIFICADOR/TECNICO, y sólo el canónico preserva la distinción
+  // que decide la excepción §6 al abrir sesión sin asignación (supervisor/admin sí;
+  // planificador/técnico no). El fallback a `aRolCanonico(user.rol)` mantiene el
+  // comportamiento cuando la sesión no trae `rolCanonico`.
+  const rolCanonico = req.session?.rolCanonico ?? aRolCanonico(user.rol);
+  res.locals.ctx = contextForOrdenes(String(user.id), rolCanonico, user.tenant, req.session?.identityId);
   next();
 });
 
