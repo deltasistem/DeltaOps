@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, waitFor, fireEvent, within } from "@testing-library/react";
 import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { OfflineProvider } from "../lib/offline/contexto";
-import { ModalAsignacion } from "../pages/ordenes-supervisor";
+import { AccionResponsable, ModalAsignacion } from "../pages/ordenes-supervisor";
 
 const ORDEN = {
   id: "OT-77", tenantId: "deltaops", codigo: "OT-77", titulo: "Falla bomba", tipo: "correctiva",
@@ -87,5 +87,66 @@ describe("ModalAsignacion (asignación fuerte por identidad)", () => {
     expect(body.tipo).toBe("persona");
     expect(body.asignadoId).toBe("idn-ana");
     expect(body.rol).toBe("responsable");
+  });
+});
+
+// DGP-020.1 (§9) · Reasignación de una OT YA asignada desde la superficie del
+// supervisor: acción visible, modal en modo reasignar que precarga la identidad
+// actual y exige elegir OTRA, con POST del nuevo identityId (mismo comando).
+const ORDEN_ASIGNADA = {
+  ...ORDEN, id: "OT-88", codigo: "OT-88", estado: "EN_EJECUCION", responsable: "Ana Soto",
+};
+
+function WrapReasignar() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <OfflineProvider tenant="deltaops" modulo="ordenes">
+          <AccionResponsable orden={ORDEN_ASIGNADA as never} onCambio={() => {}} />
+        </OfflineProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
+
+describe("Reasignación de responsable (OT ya asignada)", () => {
+  beforeEach(() => { posts = []; mockFetch(); });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it("expone 'Reasignar responsable', precarga la actual y envía el nuevo identityId", async () => {
+    render(<WrapReasignar />);
+
+    // Acción de reasignación visible para una OT con responsable.
+    const abrir = await screen.findByRole("button", { name: /Reasignar responsable/i });
+    fireEvent.click(abrir);
+
+    // Modal en modo reasignar: título y submit "Reasignar".
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/Reasignar responsable · OT-88/)).toBeInTheDocument();
+    const select = (await within(dialog).findByLabelText(/Responsable/i)) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(within(dialog).getByRole("option", { name: /Luis Paz · TECNICO/ })).toBeInTheDocument(),
+    );
+
+    // Precarga la identidad ACTUAL (Ana Soto ⇒ idn-ana) y el submit está
+    // deshabilitado mientras no se elija OTRA persona (evita reasignar al mismo).
+    await waitFor(() => expect(select.value).toBe("idn-ana"));
+    const submit = within(dialog).getByRole("button", { name: /^Reasignar$/ });
+    expect(submit).toBeDisabled();
+
+    // Elegir OTRA identidad ⇒ habilita ⇒ POST con el nuevo identityId.
+    fireEvent.change(select, { target: { value: "idn-luis" } });
+    await waitFor(() => expect(submit).not.toBeDisabled());
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(posts.length).toBeGreaterThanOrEqual(1));
+    const reasig = posts.find((p) => /asignar-recurso-humano/.test(p.url));
+    expect(reasig).toBeDefined();
+    const body = reasig!.body as { tipo: string; asignadoId: string; rol: string; reemplazaVigentes: boolean };
+    expect(body.tipo).toBe("persona");
+    expect(body.asignadoId).toBe("idn-luis");
+    expect(body.rol).toBe("responsable");
+    expect(body.reemplazaVigentes).toBe(true);
   });
 });

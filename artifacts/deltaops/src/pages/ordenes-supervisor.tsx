@@ -5,7 +5,7 @@
  * carga de trabajo por técnico, vencidas y SLA. Todas las escrituras degradan a
  * la cola offline.
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   PageHeader,
   Section,
@@ -98,7 +98,12 @@ function Supervisor() {
                       <td><code style={{ fontSize: "var(--do-text-xs)" }}>{o.codigo}</code> {o.titulo}</td>
                       <td><BadgeEstado estado={o.estado} /></td>
                       <td>{o.responsable ?? "—"}</td>
-                      <td><Button variant="secundario" size="sm" onClick={() => setPanelId(o.id)}>Gestionar</Button></td>
+                      <td>
+                        <div style={{ display: "flex", gap: "var(--do-sp-2)", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                          <AccionResponsable orden={o} onCambio={recargar} />
+                          <Button variant="secundario" size="sm" onClick={() => setPanelId(o.id)}>Gestionar</Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -199,7 +204,50 @@ function TarjetaAsignacion({ orden, onCambio, onAbrir }: { orden: OrdenRow; onCa
   );
 }
 
-export function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenRow; onCerrar: () => void; onGuardado: () => void }) {
+/**
+ * DGP-020.1 (§9) · Acción de (re)asignación de responsable disponible en la
+ * tabla de órdenes ACTIVAS. Para una OT ya asignada abre el modal en modo
+ * "reasignar" (precarga la identidad actual y exige elegir otra); para una OT
+ * sin responsable ofrece "Asignar". Comparte la misma superficie del supervisor
+ * (gate por acceso a la página; CONSULTA no la ve) y el mismo comando auditable.
+ */
+export function AccionResponsable({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const asignada = !!orden.responsable;
+  return (
+    <>
+      <Button variant={asignada ? "fantasma" : "primario"} size="sm" onClick={() => setAbierto(true)}>
+        {asignada ? "Reasignar responsable" : "Asignar responsable"}
+      </Button>
+      {abierto && (
+        <ModalAsignacion
+          orden={orden}
+          modo={asignada ? "reasignar" : "asignar"}
+          onCerrar={() => setAbierto(false)}
+          onGuardado={() => { setAbierto(false); onCambio(); }}
+        />
+      )}
+    </>
+  );
+}
+
+export function ModalAsignacion({
+  orden,
+  onCerrar,
+  onGuardado,
+  modo = "asignar",
+}: {
+  orden: OrdenRow;
+  onCerrar: () => void;
+  onGuardado: () => void;
+  /**
+   * DGP-020.1 (§9) · "asignar" (OT sin responsable) o "reasignar" (OT ya
+   * asignada): sólo cambia el copy y la PRECARGA de la identidad actual. El
+   * comando y el contrato son idénticos (`asignar-recurso-humano` con
+   * `reemplazaVigentes` ⇒ cambio auditable + historial append-only).
+   */
+  modo?: "asignar" | "reasignar";
+}) {
   const { cola } = useOffline();
   // DGP-020.1 · Identidades canónicas del tenant (fuente de verdad). El selector
   // muestra nombre+rol y ENVÍA únicamente el identityId; nunca texto libre.
@@ -214,6 +262,21 @@ export function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenR
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // DGP-020.1 (§9) · PRECARGA de la identidad ACTUAL al reasignar: cuando las
+  // identidades elegibles ya cargaron, se selecciona la que corresponde al
+  // responsable vigente (por nombre canónico, que es lo que expone el read
+  // model). El supervisor puede entonces elegir OTRA. Sólo precarga una vez.
+  const [precargado, setPrecargado] = useState(false);
+  useEffect(() => {
+    if (precargado || modo !== "reasignar" || !orden.responsable) return;
+    const actual = (elegibles.datos ?? []).find((i) => i.nombre === orden.responsable);
+    if (actual) {
+      form.setValores({ ...form.valores, responsable: actual.identityId });
+      setPrecargado(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elegibles.datos, modo, orden.responsable, precargado]);
+
   // DGP-020.1 (E2E) · Habilitación del submit anclada al identityId SELECCIONADO
   // (no a un campo de texto legacy): se puede asignar si hay una identidad
   // elegida como responsable, o si cambió el supervisor de la OT. Evita un
@@ -221,7 +284,17 @@ export function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenR
   const responsableSel = form.valores.responsable ? String(form.valores.responsable) : "";
   const supervisorSel = form.valores.supervisor ? String(form.valores.supervisor) : "";
   const supervisorCambio = supervisorSel !== (orden.supervisor ?? "");
-  const puedeAsignar = responsableSel.length > 0 || supervisorCambio;
+  // identityId del responsable ACTUAL (para exigir un cambio real al reasignar).
+  const responsableActualId = useMemo(
+    () => (elegibles.datos ?? []).find((i) => i.nombre === orden.responsable)?.identityId ?? "",
+    [elegibles.datos, orden.responsable],
+  );
+  const responsableCambio =
+    modo === "reasignar" ? responsableSel.length > 0 && responsableSel !== responsableActualId : responsableSel.length > 0;
+  const puedeAsignar = responsableCambio || supervisorCambio;
+
+  const titulo = modo === "reasignar" ? `Reasignar responsable · ${orden.codigo}` : `Asignar ${orden.codigo}`;
+  const etiquetaSubmit = modo === "reasignar" ? "Reasignar" : "Asignar";
 
   async function guardar() {
     setGuardando(true);
@@ -249,11 +322,11 @@ export function ModalAsignacion({ orden, onCerrar, onGuardado }: { orden: OrdenR
     <Modal
       abierto
       onClose={onCerrar}
-      titulo={`Asignar ${orden.codigo}`}
+      titulo={titulo}
       pie={
         <>
           <Button variant="fantasma" onClick={onCerrar}>Cancelar</Button>
-          <Button variant="primario" loading={guardando} disabled={!puedeAsignar} onClick={() => void guardar()}>Asignar</Button>
+          <Button variant="primario" loading={guardando} disabled={!puedeAsignar} onClick={() => void guardar()}>{etiquetaSubmit}</Button>
         </>
       }
     >
