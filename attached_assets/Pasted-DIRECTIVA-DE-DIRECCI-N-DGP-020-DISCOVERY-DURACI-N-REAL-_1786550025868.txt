@@ -1,0 +1,700 @@
+DIRECTIVA DE DIRECCIÓN — DGP-020
+DISCOVERY · DURACIÓN REAL DE ÓRDENES DE TRABAJO Y FUNDACIÓN DE MANO DE OBRA
+
+Programa DeltaOps
+
+ESTADO DEL PROGRAMA
+
+DGP-019.1 — Utilización: CERRADO / PASS
+DGP-019.2 — Ficha Operacional 360°: CERRADO / PASS
+DGP-020: AUTORIZADO ÚNICAMENTE EN FASE DE DISCOVERY
+
+IMPORTANTE:
+
+NO implementar código en esta fase.
+
+NO crear migraciones.
+
+NO crear tablas.
+
+NO modificar contratos.
+
+NO modificar Workflow Engine.
+
+NO modificar módulo Órdenes.
+
+NO modificar Activos.
+
+NO modificar Utilización.
+
+NO modificar API.
+
+NO modificar frontend.
+
+El entregable de DGP-020 es exclusivamente:
+
+DISCOVERY + ANÁLISIS ARQUITECTÓNICO + PROPUESTA DE DISEÑO.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Determinar cómo DeltaOps puede obtener de forma confiable:
+
+- duración real de una Orden de Trabajo;
+- tiempo efectivo de ejecución;
+- tiempo en pausa;
+- tiempo total transcurrido;
+- técnico(s) involucrado(s);
+- horas de mano de obra;
+- relación entre tiempo, técnico, OT y activo.
+
+El objetivo posterior será poder construir:
+
+OT
+↓
+Tiempo real
+↓
+Mano de obra
+↓
+Activo
+↓
+Costo de mantenimiento
+
+Y posteriormente:
+
+Costo de mantenimiento
++
+Combustible
++
+Repuestos
++
+Mano de obra
+↓
+Costo operacional del activo
+
+PERO ESTA FASE NO IMPLEMENTA NINGUNO DE ESOS CÁLCULOS.
+
+==================================================
+2. AUDITORÍA COMPLETA DEL MÓDULO ÓRDENES
+==================================================
+
+Inspeccionar el corpus real y documentar:
+
+- entidades;
+- agregados;
+- comandos;
+- queries;
+- read models;
+- estados;
+- transiciones;
+- Workflow;
+- responsables;
+- técnicos;
+- supervisores;
+- cuadrillas;
+- bitácora;
+- eventos;
+- timestamps;
+- historial;
+- asignaciones;
+- relación con activos;
+- relación con preventivo;
+- relación con correctivo;
+- relación con planes.
+
+Determinar exactamente qué información existe HOY.
+
+No asumir que un campo existe porque conceptualmente debería existir.
+
+==================================================
+3. CICLO REAL DE UNA OT
+==================================================
+
+Reconstruir el ciclo real implementado.
+
+Por ejemplo, determinar si actualmente existe algo equivalente a:
+
+BORRADOR
+↓
+PROGRAMADA
+↓
+ASIGNADA
+↓
+EN EJECUCIÓN
+↓
+PAUSA
+↓
+EN EJECUCIÓN
+↓
+FINALIZADA
+↓
+CERRADA
+
+Pero NO asumir estos estados.
+
+Extraer los estados reales del contrato existente.
+
+Para cada transición documentar:
+
+- estado origen;
+- estado destino;
+- comando;
+- usuario/capacidad requerida;
+- timestamp disponible;
+- evento generado;
+- datos registrados;
+- relación con responsable/técnico.
+
+==================================================
+4. BITÁCORA DE LA OT
+==================================================
+
+Auditar la bitácora append-only existente.
+
+Determinar:
+
+- qué eventos registra;
+- qué timestamp tiene cada evento;
+- si identifica al actor;
+- si identifica al técnico;
+- si existe inicio;
+- si existe pausa;
+- si existe reanudación;
+- si existe finalización;
+- si existen múltiples ciclos de pausa;
+- si existe cancelación;
+- si existe reapertura;
+- si existe cierre.
+
+Determinar si únicamente con estos eventos es posible reconstruir:
+
+TIEMPO TRANSCURRIDO
+
+y
+
+TIEMPO EFECTIVO DE EJECUCIÓN.
+
+==================================================
+5. DURACIÓN REAL
+==================================================
+
+Determinar matemáticamente qué duración puede obtenerse con los datos actuales.
+
+Distinguir obligatoriamente:
+
+A. Tiempo calendario/transcurrido
+
+Desde inicio hasta finalización.
+
+B. Tiempo efectivo
+
+Tiempo en estado EN_EJECUCIÓN excluyendo pausas.
+
+C. Tiempo pausado
+
+Suma de intervalos en estado PAUSA.
+
+D. Tiempo hasta cierre
+
+Desde creación/inicio hasta cierre, si los datos lo permiten.
+
+NO mezclar estas métricas.
+
+Si alguna no puede calcularse con certeza:
+
+declarar:
+
+NO DISPONIBLE CON EL CONTRATO ACTUAL.
+
+No inventar.
+
+==================================================
+6. ASIGNACIÓN DE TÉCNICOS
+==================================================
+
+Auditar cómo se representa actualmente:
+
+- responsable;
+- supervisor;
+- técnico;
+- cuadrilla;
+- identidad;
+- asignación.
+
+Determinar si existe un vínculo fuerte con:
+
+identityId.
+
+Esto es especialmente importante porque DGP-018 identificó:
+
+G-1
+
+falta de contrato que garantice la asignación de OT a identityId.
+
+Determinar si G-1 sigue vigente.
+
+Si continúa vigente:
+
+explicar exactamente qué impide resolverlo.
+
+NO modificarlo en Discovery.
+
+==================================================
+7. MANO DE OBRA
+==================================================
+
+Investigar si actualmente existe en el corpus:
+
+- tarifa/hora;
+- costo por técnico;
+- costo por cuadrilla;
+- horas trabajadas;
+- jornada;
+- turno;
+- costo de mano de obra;
+- centro de costo;
+- proyecto;
+- contrato laboral;
+- costo interno.
+
+NO asumir información salarial.
+
+NO crear conceptos financieros ficticios.
+
+Determinar solamente qué datos existen realmente.
+
+==================================================
+8. RELACIÓN CON ACTIVOS
+==================================================
+
+Determinar cómo se relaciona una OT con:
+
+- activo principal;
+- activos secundarios, si existen;
+- componentes;
+- ubicación;
+- proyecto.
+
+Estudiar cómo conectar posteriormente:
+
+OT
+→ duración
+→ activo
+→ utilización.
+
+No crear ninguna integración todavía.
+
+==================================================
+9. RELACIÓN CON UTILIZACIÓN
+==================================================
+
+Auditar DGP-019.1 y determinar cómo podría componerse:
+
+module-ordenes
++
+module-utilizacion
+
+sin duplicar datos.
+
+Determinar si posteriormente podría obtenerse:
+
+Activo X
+→ OT Y
+→ tiempo efectivo
+→ horas de mantenimiento
+→ impacto sobre utilización/disponibilidad.
+
+Identificar gaps.
+
+==================================================
+10. RELACIÓN CON REPUESTOS
+==================================================
+
+Auditar Inventario y Abastecimiento.
+
+Determinar si actualmente es posible identificar:
+
+- repuesto;
+- cantidad;
+- costo;
+- OT;
+- activo;
+- consumo.
+
+Si no existe una relación completa:
+
+declarar GAP.
+
+NO modificar Inventario.
+
+==================================================
+11. RELACIÓN CON COMBUSTIBLE
+==================================================
+
+Auditar module-utilizacion.
+
+Determinar qué información existe para:
+
+- tanqueo;
+- litros;
+- costo;
+- horómetro;
+- odómetro;
+- activo;
+- usuario.
+
+Determinar cómo podría relacionarse posteriormente con costos del activo.
+
+NO duplicar combustible dentro de Órdenes.
+
+==================================================
+12. COSTOS
+==================================================
+
+Determinar qué sería necesario para obtener posteriormente:
+
+COSTO DE OT
+
+y:
+
+COSTO DE MANTENIMIENTO DEL ACTIVO.
+
+Analizar:
+
+- mano de obra;
+- repuestos;
+- servicios externos;
+- consumibles;
+- combustible cuando aplique;
+- otros costos existentes.
+
+Diferenciar claramente:
+
+DATOS EXISTENTES
+
+vs
+
+DATOS FALTANTES.
+
+No implementar costos en DGP-020.
+
+==================================================
+13. DISPONIBILIDAD DEL ACTIVO
+==================================================
+
+Analizar si los eventos de OT permiten determinar:
+
+- cuándo un activo entró en mantenimiento;
+- cuándo salió de mantenimiento;
+- cuánto tiempo estuvo fuera de servicio.
+
+NO asumir que:
+
+OT abierta = activo fuera de servicio.
+
+Determinar si existe un contrato explícito de estado del activo.
+
+Si no existe:
+
+declarar GAP.
+
+==================================================
+14. WORKFLOW
+==================================================
+
+Auditar Workflow Engine.
+
+Determinar si el Workflow actual permite:
+
+- inicio;
+- pausa;
+- reanudación;
+- finalización;
+- cierre.
+
+Determinar si los timestamps necesarios están disponibles de forma confiable.
+
+NO modificar Workflow.
+
+Si se requiere una extensión:
+
+declarar GAP y describir exactamente:
+
+- qué contrato;
+- qué transición;
+- qué evento;
+- qué dato;
+- qué impacto.
+
+==================================================
+15. EVENTOS Y TIMELINE
+==================================================
+
+Auditar qué eventos de OT llegan actualmente a:
+
+Shared Timeline.
+
+Determinar si son suficientes para reconstruir una jornada operacional.
+
+No crear otra timeline.
+
+==================================================
+16. OFFLINE
+==================================================
+
+Auditar cómo funcionan actualmente las operaciones offline de Órdenes.
+
+Determinar:
+
+- qué transiciones pueden ejecutarse offline;
+- cómo se conservan timestamps;
+- cómo se resuelven conflictos;
+- qué ocurre cuando un técnico trabaja sin conexión.
+
+Este punto es CRÍTICO para duración real.
+
+Determinar si el timestamp representa:
+
+A. hora real del dispositivo
+
+o
+
+B. hora de sincronización con servidor.
+
+Documentarlo.
+
+==================================================
+17. SEGURIDAD Y AUDITORÍA
+==================================================
+
+Determinar cómo garantizar posteriormente:
+
+- quién inició una OT;
+- quién la pausó;
+- quién la reanudó;
+- quién la finalizó;
+- quién la cerró;
+- qué técnico participó.
+
+Mantener:
+
+- identidad canónica;
+- RBAC;
+- RLS;
+- tenant isolation.
+
+No introducir autorización paralela.
+
+==================================================
+18. GAPS OBLIGATORIOS
+==================================================
+
+Clasificar cada gap encontrado:
+
+GAP EXISTENTE
+GAP BLOQUEANTE
+GAP NO BLOQUEANTE
+GAP FUTURO
+
+Prestar especial atención a:
+
+G-1 de DGP-018.
+
+También evaluar:
+
+- duración real;
+- identityId;
+- mano de obra;
+- turnos;
+- costos;
+- repuestos;
+- disponibilidad;
+- offline;
+- timestamps.
+
+==================================================
+19. PROPUESTA DE ARQUITECTURA
+==================================================
+
+Después del análisis proponer cómo resolver el problema.
+
+La propuesta debe responder:
+
+1. ¿Debe modificarse module-ordenes?
+2. ¿Debe crearse un módulo nuevo?
+3. ¿Debe extenderse un read model?
+4. ¿Debe crearse un read model específico?
+5. ¿Dónde debe vivir la fuente de verdad?
+6. ¿Dónde deben calcularse las duraciones?
+7. ¿Cómo se mantiene CQRS?
+8. ¿Cómo se mantiene Workflow?
+9. ¿Cómo se mantiene RLS?
+10. ¿Cómo se mantiene Offline First?
+11. ¿Cómo se relaciona con Utilización?
+12. ¿Cómo se relaciona con Inventario?
+13. ¿Cómo se relaciona con Activos?
+14. ¿Cómo se preparan costos?
+
+==================================================
+20. PROPUESTA DE FASES
+==================================================
+
+Proponer fases posteriores.
+
+Por ejemplo, evaluar si sería conveniente:
+
+DGP-020.1
+Duración real de OT
+
+DGP-020.2
+Fundación de mano de obra
+
+DGP-021
+Costos de mantenimiento
+
+PERO NO asumir esta estructura.
+
+La propuesta debe surgir del Discovery.
+
+==================================================
+21. CRITERIO DE NO DUPLICACIÓN
+==================================================
+
+No crear:
+
+- segundo sistema de órdenes;
+- segundo sistema de técnicos;
+- segundo sistema de identidad;
+- segundo sistema de workflow;
+- segundo sistema de inventario;
+- segundo sistema de combustible;
+- segundo sistema de activos.
+
+Toda solución debe componerse sobre los dominios existentes.
+
+==================================================
+22. CRITERIO DE GOBIERNO
+==================================================
+
+Durante Discovery:
+
+NO implementar código.
+
+NO ejecutar migraciones.
+
+NO modificar base de datos.
+
+NO modificar OpenAPI.
+
+NO modificar frontend.
+
+NO modificar contratos.
+
+NO modificar Workflow.
+
+NO modificar módulos congelados.
+
+Solo inspección, documentación y propuesta.
+
+==================================================
+23. ENTREGA
+==================================================
+
+Crear:
+
+docs/DGP-020-DESCUBRIMIENTO.md
+
+El informe debe incluir:
+
+1. Resumen ejecutivo.
+2. Estado actual.
+3. Estados reales de OT.
+4. Comandos.
+5. Eventos.
+6. Bitácora.
+7. Timestamps.
+8. Duración calculable.
+9. Duración no calculable.
+10. Asignación.
+11. identityId.
+12. Mano de obra.
+13. Activos.
+14. Utilización.
+15. Inventario.
+16. Combustible.
+17. Costos.
+18. Disponibilidad.
+19. Workflow.
+20. Offline.
+21. Timeline.
+22. Seguridad.
+23. Gaps.
+24. Arquitectura propuesta.
+25. Fases recomendadas.
+26. Riesgos.
+27. Deuda técnica.
+
+==================================================
+24. REVISIÓN INDEPENDIENTE
+==================================================
+
+Realizar revisión arquitectónica independiente del Discovery.
+
+La revisión debe verificar que:
+
+- las afirmaciones corresponden al corpus real;
+- no se inventaron capacidades;
+- no se asumieron campos inexistentes;
+- no se propusieron atajos;
+- G-1 fue revisado;
+- no se modificó código;
+- no se alteraron contratos.
+
+Si existe una afirmación no demostrable:
+
+marcarla como:
+
+NO VERIFICADA.
+
+==================================================
+25. CRITERIO DE CIERRE
+==================================================
+
+DGP-020 queda cerrado únicamente cuando:
+
+DISCOVERY COMPLETADO
++
+DOCUMENTACIÓN COMPLETA
++
+GAPS IDENTIFICADOS
++
+ARQUITECTURA PROPUESTA
++
+REVISIÓN INDEPENDIENTE PASS
+
+No implementar ninguna solución.
+
+No iniciar DGP-020.1 automáticamente.
+
+Esperar aprobación explícita de la Dirección.
+
+==================================================
+REGLA FINAL
+==================================================
+
+El objetivo de esta fase NO es "hacer que las OT tengan horas".
+
+El objetivo es descubrir exactamente:
+
+¿QUÉ PODEMOS MEDIR HOY?
+
+¿QUÉ NOS FALTA?
+
+¿DÓNDE DEBE VIVIR CADA DATO?
+
+¿CÓMO LO IMPLEMENTAMOS SIN ROMPER DELTAOPS?
+
+¿Y QUÉ NECESITAMOS PARA LLEGAR POSTERIORMENTE A COSTOS REALES DE MANTENIMIENTO?
+
+La Dirección prefiere una respuesta técnicamente incómoda pero verdadera antes que una implementación rápida basada en supuestos.
