@@ -49,6 +49,7 @@ import {
   plantillaAsociarPlantilla,
 } from "../../lib/forms/plantillas-ordenes";
 import { ACCIONES_BITACORA, ETIQUETA_BITACORA } from "../../lib/ordenes/constantes";
+import { PanelSesion } from "../../lib/ordenes/PanelSesion";
 import type { OrdenRow, DocumentoOrden } from "../../lib/ordenes/tipos";
 
 const OPCIONES_BITACORA = ACCIONES_BITACORA.map((a) => ({ valor: a, etiqueta: ETIQUETA_BITACORA[a] }));
@@ -76,6 +77,8 @@ export function coaccionarDefinicion(raw: unknown): DefinicionFormulario | null 
 export function TabEjecucion({ orden, onCambio }: { orden: OrdenRow; onCambio: () => void }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
+      {/* DGP-020.2 · Acción primaria del técnico: iniciar/pausar/reanudar/finalizar. */}
+      <PanelSesion orden={orden} />
       <ChecklistFormulario orden={orden} onCambio={onCambio} />
       <BitacoraRapida orden={orden} onCambio={onCambio} />
       <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))" }}>

@@ -350,3 +350,62 @@ export async function crearRelacion(
     directo: () => ordenesFetch(`/${ordenId}/relaciones`, { method: "POST", body: cuerpo }),
   });
 }
+
+/* ===================== DGP-020.2 · Sesiones de trabajo ==================== */
+
+/** Acciones del ciclo de una sesión de trabajo (HTTP + comando /sync). */
+export type AccionSesion = "abrir" | "pausar" | "reanudar" | "cerrar";
+
+/**
+ * Dispara un comando de la MÁQUINA DE SESIÓN de trabajo (abrir/pausar/reanudar/
+ * cerrar), Offline First. Contrato DGP-020.2:
+ *  - `identityId` y `activoId` NUNCA se envían: los deriva el backend del
+ *    contexto autenticado y de la OT (evita identidad manipulable desde cliente).
+ *  - `ocurridoAt` es HORA DEL DISPOSITIVO capturada AL PULSAR (no al sincronizar);
+ *    se conserva íntegra al encolar para que el servidor la use como device-time
+ *    y jamás la reemplace por su `registradoAt`.
+ *  - `opId` garantiza idempotencia (una sola operación por opId, online u offline).
+ *  - Ante fallo de red, `mutarConOffline` encola el MISMO comando oficial del
+ *    runtime (`modulo.ordenes.sesion.<accion>`) que consume `/sync` — no hay una
+ *    segunda cola ni rutas HTTP inventadas. El `input` encolado incluye `ordenId`
+ *    (requerido por el comando) y `origen: "offline"`.
+ *
+ * `ocurridoAtIso` es inyectable para pruebas deterministas; por defecto es la
+ * hora del dispositivo en el instante de la llamada (click).
+ */
+export async function ejecutarSesion(
+  cola: ColaSync,
+  ordenId: string,
+  accion: AccionSesion,
+  opts: { sesionId?: string; ocurridoAtIso?: string } = {},
+): Promise<ResultadoMutacion> {
+  const opId = nuevoOpId();
+  const ocurridoAt = opts.ocurridoAtIso ?? new Date().toISOString();
+  // Cuerpo del POST directo (online): `ordenId` viaja por la ruta.
+  const cuerpo: Record<string, unknown> = { opId, ocurridoAt, origen: "online" };
+  if (opts.sesionId) cuerpo.sesionId = opts.sesionId;
+  // Entrada COMPLETA del comando para el replay por /sync desde la cola: incluye
+  // `ordenId` (requerido) y marca `origen: "offline"` (conserva ocurridoAt).
+  const input: Record<string, unknown> = { id: ordenId, ordenId, opId, ocurridoAt, origen: "offline" };
+  if (opts.sesionId) input.sesionId = opts.sesionId;
+  const etiqueta = { abrir: "Iniciar trabajo", pausar: "Pausar", reanudar: "Reanudar", cerrar: "Finalizar" }[accion];
+  return mutarConOffline(cola, {
+    comando: `${MODULO}.sesion.${accion}`,
+    input,
+    descripcion: `${etiqueta} sesión de ${ordenId}`,
+    directo: () => ordenesFetch(`/${ordenId}/sesion/${accion}`, { method: "POST", body: cuerpo }),
+  });
+}
+
+/** Abre una sesión de trabajo (primer tramo). */
+export const abrirSesion = (cola: ColaSync, ordenId: string, opts?: { sesionId?: string; ocurridoAtIso?: string }) =>
+  ejecutarSesion(cola, ordenId, "abrir", opts);
+/** Pausa la sesión de trabajo abierta. */
+export const pausarSesion = (cola: ColaSync, ordenId: string, opts?: { ocurridoAtIso?: string }) =>
+  ejecutarSesion(cola, ordenId, "pausar", opts);
+/** Reanuda la sesión de trabajo pausada. */
+export const reanudarSesion = (cola: ColaSync, ordenId: string, opts?: { ocurridoAtIso?: string }) =>
+  ejecutarSesion(cola, ordenId, "reanudar", opts);
+/** Cierra la sesión de trabajo (estado final, sin reapertura). */
+export const cerrarSesion = (cola: ColaSync, ordenId: string, opts?: { ocurridoAtIso?: string }) =>
+  ejecutarSesion(cola, ordenId, "cerrar", opts);

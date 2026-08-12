@@ -134,3 +134,79 @@ export interface IdentidadElegible {
   readonly rol: string;
   readonly estadoMembresia: string;
 }
+
+/* ===================== DGP-020.2 · Sesiones de trabajo ==================== */
+
+/** Estado del ciclo de una sesión de trabajo (ABIERTA⇄PAUSADA→CERRADA). */
+export type EstadoSesion = "ABIERTA" | "PAUSADA" | "CERRADA";
+
+/**
+ * Cabecera del read model de una sesión de trabajo
+ * (GET /:id/sesion/activa → {sesion}, GET /sesiones → {sesiones:[...]}).
+ * Todas las fechas viajan como ISO (device-time en `iniciadoAt`; server-time en
+ * `registradoAt`). El frontend NO recalcula duración recorriendo eventos.
+ */
+export interface SesionTrabajo {
+  readonly id: string;
+  readonly ordenId: string;
+  readonly activoId: string | null;
+  readonly identityId: string;
+  readonly estado: EstadoSesion;
+  readonly origen: string;
+  readonly iniciadoAt: string;
+  readonly cerradoAt: string | null;
+  readonly registradoAt: string;
+  readonly actualizadoAt: string;
+}
+
+/**
+ * Duraciones derivadas del read model (GET /sesiones/duraciones). La FUENTE DE
+ * VERDAD es este read model (calculado desde los tramos append-only): el cliente
+ * jamás calcula tiempo efectivo/pausado/transcurrido recorriendo eventos crudos.
+ * Para sesión abierta son acumulados «hasta ahora» (no definitivos).
+ */
+export interface DuracionesSesion {
+  readonly sesionId: string;
+  readonly ordenId: string;
+  readonly activoId: string | null;
+  readonly identityId: string;
+  readonly estado: string;
+  readonly efectivoMs: number;
+  readonly pausadoMs: number;
+  readonly transcurridoMs: number;
+  readonly pausas: number;
+  readonly abierta: boolean;
+  readonly iniciadoAt: string;
+  readonly cerradoAt: string | null;
+}
+
+/**
+ * Tramo append-only de una sesión (GET /sesiones/{sesionId}/tramos → {tramos}).
+ * Distingue `ocurridoAt` (dispositivo/campo) de `registradoAt` (servidor);
+ * jamás se reemplaza `ocurridoAt`. `anomaliaReloj` marca inconsistencias sin
+ * destruir el hecho.
+ */
+export interface TramoSesion {
+  readonly eventId: string;
+  readonly sesionId: string;
+  readonly ordenId: string;
+  readonly secuencia: number;
+  readonly tipo: string;
+  readonly origen: string;
+  readonly ocurridoAt: string;
+  readonly registradoAt: string;
+  readonly anomaliaReloj: Record<string, unknown> | null;
+  readonly identityId: string;
+}
+
+/** Resultado de un comando de sesión (POST /:id/sesion/{accion}). */
+export interface ResultadoSesion {
+  readonly sesionId: string;
+  readonly ordenId: string;
+  readonly activoId: string | null;
+  readonly identityId: string;
+  readonly estado: EstadoSesion;
+  readonly ocurridoAt?: string;
+  readonly anomaliaReloj?: Record<string, unknown> | null;
+  readonly idempotente?: boolean;
+}

@@ -36,6 +36,7 @@ import { fusionarEcosistema } from "../lib/ecosistema/timeline";
 import { useTimelineActivo } from "../lib/ecosistema/hooks";
 import { TRANSICIONES, ETIQUETA_ESTADO, TONO_ESTADO } from "../lib/ordenes/constantes";
 import { BadgeEstado, BadgePrioridad, vencimientoSla } from "../lib/ordenes/componentes";
+import { PanelSesion } from "../lib/ordenes/PanelSesion";
 import type { OrdenRow } from "../lib/ordenes/tipos";
 import { TabEjecucion } from "./ordenes/tab-ejecucion";
 import { TabDocumentacionOrden } from "./ordenes/tab-documentacion";
@@ -181,6 +182,8 @@ function TabResumen({ orden }: { orden: OrdenRow }) {
           </CardContent>
         </Card>
       )}
+      {/* DGP-020.2 · Contexto de sesión integrado (estado + duraciones + historial). */}
+      <PanelSesion orden={orden} conHistorial />
     </div>
   );
 }

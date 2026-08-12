@@ -15,6 +15,9 @@ import type {
   Asignacion,
   IdentidadElegible,
   RelacionOrden,
+  SesionTrabajo,
+  DuracionesSesion,
+  TramoSesion,
 } from "./tipos";
 
 export interface EstadoAsync<T> {
@@ -249,5 +252,79 @@ export function useIdentidadesElegibles(q?: string): EstadoAsync<IdentidadElegib
       return r?.identidades ?? [];
     },
     [q ?? ""],
+  );
+}
+
+/* ===================== DGP-020.2 · Sesiones de trabajo ==================== */
+
+/**
+ * Sesión activa (no cerrada) de la OT (GET /:id/sesion/activa → {sesion}).
+ * Read model: refleja el estado persistido; devuelve `null` cuando no hay
+ * sesión activa. Opcionalmente filtra por identidad.
+ */
+export function useSesionActiva(id: string, identityId?: string): EstadoAsync<SesionTrabajo | null> {
+  const query = qs({ identityId });
+  return useConsulta<SesionTrabajo | null>(
+    async (signal) => {
+      const r = await ordenesFetch<{ sesion?: SesionTrabajo | null }>(`/${id}/sesion/activa${query}`, {
+        signal,
+        toleraNoEncontrado: true,
+      });
+      return r?.sesion ?? null;
+    },
+    [id, identityId ?? ""],
+  );
+}
+
+/** Historial de sesiones de una OT (GET /sesiones?ordenId → {sesiones}). */
+export function useSesionesOrden(id: string): EstadoAsync<SesionTrabajo[]> {
+  return useConsulta<SesionTrabajo[]>(
+    async (signal) => {
+      const r = await ordenesFetch<{ sesiones?: SesionTrabajo[] }>(`/sesiones?ordenId=${encodeURIComponent(id)}`, {
+        signal,
+        toleraNoEncontrado: true,
+      });
+      return r?.sesiones ?? [];
+    },
+    [id],
+  );
+}
+
+/** Tramos append-only de una sesión (GET /sesiones/{sesionId}/tramos → {tramos}). */
+export function useTramosSesion(sesionId: string | null): EstadoAsync<TramoSesion[]> {
+  return useConsulta<TramoSesion[]>(
+    async (signal) => {
+      if (!sesionId) return [];
+      const r = await ordenesFetch<{ tramos?: TramoSesion[] }>(
+        `/sesiones/${encodeURIComponent(sesionId)}/tramos`,
+        { signal, toleraNoEncontrado: true },
+      );
+      return r?.tramos ?? [];
+    },
+    [sesionId ?? ""],
+  );
+}
+
+/**
+ * Duraciones (efectivo/pausado/transcurrido) del READ MODEL — el cliente NUNCA
+ * las calcula recorriendo eventos. Filtra por `sesionId` (una sesión) o por
+ * `ordenId` (todas las sesiones de la OT). Normaliza a arreglo.
+ */
+export function useDuracionesSesion(
+  filtro: { sesionId?: string | null; ordenId?: string | null },
+): EstadoAsync<DuracionesSesion[]> {
+  const query = qs({ sesionId: filtro.sesionId ?? undefined, ordenId: filtro.ordenId ?? undefined });
+  return useConsulta<DuracionesSesion[]>(
+    async (signal) => {
+      if (!filtro.sesionId && !filtro.ordenId) return [];
+      const r = await ordenesFetch<{ duraciones?: DuracionesSesion[] | DuracionesSesion }>(
+        `/sesiones/duraciones${query}`,
+        { signal, toleraNoEncontrado: true },
+      );
+      const d = r?.duraciones;
+      if (!d) return [];
+      return Array.isArray(d) ? d : [d];
+    },
+    [filtro.sesionId ?? "", filtro.ordenId ?? ""],
   );
 }
