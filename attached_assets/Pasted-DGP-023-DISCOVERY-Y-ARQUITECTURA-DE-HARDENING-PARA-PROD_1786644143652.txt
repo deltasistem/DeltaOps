@@ -1,0 +1,766 @@
+DGP-023 — DISCOVERY Y ARQUITECTURA DE HARDENING PARA PRODUCCIÓN
+
+ESTADO: SOLO DISCOVERY.
+NO IMPLEMENTAR CÓDIGO.
+
+La Dirección del Programa aprueba iniciar DGP-023 únicamente como fase de descubrimiento y auditoría.
+
+Contexto:
+DeltaOps terminó DGP-022.1 con el cierre exitoso de PLATFORM-CONSOLE-ACL.
+
+El hallazgo crítico de Broken Access Control quedó corregido y validado:
+
+- TENANT_ADMIN → 403 en los 10 endpoints /api/deltaops/platform/*
+- SUPERVISOR → 403
+- PLANIFICADOR → 403
+- TECNICO → 403
+- CONSULTA → 403
+- Anónimo → 401
+- SUPER_ADMIN → acceso legítimo conservado
+- HTTP directo + E2E navegador + tests + revisión independiente PASS
+
+El objetivo ahora NO es agregar funcionalidades de negocio.
+
+El objetivo es determinar qué necesita DeltaOps para pasar de un entorno de desarrollo/piloto controlado a una plataforma preparada para producción.
+
+==================================================
+REGLA PRINCIPAL
+==================================================
+
+ESTA FASE ES EXCLUSIVAMENTE DISCOVERY.
+
+NO modificar código.
+NO crear migraciones.
+NO modificar esquemas.
+NO modificar contratos.
+NO modificar OpenAPI.
+NO modificar RBAC.
+NO modificar RLS.
+NO modificar CORS.
+NO instalar dependencias.
+NO cambiar configuración.
+NO cambiar frontend.
+NO cambiar backend.
+NO reiniciar servicios salvo que sea estrictamente necesario para una inspección de solo lectura.
+NO hacer commits de implementación.
+
+Únicamente se permite crear/actualizar el documento de Discovery si la convención del programa lo requiere.
+
+Si durante la auditoría aparece una vulnerabilidad crítica explotable, NO la corrijas automáticamente.
+Documenta:
+- causa;
+- impacto;
+- evidencia;
+- superficie afectada;
+- recomendación;
+- prioridad.
+
+DETENTE si encuentras algo crítico que requiera decisión de Dirección.
+
+==================================================
+1. AUDITORÍA DE SEGURIDAD DE API
+==================================================
+
+Auditar toda la superficie HTTP del api-server.
+
+Inventariar:
+
+- rutas públicas;
+- rutas autenticadas;
+- rutas por tenant;
+- rutas SUPER_ADMIN;
+- rutas de módulos;
+- rutas internas;
+- endpoints administrativos;
+- endpoints de health/readiness/metrics;
+- uploads/downloads;
+- webhooks si existen;
+- endpoints de sincronización offline;
+- endpoints de pruebas o debug que puedan quedar expuestos.
+
+Para cada superficie documentar:
+
+método | ruta | autenticación | autorización | tenant scope | RLS | riesgo
+
+Buscar específicamente:
+
+- IDOR;
+- BOLA;
+- acceso cross-tenant;
+- endpoints que confíen en tenant enviado por frontend;
+- identityId recibido desde body;
+- rol recibido desde cliente;
+- permisos derivados de datos manipulables;
+- fallos fail-open;
+- errores que devuelvan información sensible;
+- endpoints internos expuestos públicamente;
+- diferencias entre autorización UI y backend.
+
+No asumir que un endpoint está protegido solo porque la UI lo oculta.
+
+==================================================
+2. CORS
+==================================================
+
+Auditar la configuración REAL de CORS.
+
+Determinar:
+
+- origen actual permitido;
+- si existe wildcard "*";
+- métodos;
+- headers;
+- credentials;
+- comportamiento para origins desconocidos;
+- diferencias desarrollo/producción;
+- configuración por entorno.
+
+Determinar una política recomendada para:
+
+Development
+Staging
+Production
+
+No modificarla todavía.
+
+==================================================
+3. RATE LIMITING Y ABUSO
+==================================================
+
+Determinar si existe actualmente:
+
+- rate limiting;
+- protección contra brute force;
+- protección de login;
+- protección de recuperación de contraseña;
+- límites de sincronización offline;
+- límites de endpoints pesados;
+- límites de uploads;
+- límites por IP;
+- límites por identidad;
+- límites por tenant.
+
+Especial atención a:
+
+POST /login
+recuperación de contraseña
+/sync
+endpoints de búsqueda
+endpoints administrativos
+uploads
+operaciones costosas
+
+Proponer estrategia sin implementarla.
+
+==================================================
+4. HEADERS Y SEGURIDAD DEL NAVEGADOR
+==================================================
+
+Auditar si existe:
+
+- CSP;
+- HSTS;
+- X-Content-Type-Options;
+- Referrer-Policy;
+- Permissions-Policy;
+- frame-ancestors;
+- X-Frame-Options si aplica;
+- protección contra MIME sniffing;
+- cookies Secure;
+- cookies HttpOnly;
+- SameSite;
+- session fixation;
+- cache-control para respuestas sensibles.
+
+Separar claramente:
+
+YA IMPLEMENTADO
+FALTANTE
+RECOMENDADO
+NO APLICA
+
+No implementar nada.
+
+==================================================
+5. AUTENTICACIÓN Y SESIONES
+==================================================
+
+Auditar el sistema de identidad propio de DeltaOps.
+
+Revisar:
+
+- bcrypt;
+- políticas de contraseña;
+- expiración de sesión;
+- renovación;
+- logout;
+- auth_epoch;
+- invalidación global;
+- recuperación de contraseña;
+- tokens de recuperación;
+- cookies;
+- SESSION_SECRET;
+- protección contra session fixation;
+- sesiones concurrentes;
+- cambio de contraseña;
+- cambio de rol;
+- cambio de membresía;
+- desactivación de identidad;
+- revocación.
+
+Determinar qué ocurre si:
+
+- se desactiva un usuario con sesión activa;
+- se cambia su rol;
+- se elimina su membresía;
+- cambia su tenant;
+- cambia auth_epoch.
+
+No cambiar nada.
+
+==================================================
+6. IDENTITY Y RLS
+==================================================
+
+Auditar especialmente las tablas de identidad mencionadas en DGP-022:
+
+El Discovery anterior detectó tablas de identidad sin RLS completa, dependiendo parcialmente de aislamiento en application layer.
+
+Determinar exactamente:
+
+- qué tablas no tienen RLS;
+- qué operaciones realizan;
+- qué consultas las consumen;
+- si existe posibilidad real de cross-tenant;
+- qué compensaciones existen;
+- qué tablas deberían tener RLS;
+- qué política sería correcta;
+- impacto de agregar RLS.
+
+IMPORTANTE:
+
+No modificar RLS en esta fase.
+
+Clasificar:
+
+CRÍTICO
+ALTO
+MEDIO
+BAJO
+ACEPTABLE
+
+==================================================
+7. SECRETOS Y CONFIGURACIÓN
+==================================================
+
+Auditar manejo de:
+
+- SESSION_SECRET
+- secrets de base de datos
+- Graph/Microsoft secrets
+- claves HMAC
+- tokens
+- API keys
+- variables de entorno
+- .env
+- .env.example
+- logs
+- documentación
+- frontend bundles
+
+Buscar secretos hardcodeados o accidentalmente expuestos.
+
+Verificar que:
+
+- secrets nunca lleguen al frontend;
+- secrets no aparezcan en logs;
+- secrets no aparezcan en OpenAPI;
+- secrets no estén en documentación;
+- production no utilice defaults inseguros;
+- development defaults estén claramente separados.
+
+NO rotar secretos.
+
+NO cambiar secrets.
+
+==================================================
+8. LOGS Y OBSERVABILIDAD
+==================================================
+
+Auditar:
+
+- logs estructurados;
+- correlationId;
+- tenantId;
+- identityId;
+- opId;
+- niveles de log;
+- errores;
+- stack traces;
+- información sensible;
+- auditoría;
+- retención;
+- trazabilidad.
+
+Determinar si existe capacidad para responder:
+
+"¿Qué ocurrió con esta OT?"
+
+"¿Quién hizo el cambio?"
+
+"¿Cuándo ocurrió?"
+
+"¿Qué tenant lo ejecutó?"
+
+"¿Qué operación generó el hecho?"
+
+"¿Falló o quedó pendiente?"
+
+==================================================
+9. BACKUPS Y RECUPERACIÓN
+==================================================
+
+Auditar únicamente lo que existe realmente.
+
+Determinar:
+
+- proveedor DB;
+- estrategia actual de backup;
+- frecuencia;
+- retención;
+- restauración;
+- PITR si existe;
+- backups del VPS;
+- backups de archivos;
+- backups de secrets/configuración;
+- procedimiento de disaster recovery;
+- RPO;
+- RTO.
+
+NO crear backups todavía.
+
+NO modificar Neon/VPS/DigitalOcean.
+
+Si no existe estrategia documentada, declararlo como GAP.
+
+==================================================
+10. DEPLOYMENT Y ROLLBACK
+==================================================
+
+Auditar:
+
+- proceso actual de deploy;
+- GitHub;
+- VPS;
+- Docker si existe;
+- systemd/PM2/Gunicorn/etc.;
+- variables de entorno;
+- migraciones;
+- orden de despliegue;
+- rollback;
+- health checks;
+- versionado;
+- commits;
+- releases.
+
+El objetivo es poder responder:
+
+"Si el último deploy rompe DeltaOps, ¿cómo volvemos de forma segura a la versión anterior?"
+
+No ejecutar rollback.
+
+==================================================
+11. INFRAESTRUCTURA
+==================================================
+
+Auditar arquitectura actual REAL:
+
+Internet
+↓
+DNS/CDN/Cloudflare si existe
+↓
+VPS/DigitalOcean
+↓
+API
+↓
+Neon PostgreSQL
+↓
+servicios auxiliares
+
+Determinar:
+
+- puertos expuestos;
+- SSH;
+- firewall;
+- TLS;
+- HTTPS;
+- certificados;
+- dominio;
+- Cloudflare;
+- acceso administrativo;
+- exposición del puerto de la aplicación;
+- exposición directa del API Server;
+- exposición de PostgreSQL;
+- backups;
+- monitoreo.
+
+No modificar infraestructura.
+
+==================================================
+12. FRONTEND / PRODUCCIÓN
+==================================================
+
+Auditar:
+
+- bundle actual;
+- code splitting;
+- source maps;
+- variables VITE_ públicas;
+- secretos en frontend;
+- rutas internas;
+- debug;
+- consola;
+- errores;
+- assets;
+- caché;
+- service worker si existe;
+- PWA/offline;
+- headers.
+
+El bundle de aproximadamente 1.4 MB ya fue identificado como deuda.
+
+Determinar:
+
+¿Es crítico?
+¿Es importante?
+¿Puede esperar?
+
+Proponer estrategia.
+
+==================================================
+13. DEPENDENCIAS
+==================================================
+
+Auditar:
+
+- package.json;
+- lockfile;
+- dependencias directas;
+- dependencias transitorias;
+- versiones;
+- paquetes abandonados;
+- vulnerabilidades conocidas si pueden verificarse localmente sin modificar nada.
+
+No actualizar dependencias.
+
+No instalar paquetes.
+
+Solo reportar.
+
+==================================================
+14. RBAC
+==================================================
+
+No cambiar RBAC.
+
+Auditar la situación detectada:
+
+Los seis roles canónicos actualmente se proyectan parcialmente sobre tres roles legacy en algunas superficies.
+
+Determinar:
+
+- dónde ocurre;
+- qué módulos afecta;
+- si existe riesgo real;
+- si permite escalación;
+- qué comandos comparten autorización;
+- qué superficies requieren granularidad.
+
+Clasificar como:
+
+SEGURIDAD
+FUNCIONAL
+DEUDA TÉCNICA
+
+Proponer arquitectura futura.
+
+==================================================
+15. MULTITENANCY
+==================================================
+
+Auditar sistemáticamente:
+
+tenant derivado de sesión;
+tenant en comandos;
+tenant en queries;
+RLS;
+read models;
+cache;
+offline;
+opId;
+logs;
+Timeline;
+Analytics;
+uploads;
+storage.
+
+Buscar cualquier posibilidad de:
+
+Tenant A → datos Tenant B.
+
+No modificar nada.
+
+==================================================
+16. OFFLINE
+==================================================
+
+Auditar seguridad del modelo Offline First.
+
+Especial atención a:
+
+- operaciones en cola;
+- tenant;
+- identityId;
+- opId;
+- replay;
+- expiración de sesión;
+- usuario desactivado;
+- cambio de permisos;
+- dispositivo compartido;
+- datos almacenados localmente;
+- datos sensibles;
+- sincronización después de cambio de tenant.
+
+Determinar riesgos y mitigaciones.
+
+==================================================
+17. DATA PRIVACY
+==================================================
+
+Inventariar información sensible o personal almacenada:
+
+- identidad;
+- correo;
+- teléfono;
+- auditoría;
+- datos de trabajadores;
+- documentos;
+- información operacional.
+
+Determinar:
+
+- exposición;
+- logs;
+- retención;
+- acceso;
+- descarga;
+- eliminación;
+- minimización.
+
+No implementar políticas legales.
+
+Solo identificar necesidades técnicas.
+
+==================================================
+18. MATRIZ DE RIESGOS
+==================================================
+
+Construir una matriz:
+
+ID
+Hallazgo
+Severidad
+Probabilidad
+Impacto
+Superficie
+Evidencia
+Recomendación
+Dependencias
+Prioridad
+Bloquea producción
+
+Clasificación:
+
+CRÍTICO
+ALTO
+MEDIO
+BAJO
+INFORMATIVO
+
+==================================================
+19. ROADMAP DE HARDENING
+==================================================
+
+Proponer fases pequeñas.
+
+NO asumir que DGP-023 debe ser un único bloque.
+
+Recomendar una secuencia como:
+
+DGP-023.1 Seguridad HTTP/API
+DGP-023.2 Autenticación/Sesiones
+DGP-023.3 RLS/Multitenancy
+DGP-023.4 Infraestructura/Secrets
+DGP-023.5 Backups/Disaster Recovery
+DGP-023.6 Observabilidad
+DGP-023.7 Frontend/Performance
+DGP-023.8 Validación final de seguridad
+
+Pero modifica esta secuencia si la auditoría real demuestra que otra división es mejor.
+
+Cada fase debe indicar:
+
+objetivo;
+alcance;
+dependencias;
+riesgos;
+criterios de aceptación.
+
+==================================================
+20. MVP DE PRODUCCIÓN
+==================================================
+
+Definir claramente:
+
+MUST antes de piloto
+MUST antes de producción
+SHOULD
+COULD
+V2
+
+No confundir:
+
+"mejor práctica"
+
+con
+
+"bloqueante real".
+
+Quiero una clasificación técnicamente justificada.
+
+==================================================
+21. DECISIONES DE DIRECCIÓN
+==================================================
+
+El documento debe terminar con las decisiones que necesitamos tomar antes de implementar.
+
+Por ejemplo:
+
+- política CORS;
+- rate limiting;
+- RLS identidad;
+- backups;
+- RPO/RTO;
+- monitoreo;
+- estrategia de rollback;
+- exposición pública;
+- dominio producción;
+- estrategia de secrets;
+- nivel de RBAC;
+- política offline;
+- etc.
+
+Solo incluir decisiones realmente necesarias según los hallazgos.
+
+==================================================
+22. REVISIÓN INDEPENDIENTE
+==================================================
+
+Antes de cerrar el Discovery:
+
+Realiza una revisión arquitectónica independiente del documento.
+
+Debe comprobar:
+
+- que todas las afirmaciones tengan evidencia;
+- que no se inventen controles inexistentes;
+- que los riesgos estén correctamente clasificados;
+- que no se conviertan preferencias en vulnerabilidades;
+- que el roadmap sea ejecutable;
+- que las fases no tengan dependencias circulares;
+- que ningún cambio de código haya sido realizado.
+
+Si R1 FAIL:
+corrige únicamente el documento y vuelve a revisar.
+
+Si R1 PASS:
+cerrar Discovery.
+
+==================================================
+23. ENTREGABLE
+==================================================
+
+Crear:
+
+docs/dgp/DGP-023-DESCUBRIMIENTO.md
+
+Debe contener:
+
+1. Objeto
+2. Alcance
+3. Arquitectura actual
+4. Metodología
+5. Evidencia
+6. Hallazgos
+7. Riesgos
+8. Seguridad API
+9. CORS
+10. Rate limiting
+11. Headers
+12. Identity/Sesiones
+13. RLS
+14. Secrets
+15. Logs
+16. Backups
+17. Deployment
+18. Infraestructura
+19. Frontend
+20. Dependencias
+21. RBAC
+22. Multitenancy
+23. Offline
+24. Privacy
+25. Matriz de riesgos
+26. Roadmap
+27. MVP producción
+28. Decisiones de Dirección
+29. Criterios de aceptación
+30. Revisión independiente
+31. Conclusión
+
+==================================================
+24. CRITERIO DE CIERRE
+
+DGP-023 Discovery solo puede cerrarse PASS si:
+
+[ ] No se modificó código.
+[ ] No se modificó DB.
+[ ] No se modificaron contratos.
+[ ] No se modificó RBAC/RLS.
+[ ] Workspace limpio salvo el documento de Discovery.
+[ ] Toda afirmación crítica tiene evidencia.
+[ ] Riesgos clasificados.
+[ ] MVP definido.
+[ ] Roadmap definido.
+[ ] Dependencias entre fases identificadas.
+[ ] Decisiones de Dirección identificadas.
+[ ] Revisión independiente PASS.
+[ ] Documento commiteado.
+
+NO iniciar DGP-023.1.
+
+NO implementar ningún hardening todavía.
+
+==================================================
+CIERRE
+==================================================
+
+Si todo está correcto:
+
+"DGP-023 DISCOVERY COMPLETADO — PASS — A LA ESPERA DE APROBACIÓN DE DIRECCIÓN"
+
+Si existe un riesgo CRÍTICO que requiera decisión:
+
+"DGP-023 DISCOVERY DETENIDO — DECISIÓN DE DIRECCIÓN REQUERIDA"
+
+DETENTE después del informe.
