@@ -107,6 +107,28 @@ describe("DGP-021.1 · hecho económico", () => {
     expect(otros.ok && otros.value.articuloId).toBeNull();
   });
 
+  it("DGP-021.2 (R1) · naturaleza por defecto es CARGO; ABONO se distingue en el ledger", () => {
+    // Sin naturaleza explícita ⇒ CARGO (consumo/salida = costo).
+    const cargo = materializar(base({ tipo: "MATERIAL" }));
+    expect(cargo.ok && cargo.value.naturaleza).toBe("CARGO");
+    // Devolución ⇒ ABONO: mismo importe NO NEGATIVO, pero naturaleza distinta.
+    // El ledger NO representa el crédito con monto negativo: el signo es semántico.
+    const abono = materializar(base({ tipo: "MATERIAL", naturaleza: "ABONO" }));
+    expect(abono.ok && abono.value.naturaleza).toBe("ABONO");
+    if (cargo.ok && abono.ok) {
+      // Importes idénticos y no negativos; la ÚNICA diferencia económica es la naturaleza.
+      expect(abono.value.snapshot.costoTotal).toBe(cargo.value.snapshot.costoTotal);
+      expect(abono.value.snapshot.costoTotal.startsWith("-")).toBe(false);
+      expect(abono.value.naturaleza).not.toBe(cargo.value.naturaleza);
+    }
+  });
+
+  it("DGP-021.2 (R1) · materializar RECHAZA una naturaleza fuera de CARGO|ABONO", () => {
+    // @ts-expect-error prueba de robustez: naturaleza inválida debe fallar cerrado
+    const r = materializar(base({ naturaleza: "NETO" }));
+    expect(r.ok).toBe(false);
+  });
+
   it("anular es auditable y NO toca el snapshot", () => {
     const h = materializar(base());
     if (!h.ok) throw new Error("setup");

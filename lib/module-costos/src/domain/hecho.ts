@@ -47,6 +47,27 @@ export const ESTADOS_HECHO = ["ACTIVO", "ANULADO"] as const;
 export type EstadoHecho = (typeof ESTADOS_HECHO)[number];
 
 /**
+ * DGP-021.2 (R1) · NATURALEZA económica del hecho — signo SEMÁNTICO del ledger
+ * inmutable. Los importes SIEMPRE son cadenas NO negativas (invariante de
+ * {@link dinero}); la dirección económica la lleva este discriminador, NUNCA un
+ * monto negativo. Así la composición futura puede RESTAR sin que este módulo
+ * sume (§22 sigue prohibiendo totales/agregados aquí):
+ *  - CARGO: aumenta el costo de material atribuido a la OT (consumo/salida).
+ *  - ABONO: crédito/reingreso que COMPENSA un cargo previo (devolución a stock).
+ *
+ * BUG CORREGIDO (R1): antes una `devolucion` se materializaba por el MISMO
+ * comando positivo de consumo ⇒ un segundo CARGO indistinguible que inflaba el
+ * costo neto de material. Ahora una devolución es un hecho ABONO explícito,
+ * distinguible en el ledger, sin alterar el CARGO del consumo original.
+ */
+export const NATURALEZAS_HECHO = ["CARGO", "ABONO"] as const;
+export type NaturalezaHecho = (typeof NATURALEZAS_HECHO)[number];
+
+export function esNaturaleza(v: string): v is NaturalezaHecho {
+  return (NATURALEZAS_HECHO as readonly string[]).includes(v);
+}
+
+/**
  * ORIGEN auditable del hecho: tipo de fuente + identificador canónico en esa
  * fuente. NUNCA texto libre como único rastro. Ejemplos:
  *  - MATERIAL: originType="abastecimiento.costo-exacto", originId=articuloId.
@@ -64,6 +85,12 @@ export interface IdentidadHecho {
   readonly tipo: TipoHecho;
   readonly origen: OrigenHecho;
   readonly otId: string;
+  /**
+   * DGP-021.2 (R1) · NATURALEZA económica (CARGO/ABONO) del hecho. Signo semántico
+   * INMUTABLE del ledger: CARGO = costo, ABONO = crédito compensatorio (devolución).
+   * NUNCA se representa con montos negativos (los importes son no negativos).
+   */
+  readonly naturaleza: NaturalezaHecho;
   /** Derivado de la relación canónica OT→activo; null sólo si la OT no tiene activo principal. */
   readonly activoId: string | null;
   /** Identidad canónica atribuible (p.ej. autorizante de OTROS). null si no aplica. */
@@ -123,6 +150,11 @@ export interface EntradaMaterializar {
   readonly tipo: TipoMaterializable;
   readonly origen: OrigenHecho;
   readonly otId: string;
+  /**
+   * DGP-021.2 (R1) · NATURALEZA económica. OPCIONAL en la entrada: por defecto
+   * CARGO (consumo/salida). Sólo la orquestación de una devolución la fija a ABONO.
+   */
+  readonly naturaleza?: NaturalezaHecho;
   readonly activoId: string | null;
   readonly identityId: string | null;
   /** DGP-021.2 · Movimiento de inventario de origen (null si no aplica). */
@@ -151,6 +183,10 @@ export function materializar(e: EntradaMaterializar): Result<HechoEconomico, Ker
   if (e.origen.originType.trim() === "" || e.origen.originId.trim() === "") {
     return fail(KernelErrors.validation("El origen del hecho (originType/originId) es obligatorio y no puede ser texto libre vacío"));
   }
+  const naturaleza: NaturalezaHecho = e.naturaleza ?? "CARGO";
+  if (!esNaturaleza(naturaleza)) {
+    return fail(KernelErrors.validation(`Naturaleza económica inválida: "${e.naturaleza}" (esperado CARGO|ABONO)`));
+  }
   const cantidad = normalizarImporte(e.cantidad);
   if (!cantidad.ok) return cantidad;
   const unitario = normalizarImporte(e.costoUnitario);
@@ -164,6 +200,7 @@ export function materializar(e: EntradaMaterializar): Result<HechoEconomico, Ker
     tipo: e.tipo,
     origen: e.origen,
     otId: e.otId,
+    naturaleza,
     activoId: e.activoId,
     identityId: e.identityId,
     movimientoId: e.movimientoId ?? null,

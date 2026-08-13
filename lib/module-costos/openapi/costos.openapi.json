@@ -403,6 +403,15 @@
             "description": "MATERIAL | COMBUSTIBLE | MANO_DE_OBRA | OTROS"
           },
           {
+            "name": "naturaleza",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "DGP-021.2 (R1) · CARGO (costo) | ABONO (crédito/devolución)"
+          },
+          {
             "name": "moneda",
             "in": "query",
             "required": false,
@@ -625,6 +634,10 @@
             "type": "string",
             "description": "DGP-021.2 ANTI-BYPASS (§20): movimiento de inventario de ORIGEN (OBLIGATORIO). MATERIAL sólo se materializa desde un movimiento físico confirmado; la orquestación de servicio deriva el opId determinista inv:<movimientoId>. NO existe MATERIAL manual."
           },
+          "familia": {
+            "type": "string",
+            "description": "DGP-021.2 (R1): FAMILIA contable del movimiento (auditoría). Deriva la NATURALEZA del hecho: 'devolucion' ⇒ ABONO (crédito compensatorio); consumo/salida ⇒ CARGO. Se registra cruda en fuente.familia. Omitida ⇒ CARGO."
+          },
           "cantidad": {
             "type": "string",
             "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
@@ -742,6 +755,14 @@
               "OTROS"
             ]
           },
+          "naturaleza": {
+            "type": "string",
+            "enum": [
+              "CARGO",
+              "ABONO"
+            ],
+            "description": "DGP-021.2 (R1) · signo SEMÁNTICO del ledger: CARGO = costo (consumo), ABONO = crédito compensatorio (devolución). Importes SIEMPRE no negativos; el signo lo lleva este campo, nunca un monto negativo."
+          },
           "originType": {
             "type": "string"
           },
@@ -833,6 +854,7 @@
         "required": [
           "costoId",
           "tipo",
+          "naturaleza",
           "otId",
           "estado",
           "cantidad",

@@ -197,6 +197,53 @@ suite("DGP-021.1 · Costos · PostgreSQL", { timeout: 30_000 }, () => {
     expect(enB.hechos.length).toBe(0);
   });
 
+  it("DGP-021.2 (R1) · una DEVOLUCIÓN es un ABONO distinguible del CONSUMO (no infla el costo neto)", async () => {
+    // CONSUMO (CARGO): 2 uds × 1234.567890 = 2469.135780.
+    const consumo = must(await exec(ctx(T_A), `${MODULO}.hecho.materializar-material`, {
+      opId: `dev-cons-${RUN}`, otId: "ot1", articuloId: "art1", movimientoId: `mov-cons-${RUN}`,
+      familia: "consumo", cantidad: "2.000000", unidad: "UN", moneda: "COP",
+    })) as Record<string, unknown>;
+    // DEVOLUCIÓN (ABONO): mismas 2 uds reingresadas; MISMO importe NO negativo.
+    const devol = must(await exec(ctx(T_A), `${MODULO}.hecho.materializar-material`, {
+      opId: `dev-abon-${RUN}`, otId: "ot1", articuloId: "art1", movimientoId: `mov-devol-${RUN}`,
+      familia: "devolucion", cantidad: "2.000000", unidad: "UN", moneda: "COP",
+    })) as Record<string, unknown>;
+
+    // 1) La naturaleza es el ÚNICO discriminador económico: CARGO vs ABONO.
+    expect(consumo["naturaleza"]).toBe("CARGO");
+    expect(devol["naturaleza"]).toBe("ABONO");
+    // 2) Los importes son idénticos y NO negativos (el crédito NO usa monto negativo).
+    expect(String(devol["costoTotal"])).toBe(String(consumo["costoTotal"]));
+    expect(String(devol["costoTotal"]).startsWith("-")).toBe(false);
+
+    // 3) Persistencia: columna naturaleza + familia cruda en fuente (auditoría).
+    const rowDev = (await pool.query(
+      `SELECT naturaleza, fuente->>'familia' fam, fuente->>'naturaleza' fnat, costo_total ct
+         FROM deltaops.cos_hechos WHERE tenant_id=$1 AND costo_id=$2`,
+      [T_A, devol["costoId"]],
+    )).rows[0];
+    expect(rowDev["naturaleza"]).toBe("ABONO");
+    expect(rowDev["fam"]).toBe("devolucion");
+    expect(rowDev["fnat"]).toBe("ABONO");
+    expect(String(rowDev["ct"]).startsWith("-")).toBe(false); // ledger sin negativos
+
+    // 4) El COSTO NETO de material NO aumenta por la devolución: filtrando SÓLO los
+    //    CARGO de esa OT/artículo el consumo aparece UNA vez y el ABONO NO cuenta
+    //    como costo (es un crédito, distinguible). Sin este fix, la devolución sería
+    //    un segundo CARGO indistinguible que inflaba el neto.
+    const cargos = must(await query(ctx(T_A), `${MODULO}.hechos`, {
+      articuloId: "art1", naturaleza: "CARGO",
+    })) as { hechos: { costoId: string; naturaleza: string }[] };
+    expect(cargos.hechos.every((x) => x.naturaleza === "CARGO")).toBe(true);
+    expect(cargos.hechos.some((x) => x.costoId === consumo["costoId"])).toBe(true);
+    expect(cargos.hechos.some((x) => x.costoId === devol["costoId"])).toBe(false);
+    // El ABONO es recuperable por su propio filtro (composición futura lo resta).
+    const abonos = must(await query(ctx(T_A), `${MODULO}.hechos`, {
+      articuloId: "art1", naturaleza: "ABONO",
+    })) as { hechos: { costoId: string }[] };
+    expect(abonos.hechos.some((x) => x.costoId === devol["costoId"])).toBe(true);
+  });
+
   it("drena el outbox a vacío tras las mutaciones", async () => {
     await rt.platform.kernel.outboxProcessor.processPending();
     const pend = await rt.platform.kernel.outboxProcessor.processPending();

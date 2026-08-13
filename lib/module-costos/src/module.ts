@@ -39,9 +39,11 @@ import {
   anular as anularHecho,
   ESTADOS_HECHO,
   materializar as materializarHecho,
+  NATURALEZAS_HECHO,
   TIPOS_HECHO,
   type EstadoHecho,
   type HechoEconomico,
+  type NaturalezaHecho,
   type TipoHecho,
 } from "./domain/hecho";
 import { RE_DINERO } from "./domain/dinero";
@@ -165,6 +167,9 @@ function hechoAResultado(h: HechoEconomico): Record<string, unknown> {
   return {
     costoId: h.costoId,
     tipo: h.tipo,
+    // DGP-021.2 (R1) · naturaleza económica del ledger (CARGO/ABONO): expuesta en
+    // TODO read model para que la composición distinga costo de crédito.
+    naturaleza: h.naturaleza,
     originType: h.origen.originType,
     originId: h.origen.originId,
     otId: h.otId,
@@ -278,6 +283,11 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
           otId: z.string().min(1),
           articuloId: z.string().min(1),
           movimientoId: z.string().min(1, "movimientoId es obligatorio: MATERIAL sólo se materializa desde un movimiento de inventario"),
+          // DGP-021.2 (R1) · FAMILIA contable del movimiento de origen (auditoría).
+          // Deriva la NATURALEZA económica del hecho: `devolucion` ⇒ ABONO (crédito
+          // compensatorio); cualquier otra (consumo/salida) ⇒ CARGO. Se registra
+          // cruda en `fuente.familia`. Omitida ⇒ CARGO (compatibilidad).
+          familia: z.string().min(1).optional(),
           cantidad: dineroSchema,
           unidad: z.string().min(1),
           moneda: z.string().min(1),
@@ -308,10 +318,16 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
           }
 
           const ahora = new Date();
+          // DGP-021.2 (R1) · La FAMILIA del movimiento decide la NATURALEZA: una
+          // `devolucion` es un ABONO (crédito) que compensa; consumo/salida es CARGO.
+          // NUNCA se enruta una devolución por la semántica positiva de consumo.
+          const familia = (input.familia ?? "").toLowerCase();
+          const naturaleza: NaturalezaHecho = familia === "devolucion" ? "ABONO" : "CARGO";
           const hecho = materializarHecho({
             costoId: input.costoId ?? crypto.randomUUID(),
             tenantId: tenant.value,
             tipo: "MATERIAL",
+            naturaleza,
             // ORIGEN físico determinista: el movimiento de inventario. El costo
             // EXACTO sigue viniendo de Abastecimiento (se guarda crudo en `fuente`).
             origen: { originType: "inventario.movimiento", originId: input.movimientoId },
@@ -326,8 +342,11 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
             costoUnitario: exacto.costoUnitario,
             moneda: input.moneda,
             fuente: {
-              // Trazabilidad de ORIGEN (movimiento) + copia CRUDA del costo exacto.
+              // Trazabilidad de ORIGEN (movimiento) + FAMILIA contable (auditoría de
+              // la naturaleza) + copia CRUDA del costo exacto.
               movimientoId: input.movimientoId,
+              familia: input.familia ?? null,
+              naturaleza,
               articuloId: exacto.articuloId,
               moneda: exacto.moneda,
               metodoValoracion: exacto.metodoValoracion,
@@ -521,6 +540,8 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
           movimientoId: z.string().optional(),
           articuloId: z.string().optional(),
           tipo: z.enum([...TIPOS_HECHO] as [string, ...string[]]).optional(),
+          // DGP-021.2 (R1) · filtra CARGO vs ABONO (distingue costo de crédito).
+          naturaleza: z.enum([...NATURALEZAS_HECHO] as [string, ...string[]]).optional(),
           moneda: z.string().optional(),
           estado: z.enum([...ESTADOS_HECHO] as [string, ...string[]]).optional(),
           desde: z.string().optional(),
@@ -538,6 +559,7 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
             movimientoId: input.movimientoId,
             articuloId: input.articuloId,
             tipo: input.tipo as TipoHecho | undefined,
+            naturaleza: input.naturaleza as NaturalezaHecho | undefined,
             moneda: input.moneda,
             estado: input.estado as EstadoHecho | undefined,
             desde: input.desde,

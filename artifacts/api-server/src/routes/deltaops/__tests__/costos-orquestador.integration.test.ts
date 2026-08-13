@@ -195,6 +195,50 @@ suite("DGP-021.2 · Orquestador Inventario→Costos · PostgreSQL", { timeout: 6
     expect(p.some((x) => x.movimientoId === mov && x.costoId === r.costoId)).toBe(true);
   });
 
+  it("DGP-021.2 (R1) · una DEVOLUCIÓN atribuida a OT ⇒ hecho ABONO (NO infla el costo neto, distinguible del consumo)", async () => {
+    // CONSUMO (CARGO) y DEVOLUCIÓN (ABONO) sobre el MISMO artículo/OT.
+    const movC = `mov-cons-r1-${RUN}`;
+    const movD = `mov-devol-r1-${RUN}`;
+    await seedMovimiento(T_A, movC, ART_OK, "consumo", 2, { tipo: "ot", id: OT_OK });
+    await seedMovimiento(T_A, movD, ART_OK, "devolucion", 2, { tipo: "ot", id: OT_OK });
+    const rc = await orquestarDesdeMover({ movimientoId: movC, inventarioId: INV }, T_A);
+    const rd = await orquestarDesdeMover({ movimientoId: movD, inventarioId: INV }, T_A);
+    expect(rc.estado).toBe("MATERIALIZADO");
+    expect(rd.estado).toBe("MATERIALIZADO");
+
+    // El hecho de la devolución es ABONO, con familia cruda registrada e importe
+    // NO negativo (el crédito NUNCA se representa con monto negativo).
+    const dev = await conTenant(T_A, async (c) => (await c.query(
+      `SELECT naturaleza n, fuente->>'familia' fam, costo_total::text tt
+         FROM deltaops.cos_hechos WHERE tenant_id=$1 AND movimiento_id=$2`,
+      [T_A, movD],
+    )).rows[0]);
+    expect(dev["n"]).toBe("ABONO");
+    expect(dev["fam"]).toBe("devolucion");
+    expect(String(dev["tt"]).startsWith("-")).toBe(false);
+
+    // El consumo sigue siendo CARGO: la devolución NO lo alteró ni lo duplicó.
+    const con = await conTenant(T_A, async (c) => (await c.query(
+      `SELECT naturaleza n FROM deltaops.cos_hechos WHERE tenant_id=$1 AND movimiento_id=$2`,
+      [T_A, movC],
+    )).rows[0]);
+    expect(con["n"]).toBe("CARGO");
+
+    // COSTO NETO de material: sólo los CARGO cuentan como costo; la devolución es
+    // un ABONO recuperable aparte (composición futura lo resta). Se acota a los DOS
+    // movimientos de este caso (el tenant/OT/artículo lo comparten otros tests).
+    const conteos = await conTenant(T_A, async (c) => (await c.query(
+      `SELECT naturaleza, count(*)::int n FROM deltaops.cos_hechos
+         WHERE tenant_id=$1 AND movimiento_id = ANY($2) GROUP BY naturaleza`,
+      [T_A, [movC, movD]],
+    )).rows as Array<{ naturaleza: string; n: number }>);
+    const porNat = Object.fromEntries(conteos.map((x) => [x.naturaleza, x.n]));
+    // Exactamente 1 CARGO (consumo) y 1 ABONO (devolución): la devolución NO creó
+    // un SEGUNDO cargo indistinguible (bug MAYOR R1 corregido).
+    expect(porNat["CARGO"]).toBe(1);
+    expect(porNat["ABONO"]).toBe(1);
+  });
+
   it("IDENTIDAD DETERMINISTA: el MISMO movimiento 2× ⇒ EXACTAMENTE 1 hecho (opId inv:<id>)", async () => {
     const mov = `mov-idem-${RUN}`;
     await seedMovimiento(T_A, mov, ART_OK, "consumo", 1, { tipo: "orden-trabajo", id: OT_OK });

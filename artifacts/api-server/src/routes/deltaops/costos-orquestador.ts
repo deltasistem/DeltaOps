@@ -59,9 +59,13 @@ const ROL_MATERIALIZADOR = "SUPERVISOR";
 // GAP-INV-REFOT: `referencia.tipo` es texto libre en inventario; se acepta un
 // conjunto configurable de alias (sin inventar datos).
 const REF_OT_TIPOS = new Set(["ot", "orden", "orden-trabajo", "ordentrabajo"]);
-// Familias contables que representan un CONSUMO de material atribuible a costo.
-// `consumo` es el candidato semántico primario; `salida` atribuida a OT también
-// descarga `disponible`. `devolucion` genera un hecho compensatorio propio.
+// Familias contables MATERIALIZABLES a un hecho económico atribuible a la OT.
+// `consumo`/`salida` atribuidos a OT descargan `disponible` ⇒ CARGO (costo).
+// `devolucion` reingresa a stock ⇒ ABONO (crédito compensatorio): DGP-021.2 (R1)
+// la familia viaja al comando, que deriva la NATURALEZA (devolucion⇒ABONO, resto
+// ⇒CARGO). NUNCA se enruta una devolución por la semántica positiva de consumo:
+// el hecho ABONO es distinguible en el ledger inmutable y restable por la
+// composición futura, sin alterar el CARGO del consumo original.
 const FAMILIAS_MATERIAL = new Set(["consumo", "salida", "devolucion"]);
 
 export type EstadoPendiente =
@@ -315,6 +319,9 @@ async function materializarMovimiento(
     otId: mov.otId,
     articuloId: mov.itemId,
     movimientoId: mov.movimientoId,
+    // DGP-021.2 (R1) · FAMILIA del movimiento ⇒ el comando deriva la NATURALEZA
+    // (devolucion⇒ABONO, consumo/salida⇒CARGO). La familia queda en fuente.familia.
+    familia: mov.familia,
     cantidad: mov.cantidad,
     unidad: mov.unidad,
     moneda,

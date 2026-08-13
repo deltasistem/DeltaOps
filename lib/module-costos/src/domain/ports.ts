@@ -15,7 +15,7 @@
  * vive en puertos de repositorio con adaptadores PG (RLS) y Fake (memoria).
  */
 import type { KernelError, Result, UnitOfWork } from "@workspace/kernel";
-import type { EstadoHecho, HechoEconomico, TipoHecho } from "./hecho";
+import type { EstadoHecho, HechoEconomico, NaturalezaHecho, TipoHecho } from "./hecho";
 import type { Dinero } from "./dinero";
 
 export type TenantId = string;
@@ -82,6 +82,8 @@ export interface FiltroHechos {
   /** DGP-021.2 · Read model «por artículo/ítem». */
   readonly articuloId?: string;
   readonly tipo?: TipoHecho;
+  /** DGP-021.2 (R1) · filtra por naturaleza económica (CARGO/ABONO). */
+  readonly naturaleza?: NaturalezaHecho;
   readonly moneda?: string;
   readonly estado?: EstadoHecho;
   /** Rango [desde, hasta) sobre `ocurridoAt` (ISO). */

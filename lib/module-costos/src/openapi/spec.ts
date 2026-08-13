@@ -84,6 +84,7 @@ export function construirOpenApi(): Record<string, unknown> {
         otId: str({ description: "OT verificada por contrato público; el activo se DERIVA de la relación canónica" }),
         articuloId: str({ description: "Artículo cuyo costo EXACTO se snapshotea (DGP-021.0)" }),
         movimientoId: str({ description: "DGP-021.2 ANTI-BYPASS (§20): movimiento de inventario de ORIGEN (OBLIGATORIO). MATERIAL sólo se materializa desde un movimiento físico confirmado; la orquestación de servicio deriva el opId determinista inv:<movimientoId>. NO existe MATERIAL manual." }),
+        familia: str({ description: "DGP-021.2 (R1): FAMILIA contable del movimiento (auditoría). Deriva la NATURALEZA del hecho: 'devolucion' ⇒ ABONO (crédito compensatorio); consumo/salida ⇒ CARGO. Se registra cruda en fuente.familia. Omitida ⇒ CARGO." }),
         cantidad: dineroReq,
         unidad: str(),
         moneda: str({ description: "Moneda del hecho; debe existir costo exacto en esa moneda (SIN COSTO ≠ 0)" }),
@@ -115,6 +116,7 @@ export function construirOpenApi(): Record<string, unknown> {
       {
         costoId: str(),
         tipo: str({ enum: ["MATERIAL", "COMBUSTIBLE", "MANO_DE_OBRA", "OTROS"] }),
+        naturaleza: str({ enum: ["CARGO", "ABONO"], description: "DGP-021.2 (R1) · signo SEMÁNTICO del ledger: CARGO = costo (consumo), ABONO = crédito compensatorio (devolución). Importes SIEMPRE no negativos; el signo lo lleva este campo, nunca un monto negativo." }),
         originType: str(), originId: str(),
         otId: str(), activoId: str({ nullable: true, description: "Derivado de la OT; null si la OT no tiene activo principal" }),
         identityId: str({ nullable: true }),
@@ -131,7 +133,7 @@ export function construirOpenApi(): Record<string, unknown> {
         anuladoPor: str({ nullable: true }),
         motivoAnulacion: str({ nullable: true }),
       },
-      ["costoId", "tipo", "otId", "estado", "cantidad", "costoUnitario", "costoTotal", "moneda"],
+      ["costoId", "tipo", "naturaleza", "otId", "estado", "cantidad", "costoUnitario", "costoTotal", "moneda"],
     ),
     SerieMoneda: obj({ moneda: str(), hechos: arr(ref("Hecho")) }, ["moneda", "hechos"]),
   };
@@ -185,6 +187,7 @@ export function construirOpenApi(): Record<string, unknown> {
       queryParam("movimientoId", "DGP-021.2 · Filtro por movimiento de inventario (trazabilidad de origen)"),
       queryParam("articuloId", "DGP-021.2 · Filtro por artículo/ítem"),
       queryParam("tipo", "MATERIAL | COMBUSTIBLE | MANO_DE_OBRA | OTROS"),
+      queryParam("naturaleza", "DGP-021.2 (R1) · CARGO (costo) | ABONO (crédito/devolución)"),
       queryParam("moneda", "Filtro por moneda (serie por moneda; nunca se suman)"),
       queryParam("estado", "ACTIVO | ANULADO"),
       queryParam("desde", "ocurridoAt >= (ISO)"), queryParam("hasta", "ocurridoAt < (ISO)"),
