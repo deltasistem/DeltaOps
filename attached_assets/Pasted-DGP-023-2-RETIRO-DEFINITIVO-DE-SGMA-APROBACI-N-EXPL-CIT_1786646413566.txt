@@ -1,0 +1,531 @@
+DGP-023.2 — RETIRO DEFINITIVO DE SGMA
+
+APROBACIÓN EXPLÍCITA DE DIRECCIÓN
+
+DGP-023.1 DISCOVERY PASS.
+
+La Dirección aprueba el retiro definitivo de SGMA.
+
+DECISIONES:
+
+1. SGMA nunca salió a producción.
+2. DeltaOps es el producto final y único producto que continuará.
+3. Todo código, API, tablas y configuración exclusivamente SGMA debe retirarse.
+4. Health gate:
+   migrar de /api/healthz legacy a la ruta de salud existente de DeltaOps:
+   /api/deltaops/platform/health
+5. Antes de eliminar tablas SGMA:
+   realizar pg_dump de las 9 tablas public.*.
+6. mockup-sandbox NO se toca.
+7. Documentación histórica SGMA se conserva/archiva.
+8. OpenAPI/clientes compartidos deben limpiarse quirúrgicamente:
+   eliminar únicamente paths/schemas exclusivamente SGMA;
+   conservar Error y todo contrato utilizado por DeltaOps.
+9. No modificar funcionalidades DeltaOps salvo lo estrictamente necesario para retirar SGMA.
+10. No introducir autenticación, RBAC o RLS para SGMA: SGMA será eliminado.
+
+==================================================
+OBJETIVO
+==================================================
+
+Eliminar completamente la superficie SGMA sin afectar DeltaOps.
+
+Debe desaparecer:
+
+- artifacts/sgma
+- routers legacy SGMA
+- rutas SGMA
+- tablas public.* SGMA
+- seed-sgma
+- schemas Drizzle exclusivos SGMA
+- barrels/exportaciones exclusivas SGMA
+- contratos OpenAPI exclusivos SGMA
+- hooks/clientes generados exclusivamente SGMA
+- configuración exclusiva SGMA
+- workflows exclusivos SGMA
+- scripts exclusivos SGMA
+
+Debe permanecer:
+
+- DeltaOps
+- sus módulos
+- sus contratos
+- api-client compartido utilizado por DeltaOps
+- schema Error compartido
+- identidad canónica
+- RLS DeltaOps
+- Analytics
+- utilización
+- mano de obra
+- costos
+- frontend DeltaOps
+- mockup-sandbox
+- documentación histórica SGMA
+
+==================================================
+REGLA FUNDAMENTAL
+==================================================
+
+NO eliminar algo únicamente porque "parece SGMA".
+
+Antes de eliminar cualquier archivo:
+
+1. buscar consumidores;
+2. comprobar referencias;
+3. comprobar imports;
+4. comprobar scripts;
+5. comprobar workflows;
+6. comprobar tests;
+7. comprobar generación de clientes;
+8. comprobar dependencias DeltaOps.
+
+Si existe consumidor DeltaOps:
+
+NO eliminar.
+
+==================================================
+FASE 0 — PRECHECK
+==================================================
+
+Antes de modificar:
+
+- verificar git status;
+- registrar HEAD;
+- verificar rama;
+- verificar workspace;
+- comprobar workflows;
+- comprobar API Server;
+- comprobar DeltaOps.
+
+Crear tag:
+
+pre-retiro-sgma
+
+No modificar DeltaOps todavía.
+
+==================================================
+FASE 1 — BACKUP DB
+==================================================
+
+ANTES DE CUALQUIER DROP:
+
+Realizar pg_dump exclusivamente de las 9 tablas SGMA:
+
+public.*
+
+Identificadas en DGP-023.1.
+
+El backup debe permitir recuperación de los datos SGMA si fuera necesario.
+
+Verificar:
+
+- archivo creado;
+- tamaño;
+- tablas incluidas;
+- restaurabilidad básica o validación equivalente.
+
+NO hacer DROP todavía.
+
+Registrar evidencia.
+
+==================================================
+FASE 2 — HEALTH GATE
+==================================================
+
+Modificar el health gate del api-server:
+
+ANTES:
+
+/api/healthz
+
+DESPUÉS:
+
+/api/deltaops/platform/health
+
+Utilizar la ruta DeltaOps existente confirmada durante DGP-023.1.
+
+Verificar:
+
+- respuesta HTTP;
+- comportamiento del proceso;
+- startup;
+- workflow;
+- deploy configuration.
+
+No crear una segunda ruta.
+
+==================================================
+FASE 3 — RETIRO FRONTEND SGMA
+==================================================
+
+Eliminar:
+
+artifacts/sgma
+
+y únicamente sus dependencias exclusivas.
+
+Antes de eliminar verificar referencias globales.
+
+NO eliminar:
+
+- componentes compartidos;
+- design system;
+- api-client compartido;
+- componentes utilizados por DeltaOps.
+
+Ejecutar posteriormente:
+
+- typecheck;
+- búsqueda de imports rotos.
+
+==================================================
+FASE 4 — RETIRO API LEGACY
+==================================================
+
+Eliminar los routers exclusivamente SGMA.
+
+Retirar sus montajes de app.ts.
+
+Eliminar únicamente:
+
+- dashboard legacy;
+- work-orders;
+- assets;
+- spare-parts;
+- locations;
+- work-centers;
+- technicians;
+- suppliers;
+- maintenance-plans;
+
+y cualquier otro router que DGP-023.1 haya identificado como exclusivamente SGMA.
+
+Conservar cualquier endpoint compartido o utilizado por DeltaOps.
+
+Verificar que las rutas SGMA ya no existen.
+
+Esperado:
+
+las antiguas rutas deben responder 404.
+
+==================================================
+FASE 5 — OPENAPI
+==================================================
+
+Limpiar lib/api-spec/openapi.yaml.
+
+Eliminar exclusivamente:
+
+- paths SGMA;
+- schemas SGMA;
+- operaciones SGMA.
+
+NO eliminar:
+
+- Error;
+- schemas utilizados por DeltaOps;
+- auth DeltaOps;
+- cualquier contrato compartido.
+
+Regenerar:
+
+- api-client-react;
+- api-zod;
+- cualquier artefacto generado necesario.
+
+Ejecutar drift tests.
+
+==================================================
+FASE 6 — DATABASE CODE
+==================================================
+
+Eliminar únicamente:
+
+- schemas Drizzle SGMA;
+- tablas SGMA;
+- seed-sgma;
+- repositorios SGMA;
+- tipos SGMA;
+- exports/barrels exclusivamente SGMA.
+
+NO tocar tablas deltaops.*.
+
+NO modificar RLS DeltaOps.
+
+==================================================
+FASE 7 — MIGRACIÓN DB
+==================================================
+
+Crear una migración explícita y reversible en cuanto sea técnicamente posible.
+
+Debe eliminar únicamente las 9 tablas SGMA de public.*.
+
+ORDEN:
+
+1. verificar ausencia de FKs;
+2. verificar ausencia de vistas;
+3. verificar ausencia de triggers;
+4. verificar ausencia de funciones;
+5. ejecutar DROP de las tablas SGMA;
+6. verificar catálogo;
+7. verificar que deltaops.* permanece intacto.
+
+NO utilizar:
+
+DROP SCHEMA public CASCADE
+
+NO utilizar comandos destructivos globales.
+
+Eliminar solamente las tablas identificadas.
+
+==================================================
+FASE 8 — CONFIGURACIÓN
+==================================================
+
+Buscar y retirar:
+
+- workflow SGMA;
+- artifact.toml SGMA;
+- scripts SGMA;
+- variables de entorno exclusivamente SGMA;
+- referencias de deploy SGMA;
+- referencias de build SGMA.
+
+NO modificar:
+
+- workflow DeltaOps;
+- deploy DeltaOps;
+- configuración Neon compartida;
+- Cloudflare;
+- VPS;
+- servicios utilizados por DeltaOps.
+
+==================================================
+FASE 9 — DOCUMENTACIÓN
+==================================================
+
+NO borrar documentación histórica SGMA.
+
+Mover/archivar únicamente si existe una estructura clara para documentación retirada.
+
+Registrar:
+
+"SGMA retirado — nunca llegó a producción — reemplazado por DeltaOps."
+
+==================================================
+FASE 10 — VALIDACIÓN DEL RETIRO
+==================================================
+
+Buscar globalmente:
+
+SGMA
+sgma
+/api/work-orders
+/api/assets
+/api/spare-parts
+/api/locations
+/api/work-centers
+/api/technicians
+/api/suppliers
+/api/maintenance-plans
+seed-sgma
+
+Clasificar cualquier resultado restante:
+
+- histórico/documental;
+- backup;
+- referencia válida;
+- falso positivo;
+- dependencia inesperada.
+
+NO debe quedar código ejecutable SGMA.
+
+==================================================
+FASE 11 — VALIDACIÓN DELTAOPS
+==================================================
+
+Ejecutar obligatoriamente:
+
+- api-server tests;
+- deltaops tests;
+- module tests;
+- typecheck;
+- build;
+- OpenAPI drift;
+- tests de RLS;
+- tests de identidad;
+- E2E.
+
+Validar especialmente:
+
+LOGIN
+
+SUPER_ADMIN
+TENANT_ADMIN
+SUPERVISOR
+PLANIFICADOR
+TECNICO
+CONSULTA
+
+Módulos:
+
+- Centro Operacional
+- Activos
+- Órdenes
+- Inventario
+- Abastecimiento
+- Planes
+- Preventivo
+- Correctivo
+- Utilización
+- Mano de obra
+- Costos
+- Analytics
+
+También:
+
+- logout;
+- re-login;
+- refresh;
+- tenant isolation;
+- RBAC;
+- tema claro;
+- tema oscuro;
+- responsive;
+- QR;
+- offline donde aplique.
+
+==================================================
+FASE 12 — VALIDACIÓN NEGATIVA
+==================================================
+
+Confirmar:
+
+antiguas rutas SGMA → 404.
+
+Confirmar:
+
+DeltaOps → funcionamiento normal.
+
+Confirmar:
+
+anónimo → comportamiento esperado.
+
+Confirmar:
+
+SUPER_ADMIN → consola técnica funcionando.
+
+Confirmar:
+
+TENANT_ADMIN → experiencia empresarial sin consola técnica.
+
+Confirmar:
+
+ningún módulo DeltaOps intenta consultar tablas public.* eliminadas.
+
+==================================================
+FASE 13 — SEGURIDAD POST-RETIRO
+==================================================
+
+El objetivo de esta fase NO es resolver todos los problemas de DGP-023.
+
+No implementar todavía:
+
+- CORS hardening;
+- rate limiting;
+- CSP/HSTS;
+- RLS de identidad;
+- backups productivos;
+- RBAC granular;
+- observabilidad avanzada.
+
+Eso corresponde al hardening posterior.
+
+Esta fase solamente debe garantizar:
+
+SGMA desapareció
++
+DeltaOps continúa funcionando.
+
+==================================================
+FASE 14 — REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Realizar revisión independiente.
+
+Debe verificar:
+
+- ningún código SGMA ejecutable;
+- ningún endpoint SGMA;
+- tablas SGMA eliminadas;
+- OpenAPI limpio;
+- clientes generados correctamente;
+- health gate funcionando;
+- DeltaOps sin regresiones;
+- mockup-sandbox intacto;
+- documentación histórica conservada;
+- backup realizado;
+- migración correcta;
+- git limpio.
+
+Si encuentra una dependencia inesperada:
+
+DETENERSE.
+
+No ocultar ni saltar el problema.
+
+==================================================
+CRITERIOS DE CIERRE
+==================================================
+
+DGP-023.2 PASS solamente si:
+
+✓ SGMA retirado
+✓ APIs legacy retiradas
+✓ tablas SGMA retiradas
+✓ backup realizado
+✓ health gate migrado
+✓ OpenAPI limpio
+✓ clientes regenerados
+✓ seed SGMA eliminado
+✓ configuración SGMA eliminada
+✓ mockup-sandbox intacto
+✓ documentación histórica conservada
+✓ DeltaOps tests verdes
+✓ api-server tests verdes
+✓ typecheck verde
+✓ build verde
+✓ OpenAPI drift PASS
+✓ E2E PASS
+✓ multitenancy PASS
+✓ RBAC PASS
+✓ tema claro/oscuro PASS
+✓ responsive PASS
+✓ revisión independiente PASS
+
+==================================================
+CIERRE
+==================================================
+
+Crear:
+
+docs/dgp/DGP-023.2-CIERRE-RETIRO-SGMA.md
+
+El informe debe documentar:
+
+- qué se eliminó;
+- qué se conservó;
+- backup;
+- migración;
+- health gate;
+- OpenAPI;
+- pruebas;
+- E2E;
+- revisión;
+- cualquier deuda residual.
+
+NO iniciar DGP-023.3.
+
+DETENERSE después del cierre.
+
+Esperar aprobación explícita de Dirección.
