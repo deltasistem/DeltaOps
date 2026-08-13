@@ -543,9 +543,33 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(await contarPorTenant("cor_eventos_activo_read", "tenant-inexistente")).toBe(0);
   });
 
-  it("ANALYTICS · catálogo del sistema sembrado (30 indicadores + 8 dashboards + 1 personalizado)", async () => {
+  it("ANALYTICS · catálogo del sistema sembrado (31 indicadores + 8 dashboards + 1 personalizado)", async () => {
     const indicadores = await contarPorTenant("an_definiciones_read", DEMO_TENANT);
-    expect(indicadores).toBe(30);
+    // 30 indicadores heredados + 1 de DGP-021.4 (cobertura de indicadores de costo).
+    expect(indicadores).toBe(31);
+
+    // DGP-021.4 · IDENTIDAD del nuevo indicador de costos (no sólo el conteo):
+    // clave/categoría/fuente {modulo:'costos',dataset:'indicadores'} y expresión conteo.
+    const costo = await pool.query(
+      `SELECT datos FROM deltaops.an_definiciones_read
+        WHERE tenant_id = $1 AND (datos->>'clave') = 'cobertura-indicadores-costo'`,
+      [DEMO_TENANT],
+    );
+    expect(costo.rows.length).toBe(1);
+    const def = costo.rows[0]?.datos as {
+      clave?: string;
+      categoria?: string;
+      fuente?: { modulo?: string; dataset?: string };
+      expresion?: { tipo?: string };
+      descripcion?: string;
+    };
+    expect(def.clave).toBe("cobertura-indicadores-costo");
+    expect(def.categoria).toBe("costos");
+    expect(def.fuente?.modulo).toBe("costos");
+    expect(def.fuente?.dataset).toBe("indicadores");
+    expect(def.expresion?.tipo).toBe("conteo");
+    expect(typeof def.descripcion).toBe("string");
+    expect((def.descripcion ?? "").length).toBeGreaterThan(0);
 
     const dashboards = await contarPorTenant("an_dashboards_read", DEMO_TENANT);
     // 8 dashboards del sistema + 1 personalizado del usuario demo.
@@ -566,7 +590,7 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
         WHERE tenant_id = $1 AND (datos->>'descripcion') IS NOT NULL AND (datos->>'descripcion') <> ''`,
       [DEMO_TENANT],
     );
-    expect(Number(conDesc.rows[0]?.n ?? 0)).toBe(30);
+    expect(Number(conDesc.rows[0]?.n ?? 0)).toBe(31);
   });
 
   it("ANALYTICS · snapshots representativos evaluados contra datos REALES (no todos cero)", async () => {
