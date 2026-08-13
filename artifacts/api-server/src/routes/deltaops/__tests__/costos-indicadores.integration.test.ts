@@ -325,4 +325,102 @@ suite("DGP-021.4 · Indicadores económicos (costo/hora, costo/km) · PostgreSQL
     // por lo que el indicador se compone sin error (recorte lo aplica el backend).
     expect(r.ok).toBe(true);
   });
+
+  // ---------------------------------------------------------------------------
+  // MAYOR-1 (R2): la tendencia recorta cada tramo mensual a los límites EXACTOS del
+  // rango; no expande al mes completo. Un rango intra-mes / de bordes sólo cuenta los
+  // hechos y lecturas de esos días, jamás los posteriores a `hasta` (ni previos a
+  // `desde`) del mismo mes calendario.
+  // ---------------------------------------------------------------------------
+  it("(14) TENDENCIA · rango intra-mes/bordes: sólo hechos y lecturas dentro de [desde,hasta]", async () => {
+    const T_BORDE = `${T_A}-borde`;
+    // Mano de obra: FUERA del rango (día 14 y día 17) e DENTRO (día 15 y 16).
+    await seedValoracion(T_BORDE, "ab", "CLP", "1000.000000", "2024-05-14T09:00:00.000Z"); // fuera (antes)
+    await seedValoracion(T_BORDE, "ab", "CLP", "300.000000", "2024-05-15T09:00:00.000Z");  // dentro
+    await seedValoracion(T_BORDE, "ab", "CLP", "300.000000", "2024-05-16T09:00:00.000Z");  // dentro
+    await seedValoracion(T_BORDE, "ab", "CLP", "9999.000000", "2024-05-17T09:00:00.000Z"); // fuera (después)
+    // Lecturas de horómetro: día 14=100, 15=110, 16=140, 17=200.
+    await seedLectura(T_BORDE, "ab", "horometro", "100.000000", "2024-05-14T08:00:00Z"); // fuera (antes)
+    await seedLectura(T_BORDE, "ab", "horometro", "110.000000", "2024-05-15T08:00:00Z"); // dentro (ancla)
+    await seedLectura(T_BORDE, "ab", "horometro", "140.000000", "2024-05-16T08:00:00Z"); // dentro (+30)
+    await seedLectura(T_BORDE, "ab", "horometro", "200.000000", "2024-05-17T08:00:00Z"); // fuera (después)
+    try {
+      // Rango de bordes: 15 de mayo 00:00 → 16 de mayo 23:59:59 (inclusivo).
+      const rango = resolverPeriodo(
+        "rango", new Date("2024-06-01T00:00:00.000Z"),
+        "2024-05-15T00:00:00.000Z", "2024-05-16T23:59:59.999Z",
+      );
+      const r = await tendenciaActivo(SUP(T_BORDE), "ab", rango);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const puntos = (r.value as any).puntos as any[];
+      // UN solo punto mensual (mayo), recortado a [15,16] — no el mes completo.
+      expect(puntos.length).toBe(1);
+      const mayo = puntos[0];
+      expect(mayo.mes).toBe("2024-05");
+      expect(mayo.estado).toBe("COMPLETO");
+      // Δ EXACTO = 140 − 110 = 30 h (día 14 y 17 EXCLUIDOS). Si se expandiera al mes,
+      // el ancla sería el día 14 (100) y el último el día 17 (200) ⇒ Δ=100 (erróneo).
+      expect(mayo.horas).toBe("30.000000");
+      // Numerador: sólo 300+300=600 CLP (día 15 y 16); NUNCA el día 14 (1000) ni 17 (9999).
+      const clp = (mayo.costoPorMoneda as any[]).find((t) => t.moneda === "CLP");
+      expect(clp.total).toBe("600.000000");
+      // 600 / 30 = 20.000000 CLP/h.
+      const cph = (mayo.costoPorHora as any[]).find((p) => p.moneda === "CLP");
+      expect(cph.valor).toBe("20.000000");
+    } finally {
+      await conTenant(T_BORDE, async (c) => {
+        for (const t of ["mdo_valoraciones", "utl_lecturas_read"]) {
+          await c.query(`DELETE FROM deltaops.${t} WHERE tenant_id=$1`, [T_BORDE]).catch(() => undefined);
+        }
+      });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // MAYOR-2 (R2): con más lecturas que el tope de paginación, el denominador NO se
+  // trunca silenciosamente. El indicador falla CERRADO (SIN_DATOS_SUFICIENTES con
+  // motivo de truncamiento), jamás publica un delta parcial ni un costo/hora erróneo.
+  // Se prueba la ruta de paginación real (>500 lecturas en el período).
+  // ---------------------------------------------------------------------------
+  it("(15) DENOMINADOR · >500 lecturas: paginación completa (delta exacto, no truncado)", async () => {
+    const T_PAG = `${T_A}-pag`;
+    const N = 900; // > 1 página de 500 ⇒ obliga a paginar por offset.
+    await seedValoracion(T_PAG, "ap", "CLP", "900.000000", "2024-05-03T09:00:00.000Z");
+    // 900 lecturas crecientes: valor i (en horas) a la fecha i (minutos). Δ total = 899.
+    await conTenant(T_PAG, async (c) => {
+      const base = Date.parse("2024-05-01T00:00:00.000Z");
+      for (let i = 0; i < N; i++) {
+        const id = `lp-${i}-${randomUUID().slice(0, 6)}`;
+        const val = `${i}.000000`;
+        const fecha = new Date(base + i * 60_000); // 1 min de separación
+        const datos = { id, activoId: "ap", tipoMedidor: "horometro", valor: i, unidad: "h", fechaHora: fecha.toISOString(), estado: "vigente", inconsistente: false };
+        await c.query(
+          `INSERT INTO deltaops.utl_lecturas_read
+             (tenant_id, id, activo_id, tipo_medidor, valor, valor_exacto, es_reinicio, unidad, fecha_hora,
+              identity_id, origen, estado, inconsistente, sincronizacion_activo, datos, last_event_id, actualizado_at)
+           VALUES ($1,$2,'ap','horometro',$3::numeric,$4,false,'h',$5,'id-sup','manual','vigente',false,'confirmada',$6::jsonb,$7,now())
+           ON CONFLICT (tenant_id, id) DO NOTHING`,
+          [T_PAG, id, i, val, fecha, JSON.stringify(datos), randomUUID()],
+        );
+      }
+    });
+    try {
+      const r = await indicadoresActivo(SUP(T_PAG), "ap", TOTAL);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const cph = (r.value as any).costoPorHora;
+      // Δ EXACTO de 0 → 899 = 899 h (paginación cubrió TODAS las lecturas, sin límite 500).
+      expect(cph.estado).toBe("COMPLETO");
+      expect(cph.delta).toBe("899.000000");
+      // 900 CLP / 899 h (half-up a 6 decimales): sólo se afirma que hay ratio exacto no nulo.
+      expect(ratio(cph, "CLP")).toBeTruthy();
+    } finally {
+      await conTenant(T_PAG, async (c) => {
+        for (const t of ["mdo_valoraciones", "utl_lecturas_read"]) {
+          await c.query(`DELETE FROM deltaops.${t} WHERE tenant_id=$1`, [T_PAG]).catch(() => undefined);
+        }
+      });
+    }
+  });
 });

@@ -133,35 +133,63 @@ function ratioMicros(costoMicros: bigint, denomMicros: bigint): bigint | null {
 
 /* ---------------------- Serie de lecturas (contrato público) -------------- */
 
+/** Tamaño de página del contrato público `modulo.utilizacion.lecturas` (límite duro = 500). */
+const PAGINA_LECTURAS = 500;
+/**
+ * Cota de seguridad de páginas (500 * 400 = 200.000 lecturas por activo/medidor/período).
+ * Si se supera, se falla CERRADO (no se emite un delta parcial silencioso, §26/§8).
+ */
+const MAX_PAGINAS_LECTURAS = 400;
+
+/**
+ * Serie COMPLETA de lecturas del período leída por PAGINACIÓN bajo el contrato
+ * público (`limit`≤500 + `offset`). Recorre páginas hasta agotar la serie; el orden
+ * del contrato es estable (`fecha_hora DESC, id DESC`), así que `offset` es determinista.
+ *
+ * FALLO CERRADO (MAYOR-2): si la serie excede la cota de seguridad de páginas, se
+ * devuelve `truncada:true` para que el indicador se marque SIN_DATOS_SUFICIENTES con
+ * motivo de truncamiento — JAMÁS un denominador parcial silencioso.
+ */
 async function serieLecturas(
   s: Sesion,
   activoId: string,
   tipoMedidor: string,
   rango: RangoPeriodo,
-): Promise<Result<LecturaPub[], KernelError>> {
+): Promise<Result<{ lecturas: LecturaPub[]; truncada: boolean }, KernelError>> {
   const ctx = contextForUtilizacion(s.userId, s.rol, s.tenant);
-  // Sólo VIGENTES (excluye anuladas en origen); inconsistentes se filtran también aquí.
-  const r = await utilizacionRuntime().platform.kernel.queries.execute(ctx, "modulo.utilizacion.lecturas", {
-    activoId,
-    tipoMedidor,
-    estado: "vigente",
-    desde: rango.desde ?? undefined,
-    hasta: rango.hasta ?? undefined,
-    limit: 500,
-  });
-  if (!r.ok) return r as Result<never, KernelError>;
-  const filas = (r.value as Record<string, unknown>[]) ?? [];
-  return {
-    ok: true,
-    value: filas.map((f) => ({
-      valorExacto: String(f["valorExacto"] ?? ""),
-      esReinicio: f["esReinicio"] === true,
-      fechaHora: f["fechaHora"],
-      estado: f["estado"] == null ? undefined : String(f["estado"]),
-      inconsistente: f["inconsistente"] === true,
-      tipoMedidor: f["tipoMedidor"] == null ? undefined : String(f["tipoMedidor"]),
-    })),
-  };
+  const acumulado: LecturaPub[] = [];
+  let offset = 0;
+  for (let pagina = 0; pagina < MAX_PAGINAS_LECTURAS; pagina++) {
+    // Sólo VIGENTES (excluye anuladas en origen); inconsistentes se filtran al calcular.
+    const r = await utilizacionRuntime().platform.kernel.queries.execute(ctx, "modulo.utilizacion.lecturas", {
+      activoId,
+      tipoMedidor,
+      estado: "vigente",
+      desde: rango.desde ?? undefined,
+      hasta: rango.hasta ?? undefined,
+      limit: PAGINA_LECTURAS,
+      offset,
+    });
+    if (!r.ok) return r as Result<never, KernelError>;
+    const filas = (r.value as Record<string, unknown>[]) ?? [];
+    for (const f of filas) {
+      acumulado.push({
+        valorExacto: String(f["valorExacto"] ?? ""),
+        esReinicio: f["esReinicio"] === true,
+        fechaHora: f["fechaHora"],
+        estado: f["estado"] == null ? undefined : String(f["estado"]),
+        inconsistente: f["inconsistente"] === true,
+        tipoMedidor: f["tipoMedidor"] == null ? undefined : String(f["tipoMedidor"]),
+      });
+    }
+    // Última página: menos filas que el tamaño de página ⇒ serie completa.
+    if (filas.length < PAGINA_LECTURAS) {
+      return { ok: true, value: { lecturas: acumulado, truncada: false } };
+    }
+    offset += PAGINA_LECTURAS;
+  }
+  // Se agotó la cota de páginas: la serie NO cabe ⇒ fallo cerrado (delta no confiable).
+  return { ok: true, value: { lecturas: acumulado, truncada: true } };
 }
 
 /** ¿El activo REGISTRA odómetro? (para distinguir NO_APLICA de SIN_DATOS). */
@@ -201,9 +229,19 @@ async function indicadorMedidor(
 
   const serie = await serieLecturas(s, activoId, tipoMedidor, rango);
   if (!serie.ok) return serie;
+  const lecturas = serie.value.lecturas;
+
+  // FALLO CERRADO (MAYOR-2): serie truncada por la cota de páginas ⇒ el denominador
+  // NO es confiable; se marca SIN_DATOS_SUFICIENTES con motivo, jamás un delta parcial.
+  if (serie.value.truncada) {
+    return { ok: true, value: {
+      tipoMedidor, unidad, estado: "SIN_DATOS_SUFICIENTES", delta: null, tramos: 0, porMoneda: [],
+      nota: `Demasiadas lecturas de ${tipoMedidor} en el período para garantizar un avance exacto (serie truncada); no se publica un costo por uso parcial.`,
+    } };
+  }
 
   // NO_APLICA para km si el activo no registra odómetro (no se asume vehículo).
-  if (tipoMedidor === TIPO_ODOMETRO && serie.value.length === 0) {
+  if (tipoMedidor === TIPO_ODOMETRO && lecturas.length === 0) {
     const odo = await tieneOdometro(s, activoId);
     if (!odo.ok) return odo;
     if (!odo.value) {
@@ -214,7 +252,7 @@ async function indicadorMedidor(
     }
   }
 
-  const delta = deltaMicrosPorTramo(serie.value);
+  const delta = deltaMicrosPorTramo(lecturas);
   if (!delta.ok) return delta;
 
   if (!delta.value || delta.value.micros <= 0n) {
@@ -353,20 +391,42 @@ export async function comparativaActivos(
 
 /* ---------------------- API pública: tendencias (§14) --------------------- */
 
-/** Genera los tramos mensuales [inicio,fin) que cubren [desde,hasta] (UTC). */
+/**
+ * Genera los tramos mensuales que cubren el período pedido, RECORTADOS a los límites
+ * exactos del rango (MAYOR-1). El límite `hasta` del resolvedor es INCLUSIVO (la query
+ * de lecturas usa `fecha_hora <= hasta`), así que cada tramo mensual se intersecta:
+ *   desde_mes' = max(inicioMes,  desdePedido)
+ *   hasta_mes' = min(finMesInclusivo, hastaPedido)
+ * Nunca se expande al mes completo ⇒ nunca se incluyen hechos/lecturas fuera de
+ * [desdePedido, hastaPedido]. Un rango intra-mes (p. ej. día 15–16) produce UN solo
+ * tramo acotado a esos dos días.
+ */
 function mesesEntre(desdeIso: string, hastaIso: string): { clave: string; desde: string; hasta: string }[] {
   const out: { clave: string; desde: string; hasta: string }[] = [];
+  const desdeMs = new Date(desdeIso).getTime();
+  const hastaMs = new Date(hastaIso).getTime();
+  if (!(hastaMs >= desdeMs)) return out; // rango inválido ⇒ sin tramos (el llamador ya valida).
+
   const d = new Date(desdeIso);
   let y = d.getUTCFullYear();
   let m = d.getUTCMonth();
-  const fin = new Date(hastaIso).getTime();
   // Límite duro de 60 meses para acotar el fan-out.
   for (let i = 0; i < 60; i++) {
-    const ini = new Date(Date.UTC(y, m, 1));
-    if (ini.getTime() > fin) break;
-    const sig = new Date(Date.UTC(y, m + 1, 1));
-    const clave = `${y}-${String(m + 1).padStart(2, "0")}`;
-    out.push({ clave, desde: ini.toISOString(), hasta: new Date(sig.getTime() - 1).toISOString() });
+    const iniMesMs = Date.UTC(y, m, 1);
+    if (iniMesMs > hastaMs) break;
+    // Último milisegundo del mes (inclusivo): inicio del mes siguiente − 1 ms.
+    const finMesInclusivoMs = Date.UTC(y, m + 1, 1) - 1;
+    // Intersección EXACTA con el período pedido (recorte de bordes).
+    const desdeTramoMs = Math.max(iniMesMs, desdeMs);
+    const hastaTramoMs = Math.min(finMesInclusivoMs, hastaMs);
+    if (desdeTramoMs <= hastaTramoMs) {
+      const clave = `${y}-${String(m + 1).padStart(2, "0")}`;
+      out.push({
+        clave,
+        desde: new Date(desdeTramoMs).toISOString(),
+        hasta: new Date(hastaTramoMs).toISOString(),
+      });
+    }
     m += 1;
     if (m > 11) { m = 0; y += 1; }
   }
