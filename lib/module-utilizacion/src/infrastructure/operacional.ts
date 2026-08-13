@@ -204,12 +204,24 @@ export interface LecturaReadRow {
   readonly activoId: string;
   readonly tipoMedidor: string;
   readonly valor: number;
+  /**
+   * DGP-021.4-A (ADITIVO): valor del medidor como CADENA decimal EXACTA, tal cual
+   * el `numeric` persistido (sin float). Habilita denominadores exactos de
+   * costo/hora y costo/km. Consumible con permiso de LECTURA normal.
+   */
+  readonly valorExacto: string;
   readonly unidad: string;
   readonly fechaHora: Date;
   readonly identityId: string;
   readonly origen: string;
   readonly estado: string;
   readonly inconsistente: boolean;
+  /**
+   * DGP-021.4-A (ADITIVO): marca el ANCLA de tramo (reinicio de medidor). Permite
+   * segmentar el delta por tramos sin cruzar reinicios. Se deriva del TIPO de
+   * evento (REINICIO_MEDIDOR), no de parseo de texto. Consumible con LECTURA.
+   */
+  readonly esReinicio: boolean;
   readonly sincronizacionActivo: string;
   readonly datos: Record<string, unknown>;
   readonly lastEventId: string;
@@ -338,16 +350,17 @@ export class PgReadModelsStore implements ReadModelsStore {
       await setTenant(uow, row.tenantId);
       const res = await pgSessionOf(uow).query(
         `INSERT INTO deltaops.utl_lecturas_read
-           (tenant_id, id, activo_id, tipo_medidor, valor, unidad, fecha_hora, identity_id, origen, estado, inconsistente, sincronizacion_activo, datos, last_event_id, actualizado_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+           (tenant_id, id, activo_id, tipo_medidor, valor, valor_exacto, es_reinicio, unidad, fecha_hora, identity_id, origen, estado, inconsistente, sincronizacion_activo, datos, last_event_id, actualizado_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          ON CONFLICT (tenant_id, id) DO UPDATE SET
-           activo_id=EXCLUDED.activo_id, tipo_medidor=EXCLUDED.tipo_medidor, valor=EXCLUDED.valor, unidad=EXCLUDED.unidad,
+           activo_id=EXCLUDED.activo_id, tipo_medidor=EXCLUDED.tipo_medidor, valor=EXCLUDED.valor,
+           valor_exacto=EXCLUDED.valor_exacto, es_reinicio=EXCLUDED.es_reinicio, unidad=EXCLUDED.unidad,
            fecha_hora=EXCLUDED.fecha_hora, identity_id=EXCLUDED.identity_id, origen=EXCLUDED.origen, estado=EXCLUDED.estado,
            inconsistente=EXCLUDED.inconsistente, sincronizacion_activo=EXCLUDED.sincronizacion_activo, datos=EXCLUDED.datos,
            last_event_id=EXCLUDED.last_event_id, actualizado_at=EXCLUDED.actualizado_at
          WHERE deltaops.utl_lecturas_read.last_event_id <> EXCLUDED.last_event_id
            AND deltaops.utl_lecturas_read.actualizado_at <= EXCLUDED.actualizado_at`,
-        [row.tenantId, row.id, row.activoId, row.tipoMedidor, row.valor, row.unidad, row.fechaHora, row.identityId, row.origen, row.estado, row.inconsistente, row.sincronizacionActivo, JSON.stringify(row.datos), row.lastEventId, row.actualizadoAt],
+        [row.tenantId, row.id, row.activoId, row.tipoMedidor, row.valor, row.valorExacto, row.esReinicio, row.unidad, row.fechaHora, row.identityId, row.origen, row.estado, row.inconsistente, row.sincronizacionActivo, JSON.stringify(row.datos), row.lastEventId, row.actualizadoAt],
       );
       return ok((res.rowCount ?? 0) > 0);
     } catch (err) {
@@ -470,9 +483,14 @@ export class PgReadModelsStore implements ReadModelsStore {
   private toLectura(r: Record<string, unknown>): LecturaReadRow {
     return {
       tenantId: String(r["tenant_id"]), id: String(r["id"]), activoId: String(r["activo_id"]),
-      tipoMedidor: String(r["tipo_medidor"]), valor: Number(r["valor"]), unidad: String(r["unidad"]),
+      tipoMedidor: String(r["tipo_medidor"]), valor: Number(r["valor"]),
+      // DGP-021.4-A: cadena decimal EXACTA (numeric persistido, sin float). Si la
+      // columna fuese NULL (fila pre-backfill), cae al texto del numeric crudo.
+      valorExacto: String(r["valor_exacto"] ?? r["valor"] ?? "0"),
+      unidad: String(r["unidad"]),
       fechaHora: r["fecha_hora"] as Date, identityId: String(r["identity_id"]), origen: String(r["origen"]),
-      estado: String(r["estado"]), inconsistente: r["inconsistente"] === true, sincronizacionActivo: String(r["sincronizacion_activo"]),
+      estado: String(r["estado"]), inconsistente: r["inconsistente"] === true,
+      esReinicio: r["es_reinicio"] === true, sincronizacionActivo: String(r["sincronizacion_activo"]),
       datos: parseJson(r["datos"]), lastEventId: String(r["last_event_id"]), actualizadoAt: r["actualizado_at"] as Date,
     };
   }

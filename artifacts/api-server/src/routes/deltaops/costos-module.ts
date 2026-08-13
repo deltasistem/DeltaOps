@@ -17,6 +17,12 @@ import { MODULO } from "@workspace/module-costos";
 import { costosRuntime, contextForCostos } from "./costos-runtime";
 import { listarPendientes, reprocesarPendientes, type EstadoPendiente } from "./costos-orquestador";
 import { componerOt, componerActivo, resolverPeriodo, type Sesion } from "./costos-composicion";
+import {
+  componerActivoConIndicadores,
+  indicadoresActivo,
+  comparativaActivos,
+  tendenciaActivo,
+} from "./costos-indicadores";
 import { aRolCanonico } from "../../deltaops/identity/rbac";
 
 const router: IRouter = Router();
@@ -133,7 +139,32 @@ router.get(`${BASE}/composicion/ot/:otId`, async (req, res) => {
 
 router.get(`${BASE}/composicion/activo/:activoId`, async (req, res) => {
   const rango = resolverPeriodo(strQuery(req.query.periodo), new Date(), strQuery(req.query.desde), strQuery(req.query.hasta));
-  send(res, await componerActivo(sesionOf(res), req.params.activoId, rango));
+  // DGP-021.4: la composición por activo se AMPLÍA con los indicadores económicos
+  // (costo/hora, costo/km) reales, sustituyendo los placeholders diferidos.
+  send(res, await componerActivoConIndicadores(sesionOf(res), req.params.activoId, rango));
+});
+
+/* ---------------- Indicadores económicos DGP-021.4 (LECTURA) ------------- */
+// Costo/hora y costo/km por activo/período, POR MONEDA. Numerador EXACTO (021.3),
+// denominador EXACTO (utilización, valorExacto por tramo). Tenant SÓLO de sesión.
+
+router.get(`${BASE}/indicadores/activo/:activoId`, async (req, res) => {
+  const rango = resolverPeriodo(strQuery(req.query.periodo), new Date(), strQuery(req.query.desde), strQuery(req.query.hasta));
+  send(res, await indicadoresActivo(sesionOf(res), req.params.activoId, rango));
+});
+
+// Comparativa entre activos (§13): SERIES POR MONEDA, sin ranking cross-moneda.
+// `activos` = lista separada por comas (IDs bajo el tenant de sesión ⇒ IDOR-safe).
+router.get(`${BASE}/comparativa`, async (req, res) => {
+  const rango = resolverPeriodo(strQuery(req.query.periodo), new Date(), strQuery(req.query.desde), strQuery(req.query.hasta));
+  const ids = (strQuery(req.query.activos) ?? "").split(",").map((x) => x.trim()).filter((x) => x !== "");
+  send(res, await comparativaActivos(sesionOf(res), ids, rango));
+});
+
+// Tendencia mensual (§14): costo, horas, km, costo/hora, costo/km; huecos = sin-datos.
+router.get(`${BASE}/tendencia/activo/:activoId`, async (req, res) => {
+  const rango = resolverPeriodo(strQuery(req.query.periodo), new Date(), strQuery(req.query.desde), strQuery(req.query.hasta));
+  send(res, await tendenciaActivo(sesionOf(res), req.params.activoId, rango));
 });
 
 /* --------------------- Pendientes de materialización (DGP-021.2) --------- */

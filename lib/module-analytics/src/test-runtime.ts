@@ -103,6 +103,14 @@ export const DATOS_DEMO: Record<keyof RegistroFuentes, Record<string, Hecho[]>> 
       { id: "t-1", entityRef: "activo:act-1", eventType: "estado", fecha: "2024-01-10T08:00:00.000Z" },
     ],
   },
+  // DGP-021.4 (ADITIVO): indicadores económicos por activo/moneda. El dinero viaja
+  // como CADENA decimal exacta (string-safe); nunca se re-parsea a float.
+  costos: {
+    indicadores: [
+      { id: "ind-1", activo: "act-1", moneda: "USD", indicador: "costoPorHora", unidad: "USD/h", valor: "12.500000", costoTotal: "1250.000000", horas: "100.000000", estado: "COMPLETO", fecha: "2024-01-10T08:00:00.000Z" },
+      { id: "ind-2", activo: "act-2", moneda: "USD", indicador: "costoPorKm", unidad: "USD/km", valor: "0.750000", costoTotal: "1500.000000", km: "2000.000000", estado: "COMPLETO", fecha: "2024-01-11T08:00:00.000Z" },
+    ],
+  },
 };
 
 /** Construye el registro de fuentes RICAS a partir de `DATOS_DEMO`. */
@@ -116,6 +124,7 @@ export function crearFuentesDemo(): RegistroFuentes {
     abastecimiento: new FakeFuente(DATOS_DEMO.abastecimiento),
     planes: new FakeFuente(DATOS_DEMO.planes),
     timeline: new FakeFuente(DATOS_DEMO.timeline),
+    costos: new FakeFuente(DATOS_DEMO.costos),
   };
 }
 

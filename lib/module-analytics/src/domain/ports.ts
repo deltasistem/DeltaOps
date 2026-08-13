@@ -53,6 +53,12 @@ export interface FuenteHechos {
 
 export interface FuenteOrdenesPort extends FuenteHechos {}
 export interface FuenteActivosPort extends FuenteHechos {}
+/**
+ * DGP-021.4 (ADITIVO): fuente de INDICADORES ECONÓMICOS de mantenimiento (costo,
+ * costo/hora, costo/km) por activo/período/moneda. En Etapa 2 envuelve la LECTURA
+ * de composición/indicadores de costos (DGP-021.3/021.4) sin importar aggregates.
+ */
+export interface FuenteCostosPort extends FuenteHechos {}
 export interface FuenteInventarioPort extends FuenteHechos {}
 export interface FuenteCorrectivoPort extends FuenteHechos {}
 export interface FuentePreventivoPort extends FuenteHechos {}
@@ -70,6 +76,8 @@ export interface RegistroFuentes {
   readonly abastecimiento?: FuenteAbastecimientoPort;
   readonly planes?: FuentePlanesPort;
   readonly timeline?: FuenteTimelinePort;
+  /** DGP-021.4 (ADITIVO): indicadores económicos de mantenimiento (costo/hora, costo/km). */
+  readonly costos?: FuenteCostosPort;
 }
 
 export type ClaveFuente = keyof RegistroFuentes;

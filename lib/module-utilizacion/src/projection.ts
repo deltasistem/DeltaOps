@@ -52,6 +52,13 @@ function lecturaRow(ev: EventoLike): LecturaReadRow {
     activoId: String(snap["activoId"] ?? ""),
     tipoMedidor: String(snap["tipoMedidor"] ?? ""),
     valor: Number(snap["valor"] ?? 0),
+    // DGP-021.4-A (ADITIVO): representación decimal EXACTA del valor. El snapshot
+    // conserva el valor tal cual lo ingresó el comando; su String() es su decimal
+    // canónico exacto (no se re-parsea a float). La columna DB `valor` es numeric
+    // ⇒ persiste sin pérdida.
+    valorExacto: String(snap["valor"] ?? 0),
+    // Marca de ANCLA de tramo: se deriva del TIPO de evento, NUNCA de texto.
+    esReinicio: ev.type === REINICIO_MEDIDOR,
     unidad: String(snap["unidad"] ?? ""),
     fechaHora: fecha(snap["fechaHora"]),
     identityId: String(snap["identityId"] ?? ""),

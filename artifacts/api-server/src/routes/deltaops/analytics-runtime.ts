@@ -39,6 +39,8 @@ import { correctivoRuntime, contextForCorrectivo } from "./correctivo-runtime";
 import { preventivoRuntime, contextForPreventivo } from "./preventivo-runtime";
 import { abastecimientoRuntime, contextForAbastecimiento } from "./abastecimiento-runtime";
 import { planesRuntime, contextForPlanes } from "./planes-runtime";
+import { indicadoresActivo } from "./costos-indicadores";
+import type { RangoPeriodo, Sesion } from "./costos-composicion";
 
 let runtime: AnalyticsRuntimeOperacional | null = null;
 
@@ -219,6 +221,68 @@ const fuenteInventario = new FuenteComposicion({
   },
 });
 
+/* --------------------------------- Costos -------------------------------- */
+// dataset: indicadores — DGP-021.4 (ADITIVO). Proyecta un HECHO por (activo, moneda,
+// indicador) con el valor EXACTO como CADENA (string-safe; NUNCA Number()), más los
+// metadatos declarativos requeridos (§15): fuente, período (rango), tenant, activo,
+// moneda, indicador, unidad, fecha, calidad/estado. Fan-out: activos del tenant →
+// indicadores por activo (composición 021.3 + Δ de medidor exacto 021.4). Fail-safe.
+
+const RANGO_TOTAL: RangoPeriodo = { clave: "total", desde: null, hasta: null };
+
+const fuenteCostos = new FuenteComposicion({
+  async indicadores(tenantId, criterio) {
+    const sesion: Sesion = { userId: "system", rol: "lector", tenant: tenantId };
+    // Activos del tenant vía contrato público de Activos (lectura pura).
+    const ctxA = contextForActivos("system", "lector", tenantId);
+    const la = await activosRuntime().platform.kernel.queries.execute(ctxA, "modulo.activos.listar", {
+      ...(criterio.limite ? { limit: criterio.limite } : {}),
+    });
+    if (!la.ok) return la as Result<never, KernelError>;
+    const activos = filasDe(la.value, "activos", "items");
+    const activoIds = activos
+      .map((a) => String(a["id"] ?? (a["datos"] as Record<string, unknown> | undefined)?.["id"] ?? ""))
+      .filter((x) => x !== "");
+
+    // Ventana temporal: usa el criterio si viene, o el total histórico.
+    const rango: RangoPeriodo = criterio.desde || criterio.hasta
+      ? { clave: "rango", desde: criterio.desde ?? null, hasta: criterio.hasta ?? null }
+      : RANGO_TOTAL;
+    const fechaDataset = iso(criterio.hasta) ?? iso(criterio.desde) ?? null;
+
+    const hechos: Hecho[] = [];
+    for (const activoId of activoIds) {
+      const ind = await indicadoresActivo(sesion, activoId, rango);
+      if (!ind.ok) return ind as Result<never, KernelError>;
+      for (const clave of ["costoPorHora", "costoPorKm"] as const) {
+        const im = ind.value[clave] as {
+          estado: string; unidad: string; delta: string | null;
+          porMoneda: readonly { moneda: string; costoTotal: string; valor: string }[];
+        };
+        if (im.estado !== "COMPLETO") {
+          // Ausencia ≠ 0: se emite el hecho con estado y sin `valor` (calidad).
+          hechos.push({
+            id: `${activoId}:${clave}`, activo: activoId, indicador: clave, unidad: im.unidad,
+            estado: im.estado, moneda: null, valor: null, costoTotal: null, delta: im.delta,
+            ...(fechaDataset ? { fecha: fechaDataset } : {}),
+          });
+          continue;
+        }
+        for (const r of im.porMoneda) {
+          hechos.push({
+            id: `${activoId}:${clave}:${r.moneda}`, activo: activoId, indicador: clave, unidad: im.unidad,
+            estado: "COMPLETO", moneda: r.moneda,
+            // string-safe: valores decimales EXACTOS como cadena, jamás float.
+            valor: r.valor, costoTotal: r.costoTotal, delta: im.delta,
+            ...(fechaDataset ? { fecha: fechaDataset } : {}),
+          });
+        }
+      }
+    }
+    return ok(hechos);
+  },
+});
+
 /* ------------------------------- Correctivo ------------------------------ */
 // datasets: eventos-activo | solicitudes
 
@@ -378,6 +442,7 @@ const REGISTRO_FUENTES: RegistroFuentes = {
   abastecimiento: fuenteAbastecimiento,
   planes: fuentePlanes,
   timeline: fuenteTimeline,
+  costos: fuenteCostos,
 };
 
 export function analyticsRuntime(): AnalyticsRuntimeOperacional {

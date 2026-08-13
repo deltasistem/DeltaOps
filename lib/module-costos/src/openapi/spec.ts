@@ -196,6 +196,63 @@ export function construirOpenApi(): Record<string, unknown> {
       },
       ["activo", "estado", "componentes", "totalesPorMoneda"],
     ),
+
+    // ---- DGP-021.4 · Indicadores económicos (costo/hora, costo/km) ----
+    // Numerador EXACTO (composición 021.3, micros BigInt por moneda) / denominador
+    // EXACTO (Δ del medidor por tramo desde `valorExacto` de Utilización, aditivo
+    // 021.4-A). Ratio en punto fijo numeric(18,6) string-safe. Series por moneda.
+    EstadoIndicador: str({
+      enum: ["COMPLETO", "PARCIAL", "SIN_DATOS_SUFICIENTES", "NO_APLICA"],
+      description: "COMPLETO / PARCIAL / SIN_DATOS_SUFICIENTES / NO_APLICA. Activo sin odómetro ⇒ NO_APLICA (nunca 0). Sin avance de medidor ⇒ SIN_DATOS_SUFICIENTES.",
+    }),
+    RatioMoneda: obj(
+      {
+        moneda: str(),
+        costoTotal: dineroCanon,
+        valor: str({ pattern: "^-?\\d{1,12}\\.\\d{6}$", description: "Ratio [moneda]/unidad en punto fijo numeric(18,6) string-safe (puede ser negativo si el neto lo es)." }),
+      },
+      ["moneda", "costoTotal", "valor"],
+    ),
+    IndicadorMedidor: obj(
+      {
+        tipoMedidor: str({ enum: ["horometro", "odometro"] }),
+        unidad: str({ enum: ["h", "km"] }),
+        estado: ref("EstadoIndicador"),
+        delta: str({ nullable: true, pattern: "^\\d{1,12}\\.\\d{6}$", description: "Denominador EXACTO: Σ de deltas positivos por tramo (numeric 18,6). null si no computable." }),
+        tramos: int({ description: "Nº de tramos considerados (reinicios + 1)." }),
+        porMoneda: arr(ref("RatioMoneda")),
+        nota: str(),
+      },
+      ["tipoMedidor", "unidad", "estado", "tramos", "porMoneda"],
+    ),
+    IndicadoresActivo: obj(
+      {
+        activo: str(),
+        periodo: str(), rango: objAny(),
+        totalesPorMoneda: arr(ref("TotalMoneda")),
+        costoPorHora: ref("IndicadorMedidor"),
+        costoPorKm: ref("IndicadorMedidor"),
+      },
+      ["activo", "costoPorHora", "costoPorKm"],
+    ),
+    ComparativaActivos: obj(
+      {
+        periodo: str(), rango: objAny(),
+        // §13: SERIES POR MONEDA; jamás ranking combinado entre monedas.
+        rankingPorMoneda: arr(objAny()),
+        activos: arr(objAny()),
+      },
+      ["rankingPorMoneda", "activos"],
+    ),
+    TendenciaActivo: obj(
+      {
+        activo: str(),
+        periodo: str(), rango: objAny(),
+        // Puntos mensuales; huecos con estado SIN_DATOS_SUFICIENTES y valores null.
+        puntos: arr(objAny()),
+      },
+      ["activo", "puntos"],
+    ),
   };
 
   const paths: Record<string, Record<string, unknown>> = {};
@@ -281,6 +338,35 @@ export function construirOpenApi(): Record<string, unknown> {
     responses: { "200": jsonOk(ref("ComposicionActivo")), ...errores("401", "403", "404") },
   });
 
+  // ---- DGP-021.4 · Indicadores económicos (costo/hora, costo/km) ----
+  // LECTURA que compone el numerador exacto (021.3) con el denominador exacto
+  // (Δ de medidor por tramo, `valorExacto` de Utilización). RBAC de lectura;
+  // tenant SÓLO de sesión (§17); IDOR-safe (RLS).
+  add(`${BASE}/indicadores/activo/{activoId}`, "get", {
+    tags: ["Indicadores"], operationId: "costos.indicadores.activo",
+    summary: "Costo/hora y costo/km de un activo, POR MONEDA (DGP-021.4)",
+    description:
+      "Numerador EXACTO (composición de costos 021.3, micros BigInt por moneda) dividido por el DENOMINADOR EXACTO (Δ del horómetro/odómetro sumado por TRAMOS respetando reinicios/anulaciones/monotonicidad, desde el campo aditivo `valorExacto` de Utilización). Ratio en punto fijo numeric(18,6) string-safe, HALF-UP. Combustible NO entra (GAP-FUEL-MONEY). Activo sin odómetro ⇒ costo/km NO_APLICA. Ausencia ≠ 0.",
+    parameters: [pathParam("activoId", "Activo (leído bajo el tenant de sesión; IDOR-safe)"), periodoParam, rangoDesde, rangoHasta],
+    responses: { "200": jsonOk(ref("IndicadoresActivo")), ...errores("401", "403", "404") },
+  });
+  add(`${BASE}/comparativa`, "get", {
+    tags: ["Indicadores"], operationId: "costos.comparativa",
+    summary: "Comparativa de costo entre activos, SERIES POR MONEDA (§13)",
+    description:
+      "Compara varios activos en el mismo período. NUNCA combina monedas en un ranking: devuelve una serie por moneda ordenada por costo total (comparación en micros, sin float), con los ratios costo/hora y costo/km por activo cuando existen. `activos` = IDs separados por coma, leídos bajo el tenant de sesión.",
+    parameters: [queryParam("activos", "IDs de activo separados por coma (bajo el tenant de sesión; IDOR-safe)"), periodoParam, rangoDesde, rangoHasta],
+    responses: { "200": jsonOk(ref("ComparativaActivos")), ...errores("401", "403") },
+  });
+  add(`${BASE}/tendencia/activo/{activoId}`, "get", {
+    tags: ["Indicadores"], operationId: "costos.tendencia.activo",
+    summary: "Tendencia mensual de costo/horas/km/ratios de un activo (§14)",
+    description:
+      "Serie MENSUAL de costo (por moneda), horas, km, costo/hora y costo/km. Los meses sin datos se emiten con estado SIN_DATOS_SUFICIENTES y valores null — JAMÁS 0 artificial. Requiere un rango [desde,hasta] acotado (periodo=rango o 30d/90d/anio/actual).",
+    parameters: [pathParam("activoId", "Activo (leído bajo el tenant de sesión; IDOR-safe)"), periodoParam, rangoDesde, rangoHasta],
+    responses: { "200": jsonOk(ref("TendenciaActivo")), ...errores("400", "401", "403", "404") },
+  });
+
   return {
     openapi: "3.0.3",
     info: {
@@ -294,7 +380,7 @@ export function construirOpenApi(): Record<string, unknown> {
         "Errores kernel→HTTP: AUTH→403, NF→404, CFL→409, VAL→400, INF→500.",
     },
     servers: [{ url: "/", description: "API DeltaOps" }],
-    tags: [{ name: "Materialización" }, { name: "Consulta" }, { name: "Composición" }],
+    tags: [{ name: "Materialización" }, { name: "Consulta" }, { name: "Composición" }, { name: "Indicadores" }],
     paths,
     components: { schemas },
   };

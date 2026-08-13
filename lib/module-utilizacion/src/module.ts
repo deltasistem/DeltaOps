@@ -83,10 +83,22 @@ import type {
   ReciboPort,
   TanqueoRepository,
 } from "./domain/ports";
-import type { ConsolaStore, EventLogOperacional, ReadModelsStore, SyncReceiptStore } from "./infrastructure/operacional";
+import type { ConsolaStore, EventLogOperacional, LecturaReadRow, ReadModelsStore, SyncReceiptStore } from "./infrastructure/operacional";
 import { aplicarEventoAggregate, handlerProyeccion, type ProyeccionAdapters } from "./projection";
 
 const catalogoEnum = z.enum([...CATALOGOS] as [string, ...string[]]);
+
+/**
+ * DGP-021.4-A (ADITIVO): enriquece el snapshot público de una lectura con los
+ * campos EXACTOS `valorExacto` (cadena decimal del numeric persistido) y
+ * `esReinicio` (ancla de tramo), sin alterar ningún campo existente de `datos`.
+ * Habilita a los consumidores de LECTURA (sin CAP_REGULARIZAR) a calcular deltas
+ * exactos por tramo. Consumidores previos que ignoran los campos nuevos no notan
+ * cambio alguno (extensión estrictamente aditiva).
+ */
+function conExactitud(r: LecturaReadRow): Record<string, unknown> {
+  return { ...r.datos, valorExacto: r.valorExacto, esReinicio: r.esReinicio };
+}
 
 /** Tablas del módulo protegidas por RLS (para la consola técnica de admin). */
 const TABLAS_RLS_MODULO: readonly string[] = [
@@ -770,7 +782,7 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
             const rm = await adapters.readModel.lecturaGet(tenant.value, input.id);
             if (!rm.ok) return rm;
             if (!rm.value) return fail(KernelErrors.notFound("lectura", input.id));
-            return ok(rm.value.datos);
+            return ok(conExactitud(rm.value));
           }
           const r = await adapters.lecturas.findById(tenant.value, input.id);
           if (!r.ok) return r;
@@ -797,7 +809,7 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
           if (adapters.readModel) {
             const rm = await adapters.readModel.lecturaList(tenant.value, input);
             if (!rm.ok) return rm;
-            return ok(rm.value.map((x) => x.datos));
+            return ok(rm.value.map((x) => conExactitud(x)));
           }
           const r = await adapters.lecturas.list(tenant.value, input as { tipoMedidor?: TipoMedidor });
           if (!r.ok) return r;
@@ -815,7 +827,7 @@ export function utilizacionModule(adapters: ModuleAdapters): PlatformServiceDefi
           if (adapters.readModel) {
             const rm = await adapters.readModel.ultimaLectura(tenant.value, input.activoId, input.tipoMedidor);
             if (!rm.ok) return rm;
-            return ok(rm.value ? rm.value.datos : null);
+            return ok(rm.value ? conExactitud(rm.value) : null);
           }
           const r = await adapters.lecturas.ultimaValida(tenant.value, input.activoId, input.tipoMedidor as TipoMedidor);
           if (!r.ok) return r;
@@ -1097,9 +1109,15 @@ async function marcarSincronizacion(
     const saved = await adapters.lecturas.replace(uow, actualizada);
     if (!saved.ok) return saved;
     if (adapters.readModel) {
+      // DGP-021.4-A: preserva los campos EXACTOS ya proyectados (`esReinicio` y el
+      // decimal exacto) al re-proyectar por cambio de sincronización; este flujo
+      // NO altera el valor ni el anclaje de tramo.
+      const previa = await adapters.readModel.lecturaGet(tenantId, lecturaId);
+      const rowPrevia = previa.ok ? previa.value : null;
       await adapters.readModel.aplicarLectura(uow, {
         tenantId, id: actualizada.id, activoId: actualizada.activoId, tipoMedidor: actualizada.tipoMedidor,
-        valor: actualizada.valor, unidad: actualizada.unidad, fechaHora: new Date(actualizada.fechaHora),
+        valor: actualizada.valor, valorExacto: rowPrevia?.valorExacto ?? String(actualizada.valor),
+        esReinicio: rowPrevia?.esReinicio ?? false, unidad: actualizada.unidad, fechaHora: new Date(actualizada.fechaHora),
         identityId: actualizada.identityId, origen: actualizada.origen, estado: actualizada.estado,
         inconsistente: actualizada.inconsistente, sincronizacionActivo: actualizada.sincronizacionActivo,
         datos: actualizada as unknown as Record<string, unknown>, lastEventId: `sync:${lecturaId}:${estado}`, actualizadoAt: new Date(),

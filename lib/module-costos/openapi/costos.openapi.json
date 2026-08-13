@@ -20,6 +20,9 @@
     },
     {
       "name": "Composición"
+    },
+    {
+      "name": "Indicadores"
     }
   ],
   "paths": {
@@ -676,6 +679,276 @@
           }
         }
       }
+    },
+    "/api/deltaops/costos/indicadores/activo/{activoId}": {
+      "get": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "costos.indicadores.activo",
+        "summary": "Costo/hora y costo/km de un activo, POR MONEDA (DGP-021.4)",
+        "description": "Numerador EXACTO (composición de costos 021.3, micros BigInt por moneda) dividido por el DENOMINADOR EXACTO (Δ del horómetro/odómetro sumado por TRAMOS respetando reinicios/anulaciones/monotonicidad, desde el campo aditivo `valorExacto` de Utilización). Ratio en punto fijo numeric(18,6) string-safe, HALF-UP. Combustible NO entra (GAP-FUEL-MONEY). Activo sin odómetro ⇒ costo/km NO_APLICA. Ausencia ≠ 0.",
+        "parameters": [
+          {
+            "name": "activoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Activo (leído bajo el tenant de sesión; IDOR-safe)"
+          },
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Período por fechas REALES del hecho (§10): actual | 30d | 90d | anio | rango | total (omitido ⇒ total)."
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite inferior ISO (inclusive)."
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite superior ISO (inclusive)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicadoresActivo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/comparativa": {
+      "get": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "costos.comparativa",
+        "summary": "Comparativa de costo entre activos, SERIES POR MONEDA (§13)",
+        "description": "Compara varios activos en el mismo período. NUNCA combina monedas en un ranking: devuelve una serie por moneda ordenada por costo total (comparación en micros, sin float), con los ratios costo/hora y costo/km por activo cuando existen. `activos` = IDs separados por coma, leídos bajo el tenant de sesión.",
+        "parameters": [
+          {
+            "name": "activos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "IDs de activo separados por coma (bajo el tenant de sesión; IDOR-safe)"
+          },
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Período por fechas REALES del hecho (§10): actual | 30d | 90d | anio | rango | total (omitido ⇒ total)."
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite inferior ISO (inclusive)."
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite superior ISO (inclusive)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparativaActivos"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/tendencia/activo/{activoId}": {
+      "get": {
+        "tags": [
+          "Indicadores"
+        ],
+        "operationId": "costos.tendencia.activo",
+        "summary": "Tendencia mensual de costo/horas/km/ratios de un activo (§14)",
+        "description": "Serie MENSUAL de costo (por moneda), horas, km, costo/hora y costo/km. Los meses sin datos se emiten con estado SIN_DATOS_SUFICIENTES y valores null — JAMÁS 0 artificial. Requiere un rango [desde,hasta] acotado (periodo=rango o 30d/90d/anio/actual).",
+        "parameters": [
+          {
+            "name": "activoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Activo (leído bajo el tenant de sesión; IDOR-safe)"
+          },
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Período por fechas REALES del hecho (§10): actual | 30d | 90d | anio | rango | total (omitido ⇒ total)."
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite inferior ISO (inclusive)."
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite superior ISO (inclusive)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TendenciaActivo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validación fallida (KRN-VAL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1154,6 +1427,180 @@
           "estado",
           "componentes",
           "totalesPorMoneda"
+        ],
+        "additionalProperties": false
+      },
+      "EstadoIndicador": {
+        "type": "string",
+        "enum": [
+          "COMPLETO",
+          "PARCIAL",
+          "SIN_DATOS_SUFICIENTES",
+          "NO_APLICA"
+        ],
+        "description": "COMPLETO / PARCIAL / SIN_DATOS_SUFICIENTES / NO_APLICA. Activo sin odómetro ⇒ NO_APLICA (nunca 0). Sin avance de medidor ⇒ SIN_DATOS_SUFICIENTES."
+      },
+      "RatioMoneda": {
+        "type": "object",
+        "properties": {
+          "moneda": {
+            "type": "string"
+          },
+          "costoTotal": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales)."
+          },
+          "valor": {
+            "type": "string",
+            "pattern": "^-?\\d{1,12}\\.\\d{6}$",
+            "description": "Ratio [moneda]/unidad en punto fijo numeric(18,6) string-safe (puede ser negativo si el neto lo es)."
+          }
+        },
+        "required": [
+          "moneda",
+          "costoTotal",
+          "valor"
+        ],
+        "additionalProperties": false
+      },
+      "IndicadorMedidor": {
+        "type": "object",
+        "properties": {
+          "tipoMedidor": {
+            "type": "string",
+            "enum": [
+              "horometro",
+              "odometro"
+            ]
+          },
+          "unidad": {
+            "type": "string",
+            "enum": [
+              "h",
+              "km"
+            ]
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoIndicador"
+          },
+          "delta": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Denominador EXACTO: Σ de deltas positivos por tramo (numeric 18,6). null si no computable."
+          },
+          "tramos": {
+            "type": "integer",
+            "description": "Nº de tramos considerados (reinicios + 1)."
+          },
+          "porMoneda": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RatioMoneda"
+            }
+          },
+          "nota": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipoMedidor",
+          "unidad",
+          "estado",
+          "tramos",
+          "porMoneda"
+        ],
+        "additionalProperties": false
+      },
+      "IndicadoresActivo": {
+        "type": "object",
+        "properties": {
+          "activo": {
+            "type": "string"
+          },
+          "periodo": {
+            "type": "string"
+          },
+          "rango": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "totalesPorMoneda": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TotalMoneda"
+            }
+          },
+          "costoPorHora": {
+            "$ref": "#/components/schemas/IndicadorMedidor"
+          },
+          "costoPorKm": {
+            "$ref": "#/components/schemas/IndicadorMedidor"
+          }
+        },
+        "required": [
+          "activo",
+          "costoPorHora",
+          "costoPorKm"
+        ],
+        "additionalProperties": false
+      },
+      "ComparativaActivos": {
+        "type": "object",
+        "properties": {
+          "periodo": {
+            "type": "string"
+          },
+          "rango": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "rankingPorMoneda": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "activos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "rankingPorMoneda",
+          "activos"
+        ],
+        "additionalProperties": false
+      },
+      "TendenciaActivo": {
+        "type": "object",
+        "properties": {
+          "activo": {
+            "type": "string"
+          },
+          "periodo": {
+            "type": "string"
+          },
+          "rango": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "puntos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "activo",
+          "puntos"
         ],
         "additionalProperties": false
       }
