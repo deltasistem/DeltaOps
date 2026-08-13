@@ -1,0 +1,537 @@
+# DIRECTIVA DELTAOPS LITE — FASE 1
+## DISCOVERY DE PRODUCTO, SIMPLIFICACIÓN OPERACIONAL Y AUDITORÍA UX/UI
+
+Rol:
+Actúa como Product Architect, UX/UI Lead y Software Architect de DeltaOps.
+
+IMPORTANTE:
+Esta fase NO es una implementación.
+NO modificar código.
+NO modificar base de datos.
+NO crear migraciones.
+NO modificar contratos API.
+NO modificar RBAC/RLS.
+NO eliminar módulos.
+NO eliminar funcionalidades.
+NO cambiar arquitectura.
+NO ejecutar refactors.
+
+El objetivo de esta fase es entender el producto actual y diseñar una propuesta concreta para convertir DeltaOps en una experiencia mucho más simple, agradable y orientada a la operación real de Delta Logística.
+
+---
+
+## 1. CONTEXTO DEL PROGRAMA
+
+DeltaOps ya posee un core funcional y arquitectónicamente robusto construido mediante las fases DGP anteriores.
+
+Actualmente existen capacidades relacionadas con:
+
+- Activos
+- Órdenes de trabajo
+- Inventario
+- Planes
+- Preventivo
+- Correctivo
+- Abastecimiento
+- Utilización
+- Mano de obra
+- Costos
+- Analytics
+- Identidad
+- RBAC
+- RLS
+- Sesiones
+- Auditoría
+- Integraciones
+- Centro Operacional
+
+Estas capacidades NO deben eliminarse.
+
+El objetivo ahora es cambiar la experiencia del usuario.
+
+La aplicación debe dejar de sentirse como una colección de módulos técnicos y convertirse en una plataforma operacional de mantenimiento.
+
+---
+
+# 2. OBJETIVO DE DELTAOPS LITE
+
+"Lite" NO significa eliminar el core.
+
+Significa:
+
+CORE ROBUSTO
++
+EXPERIENCIA SIMPLE
+
+La complejidad debe permanecer en backend, dominio, seguridad y datos cuando sea necesaria.
+
+La interfaz debe mostrar solamente lo que cada usuario necesita para realizar su trabajo.
+
+Principio rector:
+
+"El usuario no debe necesitar conocer la arquitectura de DeltaOps para poder utilizar DeltaOps."
+
+---
+
+# 3. FLUJO OPERACIONAL QUE DEBE GUIAR EL PRODUCTO
+
+Investiga cómo representar visual y funcionalmente este flujo:
+
+PREOPERACIONAL
+    ↓
+CHECKLIST
+    ↓
+CUMPLE / NO CUMPLE
+    ↓
+SI CUMPLE → EQUIPO DISPONIBLE PARA OPERAR
+    ↓
+SI NO CUMPLE → HALLAZGO
+    ↓
+REPORTE / NOVEDAD
+    ↓
+ORDEN DE TRABAJO
+    ↓
+ASIGNACIÓN
+    ↓
+EJECUCIÓN
+    ↓
+REPUESTOS / MANO DE OBRA / TIEMPO
+    ↓
+CIERRE
+    ↓
+COSTO
+    ↓
+INDICADORES
+
+Determina qué partes de este flujo ya existen en el sistema y qué partes faltan.
+
+NO implementes nada.
+
+---
+
+# 4. AUDITORÍA DEL PRODUCTO ACTUAL
+
+Inspecciona el código real y documenta:
+
+A. Todas las rutas/pantallas actuales.
+
+B. Todos los módulos funcionales.
+
+C. Qué pantalla utiliza cada módulo.
+
+D. Qué roles utilizan cada funcionalidad.
+
+E. Qué funcionalidades son:
+- operacionales
+- administrativas
+- configuración
+- técnicas
+- analíticas
+- infraestructura
+
+F. Qué funcionalidades pueden ocultarse de la navegación principal sin perder capacidad.
+
+G. Qué funcionalidades deben permanecer accesibles solamente desde otras pantallas.
+
+H. Qué funcionalidades parecen duplicadas o excesivamente complejas para el usuario final.
+
+NO asumas.
+Utiliza evidencia del código real.
+
+---
+
+# 5. AUDITORÍA ESPECÍFICA DE UX/UI
+
+Analiza las pantallas existentes, especialmente:
+
+- Login
+- Dashboard/Consola
+- Activos
+- Órdenes
+- Inventario
+- Preventivo
+- Correctivo
+- Costos
+- Analytics
+- Utilización
+- Centro Operacional
+
+Evalúa:
+
+- jerarquía visual
+- navegación
+- densidad de información
+- cantidad de botones
+- cantidad de filtros
+- consistencia
+- tipografía
+- espaciado
+- iconografía
+- estados
+- formularios
+- tablas
+- tarjetas
+- modales
+- mensajes
+- feedback de acciones
+- responsive
+- experiencia móvil
+- accesibilidad
+- contraste
+- tema claro
+- tema oscuro
+
+Presta especial atención a los problemas observados actualmente:
+
+1. navegación superior demasiado extensa;
+2. exceso de opciones visibles;
+3. filtros excesivos en Activos;
+4. controles nativos con problemas de contraste en tema oscuro;
+5. textos y opciones que pierden legibilidad;
+6. inconsistencias visuales entre tema claro y oscuro;
+7. sensación de aplicación administrativa genérica;
+8. falta de una jerarquía operacional clara;
+9. demasiada información técnica presentada simultáneamente.
+
+NO corrijas estos problemas todavía.
+
+---
+
+# 6. TEMA CLARO Y OSCURO
+
+Audita específicamente el sistema de temas.
+
+Debe existir conceptualmente:
+
+ThemeProvider
+    ↓
+design tokens
+    ↓
+todos los componentes
+
+No debe existir una colección de estilos independientes para cada pantalla.
+
+Identifica:
+
+- colores de fondo
+- texto principal
+- texto secundario
+- bordes
+- inputs
+- selects
+- botones
+- tablas
+- badges
+- estados
+- iconos
+- logos
+- focus states
+- hover states
+
+Verifica específicamente que:
+
+- el logo sea legible en ambos temas;
+- los textos tengan contraste suficiente;
+- los `<select>` y opciones sean utilizables en oscuro;
+- los estados no dependan únicamente del color;
+- los componentes mantengan consistencia entre temas.
+
+El logo blanco/oficial para fondo oscuro debe considerarse parte del sistema de identidad visual existente.
+
+No inventes una nueva identidad de marca.
+
+---
+
+# 7. PROPUESTA DE NAVEGACIÓN
+
+Diseña una propuesta de navegación mucho más pequeña.
+
+No elimines funcionalidades.
+
+Determina qué debería aparecer en la navegación principal y qué debería quedar agrupado.
+
+Como referencia conceptual, evalúa una estructura similar a:
+
+INICIO
+MANTENIMIENTO
+EQUIPOS
+PREOPERACIONAL
+INVENTARIO
+INDICADORES
+ADMINISTRACIÓN
+
+Pero NO la adoptes automáticamente.
+
+Determina la mejor estructura basándote en el código real y los roles existentes.
+
+La navegación debe ser diferente según el rol cuando esto tenga sentido.
+
+Un técnico NO debería ver opciones administrativas.
+
+Un operador NO debería ver configuración técnica.
+
+Un administrador puede acceder al conjunto completo.
+
+---
+
+# 8. EXPERIENCIA POR PERFIL
+
+Define la experiencia ideal para:
+
+1. OPERADOR
+2. TÉCNICO
+3. SUPERVISOR / PLANIFICADOR
+4. ADMINISTRADOR
+5. CONSULTA
+
+Para cada perfil define:
+
+- pantalla inicial
+- acciones principales
+- navegación visible
+- información necesaria
+- información que debe ocultarse
+- acciones críticas
+- acciones secundarias
+
+Prioriza acciones reales sobre módulos técnicos.
+
+---
+
+# 9. PREOPERACIONAL
+
+Analiza especialmente esta funcionalidad porque será uno de los ejes de DeltaOps Lite.
+
+Determina cómo debería funcionar:
+
+Seleccionar equipo
+→ iniciar preoperacional
+→ mostrar checklist
+→ responder condiciones
+→ evidenciar incumplimiento
+→ registrar observación
+→ determinar APTO / NO APTO
+
+Si una condición crítica falla:
+
+→ generar automáticamente una novedad/incidencia
+→ permitir generar OT según reglas definidas
+→ asociar automáticamente:
+   equipo
+   operador
+   fecha/hora
+   checklist
+   hallazgo
+
+No implementar.
+
+Solo diseñar el flujo funcional y señalar qué capacidades existentes pueden reutilizarse.
+
+---
+
+# 10. DATOS E INDICADORES
+
+Identifica qué información existente puede alimentar una experiencia sencilla:
+
+- horas hombre
+- horas de operación
+- horómetro
+- odómetro
+- consumo
+- combustible
+- repuestos
+- costos
+- órdenes
+- fallas
+- mantenimientos
+- cumplimiento de preventivos
+- disponibilidad
+- equipos fuera de servicio
+- frecuencia de fallas
+- costo por hora
+- costo por km
+- utilización
+
+Determina qué indicadores realmente deberían aparecer en la experiencia principal y cuáles deberían quedar en Analytics.
+
+NO inventes indicadores que no tengan fuente real.
+
+---
+
+# 11. REGLA FUNDAMENTAL: NO DUPLICAR FUNCIONALIDAD
+
+Antes de proponer cualquier pantalla nueva:
+
+Buscar si la funcionalidad ya existe.
+
+Si existe:
+→ reutilizarla.
+
+Si existe parcialmente:
+→ proponer composición.
+
+Si no existe:
+→ marcar como GAP.
+
+No crear módulos paralelos.
+
+No crear una segunda versión de Órdenes, Activos, Inventario, etc.
+
+---
+
+# 12. CLASIFICACIÓN DE FUNCIONALIDADES
+
+Clasifica cada funcionalidad actual como:
+
+A — MOSTRAR EN NAVEGACIÓN PRINCIPAL
+B — MOSTRAR DENTRO DE OTRA FUNCIONALIDAD
+C — DISPONIBLE SOLO PARA ADMINISTRACIÓN
+D — OCULTA PERO CONSERVADA
+E — CANDIDATA A FUTURA DEPURACIÓN
+
+IMPORTANTE:
+
+"E — candidata a depuración" NO significa borrar.
+
+Solo significa que Dirección deberá decidir posteriormente.
+
+---
+
+# 13. PROPUESTA VISUAL
+
+Sin implementar todavía, propón un lenguaje visual para DeltaOps Lite:
+
+- corporativo
+- moderno
+- limpio
+- industrial
+- profesional
+- fácil de utilizar
+- mobile-first para operación
+
+Evitar:
+
+- exceso de tarjetas
+- exceso de bordes
+- dashboards saturados
+- colores innecesarios
+- sombras exageradas
+- gradientes decorativos excesivos
+- interfaces que parezcan un ERP genérico
+
+Priorizar:
+
+- jerarquía
+- acciones claras
+- estados visibles
+- información contextual
+- botones grandes para operación móvil
+- formularios simples
+- feedback inmediato
+- consistencia visual
+
+No crear un diseño experimental.
+
+---
+
+# 14. RESTRICCIÓN DE ALCANCE
+
+Esta fase NO debe:
+
+- modificar código
+- modificar DB
+- crear migraciones
+- cambiar API
+- cambiar RBAC
+- cambiar RLS
+- cambiar contratos
+- eliminar archivos
+- eliminar módulos
+- modificar workflows
+- modificar infraestructura
+
+Solo análisis y propuesta.
+
+---
+
+# 15. ENTREGABLE
+
+Crear únicamente:
+
+docs/dgp/DELTAOPS-LITE-01-DISCOVERY.md
+
+El documento debe contener:
+
+1. Resumen ejecutivo
+2. Estado actual del producto
+3. Inventario de módulos
+4. Inventario de pantallas
+5. Inventario de navegación
+6. Matriz funcionalidad × rol
+7. Problemas UX/UI encontrados
+8. Problemas de tema claro/oscuro
+9. Flujo operacional actual
+10. Flujo operacional objetivo
+11. Diseño conceptual del preoperacional
+12. Diseño conceptual de checklist
+13. Flujo hallazgo → OT
+14. Indicadores disponibles actualmente
+15. Indicadores recomendados para la experiencia principal
+16. Propuesta de navegación DeltaOps Lite
+17. Experiencia por rol
+18. Funcionalidades A/B/C/D/E
+19. GAPs reales
+20. Funcionalidades que NO deben tocarse
+21. Propuesta visual
+22. Recomendaciones mobile
+23. Principios UX
+24. Roadmap de implementación
+25. Riesgos
+26. Criterios de aceptación
+
+---
+
+# 16. REVISIÓN OBLIGATORIA
+
+Antes de cerrar:
+
+- ejecutar revisión independiente del documento;
+- comprobar que no hubo modificaciones de código;
+- comprobar git status;
+- comprobar que no se eliminaron archivos;
+- comprobar que no se modificaron migraciones;
+- comprobar que no se modificaron contratos;
+- comprobar que no se modificó RBAC/RLS.
+
+Si encuentras una contradicción entre la propuesta y el código real:
+
+NO la ocultes.
+
+Documenta:
+
+REALIDAD ACTUAL
+vs
+PROPUESTA DELTAOPS LITE
+
+---
+
+# 17. REGLA FINAL
+
+NO QUIERO QUE CONSTRUYAS TODAVÍA.
+
+Primero quiero saber qué tenemos realmente y cómo convertirlo en una aplicación mucho más sencilla, operacional y visualmente agradable para Delta.
+
+El core robusto existente debe considerarse una fortaleza, no algo que haya que eliminar.
+
+La meta de esta fase es:
+
+"Menos cosas visibles.
+Menos decisiones para el usuario.
+Más automatización.
+Más claridad.
+Mejor experiencia visual.
+Misma capacidad empresarial detrás."
+
+Al finalizar, DETENTE y entrega el informe.
+
+NO inicies ninguna implementación posterior sin aprobación explícita de Dirección.
