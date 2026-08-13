@@ -22,6 +22,14 @@ description: Hallazgos CRÍTICOS/ALTOS abiertos de la auditoría de producción 
 - **DeltaOps probado independiente:** cero referencias a hooks/rutas/tablas legacy en `artifacts/deltaops` y en `lib/module-*`/`routes/deltaops/*`; esquemas disjuntos (public.* vs deltaops.*, sin FKs cruzadas); `seed-sgma` es script manual sin cableado.
 - Recomendación entregada: **B) aislamiento temporal** ya (cerrar CRUD anónimo sin romper sgma) → luego C (migrar) o A (eliminar) según decida Dirección el futuro de sgma. Pendiente de decisión.
 
+## Retiro de SGMA aprobable (DGP-023.1, Discovery PASS)
+- **Decisión de Dirección:** SGMA oficialmente RETIRADO (nunca fue a producción); DeltaOps es el único producto. Retiro pendiente de aprobación de ejecución.
+- DB confirmada trivial de retirar: esquema `public` contiene SOLO las 9 tablas SGMA, 0 FKs (ni cross-schema con deltaops.*), 0 vistas/triggers/funciones, ~52 filas 100% demo/seed. DROP futuro seguro con `pg_dump` previo.
+- **2 acoplamientos de infraestructura (no bloqueantes, condicionan la ejecución):**
+  1. Health gate de deploy del api-server apunta a `/api/healthz`, servido SOLO por el router legacy — repuntar a `/api/deltaops/platform/health` ANTES/atómico con eliminar `health.ts`.
+  2. `openapi.yaml` + `api-client-react` + `api-zod` son COMPARTIDOS: el schema `Error` lo usan rutas `/deltaops/auth/*` y los hooks `useDeltaops*` viven en el mismo cliente generado ⇒ editar solo paths/schemas SGMA y regenerar clientes en el MISMO cambio atómico que retira los routers (jamás borrar los paquetes).
+- Secuencia validada: retirar artifacts/sgma → migrar health gate → routers+spec+regeneración atómica → seed/schemas drizzle/barrel db → docs/config → pg_dump+DROP por migración → validación completa DeltaOps. Rollback: tag pre-retiro + git revert + dump.
+
 ## Contexto durable
 - **Why:** una lectura anónima que devuelve datos de negocio y una RLS que el motor ignora son contención rota, no "mejores prácticas". El programa distingue bloqueante real de preferencia.
 - **How to apply:** antes de cualquier piloto real hay que resolver H-01 (exposición anónima inmediata); antes de producción general, H-02 + ALTOS. Roadmap propuesto DGP-023.1..023.8 (HTTP/API → Auth/Sesiones → RLS/Multitenancy → Infra/Secrets → Backups/DR → Observabilidad → Frontend/Perf → validación final). No iniciar ninguna sub-fase sin aprobación expresa.
