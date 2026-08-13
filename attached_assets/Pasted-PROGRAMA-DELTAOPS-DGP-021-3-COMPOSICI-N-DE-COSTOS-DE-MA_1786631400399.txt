@@ -1,0 +1,960 @@
+PROGRAMA DELTAOPS
+DGP-021.3 — COMPOSICIÓN DE COSTOS DE MANTENIMIENTO POR OT Y ACTIVO
+
+ESTADO:
+IMPLEMENTACIÓN AUTORIZADA.
+
+============================================================
+1. CONTEXTO DEL PROGRAMA
+============================================================
+
+DeltaOps es una plataforma empresarial multi-tenant para gestión de
+mantenimiento de maquinaria amarilla, equipos estáticos, equipos de
+logística y activos operacionales.
+
+La plataforma ya cuenta con:
+
+- Identidad y tenancy canónicos.
+- RBAC.
+- Activos.
+- Órdenes de Trabajo.
+- Inventario.
+- Abastecimiento.
+- Planes/Preventivo/Correctivo.
+- Utilización.
+- Horómetro/odómetro.
+- Combustible.
+- Sesiones reales de trabajo.
+- Mano de obra.
+- Hechos económicos de costos.
+- Offline-first.
+- Shared Timeline.
+- QR.
+- Analytics.
+- Tema global claro/oscuro/automático.
+
+NO rediseñar estos dominios.
+
+NO crear implementaciones paralelas.
+
+NO duplicar fuentes de verdad.
+
+============================================================
+2. OBJETIVO DE DGP-021.3
+============================================================
+
+Construir la composición operacional de costos de mantenimiento.
+
+El objetivo es poder responder, con datos reales:
+
+1. ¿Cuánto ha costado una Orden de Trabajo?
+2. ¿Cuánto ha costado mantener un activo?
+3. ¿De dónde proviene cada componente del costo?
+4. ¿Cuánto corresponde a mano de obra?
+5. ¿Cuánto corresponde a materiales/repuestos?
+6. ¿Cuánto corresponde a combustible?
+7. ¿Qué parte del costo es estimada y qué parte está materializada?
+8. ¿Qué información falta para determinar un costo completo?
+
+La fase debe ser de COMPOSICIÓN.
+
+No crear nuevas fuentes de verdad cuando ya existen.
+
+============================================================
+3. FUENTES DE VERDAD OBLIGATORIAS
+============================================================
+
+MANO DE OBRA:
+DGP-020.3 / module-manodeobra.
+
+Utilizar las valoraciones existentes.
+
+No recalcular sesiones.
+
+No recalcular tarifas.
+
+No leer tablas internas de Órdenes directamente.
+
+No duplicar valoraciones.
+
+------------------------------------------------------------
+
+MATERIALES:
+DGP-021.0 + DGP-021.1 + DGP-021.2.
+
+Utilizar los hechos económicos materializados por Inventario.
+
+Inventario sigue siendo la fuente del movimiento físico.
+
+Abastecimiento sigue siendo la fuente del costo unitario.
+
+module-costos sigue siendo la fuente del hecho económico.
+
+No utilizar:
+
+- abs_costos_read;
+- endpoint legacy de costos float;
+- tablas privadas de otros módulos;
+- precios inventados;
+- costoReal manual de la OT como fuente económica.
+
+------------------------------------------------------------
+
+COMBUSTIBLE:
+DGP-019.
+
+Utilizar los hechos/snapshots de combustible existentes en Utilización.
+
+El combustible está atribuido al ACTIVO.
+
+No inventar una relación combustible→OT si el contrato no la proporciona.
+
+Cuando una OT esté asociada a un activo, la información de combustible
+debe presentarse diferenciando claramente:
+
+- costo atribuible directamente a la OT, si existe contrato;
+- costo del activo en período;
+- información contextual no atribuible a la OT.
+
+Nunca presentar costo de combustible del activo como costo directo de una
+OT si no existe una relación contractual válida.
+
+============================================================
+4. PRINCIPIO FUNDAMENTAL
+============================================================
+
+NO INVENTAR COSTOS.
+
+Si un componente tiene fuente real:
+
+→ mostrarlo.
+
+Si no existe fuente suficiente:
+
+→ mostrar "Sin datos suficientes".
+
+Nunca:
+
+→ mostrar $0 para representar ausencia de información.
+
+Debe diferenciarse:
+
+$0 real
+vs.
+Sin datos suficientes.
+
+============================================================
+5. MODELO DE COMPOSICIÓN
+============================================================
+
+La composición conceptual será:
+
+COSTO DE MANTENIMIENTO
+
+├── Mano de obra
+├── Materiales / repuestos
+├── Combustible atribuible
+└── Otros costos económicos válidos
+
+Cada componente debe conservar:
+
+- fuente;
+- origen;
+- OT;
+- activo;
+- identityId cuando corresponda;
+- moneda;
+- valor;
+- estado;
+- snapshot;
+- evidencia.
+
+NO mezclar monedas.
+
+============================================================
+6. MONEDAS
+============================================================
+
+Una OT o activo puede contener hechos en diferentes monedas.
+
+NO realizar conversión monetaria.
+
+Los agregados deben estar separados por moneda.
+
+Ejemplo:
+
+COP
+- Mano de obra: $500.000
+- Materiales: $800.000
+- Total: $1.300.000
+
+USD
+- Materiales: $100
+
+No mostrar:
+
+"Total $1.700.000"
+
+porque eso sería mezclar monedas.
+
+============================================================
+7. COSTO DE OT
+============================================================
+
+Implementar composición para una OT.
+
+La vista debe poder mostrar:
+
+- Costo de mano de obra.
+- Costo de materiales.
+- Combustible, solamente cuando exista atribución válida.
+- Otros hechos económicos válidos.
+- Total por moneda.
+- Cantidad de componentes.
+- Componentes sin datos suficientes.
+- Componentes pendientes de materialización.
+
+Cada total debe ser derivado exclusivamente del backend/read models.
+
+NO calcular reglas económicas complejas en React.
+
+============================================================
+8. ESTADOS DEL COSTO
+============================================================
+
+Diferenciar al menos:
+
+COMPLETO
+→ existen todos los componentes requeridos para el cálculo según
+   las fuentes disponibles.
+
+PARCIAL
+→ existen algunos componentes pero faltan otros.
+
+SIN DATOS SUFICIENTES
+→ no existen hechos suficientes para calcular.
+
+PENDIENTE
+→ existe una operación económica pendiente de materialización.
+
+NO APLICA
+→ el componente no corresponde al tipo de operación.
+
+No convertir estados a valores monetarios artificiales.
+
+============================================================
+9. COSTO DEL ACTIVO
+============================================================
+
+Implementar composición del costo histórico/operacional del activo.
+
+Debe permitir consultar:
+
+- costos acumulados;
+- costos por período;
+- costos por OT;
+- mano de obra;
+- materiales;
+- combustible;
+- otros;
+- desglose por moneda.
+
+Los costos deben respetar tenant y activo.
+
+Nunca usar información de otro tenant.
+
+============================================================
+10. PERÍODOS
+============================================================
+
+Permitir filtros temporales usando fechas reales de los hechos económicos.
+
+Como mínimo:
+
+- período actual;
+- últimos 30 días;
+- últimos 90 días;
+- año actual;
+- rango personalizado.
+
+No inventar hechos para completar períodos.
+
+Si no hay datos:
+
+→ "Sin datos suficientes".
+
+============================================================
+11. COSTO POR HORA
+============================================================
+
+En esta fase NO implementar todavía el costo por hora definitivo si
+requiere una política que no esté contractualizada.
+
+Sin embargo, dejar la composición preparada para DGP-021.4.
+
+El denominador futuro deberá ser:
+
+HORÓMETRO DEL ACTIVO.
+
+NO utilizar:
+
+- horas de sesión;
+- horas calendario;
+- uptime;
+- tiempo estimado.
+
+Si el activo no tiene horómetro suficiente:
+
+→ "Sin datos suficientes".
+
+============================================================
+12. COSTO POR KILÓMETRO
+============================================================
+
+No implementar una conversión inventada.
+
+El costo por kilómetro solamente será válido para activos con:
+
+- odómetro;
+- lecturas suficientes;
+- unidad consistente;
+- período comparable.
+
+Dejar preparado para DGP-021.4.
+
+============================================================
+13. COSTO REAL MANUAL DE LA OT
+============================================================
+
+El campo costoReal existente de la OT fue identificado anteriormente
+como declaración manual sin fuente económica demostrable.
+
+NO utilizarlo como fuente del nuevo costo económico.
+
+No eliminarlo destructivamente.
+
+No reinterpretarlo silenciosamente.
+
+Si aparece en la UI, debe diferenciarse del costo económico calculado.
+
+Documentar la decisión.
+
+============================================================
+14. SNAPSHOTS
+============================================================
+
+Todo costo económico histórico debe conservar el snapshot de su origen.
+
+Cambios posteriores en:
+
+- tarifas;
+- costos de abastecimiento;
+- inventario;
+- combustible;
+
+NO deben alterar hechos históricos ya materializados.
+
+Verificar esto en pruebas.
+
+============================================================
+15. BACKEND
+============================================================
+
+Preferir composición mediante read models públicos.
+
+Si se necesita una nueva query pública de composición:
+
+crear solamente el contrato estrictamente necesario.
+
+No acceder directamente a tablas privadas de otros módulos.
+
+No crear dependencias SQL cross-module.
+
+No romper contratos existentes.
+
+OpenAPI debe actualizarse únicamente si realmente se crea un contrato
+público nuevo.
+
+Agregar drift test.
+
+============================================================
+16. RBAC
+============================================================
+
+Respetar roles canónicos.
+
+TENANT_ADMIN:
+→ acceso completo según capacidades existentes.
+
+SUPERVISOR:
+→ lectura operacional de costos.
+
+PLANIFICADOR:
+→ lectura según sus capacidades.
+
+TECNICO:
+→ únicamente información que corresponda a sus permisos y alcance.
+
+CONSULTA:
+→ solo lectura.
+
+No crear permisos nuevos salvo que exista una necesidad contractual
+demostrable y documentada.
+
+Frontend solo gatea presentación.
+
+Backend sigue siendo autoridad.
+
+============================================================
+17. MULTITENANCY
+============================================================
+
+Tenant exclusivamente desde sesión autenticada.
+
+Nunca aceptar tenantId como autoridad desde frontend.
+
+Probar explícitamente:
+
+Tenant A no puede consultar costos de Tenant B.
+
+============================================================
+18. AUDITORÍA
+============================================================
+
+Toda composición debe permitir responder:
+
+- qué OT;
+- qué activo;
+- qué componente;
+- qué hecho económico;
+- qué fuente;
+- qué moneda;
+- qué valor;
+- cuándo;
+- quién;
+- origen.
+
+No crear agregados irreversibles que destruyan trazabilidad.
+
+============================================================
+19. FRONTEND — OT
+============================================================
+
+Integrar en la ficha existente de Orden de Trabajo.
+
+NO crear una aplicación paralela.
+
+Agregar una sección claramente identificable:
+
+"COSTOS DE MANTENIMIENTO"
+
+Mostrar:
+
+- resumen;
+- desglose;
+- estado;
+- moneda;
+- fuentes;
+- pendientes;
+- enlaces a los hechos cuando corresponda.
+
+Visualmente:
+
+┌─────────────────────────────────────────────┐
+│ COSTOS DE MANTENIMIENTO                     │
+├─────────────────────────────────────────────┤
+│ Mano de obra                 $ XXX.XX       │
+│ Materiales                   $ XXX.XX       │
+│ Combustible                  Sin datos      │
+│ Otros                        $ XXX.XX       │
+├─────────────────────────────────────────────┤
+│ TOTAL COP                   $ X.XXX.XXX     │
+│                                             │
+│ Estado: PARCIAL                             │
+└─────────────────────────────────────────────┘
+
+El ejemplo anterior es conceptual.
+
+NO hardcodear valores.
+
+============================================================
+20. FRONTEND — ACTIVO
+============================================================
+
+Integrar el costo dentro de la ficha operacional 360° existente.
+
+Mostrar:
+
+- costo acumulado;
+- costo del período;
+- costo por OT;
+- mano de obra;
+- materiales;
+- combustible;
+- otros;
+- moneda;
+- estado de información.
+
+Debe integrarse con la ficha actual.
+
+NO duplicarla.
+
+============================================================
+21. UX
+============================================================
+
+La información debe ser comprensible para personal de mantenimiento,
+no solamente para contabilidad.
+
+Usar lenguaje como:
+
+- Mano de obra
+- Repuestos
+- Combustible
+- Otros
+- Total
+- Sin datos suficientes
+- Pendiente
+- Estimado
+
+Evitar lenguaje excesivamente técnico.
+
+Los valores monetarios deben tener formato legible, pero mantener el
+valor exacto en backend.
+
+============================================================
+22. RESPONSIVE
+============================================================
+
+Verificar:
+
+390px
+768px
+1280px
+
+En móvil:
+
+- tarjetas;
+- bloques apilados;
+- números legibles;
+- sin tablas imposibles de utilizar;
+- sin overflow horizontal;
+- targets táctiles ≥48px.
+
+============================================================
+23. TEMA
+============================================================
+
+Respetar ThemeProvider global.
+
+Debe funcionar en:
+
+- claro;
+- oscuro;
+- automático.
+
+No crear ThemeProvider local.
+
+No fijar data-do-theme.
+
+No hardcodear colores fuera de tokens.
+
+============================================================
+24. PRUEBAS OBLIGATORIAS
+============================================================
+
+Agregar pruebas para:
+
+1. Mano de obra real.
+2. Material real.
+3. Combustible.
+4. Ausencia de combustible.
+5. OT con múltiples monedas.
+6. Activo con múltiples monedas.
+7. Cero real.
+8. Ausencia de datos.
+9. Estado parcial.
+10. Pendiente de materialización.
+11. Snapshot histórico.
+12. Cambio de tarifa sin alterar histórico.
+13. Cambio de costo de abastecimiento sin alterar histórico.
+14. Tenant A/B.
+15. RBAC.
+16. Refresh.
+17. Logout/re-login.
+18. Tema claro.
+19. Tema oscuro.
+20. Responsive.
+
+Las pruebas deben utilizar datos reales/PG cuando corresponda.
+
+No utilizar mocks para afirmar propiedades que requieran validación de
+persistencia, RLS, concurrencia o precisión monetaria.
+
+============================================================
+25. E2E OBLIGATORIO
+============================================================
+
+Con navegador real:
+
+TENANT_ADMIN:
+- visualizar costos;
+- revisar OT;
+- revisar activo.
+
+SUPERVISOR:
+- visualizar.
+
+TECNICO:
+- visualizar únicamente lo permitido.
+
+CONSULTA:
+- lectura sin CTAs de escritura.
+
+Verificar:
+
+- refresh;
+- logout/re-login;
+- tenant isolation;
+- claro/oscuro;
+- 390px;
+- 768px;
+- 1280px.
+
+============================================================
+26. PRECISIÓN MONETARIA
+============================================================
+
+Mantener todas las reglas DGP-021.0 y DGP-021.1.
+
+Dinero:
+
+numeric(18,6)
+→ driver string
+→ dominio string
+→ API string.
+
+PROHIBIDO:
+
+parseFloat()
+Number()
+cálculo monetario con floating point.
+
+No introducir regresiones.
+
+============================================================
+27. REVISIÓN ARQUITECTÓNICA
+============================================================
+
+Realizar revisión independiente.
+
+R1 debe buscar específicamente:
+
+- duplicación de fuentes de verdad;
+- mezcla de monedas;
+- uso de costoReal manual;
+- acceso SQL cross-module;
+- bypass RBAC;
+- IDOR;
+- pérdida de snapshot;
+- cálculo monetario con float;
+- costos inventados;
+- $0 utilizado para ausencia de información;
+- fuga cross-tenant.
+
+No cerrar la fase si existen hallazgos CRÍTICOS o MAYORES.
+
+Corregir y repetir revisión.
+
+============================================================
+28. REVISIÓN VISUAL
+============================================================
+
+Evaluar:
+
+- jerarquía;
+- claridad;
+- densidad;
+- consistencia;
+- responsive;
+- tema;
+- accesibilidad;
+- lenguaje operacional.
+
+La interfaz debe sentirse como una plataforma empresarial de
+mantenimiento, no como una hoja de cálculo.
+
+============================================================
+29. NO HACER
+============================================================
+
+NO crear dashboard ejecutivo.
+
+NO crear BI.
+
+NO crear facturación.
+
+NO crear impuestos.
+
+NO convertir monedas.
+
+NO inventar costos.
+
+NO duplicar inventario.
+
+NO duplicar abastecimiento.
+
+NO duplicar utilización.
+
+NO duplicar mano de obra.
+
+NO crear una segunda cola offline.
+
+NO modificar Workflow salvo necesidad contractual demostrable.
+
+NO modificar Identity.
+
+NO romper RLS.
+
+NO acceder a tablas privadas de otros módulos.
+
+============================================================
+30. DIRECTIVA VISUAL ADICIONAL
+============================================================
+
+Esta sección es INDEPENDIENTE de la lógica de costos.
+
+Debe ejecutarse como una mejora controlada de autenticación y branding.
+
+NO utilizarla para justificar cambios funcionales en los módulos.
+
+------------------------------------------------------------
+30.1 PROBLEMA DETECTADO
+------------------------------------------------------------
+
+El logo actual pierde contraste en tema oscuro porque la variante
+utilizada tiene tipografía oscura.
+
+Dirección proporciona una variante oficial:
+
+"Logo_ Full color-Blanco.png"
+
+Esta variante contiene:
+
+- símbolo Delta rojo;
+- tipografía blanca/clara.
+
+Utilizarla específicamente sobre fondos oscuros.
+
+La variante oscura existente debe utilizarse sobre fondos claros.
+
+------------------------------------------------------------
+30.2 REGLA DE BRANDING
+------------------------------------------------------------
+
+Seleccionar automáticamente el logo según el ThemeProvider global.
+
+Tema claro:
+→ logo oficial para fondo claro.
+
+Tema oscuro:
+→ logo oficial blanco/claro.
+
+Tema automático:
+→ seguir el tema efectivo.
+
+NO:
+
+- recolorear mediante CSS;
+- usar filtros;
+- recrear el logo;
+- escribir "DELTA" manualmente como sustituto;
+- crear un segundo sistema de temas.
+
+------------------------------------------------------------
+30.3 REDISEÑO CONTROLADO DEL LOGIN
+------------------------------------------------------------
+
+Mejorar la pantalla actual de login de DeltaOps tomando como referencia
+visual la captura corporativa proporcionada por Dirección.
+
+La referencia NO debe copiarse literalmente.
+
+Debe servir para elevar el nivel visual y corporativo.
+
+Objetivo:
+
+Una pantalla moderna, empresarial, limpia y coherente con DeltaOps.
+
+En desktop puede utilizarse una composición de dos zonas:
+
+ZONA BRANDING
++
+ZONA AUTENTICACIÓN.
+
+------------------------------------------------------------
+30.4 ZONA DE BRANDING
+------------------------------------------------------------
+
+Puede incluir:
+
+- logo Delta;
+- nombre de DeltaOps;
+- "Plataforma empresarial de gestión de mantenimiento";
+- breve descripción operacional;
+- elementos visuales discretos relacionados con activos,
+  mantenimiento y operación.
+
+No inventar certificaciones, clientes, cifras ni funcionalidades.
+
+------------------------------------------------------------
+30.5 ZONA DE AUTENTICACIÓN
+------------------------------------------------------------
+
+Conservar exactamente el flujo existente:
+
+- correo;
+- contraseña;
+- mostrar/ocultar contraseña;
+- iniciar sesión;
+- recuperación de contraseña;
+- errores;
+- sesión;
+- RBAC.
+
+Modificar solamente presentación/UX.
+
+------------------------------------------------------------
+30.6 RESPONSIVE LOGIN
+------------------------------------------------------------
+
+1280px:
+→ composición completa.
+
+768px:
+→ composición adaptada.
+
+390px:
+→ priorizar formulario y logo;
+→ branding reducido;
+→ sin overflow.
+
+Targets ≥48px.
+
+------------------------------------------------------------
+30.7 TEMA DEL LOGIN
+------------------------------------------------------------
+
+El login debe respetar:
+
+CLARO
+OSCURO
+AUTOMÁTICO
+
+No crear estado de tema independiente.
+
+Verificar que cambien correctamente:
+
+- logo;
+- fondo;
+- superficie;
+- texto;
+- inputs;
+- bordes;
+- botones;
+- mensajes de error.
+
+CRITERIO ESPECIAL:
+
+EL LOGO NUNCA DEBE PERDER CONTRASTE.
+
+------------------------------------------------------------
+30.8 ACCESIBILIDAD LOGIN
+------------------------------------------------------------
+
+Mantener:
+
+- labels;
+- teclado;
+- foco visible;
+- contraste;
+- aria-label;
+- autocomplete;
+- mensajes de error asociados.
+
+No sacrificar accesibilidad por estética.
+
+------------------------------------------------------------
+30.9 REVISIÓN VISUAL DEL LOGIN
+------------------------------------------------------------
+
+La revisión debe evaluar:
+
+1. Branding.
+2. Contraste del logo.
+3. Jerarquía.
+4. Composición.
+5. Profesionalismo.
+6. Consistencia con DeltaOps.
+7. Claro/oscuro.
+8. Responsive.
+9. Accesibilidad.
+10. Ausencia de decoración excesiva.
+
+============================================================
+31. REGLA DE ALCANCE VISUAL
+============================================================
+
+La mejora visual SOLO afecta:
+
+- login;
+- selección correcta de logo;
+- superficies directamente relacionadas con autenticación.
+
+NO rediseñar todos los módulos durante esta fase.
+
+NO cambiar navegación global.
+
+NO cambiar arquitectura visual existente.
+
+NO crear un nuevo Design System.
+
+NO cambiar contratos funcionales.
+
+============================================================
+32. CIERRE
+============================================================
+
+La fase se considera terminada únicamente cuando:
+
+- composición de costos funciona;
+- fuentes de verdad permanecen intactas;
+- monedas no se mezclan;
+- precisión monetaria se conserva;
+- RLS PASS;
+- RBAC PASS;
+- E2E PASS;
+- responsive PASS;
+- tema PASS;
+- revisión arquitectónica PASS;
+- revisión visual PASS;
+- login mejorado;
+- logo correcto en claro y oscuro;
+- ningún contrato existente queda roto.
+
+NO iniciar DGP-021.4 automáticamente.
+
+Entregar informe oficial de cierre detallando:
+
+- cambios;
+- archivos;
+- contratos;
+- pruebas;
+- E2E;
+- revisión arquitectónica;
+- revisión visual;
+- GAPs;
+- deuda técnica;
+- commits.
+
+Detenerse después del cierre y esperar aprobación explícita de Dirección.
