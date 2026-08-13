@@ -1,0 +1,732 @@
+DGP-023.3 — DISCOVERY: RLS ENFORCEMENT Y ROL DE APLICACIÓN POSTGRESQL
+
+Programa DeltaOps
+
+ESTADO DEL PROGRAMA
+
+DGP-023 Discovery identificó H-02:
+
+La aplicación conecta actualmente a PostgreSQL mediante un usuario con privilegios de superusuario / rol que posee bypass de RLS, por lo que PostgreSQL no aplica realmente las políticas RLS durante el runtime.
+
+DGP-023.2 retiró definitivamente SGMA.
+DeltaOps es ahora el único producto operativo.
+
+OBJETIVO
+
+Realizar un Discovery técnico completo para diseñar la transición desde la conexión actual de PostgreSQL hacia un rol de aplicación que NO pueda evadir RLS.
+
+Esta fase es EXCLUSIVAMENTE DISCOVERY.
+
+==================================================
+REGLA ABSOLUTA
+==================================================
+
+NO modificar código.
+
+NO modificar DATABASE_URL.
+
+NO crear usuarios PostgreSQL.
+
+NO cambiar contraseñas.
+
+NO ejecutar GRANT/REVOKE.
+
+NO ejecutar ALTER ROLE.
+
+NO ejecutar ALTER TABLE.
+
+NO activar FORCE ROW LEVEL SECURITY.
+
+NO modificar migraciones.
+
+NO modificar RLS.
+
+NO reiniciar servicios para aplicar cambios.
+
+NO cambiar frontend.
+
+NO cambiar contratos.
+
+NO modificar DeltaOps.
+
+NO hacer DROP.
+
+NO hacer cambios destructivos.
+
+Solo lectura, análisis y documentación.
+
+==================================================
+1. INVENTARIO DE CONEXIONES
+==================================================
+
+Identificar todas las conexiones PostgreSQL utilizadas por el proyecto.
+
+Buscar:
+
+DATABASE_URL
+PGHOST
+PGPORT
+PGUSER
+PGPASSWORD
+PGDATABASE
+POSTGRES_USER
+POSTGRES_PASSWORD
+Drizzle
+pg Pool
+node-postgres
+connection strings
+Neon
+migraciones
+scripts
+tests
+seeders
+api-server
+workers
+jobs
+
+Para cada consumidor documentar:
+
+Proceso | Archivo | Usuario | Base | Conexión | Propósito | ¿Runtime?
+
+Diferenciar claramente:
+
+- runtime API;
+- migraciones;
+- tests;
+- seed;
+- scripts administrativos;
+- herramientas de desarrollo;
+- procesos internos.
+
+NO exponer contraseñas en el informe.
+
+==================================================
+2. IDENTIDAD REAL DEL USUARIO DB
+==================================================
+
+Verificar mediante consultas de solo lectura:
+
+current_user
+session_user
+current_database()
+current_schema()
+current_setting('app.tenant_id', true)
+
+Y catálogo:
+
+pg_roles
+pg_authid si el entorno permite lectura segura
+pg_database
+
+Determinar:
+
+- usuario actual;
+- si es SUPERUSER;
+- si tiene BYPASSRLS;
+- atributos CREATEDB;
+- CREATEROLE;
+- REPLICATION;
+- INHERIT;
+- membresías;
+- roles heredados.
+
+NO modificar ningún rol.
+
+==================================================
+3. INVENTARIO COMPLETO DE RLS
+==================================================
+
+Auditar todas las tablas del esquema:
+
+deltaops.*
+
+Para cada tabla obtener:
+
+- relrowsecurity;
+- relforcerowsecurity;
+- cantidad de políticas;
+- nombres de políticas;
+- comandos aplicables;
+- USING;
+- WITH CHECK;
+- roles;
+- dependencias.
+
+Crear una matriz:
+
+Tabla | RLS | FORCE RLS | Policies | Tenant predicate | Riesgo
+
+No asumir que "RLS habilitada" significa que el aislamiento funciona.
+
+==================================================
+4. TABLAS SIN RLS
+==================================================
+
+Identificar todas las tablas deltaops.* sin RLS.
+
+Clasificar:
+
+CRÍTICA
+si contiene datos tenant-scoped.
+
+ALTA
+si puede contener información sensible.
+
+MEDIA
+si es configuración o catálogo.
+
+BAJA
+si es global por diseño.
+
+Determinar cuáles deberían tener RLS antes de producción.
+
+NO activar ninguna todavía.
+
+==================================================
+5. TABLAS CON RLS PERO SIN FORCE
+==================================================
+
+Identificar tablas donde:
+
+relrowsecurity = true
+relforcerowsecurity = false
+
+Determinar si:
+
+- el usuario de aplicación podría ser propietario;
+- un owner podría evadir RLS;
+- algún rol heredado podría tener BYPASSRLS;
+- existen operaciones internas que requieren privilegios especiales.
+
+Documentar exactamente el riesgo.
+
+==================================================
+6. MODELO DE TENANT
+==================================================
+
+Auditar cómo se establece:
+
+app.tenant_id
+
+Buscar:
+
+- SET LOCAL;
+- set_config;
+- middleware;
+- transacciones;
+- UoW;
+- repositorios;
+- helpers;
+- session context;
+- consultas directas.
+
+Determinar:
+
+¿Dónde nace tenant_id?
+
+¿Quién lo controla?
+
+¿Puede venir del frontend?
+
+¿Puede ser enviado por el body?
+
+¿Puede ser modificado por un usuario?
+
+¿Se conserva durante toda la transacción?
+
+¿Se pierde en conexiones pooled?
+
+¿Se utiliza correctamente en operaciones offline?
+
+==================================================
+7. AISLAMIENTO ACTUAL
+==================================================
+
+Determinar qué mecanismos existen además de RLS:
+
+- tenant filters;
+- repository guards;
+- application services;
+- middleware;
+- authorization;
+- Identity;
+- entitlements;
+- SQL predicates.
+
+Separar:
+
+AUTORIZACIÓN
+vs
+AISLAMIENTO DE DATOS.
+
+No considerar un filtro frontend como control de seguridad.
+
+==================================================
+8. PRINCIPALES RIESGOS
+==================================================
+
+Buscar escenarios como:
+
+A. API solicita tenant A pero intenta consultar tenant B.
+
+B. Usuario de tenant A modifica tenant B.
+
+C. Query omite tenant predicate.
+
+D. INSERT utiliza tenant enviado por cliente.
+
+E. UPDATE cambia tenant_id.
+
+F. DELETE sin filtro tenant.
+
+G. SQL raw sin contexto tenant.
+
+H. transacción sin app.tenant_id.
+
+I. conexión pooled reutilizando contexto de otra solicitud.
+
+J. worker ejecutando sin contexto.
+
+K. procesos de sincronización cross-module.
+
+L. tareas administrativas que necesitan privilegios elevados.
+
+No explotar destructivamente.
+
+Las pruebas de seguridad de esta fase deben ser SOLO LECTURA.
+
+==================================================
+9. ROL DE APLICACIÓN PROPUESTO
+==================================================
+
+Diseñar, sin implementarlo, un rol:
+
+deltaops_app
+
+o nombre equivalente justificado.
+
+Debe:
+
+- NO ser SUPERUSER;
+- NO tener BYPASSRLS;
+- NO tener CREATEDB;
+- NO tener CREATEROLE;
+- NO tener REPLICATION;
+- tener únicamente los privilegios necesarios;
+- poder utilizar las tablas necesarias;
+- respetar RLS;
+- no poder modificar estructura.
+
+Determinar si conviene:
+
+NOLOGIN role
++
+LOGIN role
+
+o un único login role.
+
+Recomendar la alternativa más segura.
+
+==================================================
+10. OWNER DE LAS TABLAS
+==================================================
+
+Determinar quién es actualmente owner de:
+
+deltaops.*
+
+Analizar si el futuro rol de aplicación será owner.
+
+La recomendación debe evitar que el rol de runtime pueda evadir RLS por ser propietario.
+
+Diseñar una separación:
+
+OWNER / MIGRATION ROLE
+        ↓
+APPLICATION ROLE
+        ↓
+RLS
+
+si resulta viable.
+
+==================================================
+11. MIGRACIONES
+==================================================
+
+Determinar qué usuario ejecuta:
+
+- migraciones;
+- Drizzle;
+- SQL migrations;
+- creación de tablas;
+- índices;
+- RLS;
+- funciones;
+- triggers.
+
+Diseñar separación entre:
+
+DATABASE OWNER / MIGRATION ROLE
+y
+APPLICATION RUNTIME ROLE.
+
+NO implementar todavía.
+
+==================================================
+12. OPERACIONES INTERNAS
+==================================================
+
+Inventariar procesos que podrían requerir privilegios especiales:
+
+- utilización → activos;
+- inventario → costos;
+- sesiones → mano de obra;
+- órdenes;
+- outbox;
+- sincronización;
+- seed;
+- Analytics;
+- tareas administrativas;
+- SUPER_ADMIN.
+
+Para cada uno:
+
+Proceso | ¿Tenant-scoped? | ¿Necesita privilegio elevado? | Alternativa segura
+
+No conceder privilegios todavía.
+
+==================================================
+13. PRINCIPAL DE SERVICIO
+==================================================
+
+Revisar especialmente:
+
+system:utilizacion-sync
+
+y cualquier otro principal de servicio.
+
+Determinar:
+
+- cómo se autentica;
+- qué DB connection utiliza;
+- qué permisos necesita;
+- si necesita bypass de RLS;
+- si puede operar mediante contexto tenant;
+- si requiere una estrategia SECURITY DEFINER.
+
+NO crear SECURITY DEFINER durante Discovery.
+
+Si se propone SECURITY DEFINER:
+
+documentar exactamente:
+
+- función;
+- owner;
+- search_path;
+- argumentos;
+- permisos;
+- riesgos.
+
+==================================================
+14. FORCE ROW LEVEL SECURITY
+==================================================
+
+Determinar qué tablas deberían utilizar:
+
+FORCE ROW LEVEL SECURITY.
+
+No aplicar todavía.
+
+Documentar:
+
+- tablas;
+- motivo;
+- riesgo;
+- impacto esperado.
+
+Especial atención a:
+
+- propietarios;
+- migraciones;
+- seeds;
+- procesos internos.
+
+==================================================
+15. TEST DE CONTENCIÓN
+==================================================
+
+Diseñar una estrategia futura de prueba con:
+
+Tenant A
+Tenant B
+
+Debe demostrar:
+
+A no puede:
+
+SELECT B
+INSERT en B
+UPDATE B
+DELETE B
+
+incluso si el código de aplicación accidentalmente omite filtros.
+
+IMPORTANTE:
+
+Durante este Discovery NO modificar datos.
+
+Diseñar fixtures y estrategia para la futura fase de implementación.
+
+==================================================
+16. POOLED CONNECTIONS
+==================================================
+
+Auditar el uso de:
+
+pg.Pool
+
+Determinar cómo se establece:
+
+SET LOCAL app.tenant_id
+
+y verificar si existe riesgo de contaminación entre solicitudes.
+
+La solución futura debe garantizar:
+
+Request A → tenant A
+Request B → tenant B
+
+sin posibilidad de reutilización accidental del contexto.
+
+==================================================
+17. OFFLINE / SYNC
+==================================================
+
+Auditar endpoints:
+
+/sync
+
+y cualquier mecanismo offline.
+
+Determinar cómo se establece el tenant durante sincronización.
+
+Confirmar que:
+
+tenantId
+identityId
+roles
+
+NO se aceptan ciegamente desde el payload.
+
+Diseñar cómo RLS debe comportarse durante:
+
+- sync;
+- reintentos;
+- concurrencia;
+- operaciones pendientes.
+
+==================================================
+18. OPENAPI Y FRONTEND
+==================================================
+
+Determinar si la transición RLS requiere cambios en:
+
+- OpenAPI;
+- frontend;
+- hooks;
+- contratos.
+
+La expectativa es:
+
+NO debería requerir cambios funcionales en frontend.
+
+Documentar cualquier excepción real.
+
+==================================================
+19. PLAN DE MIGRACIÓN
+==================================================
+
+Diseñar una secuencia segura:
+
+FASE A
+crear rol migration/owner si corresponde.
+
+FASE B
+crear application role.
+
+FASE C
+conceder privilegios mínimos.
+
+FASE D
+completar RLS faltante.
+
+FASE E
+FORCE RLS donde corresponda.
+
+FASE F
+probar tenant A/B.
+
+FASE G
+cambiar runtime a application role.
+
+FASE H
+validar todos los módulos.
+
+FASE I
+retirar privilegios superuser del runtime.
+
+FASE J
+rollback si falla.
+
+Modificar esta secuencia si el análisis demuestra una mejor.
+
+==================================================
+20. ROLLBACK
+==================================================
+
+Diseñar rollback seguro.
+
+Debe contemplar:
+
+- fallo de migración;
+- módulo que deja de funcionar;
+- worker que pierde permisos;
+- RLS que bloquea una operación legítima;
+- pérdida de contexto tenant;
+- problemas de pooling.
+
+NO usar como rollback:
+
+"volver permanentemente a superuser".
+
+El superuser runtime no debe ser el fallback de producción.
+
+==================================================
+21. OBSERVABILIDAD
+==================================================
+
+Determinar qué necesitamos registrar para diagnosticar:
+
+- RLS violation;
+- tenant context missing;
+- permission denied;
+- cross-tenant attempt;
+- worker sin contexto.
+
+No registrar:
+
+- contraseñas;
+- cookies;
+- tokens;
+- secretos.
+
+==================================================
+22. IMPACTO EN PRODUCCIÓN
+==================================================
+
+Evaluar:
+
+- downtime;
+- reinicio API;
+- conexiones existentes;
+- pool;
+- migraciones;
+- Neon;
+- DigitalOcean;
+- backups;
+- rollback.
+
+Proponer estrategia:
+
+staging/dev → validación → producción.
+
+==================================================
+23. CRITERIOS DE ACEPTACIÓN FUTUROS
+==================================================
+
+La implementación posterior solo será PASS si:
+
+✓ runtime NO usa superuser
+✓ runtime NO tiene BYPASSRLS
+✓ tablas tenant-scoped tienen RLS
+✓ políticas tienen USING correcto
+✓ políticas tienen WITH CHECK correcto
+✓ FORCE RLS donde corresponda
+✓ tenant context fail-closed
+✓ pooled connections aisladas
+✓ offline/sync tenant-safe
+✓ workers tenant-safe
+✓ migraciones separadas
+✓ SUPER_ADMIN conserva capacidades legítimas
+✓ ningún tenant cruza datos
+✓ SELECT/INSERT/UPDATE/DELETE cross-tenant bloqueados
+✓ tests PG reales PASS
+✓ API E2E PASS
+✓ DeltaOps completo PASS
+
+==================================================
+24. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+El Discovery debe tener revisión independiente.
+
+La revisión debe contrastar:
+
+- pg_roles;
+- pg_policies;
+- pg_class;
+- owners;
+- conexiones;
+- app.tenant_id;
+- código de UoW;
+- pooling;
+- sync;
+- workers;
+- principales de servicio.
+
+Si una afirmación no tiene evidencia:
+
+FAIL.
+
+Si el diseño requiere asumir una capacidad inexistente:
+
+FAIL.
+
+==================================================
+25. ENTREGABLE
+==================================================
+
+Crear únicamente:
+
+docs/dgp/DGP-023.3-DESCUBRIMIENTO-RLS.md
+
+Debe contener:
+
+1. estado actual;
+2. inventario RLS;
+3. inventario de roles;
+4. owners;
+5. tenant context;
+6. pooling;
+7. workers;
+8. servicios;
+9. riesgos;
+10. diseño de application role;
+11. diseño migration role;
+12. FORCE RLS;
+13. plan de migración;
+14. rollback;
+15. pruebas;
+16. observabilidad;
+17. impacto;
+18. criterios de aceptación.
+
+NO implementar.
+
+NO cambiar DB.
+
+NO cambiar código.
+
+NO iniciar DGP-023.4.
+
+DETENERSE después del Discovery y esperar aprobación explícita de Dirección.
