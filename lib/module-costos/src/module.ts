@@ -277,6 +277,13 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
         // sin un movimiento real. La única vía manual queda en `materializar-otros`
         // (tipo OTROS). Justificación documentada: DGP-021.2 §D5 (extensión de la
         // MISMA serie 021.x, no de un contrato congelado ajeno).
+        //
+        // R2 · DEFENSA EN PROFUNDIDAD: NO hay ruta HTTP para este comando (se
+        // eliminó `POST /hechos/material`). Además, el handler EXIGE el marcador
+        // interno `metadata.origenOrquestacion=true`, que SÓLO fija el contexto de
+        // servicio de la orquestación (`contextForCostosOrquestacion`). Un contexto
+        // derivado de una sesión HTTP jamás lo trae ⇒ aunque un principal tuviera el
+        // permiso `materializar`, no puede invocar MATERIAL fuera de la orquestación.
         inputSchema: z.object({
           opId: opIdSchema,
           costoId: z.string().uuid().optional(),
@@ -296,6 +303,16 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
         authorization: { permissions: [P_MATERIALIZAR] },
         async handle(ctx, input, uow) {
           const comando = `${MODULO}.hecho.materializar-material`;
+          // R2 · ANTI-BYPASS: MATERIAL sólo desde la ORQUESTACIÓN de servicio. El
+          // marcador interno lo fija exclusivamente `contextForCostosOrquestacion`
+          // (nunca un contexto de sesión HTTP). Fail-closed ⇒ 403.
+          if (ctx.metadata["origenOrquestacion"] !== true) {
+            return fail(
+              KernelErrors.forbidden(
+                "MATERIAL sólo se materializa vía la orquestación inventario→costos (movimiento físico confirmado); no hay vía HTTP directa (§20 anti-bypass)",
+              ),
+            );
+          }
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
           const r0 = await reclamar(adapters, ctx, uow, tenant.value, comando, input.opId);

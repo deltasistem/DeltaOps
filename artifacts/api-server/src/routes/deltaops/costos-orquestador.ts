@@ -38,7 +38,7 @@
  */
 import { pool } from "@workspace/db";
 import { RE_DINERO } from "@workspace/module-costos";
-import { costosRuntime, contextForCostos } from "./costos-runtime";
+import { costosRuntime, contextForCostosOrquestacion } from "./costos-runtime";
 import { inventarioRuntime, contextForInventario } from "./inventario-runtime";
 import { DELTAOPS_TENANT } from "./reference-runtime";
 
@@ -313,7 +313,10 @@ async function materializarMovimiento(
   }
   const moneda = monedaRes.moneda;
 
-  const ctx = contextForCostos(ACTOR_SERVICIO, ROL_MATERIALIZADOR, tenantId);
+  // Contexto de SERVICIO con el marcador `origenOrquestacion` (anti-bypass §20):
+  // el comando `hecho.materializar-material` lo EXIGE, así que MATERIAL sólo se
+  // materializa por esta vía tras un movimiento físico confirmado.
+  const ctx = contextForCostosOrquestacion(ACTOR_SERVICIO, ROL_MATERIALIZADOR, tenantId);
   const r = await costosRuntime().platform.kernel.commands.execute(ctx, "modulo.costos.hecho.materializar-material", {
     opId,
     otId: mov.otId,

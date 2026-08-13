@@ -106,4 +106,43 @@ suite("DGP-021.2 · RBAC reprocesar pendientes (HTTP real)", () => {
     const res = await fetch(`${baseUrl}/api/deltaops/costos/pendientes/reprocesar`, { method: "POST" });
     expect(res.status).toBe(401);
   });
+
+  it("DGP-021.2 (R2) · ANTI-BYPASS: un SUPERVISOR NO puede crear MATERIAL por HTTP (ruta inexistente ⇒ 404)", async () => {
+    // El SUPERVISOR tiene permiso de materialización, pero la ruta pública de
+    // MATERIAL fue ELIMINADA: no puede fabricar un CARGO/ABONO inventando la
+    // procedencia. La única vía es la orquestación tras un movimiento confirmado.
+    sesionActual = { deltaopsUserId: idSupervisor, rolCanonico: "SUPERVISOR" };
+    const forjado = {
+      opId: `forjado-${RUN}`, otId: "ot-inventada", articuloId: "art-inventado",
+      movimientoId: "mov-inventado", familia: "consumo", cantidad: "1.000000", unidad: "UN", moneda: "COP",
+    };
+    const res = await fetch(`${baseUrl}/api/deltaops/costos/hechos/material`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(forjado),
+    });
+    // Express no registra POST /hechos/material ⇒ 404 (405 sería si existiera con
+    // otro método; aquí no existe en absoluto).
+    expect(res.status).toBe(404);
+    // Y tampoco existe la variante ABONO forjada (misma ruta, familia=devolucion).
+    const resAbono = await fetch(`${baseUrl}/api/deltaops/costos/hechos/material`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...forjado, opId: `forjado-abono-${RUN}`, familia: "devolucion" }),
+    });
+    expect(resAbono.status).toBe(404);
+  });
+
+  it("DGP-021.2 (R1/R2) · el filtro ?naturaleza se reenvía por HTTP en GET /hechos", async () => {
+    sesionActual = { deltaopsUserId: idSupervisor, rolCanonico: "SUPERVISOR" };
+    // El filtro documentado debe funcionar: 200 con la colección (vacía para este
+    // tenant nuevo, pero SIEMPRE presente). Prueba que la ruta reenvía naturaleza.
+    for (const nat of ["CARGO", "ABONO"]) {
+      const res = await fetch(`${baseUrl}/api/deltaops/costos/hechos?naturaleza=${nat}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { hechos?: unknown[] };
+      expect(Array.isArray(body.hechos)).toBe(true);
+    }
+    // Un valor inválido de naturaleza ⇒ 400 (zod enum en el comando), evidencia de
+    // que el parámetro llega al kernel y no se ignora.
+    const bad = await fetch(`${baseUrl}/api/deltaops/costos/hechos?naturaleza=NETO`);
+    expect(bad.status).toBe(400);
+  });
 });

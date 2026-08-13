@@ -99,6 +99,8 @@ router.get(`${BASE}/hechos`, async (req, res) => {
     movimientoId: strQuery(req.query.movimientoId),
     articuloId: strQuery(req.query.articuloId),
     tipo: strQuery(req.query.tipo),
+    // DGP-021.2 (R1) · filtro CARGO/ABONO: distingue costo de crédito (devolución).
+    naturaleza: strQuery(req.query.naturaleza),
     moneda: strQuery(req.query.moneda),
     estado: strQuery(req.query.estado),
   }));
@@ -166,12 +168,20 @@ router.get(`${BASE}/hechos/:costoId`, async (req, res) => {
 
 /* ============================== COMANDOS ================================= */
 
-// Materializar hecho de MATERIAL (costo exacto de Abastecimiento; activo derivado de la OT).
-router.post(`${BASE}/hechos/material`, async (req, res) => {
-  const r = await exec(ctxOf(res), `${MODULO}.hecho.materializar-material`, req.body);
-  await drain();
-  send(res, r);
-});
+// DGP-021.2 (R2) · ANTI-BYPASS (§20): NO existe ruta HTTP para materializar
+// MATERIAL. La ÚNICA vía canónica es la ORQUESTACIÓN del api-server tras un
+// movimiento físico CONFIRMADO en Inventario (`orquestarDesdeMover`): TODA la
+// procedencia (artículo, cantidad, unidad, familia, referencia OT) se DERIVA del
+// snapshot del movimiento leído del servidor — NUNCA de un cuerpo HTTP. Un
+// llamante HTTP no puede fabricar un CARGO/ABONO inventando movimientoId/familia.
+// La RECUPERACIÓN administrativa es `POST /pendientes/reprocesar` (arriba), que
+// relee el movimiento contra Inventario y reintenta idempotentemente (opId
+// determinista `inv:<movimientoId>`). El comando de kernel
+// `hecho.materializar-material` sigue existiendo SÓLO para la orquestación de
+// servicio y, en defensa en profundidad, EXIGE el marcador interno de origen
+// (`metadata.origenOrquestacion`) que sólo el principal de SERVICIO fija.
+// Decisión documentada en DGP-021.2-auditoria-inventario.md §D5 y en OpenAPI (la
+// operación `costos.hecho.materializar-material` NO se publica como ruta HTTP).
 
 // Materializar hecho de OTROS (costo manual; autorizante = identidad de sesión).
 router.post(`${BASE}/hechos/otros`, async (req, res) => {

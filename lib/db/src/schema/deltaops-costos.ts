@@ -3,6 +3,7 @@
  * Migraciones oficiales (fuente de verdad; incluyen RLS, checks e índices):
  *   - lib/db/migrations/deltaops/0044_costos_module.sql       (fundación)
  *   - lib/db/migrations/deltaops/0045_costos_inventario.sql   (integración inventario)
+ *   - lib/db/migrations/deltaops/0046_costos_naturaleza.sql   (naturaleza CARGO/ABONO, R1)
  * Este espejo existe para tooling/typecheck. drizzle-kit push NO detecta tablas
  * nuevas: el .sql se aplica con psql (fuente de verdad); la RLS la aplica el
  * .sql oficial.
@@ -26,6 +27,10 @@ export const cosHechosTable = deltaops.table(
     // DGP-021.2 · trazabilidad de origen físico (read models por movimiento/artículo).
     movimientoId: text("movimiento_id"),
     articuloId: text("articulo_id"),
+    // DGP-021.2 (R1, 0046) · NATURALEZA económica del ledger inmutable: CARGO
+    // (costo, consumo/salida) | ABONO (crédito compensatorio, devolución). El signo
+    // es semántico; los importes siguen siendo NO negativos.
+    naturaleza: text("naturaleza").notNull().default("CARGO"),
     opId: text("op_id").notNull(),
     estado: text("estado").notNull().default("ACTIVO"),
     cantidad: numeric("cantidad", { precision: 18, scale: 6 }).notNull(),
@@ -52,6 +57,7 @@ export const cosHechosTable = deltaops.table(
     index("idx_cos_hechos_estado_drizzle").on(t.tenantId, t.estado),
     index("idx_cos_hechos_movimiento_drizzle").on(t.tenantId, t.movimientoId),
     index("idx_cos_hechos_articulo_drizzle").on(t.tenantId, t.articuloId),
+    index("idx_cos_hechos_naturaleza_drizzle").on(t.tenantId, t.naturaleza),
   ],
 );
 

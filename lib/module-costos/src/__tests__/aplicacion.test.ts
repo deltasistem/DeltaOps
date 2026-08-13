@@ -33,8 +33,13 @@ function must<T>(r: Result<T, { message: string }>): T {
 
 describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
   let rt: CostosRuntime;
+  // DGP-021.2 (R2) · `materializar-material` es INTERNO (exige el marcador de
+  // orquestación). Estos tests de aplicación simulan el contexto de SERVICIO.
   const ctx = (identityId?: string, p: Principal = admin): ExecutionContext =>
-    createExecutionContext({ principal: p, metadata: identityId ? { tenantId: TENANT, identityId } : { tenantId: TENANT } });
+    createExecutionContext({
+      principal: p,
+      metadata: { tenantId: TENANT, origenOrquestacion: true, ...(identityId ? { identityId } : {}) },
+    });
   const exec = (c: ExecutionContext, name: string, input: unknown) => rt.platform.kernel.commands.execute(c, name, input);
   const query = (c: ExecutionContext, name: string, input: unknown) => rt.platform.kernel.queries.execute(c, name, input);
 

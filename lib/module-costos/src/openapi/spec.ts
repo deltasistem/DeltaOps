@@ -4,15 +4,23 @@
  * workspace) para poder ejecutarse con `node --experimental-strip-types`.
  *
  * Cubre TODAS las superficies HTTP del módulo bajo `/api/deltaops/costos`:
- * materialización de hechos económicos (MATERIAL desde el costo exacto de
- * Abastecimiento DGP-021.0, y OTROS manual autorizado), anulación auditable y
- * consultas (detalle / hechos / por-moneda). El DINERO viaja como CADENA decimal
- * exacta (punto fijo, numeric(18,6)) — nunca number JS.
+ * materialización de hechos económicos OTROS (costo manual autorizado), anulación
+ * auditable y consultas (detalle / hechos / por-moneda). El DINERO viaja como
+ * CADENA decimal exacta (punto fijo, numeric(18,6)) — nunca number JS.
+ *
+ * DGP-021.2 (R2) · ANTI-BYPASS (§20): el comando `hecho.materializar-material` NO
+ * se publica como ruta HTTP. La ÚNICA vía de MATERIAL es la ORQUESTACIÓN interna
+ * del api-server tras un movimiento físico confirmado (toda la procedencia se
+ * DERIVA del snapshot del movimiento, nunca de un body). La recuperación es
+ * `POST /pendientes/reprocesar`. Por eso el esquema `MaterializarMaterial` queda
+ * documentado como CONTRATO INTERNO de la orquestación (no como requestBody de
+ * ninguna operación HTTP). Ver DGP-021.2-auditoria-inventario.md §D5.
  *
  * Errores kernel→HTTP: AUTH→403, NF→404, CFL→409, VAL→400, INF→500.
  *
  * El test `openapi.test.ts` valida que el JSON comprometido está SINCRONIZADO
- * (regenerar == comprometido) y que enumera CADA comando/consulta del módulo.
+ * (regenerar == comprometido) y que enumera cada comando/consulta HTTP-expuesto
+ * (el comando interno `hecho.materializar-material` se excluye explícitamente).
  */
 
 const BASE = "/api/deltaops/costos";
@@ -145,14 +153,10 @@ export function construirOpenApi(): Record<string, unknown> {
   };
 
   // ---- Materialización ----
-  add(`${BASE}/hechos/material`, "post", {
-    tags: ["Materialización"], operationId: "costos.hecho.materializar-material",
-    summary: "Materializa un hecho económico MATERIAL con snapshot del costo exacto (DGP-021.0)",
-    description:
-      "Verifica la OT por contrato público, DERIVA el activo de la relación canónica OT→activo (nunca del frontend) y CONGELA el costo unitario exacto de Abastecimiento. Idempotente por opId. Snapshot inmutable: cambiar el costo origen luego NO altera el hecho.",
-    requestBody: jsonBody(ref("MaterializarMaterial")),
-    responses: { "200": jsonOk(ref("Hecho")), ...errores("400", "401", "403", "404", "409") },
-  });
+  // DGP-021.2 (R2) · ANTI-BYPASS: NO se expone `POST /hechos/material`. MATERIAL
+  // sólo se materializa por la ORQUESTACIÓN interna (movimiento físico confirmado);
+  // la recuperación administrativa es `POST /pendientes/reprocesar`. El esquema
+  // `MaterializarMaterial` se conserva como CONTRATO INTERNO de la orquestación.
   add(`${BASE}/hechos/otros`, "post", {
     tags: ["Materialización"], operationId: "costos.hecho.materializar-otros",
     summary: "Materializa un hecho económico OTROS (costo manual autorizado)",

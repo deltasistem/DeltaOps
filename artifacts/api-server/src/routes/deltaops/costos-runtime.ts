@@ -197,3 +197,20 @@ export function contextForCostos(
   if (identityId) metadata["identityId"] = identityId;
   return createExecutionContext({ principal: principalCostos(userId, rol), metadata });
 }
+
+/**
+ * DGP-021.2 (R2) · Contexto de SERVICIO para la ORQUESTACIÓN inventario→costos.
+ * ANTI-BYPASS/§20 defensa en profundidad: marca `metadata.origenOrquestacion=true`,
+ * el marcador que el comando `hecho.materializar-material` EXIGE. Sólo la
+ * orquestación de servidor (tras leer un movimiento físico confirmado) construye
+ * este contexto; NINGÚN contexto derivado de una sesión HTTP lo fija, de modo que
+ * un llamante HTTP no puede fabricar MATERIAL aunque tuviera el permiso.
+ */
+export function contextForCostosOrquestacion(
+  userId: string,
+  rol: string,
+  tenant: string = DELTAOPS_TENANT,
+): ExecutionContext {
+  const metadata: Record<string, unknown> = { tenantId: tenant, origenOrquestacion: true };
+  return createExecutionContext({ principal: principalCostos(userId, rol), metadata });
+}

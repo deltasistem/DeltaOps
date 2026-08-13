@@ -41,8 +41,17 @@ suite("DGP-021.1 · Costos · PostgreSQL", { timeout: 30_000 }, () => {
   let ordenes: FakeOrdenesPort;
   let costoExacto: FakeCostoExactoPort;
 
+  // DGP-021.2 (R2) · el comando `materializar-material` es INTERNO: exige el
+  // marcador de orquestación. Estos tests simulan el contexto de SERVICIO que fija
+  // `contextForCostosOrquestacion` en el api-server (origenOrquestacion=true).
   const ctx = (tenantId: string, identityId?: string): ExecutionContext =>
-    createExecutionContext({ principal: admin, metadata: identityId ? { tenantId, identityId } : { tenantId } });
+    createExecutionContext({
+      principal: admin,
+      metadata: { tenantId, origenOrquestacion: true, ...(identityId ? { identityId } : {}) },
+    });
+  // Contexto SIN el marcador (equivale a una sesión HTTP): NO debe poder MATERIAL.
+  const ctxHttp = (tenantId: string): ExecutionContext =>
+    createExecutionContext({ principal: admin, metadata: { tenantId } });
   const exec = (c: ExecutionContext, name: string, input: unknown) => rt.platform.kernel.commands.execute(c, name, input);
   const query = (c: ExecutionContext, name: string, input: unknown) => rt.platform.kernel.queries.execute(c, name, input);
   const must = <T>(r: Result<T, { message: string }>): T => {
@@ -86,6 +95,22 @@ suite("DGP-021.1 · Costos · PostgreSQL", { timeout: 30_000 }, () => {
     expect(row["c"]).toBe("3.000000");
     expect(row["u"]).toBe("1234.567890");
     expect(row["tt"]).toBe("3703.703670");
+  });
+
+  it("DGP-021.2 (R2) · ANTI-BYPASS: MATERIAL sin marcador de orquestación ⇒ FORBIDDEN, sin fila", async () => {
+    const op = `bypass-${RUN}`;
+    // Contexto tipo sesión HTTP (sin origenOrquestacion): el permiso lo tiene, pero
+    // el comando es interno ⇒ 403 y NINGÚN hecho persistido.
+    const r = await exec(ctxHttp(T_A), `${MODULO}.hecho.materializar-material`, {
+      opId: op, otId: "ot1", articuloId: "art1", movimientoId: "mov-bypass", cantidad: "1", unidad: "UN", moneda: "COP",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("KRN-AUTH-002");
+    const n = (await pool.query(
+      `SELECT count(*)::int n FROM deltaops.cos_hechos WHERE tenant_id=$1 AND movimiento_id=$2`,
+      [T_A, "mov-bypass"],
+    )).rows[0]["n"];
+    expect(n).toBe(0);
   });
 
   it("doble materialización CONCURRENTE con mismo opId ⇒ un solo hecho (índice único (tenant, op_id))", async () => {
