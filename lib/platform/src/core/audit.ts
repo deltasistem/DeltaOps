@@ -127,15 +127,32 @@ export class PgAuditTrail implements AuditTrailPort {
     filter: { service?: string; subjectId?: string; limit?: number },
   ): Promise<Result<AuditEntry[], KernelError>> {
     try {
-      const res = await this.pool.query(
-        `SELECT * FROM deltaops.platform_audit
-         WHERE tenant_id = $1
-           AND ($2::text IS NULL OR service = $2)
-           AND ($3::text IS NULL OR subject_id = $3)
-         ORDER BY occurred_at DESC
-         LIMIT $4`,
-        [tenantId, filter.service ?? null, filter.subjectId ?? null, filter.limit ?? 100],
-      );
+      // DGP-023.5 (N-5): la lectura del audit trail debe fijar `app.tenant_id`
+      // en una transacción para que la RLS (con FORCE) sea efectiva bajo el rol
+      // de aplicación sin BYPASSRLS. Antes usaba `this.pool.query` directo.
+      const client = await this.pool.connect();
+      let res: import("pg").QueryResult;
+      try {
+        await client.query("BEGIN");
+        await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [
+          tenantId,
+        ]);
+        res = await client.query(
+          `SELECT * FROM deltaops.platform_audit
+           WHERE tenant_id = $1
+             AND ($2::text IS NULL OR service = $2)
+             AND ($3::text IS NULL OR subject_id = $3)
+           ORDER BY occurred_at DESC
+           LIMIT $4`,
+          [tenantId, filter.service ?? null, filter.subjectId ?? null, filter.limit ?? 100],
+        );
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw e;
+      } finally {
+        client.release();
+      }
       return ok(
         res.rows.map((r) => ({
           id: r.id,

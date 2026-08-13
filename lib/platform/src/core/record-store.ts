@@ -4,7 +4,7 @@
  * borrado lógico. Dos adaptadores oficiales: Fake (memoria/offline) y
  * PostgreSQL (deltaops.platform_records, escrituras SIEMPRE vía pgSessionOf(uow)).
  */
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   fail,
   KernelErrors,
@@ -263,15 +263,47 @@ export class PgRecordStore implements RecordStorePort {
     }
   }
 
+  /**
+   * DGP-023.5 (N-5): las LECTURAS del Record Store deben ejecutarse dentro de
+   * una transacción que fije `app.tenant_id`, para que las políticas RLS sean
+   * efectivas bajo un rol de aplicación sin BYPASSRLS y con FORCE ROW LEVEL
+   * SECURITY. Antes se usaba `this.pool.query` directo, que funcionaba sólo por
+   * el bypass del superusuario del runtime previo y devolvería 0 filas con el
+   * rol `deltaops_app`. El filtro `WHERE tenant_id = $1` se mantiene como
+   * defensa en profundidad (redundante con la política).
+   */
+  private async readWithTenant<T>(
+    tenantId: TenantId,
+    fn: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [
+        tenantId,
+      ]);
+      const out = await fn(client);
+      await client.query("COMMIT");
+      return out;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   async findById(
     tenantId: TenantId,
     id: string,
   ): Promise<Result<PlatformRecord | null, KernelError>> {
     try {
-      const res = await this.pool.query<Row>(
-        `SELECT * FROM deltaops.platform_records
-         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
-        [tenantId, id],
+      const res = await this.readWithTenant(tenantId, (client) =>
+        client.query<Row>(
+          `SELECT * FROM deltaops.platform_records
+           WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+          [tenantId, id],
+        ),
       );
       return ok(res.rows[0] ? toRecord(res.rows[0]) : null);
     } catch (err) {
@@ -284,23 +316,25 @@ export class PgRecordStore implements RecordStorePort {
     filter: RecordFilter,
   ): Promise<Result<PlatformRecord[], KernelError>> {
     try {
-      const res = await this.pool.query<Row>(
-        `SELECT * FROM deltaops.platform_records
-         WHERE tenant_id = $1 AND service = $2
-           AND ($3::text IS NULL OR record_type = $3)
-           AND ($4::text IS NULL OR status = $4)
-           AND ($5::boolean OR deleted_at IS NULL)
-         ORDER BY created_at ASC
-         LIMIT $6 OFFSET $7`,
-        [
-          tenantId,
-          filter.service,
-          filter.recordType ?? null,
-          filter.status ?? null,
-          filter.includeDeleted ?? false,
-          filter.limit ?? 100,
-          filter.offset ?? 0,
-        ],
+      const res = await this.readWithTenant(tenantId, (client) =>
+        client.query<Row>(
+          `SELECT * FROM deltaops.platform_records
+           WHERE tenant_id = $1 AND service = $2
+             AND ($3::text IS NULL OR record_type = $3)
+             AND ($4::text IS NULL OR status = $4)
+             AND ($5::boolean OR deleted_at IS NULL)
+           ORDER BY created_at ASC
+           LIMIT $6 OFFSET $7`,
+          [
+            tenantId,
+            filter.service,
+            filter.recordType ?? null,
+            filter.status ?? null,
+            filter.includeDeleted ?? false,
+            filter.limit ?? 100,
+            filter.offset ?? 0,
+          ],
+        ),
       );
       return ok(res.rows.map(toRecord));
     } catch (err) {

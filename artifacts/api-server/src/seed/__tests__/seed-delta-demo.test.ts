@@ -13,7 +13,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import bcrypt from "bcryptjs";
-import { pool, deltaopsUsersTable } from "@workspace/db";
+import { pool, deltaopsUsersTable, type DbPoolClient } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { DELTAOPS_TENANT } from "../../routes/deltaops/reference-runtime";
@@ -26,14 +26,47 @@ const sinDb = !process.env.DATABASE_URL;
  * Cuenta filas de una tabla read model para un tenant EXACTAMENTE como lo hacen
  * los repositorios/consultas del módulo: filtrando por la columna `tenant_id`.
  *
- * Nota de entorno: la conexión de la app usa el rol `postgres` (superusuario),
- * para el que PostgreSQL OMITE las políticas RLS salvo `FORCE ROW LEVEL SECURITY`
- * (aquí `relforcerowsecurity=false`). El aislamiento efectivo entre tenants lo
- * garantiza el filtro por `tenant_id` que aplican las consultas del kernel; esta
- * prueba lo verifica sobre el mismo predicado.
+ * Nota de entorno (DGP-023.5): la RLS es EFECTIVA (FORCE ROW LEVEL SECURITY en
+ * las tablas tenant-scoped) y el rol de test no tiene BYPASSRLS, por lo que toda
+ * LECTURA de verificación debe fijar `app.tenant_id` dentro de una transacción.
+ * `conCtx` encapsula ese patrón; `contarPorTenant` lo usa.
  */
+async function conCtx<T>(
+  tenant: string,
+  fn: (client: DbPoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [tenant]);
+    const out = await fn(client);
+    await client.query("COMMIT");
+    return out;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Lectura tenant-scoped tipada: fija `app.tenant_id` y ejecuta la consulta,
+ * devolviendo siempre `{ rows }` para que la RLS (FORCE) sea efectiva.
+ */
+async function qCtx(
+  tenant: string,
+  sql: string,
+  params: unknown[],
+): Promise<{ rows: Array<Record<string, any>> }> {
+  return conCtx(tenant, (c) =>
+    c.query<Record<string, any>>(sql, params),
+  ) as Promise<{ rows: Array<Record<string, any>> }>;
+}
+
 async function contarPorTenant(tabla: string, tenant: string): Promise<number> {
-  const r = await pool.query(
+  const r = await qCtx(
+    tenant,
     `SELECT count(*)::int AS n FROM deltaops.${tabla} WHERE tenant_id = $1`,
     [tenant],
   );
@@ -142,41 +175,36 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
 
   it("ABASTECIMIENTO · artículos ligados a Inventario, proveedores calificados y OC recibida", async () => {
     // Artículos con inventarioItemId ligado a un item real de Inventario DEMO.
-    const ligados = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.abs_articulos_read
+    const ligados = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.abs_articulos_read
         WHERE tenant_id = $1 AND (datos->>'inventarioItemId') IS NOT NULL`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(ligados.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(9);
 
     // Proveedores calificados (calificación promedio > 0 en el snapshot).
-    const calif = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.abs_proveedores_read
+    const calif = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.abs_proveedores_read
         WHERE tenant_id = $1 AND calificacion_promedio > 0`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(calif.rows[0]?.n ?? 0)).toBe(4);
 
     // Solicitudes en estados variados: al menos una aprobada, una enviada, una borrador.
-    const estados = await pool.query(
-      `SELECT DISTINCT estado FROM deltaops.abs_solicitudes_read WHERE tenant_id = $1 ORDER BY 1`,
-      [DEMO_TENANT],
+    const estados = await qCtx(DEMO_TENANT, `SELECT DISTINCT estado FROM deltaops.abs_solicitudes_read WHERE tenant_id = $1 ORDER BY 1`,
+        [DEMO_TENANT],
     );
     const setEstados = estados.rows.map((x: { estado: string }) => x.estado);
     expect(setEstados).toEqual(expect.arrayContaining(["aprobada", "borrador", "enviada"]));
 
     // Una cotización SELECCIONADA para la solicitud origen-inventario.
-    const sel = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.abs_cotizaciones_read
+    const sel = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.abs_cotizaciones_read
         WHERE tenant_id = $1 AND seleccionada = true`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(sel.rows[0]?.n ?? 0)).toBe(1);
 
     // OC-B llegó a estado "recibida" (recepción parcial + total).
-    const ordenEstados = await pool.query(
-      `SELECT DISTINCT estado FROM deltaops.abs_ordenes_compra_read WHERE tenant_id = $1 ORDER BY 1`,
-      [DEMO_TENANT],
+    const ordenEstados = await qCtx(DEMO_TENANT, `SELECT DISTINCT estado FROM deltaops.abs_ordenes_compra_read WHERE tenant_id = $1 ORDER BY 1`,
+        [DEMO_TENANT],
     );
     const setOc = ordenEstados.rows.map((x: { estado: string }) => x.estado);
     expect(setOc).toEqual(expect.arrayContaining(["enviada", "recibida"]));
@@ -186,12 +214,11 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     // Cada línea materializada tiene su vínculo con movimiento_id NO nulo y estado
     // "aplicada"; la clave_dedup es única (sin duplicados) — idempotente por opId
     // ${recepcionId}:${numeroLineaOC}.
-    const mats = await pool.query(
-      `SELECT count(*)::int AS total,
+    const mats = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS total,
               count(movimiento_id)::int AS con_mov,
               count(DISTINCT clave_dedup)::int AS distintas
          FROM deltaops.abs_recepcion_materializaciones WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const row = mats.rows[0] as { total: number; con_mov: number; distintas: number };
     // 5 líneas ingresables materializadas: 3 del seed de Abastecimiento
@@ -202,29 +229,26 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(Number(row.con_mov)).toBe(5);
     expect(Number(row.distintas)).toBe(Number(row.total)); // dedup: sin duplicados
 
-    const aplicadas = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.abs_recepcion_materializaciones
+    const aplicadas = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.abs_recepcion_materializaciones
         WHERE tenant_id = $1 AND estado = 'aplicada'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(aplicadas.rows[0]?.n ?? 0)).toBe(5);
 
     // Evidencia en Inventario: existen movimientos de entrada cuya referencia es
     // una recepción del módulo Abastecimiento (enlace real, no duplicado por opId).
     // 3 del seed de Abastecimiento + 2 de la cadena Inventario→Costos (DGP-021.2).
-    const movs = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.inv_movimientos_read
+    const movs = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.inv_movimientos_read
         WHERE tenant_id = $1 AND (datos->'referencia'->>'tipo') = 'recepcion'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(movs.rows[0]?.n ?? 0)).toBe(5);
 
     // Costos del catálogo actualizados (abs_costos_read poblado para los artículos
     // recibidos, en la moneda USD).
-    const costos = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.abs_costos_read
+    const costos = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.abs_costos_read
         WHERE tenant_id = $1 AND moneda = 'USD' AND (costo_unitario)::numeric > 0`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(costos.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(2);
   });
@@ -236,10 +260,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
   });
 
   it("ÓRDENES · existen las 7 en sus 7 estados del ciclo de vida", async () => {
-    const r = await pool.query(
-      `SELECT DISTINCT datos->>'estado' AS estado FROM deltaops.ord_ordenes_read
+    const r = await qCtx(DEMO_TENANT, `SELECT DISTINCT datos->>'estado' AS estado FROM deltaops.ord_ordenes_read
         WHERE tenant_id = $1 ORDER BY 1`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const estados = r.rows.map((x: { estado: string }) => x.estado);
     expect(estados).toEqual([
@@ -257,19 +280,17 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     const planes = await contarPorTenant("pln_planes_read", DEMO_TENANT);
     expect(planes).toBe(8);
 
-    const estados = await pool.query(
-      `SELECT estado, count(*)::int AS n FROM deltaops.pln_planes_read
+    const estados = await qCtx(DEMO_TENANT, `SELECT estado, count(*)::int AS n FROM deltaops.pln_planes_read
         WHERE tenant_id = $1 GROUP BY estado ORDER BY estado`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const porEstado = Object.fromEntries(estados.rows.map((x: { estado: string; n: number }) => [x.estado, Number(x.n)]));
     expect(porEstado["vigente"]).toBe(7);
     expect(porEstado["suspendido"]).toBe(1);
 
     // Cobertura de tipos del mandato (preventivo/predictivo/inspeccion/legal).
-    const tipos = await pool.query(
-      `SELECT DISTINCT tipo_plan FROM deltaops.pln_planes_read WHERE tenant_id = $1 ORDER BY 1`,
-      [DEMO_TENANT],
+    const tipos = await qCtx(DEMO_TENANT, `SELECT DISTINCT tipo_plan FROM deltaops.pln_planes_read WHERE tenant_id = $1 ORDER BY 1`,
+        [DEMO_TENANT],
     );
     const setTipos = tipos.rows.map((x: { tipo_plan: string }) => x.tipo_plan);
     expect(setTipos).toEqual(expect.arrayContaining(["inspeccion", "legal", "predictivo", "preventivo"]));
@@ -281,28 +302,25 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
 
   it("GENERACIÓN · las generaciones tienen claveDedup ÚNICA (sin duplicados) y materializan OT preventivas", async () => {
     const total = await contarPorTenant("pln_generaciones_read", DEMO_TENANT);
-    const distintas = await pool.query(
-      `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.pln_generaciones_read WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+    const distintas = await qCtx(DEMO_TENANT, `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.pln_generaciones_read WHERE tenant_id = $1`,
+        [DEMO_TENANT],
     );
     expect(total).toBe(7);
     expect(Number(distintas.rows[0]?.n ?? 0)).toBe(total); // dedup: sin duplicados
 
     // Evidencia funcional: se crearon OT de tipo preventiva por la orquestación.
     // 7 desde el motor de Planes + 4 desde el módulo Preventivo (seedPreventivo).
-    const ot = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.ord_ordenes WHERE tenant_id = $1 AND tipo = 'preventiva'`,
-      [DEMO_TENANT],
+    const ot = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.ord_ordenes WHERE tenant_id = $1 AND tipo = 'preventiva'`,
+        [DEMO_TENANT],
     );
     expect(Number(ot.rows[0]?.n ?? 0)).toBe(11);
 
     // VÍNCULO persistido: las 7 generaciones quedan MATERIALIZADAS con su OT
     // enlazada (orden_trabajo_id NO nulo + estado=materializada en el snapshot).
-    const vinculadas = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.pln_generaciones_read
+    const vinculadas = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.pln_generaciones_read
         WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL
           AND datos->>'estado' = 'materializada'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(vinculadas.rows[0]?.n ?? 0)).toBe(7);
   });
@@ -317,17 +335,15 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(programas).toBe(3);
 
     // Todos los programas quedan PUBLICADOS (crear→enviarRevision→publicar).
-    const estados = await pool.query(
-      `SELECT DISTINCT estado FROM deltaops.prv_programas_read WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+    const estados = await qCtx(DEMO_TENANT, `SELECT DISTINCT estado FROM deltaops.prv_programas_read WHERE tenant_id = $1`,
+        [DEMO_TENANT],
     );
     expect(estados.rows.map((x: { estado: string }) => x.estado)).toEqual(["publicado"]);
 
     // Jerarquía padre→hijo: al menos un programa referencia a otro como padre.
-    const conPadre = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.prv_programas_read
+    const conPadre = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.prv_programas_read
         WHERE tenant_id = $1 AND (datos->>'padreId') IS NOT NULL`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(conPadre.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(1);
 
@@ -335,10 +351,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     // actividad con dependencias no vacías.
     const actividades = await contarPorTenant("prv_actividades_read", DEMO_TENANT);
     expect(actividades).toBe(8);
-    const conDeps = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.prv_actividades_read
+    const conDeps = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.prv_actividades_read
         WHERE tenant_id = $1 AND jsonb_array_length(COALESCE(datos->'dependencias','[]'::jsonb)) > 0`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(conDeps.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(3);
   });
@@ -348,34 +363,30 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(total).toBe(4);
 
     // claveDedup ÚNICA (sin duplicados) — idempotencia end-to-end.
-    const distintas = await pool.query(
-      `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.prv_generaciones_read WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+    const distintas = await qCtx(DEMO_TENANT, `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.prv_generaciones_read WHERE tenant_id = $1`,
+        [DEMO_TENANT],
     );
     expect(Number(distintas.rows[0]?.n ?? 0)).toBe(total);
 
     // Todas MATERIALIZADAS con su OT enlazada (orden_trabajo_id NO nulo).
-    const vinculadas = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.prv_generaciones_read
+    const vinculadas = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.prv_generaciones_read
         WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL AND estado = 'materializada'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(vinculadas.rows[0]?.n ?? 0)).toBe(4);
 
     // El vínculo apunta a OT REALES de tipo preventiva en el módulo de Órdenes.
-    const otReales = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.prv_generaciones_read g
+    const otReales = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.prv_generaciones_read g
          JOIN deltaops.ord_ordenes o ON o.id = g.orden_trabajo_id AND o.tenant_id = g.tenant_id
         WHERE g.tenant_id = $1 AND o.tipo = 'preventiva'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(otReales.rows[0]?.n ?? 0)).toBe(4);
 
     // Sin OT duplicadas: cada generación materializada enlaza una OT distinta.
-    const otDistintas = await pool.query(
-      `SELECT count(DISTINCT orden_trabajo_id)::int AS n FROM deltaops.prv_generaciones_read
+    const otDistintas = await qCtx(DEMO_TENANT, `SELECT count(DISTINCT orden_trabajo_id)::int AS n FROM deltaops.prv_generaciones_read
         WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(otDistintas.rows[0]?.n ?? 0)).toBe(4);
   });
@@ -384,9 +395,8 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     const total = await contarPorTenant("prv_programaciones_read", DEMO_TENANT);
     expect(total).toBe(3);
 
-    const tipos = await pool.query(
-      `SELECT DISTINCT tipo FROM deltaops.prv_programaciones_read WHERE tenant_id = $1 ORDER BY 1`,
-      [DEMO_TENANT],
+    const tipos = await qCtx(DEMO_TENANT, `SELECT DISTINCT tipo FROM deltaops.prv_programaciones_read WHERE tenant_id = $1 ORDER BY 1`,
+        [DEMO_TENANT],
     );
     const setTipos = tipos.rows.map((x: { tipo: string }) => x.tipo);
     expect(setTipos).toEqual(expect.arrayContaining(["exclusion", "reprogramacion", "suspension"]));
@@ -399,10 +409,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
   });
 
   it("CORRECTIVO · 4 solicitudes en estados variados (triage/diagnóstico/2×aprobada) por origen", async () => {
-    const estados = await pool.query(
-      `SELECT estado, count(*)::int AS n FROM deltaops.cor_solicitudes_read
+    const estados = await qCtx(DEMO_TENANT, `SELECT estado, count(*)::int AS n FROM deltaops.cor_solicitudes_read
         WHERE tenant_id = $1 GROUP BY estado ORDER BY estado`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const porEstado = Object.fromEntries(estados.rows.map((x: { estado: string; n: number }) => [x.estado, Number(x.n)]));
     expect(porEstado["triage"]).toBe(1);
@@ -410,30 +419,27 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(porEstado["aprobada"]).toBe(2);
 
     // Orígenes variados (operador/producción/SST/calidad) sobre activos reales.
-    const origenes = await pool.query(
-      `SELECT DISTINCT origen FROM deltaops.cor_solicitudes_read WHERE tenant_id = $1 ORDER BY 1`,
-      [DEMO_TENANT],
+    const origenes = await qCtx(DEMO_TENANT, `SELECT DISTINCT origen FROM deltaops.cor_solicitudes_read WHERE tenant_id = $1 ORDER BY 1`,
+        [DEMO_TENANT],
     );
     const setOrigenes = origenes.rows.map((x: { origen: string }) => x.origen);
     expect(setOrigenes).toEqual(expect.arrayContaining(["calidad", "operador", "produccion", "sst"]));
 
     // Las solicitudes apuntan a activos REALES del DEMO (activo_id no nulo y existe).
-    const activosReales = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.cor_solicitudes_read s
+    const activosReales = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.cor_solicitudes_read s
          JOIN deltaops.act_activos_read a ON a.id = s.activo_id AND a.tenant_id = s.tenant_id
         WHERE s.tenant_id = $1`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(activosReales.rows[0]?.n ?? 0)).toBe(4);
   });
 
   it("CORRECTIVO · 2 diagnósticos anclados a Dynamic Forms con causa raíz", async () => {
-    const diag = await pool.query(
-      `SELECT count(*)::int AS total,
+    const diag = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS total,
               count(causa_raiz)::int AS con_raiz,
               count(DISTINCT plantilla_id)::int AS plantillas
          FROM deltaops.cor_diagnosticos_read WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const row = diag.rows[0] as { total: number; con_raiz: number; plantillas: number };
     expect(Number(row.total)).toBe(2);
@@ -447,53 +453,47 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(total).toBe(2);
 
     // claveDedup ÚNICA por generación (anti-duplicado determinista).
-    const dedup = await pool.query(
-      `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.cor_generaciones_read WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+    const dedup = await qCtx(DEMO_TENANT, `SELECT count(DISTINCT clave_dedup)::int AS n FROM deltaops.cor_generaciones_read WHERE tenant_id = $1`,
+        [DEMO_TENANT],
     );
     expect(Number(dedup.rows[0]?.n ?? 0)).toBe(total);
 
     // Cada generación enlaza una OT REAL de tipo "correctiva" en el módulo Órdenes.
-    const otReales = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.cor_generaciones_read g
+    const otReales = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.cor_generaciones_read g
          JOIN deltaops.ord_ordenes o ON o.id = g.orden_trabajo_id AND o.tenant_id = g.tenant_id
         WHERE g.tenant_id = $1 AND o.tipo = 'correctiva'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(otReales.rows[0]?.n ?? 0)).toBe(2);
 
     // OT distintas (sin duplicar): cada generación materializada enlaza una OT única.
-    const otDistintas = await pool.query(
-      `SELECT count(DISTINCT orden_trabajo_id)::int AS n FROM deltaops.cor_generaciones_read
+    const otDistintas = await qCtx(DEMO_TENANT, `SELECT count(DISTINCT orden_trabajo_id)::int AS n FROM deltaops.cor_generaciones_read
         WHERE tenant_id = $1 AND orden_trabajo_id IS NOT NULL`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(otDistintas.rows[0]?.n ?? 0)).toBe(2);
   });
 
   it("CORRECTIVO · 1 intervención MAYOR (multi-cuadrilla) con consumo y devolución de repuestos", async () => {
-    const interv = await pool.query(
-      `SELECT count(*)::int AS total, count(*) FILTER (WHERE mayor)::int AS mayores
+    const interv = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS total, count(*) FILTER (WHERE mayor)::int AS mayores
          FROM deltaops.cor_intervenciones_read WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const row = interv.rows[0] as { total: number; mayores: number };
     expect(Number(row.total)).toBe(1);
     expect(Number(row.mayores)).toBe(1); // 2 cuadrillas ⇒ Correctivo Mayor
 
     // Hechos de repuestos: reserva + consumo (parcial) + devolución + compra.
-    const tipos = await pool.query(
-      `SELECT DISTINCT tipo FROM deltaops.cor_consumos_read WHERE tenant_id = $1 ORDER BY 1`,
-      [DEMO_TENANT],
+    const tipos = await qCtx(DEMO_TENANT, `SELECT DISTINCT tipo FROM deltaops.cor_consumos_read WHERE tenant_id = $1 ORDER BY 1`,
+        [DEMO_TENANT],
     );
     const setTipos = tipos.rows.map((x: { tipo: string }) => x.tipo);
     expect(setTipos).toEqual(expect.arrayContaining(["compra", "consumo", "devolucion", "reserva"]));
 
     // Evidencia REAL en Inventario: existe un movimiento de consumo referido a una OT.
-    const movsConsumo = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.inv_movimientos_read
+    const movsConsumo = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.inv_movimientos_read
         WHERE tenant_id = $1 AND tipo = 'consumo'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(movsConsumo.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(1);
   });
@@ -502,11 +502,10 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     // La auto-solicitud de Correctivo nace con origen tipo "orden" y
     // referenciaTipo "orden-correctiva" (la distingue de la solicitud de
     // Abastecimiento con referencia "orden-trabajo").
-    const compra = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.abs_solicitudes_read
+    const compra = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.abs_solicitudes_read
         WHERE tenant_id = $1 AND origen_tipo = 'orden'
           AND (datos->'origen'->>'referenciaTipo') = 'orden-correctiva'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(compra.rows[0]?.n ?? 0)).toBe(1);
   });
@@ -517,10 +516,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
 
     // Cobertura de tipos de evento del historial de fallas (los canónicos con
     // `tipo` proyectado; las reincidencias generan filas-marcador aparte).
-    const tipos = await pool.query(
-      `SELECT DISTINCT tipo FROM deltaops.cor_eventos_activo_read
+    const tipos = await qCtx(DEMO_TENANT, `SELECT DISTINCT tipo FROM deltaops.cor_eventos_activo_read
         WHERE tenant_id = $1 AND tipo <> '' ORDER BY 1`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const setTipos = tipos.rows.map((x: { tipo: string }) => x.tipo);
     expect(setTipos).toEqual(expect.arrayContaining([
@@ -528,10 +526,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     ]));
 
     // Al menos una REINCIDENCIA detectada (2 fallas del mismo modo en MON-001 dentro de ventana).
-    const reincidentes = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.cor_eventos_activo_read
+    const reincidentes = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.cor_eventos_activo_read
         WHERE tenant_id = $1 AND reincidente = true`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(reincidentes.rows[0]?.n ?? 0)).toBeGreaterThanOrEqual(1);
   });
@@ -550,10 +547,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
 
     // DGP-021.4 · IDENTIDAD del nuevo indicador de costos (no sólo el conteo):
     // clave/categoría/fuente {modulo:'costos',dataset:'indicadores'} y expresión conteo.
-    const costo = await pool.query(
-      `SELECT datos FROM deltaops.an_definiciones_read
+    const costo = await qCtx(DEMO_TENANT, `SELECT datos FROM deltaops.an_definiciones_read
         WHERE tenant_id = $1 AND (datos->>'clave') = 'cobertura-indicadores-costo'`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(costo.rows.length).toBe(1);
     const def = costo.rows[0]?.datos as {
@@ -576,19 +572,17 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(dashboards).toBe(9);
 
     // El dashboard personalizado del usuario demo existe y NO es del sistema.
-    const propio = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.an_dashboards_read
+    const propio = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.an_dashboards_read
         WHERE tenant_id = $1 AND (datos->>'delSistema')::boolean = false
           AND (datos->>'propietarioId') IS NOT NULL`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(propio.rows[0]?.n ?? 0)).toBe(1);
 
     // Los payloads proyectados incluyen `descripcion` (DGP-016 etapa 3).
-    const conDesc = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.an_definiciones_read
+    const conDesc = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.an_definiciones_read
         WHERE tenant_id = $1 AND (datos->>'descripcion') IS NOT NULL AND (datos->>'descripcion') <> ''`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     expect(Number(conDesc.rows[0]?.n ?? 0)).toBe(31);
   });
@@ -598,10 +592,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(total).toBe(9); // 9 snapshots representativos materializados (incl. actividad-timeline).
 
     // Valores materializados por clave del indicador objetivo.
-    const rows = await pool.query(
-      `SELECT datos->>'targetClave' AS clave, (datos->>'valor')::numeric AS valor
+    const rows = await qCtx(DEMO_TENANT, `SELECT datos->>'targetClave' AS clave, (datos->>'valor')::numeric AS valor
          FROM deltaops.an_snapshots_read WHERE tenant_id = $1`,
-      [DEMO_TENANT],
+        [DEMO_TENANT],
     );
     const porClave = Object.fromEntries(
       rows.rows.map((r: { clave: string; valor: string }) => [r.clave, Number(r.valor)]),
@@ -638,11 +631,10 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
 
     // Ningún activo del DEMO pertenece al tenant `deltaops` (y viceversa): la
     // intersección por `tenant_id` es vacía.
-    const cruce = await pool.query(
-      `SELECT count(*)::int AS n FROM deltaops.act_activos_read
+    const cruce = await qCtx(DEMO_TENANT, `SELECT count(*)::int AS n FROM deltaops.act_activos_read
         WHERE tenant_id = $1 AND id IN (
           SELECT id FROM deltaops.act_activos_read WHERE tenant_id = $2)`,
-      [DEMO_TENANT, DELTAOPS_TENANT],
+        [DEMO_TENANT, DELTAOPS_TENANT],
     );
     expect(Number(cruce.rows[0]?.n ?? 0)).toBe(0);
 

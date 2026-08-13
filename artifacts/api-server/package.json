@@ -7,10 +7,10 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "seed:demo": "tsx ./src/seed/seed-delta-demo.ts",
+    "seed:demo": "DELTAOPS_DB_ROLE=owner tsx ./src/seed/seed-delta-demo.ts",
     "m365:graph:smoke": "tsx ./scripts/m365-graph-smoke.ts",
     "openapi:identity": "tsx ./scripts/generar-openapi-identity.ts",
-    "test": "vitest run",
+    "test": "DELTAOPS_DB_ROLE=owner vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

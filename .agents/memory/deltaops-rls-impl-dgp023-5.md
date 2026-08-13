@@ -1,35 +1,40 @@
 ---
-name: Implementación RLS DGP-023.5 (parcial)
-description: N-1/N-2 corregidos y smoke test PostgreSQL PASS; separación de roles DETENIDA por almacenamiento seguro de credenciales.
+name: Implementación RLS DGP-023.5 (COMPLETADA)
+description: N-1/N-2/N-5 corregidos; separación de roles PostgreSQL + FORCE RLS efectiva; aislamiento A/B validado como deltaops_app.
 ---
 
-# Implementación RLS (DGP-023.5) — estado durable
+# Implementación RLS (DGP-023.5) — estado durable: PASS
 
 Doc: `docs/dgp/DGP-023.5-CIERRE-RLS-POSTGRES.md`. Tag rollback: `pre-dgp-023.5`.
 
-- **FASES 0–3 PASS; FASES 4–13 DETENIDAS (STOP).** No es PASS de DGP-023.5.
-- **N-1 corregido:** `listarTenants` ya no depende de bypass. Migración
-  `0050_tenants_super_admin_secdef.sql` crea `deltaops.tenants_para_super_admin()`
-  (SECURITY DEFINER, owner previsto `deltaops_owner`, search_path fijo, sin params, solo SELECT).
-  `service.ts::listarTenants` la invoca. Autorización SUPER_ADMIN sigue en HTTP (`requireSuperAdmin`).
-- **N-2 corregido:** `valoracionAResultado(v, tenantId)` inyecta tenant server-side en el payload
-  (los 2 emisores + todos los usos). `insertOutbox`/`bury` persisten `tenant_id` desde
-  `payload->>'tenantId'` (helper `tenantIdDe`). Migración aditiva `0049_kernel_outbox_tenant.sql`
-  (ADD COLUMN tenant_id en kernel_outbox/kernel_dead_letter + índice parcial) aplicada con psql.
-  Los 163 eventos históricos quedan con tenant_id NULL (NO falsificados; backfill exige aprobación).
-- **Validación:** typecheck completo verde; module-manodeobra 42/42; kernel 31/31 (flakiness de
-  contención PG en primera corrida → verde en reintento serie). Nuevos eventos persisten tenant_id.
-- **HALLAZGO CRÍTICO de diseño (smoke test):** FORCE RLS somete TAMBIÉN al owner ⇒ una función
-  SECURITY DEFINER cross-tenant SOLO funciona si su tabla está en RLS ENABLE (no FORCE). Por eso
-  `ten_tenants` DEBE quedar EXCLUIDA de FORCE en FASE 10. Además, el owner de la función necesita
-  USAGE del esquema (automático cuando `deltaops_owner` sea dueño de `deltaops`).
-- **STOP (por qué):** `DATABASE_URL` y `PG*` son runtime-managed por Replit (no modificables por el
-  mecanismo de secretos). `setEnvVars` guarda vars NO secretas (una connection string con contraseña
-  quedaría legible ⇒ inseguro y prohibido). `requestSecrets` exige que una persona teclee el valor y
-  detiene el turno. ⇒ No hay vía para que el agente GENERE la credencial y la almacene en un secret
-  store real sin exponerla. Capacidad del motor (CREATE ROLE/GRANT/ALTER OWNER/SECDEF/FORCE/LOGIN)
-  está VERIFICADA en FASE 3; persistencia de roles tras reinicio del clúster sigue NO VERIFICADA.
-- **Env recomendado (pendiente de desbloqueo):** conservar admin como DATABASE_ADMIN_URL/rollback;
-  DATABASE_MIGRATION_URL (owner) + DATABASE_RUNTIME_URL (app) como SECRETOS; el pool debe preferir
-  DATABASE_RUNTIME_URL con fallback a DATABASE_URL (cambio aditivo NO aplicado aún).
-- NO se comiteó (working tree listo para revisión del agente principal). NO se inició DGP-023.6.
+- **FASES 0–13 COMPLETADAS. Veredicto PASS.** Único pendiente OPERATIVO: reiniciar el
+  workflow «artifacts/api-server: API Server» (lo hace el agente principal) para que el
+  proceso vivo reconecte como `deltaops_app`. Toda la superficie ya validada por conexión
+  directa como `deltaops_app` + suites PG.
+- **Roles (secretos Replit `DELTAOPS_OWNER_PASSWORD`/`DELTAOPS_APP_PASSWORD`):**
+  `deltaops_owner` (LOGIN, dueño de todo, NO super/bypass), `deltaops_app_rw` (NOLOGIN, DML),
+  `deltaops_app` (LOGIN runtime, mínimo privilegio; hereda de app_rw). Migración
+  `0051_role_separation.sql`.
+- **FORCE RLS:** 166 tablas tenant-scoped (`0052_force_rls.sql`). `ten_tenants` EXCLUIDA
+  (para que la función SD N-1, dueño owner, liste todos los tenants). Las 7 globales sin RLS.
+- **N-1:** `deltaops.tenants_para_super_admin()` SECURITY DEFINER (mig 0050); `service.ts` la usa.
+- **N-2:** `tenantId` server-side en valoración + `tenant_id` en outbox (mig 0049 aditiva).
+- **N-5 (NUEVO, descubierto en FASE 12):** `PgRecordStore.findById/list` y `PgAuditTrail.list`
+  leían con `pool.query` SIN fijar `app.tenant_id` → 0 filas bajo FORCE con rol sin bypass.
+  Corregido envolviendo las lecturas en tx con `set_config`. Archivos:
+  `lib/platform/src/core/record-store.ts`, `lib/platform/src/core/audit.ts`.
+- **Composición de URLs (FASE 7):** `lib/db/src/index.ts` prefiere URL de runtime compuesta
+  desde env (`deltaops_app` + `DELTAOPS_APP_PASSWORD`); si `DELTAOPS_DB_ROLE=owner` usa owner;
+  fallback a `DATABASE_URL`. `drizzle.config.ts` idem para migraciones. Scripts `db:push`,
+  `seed:demo`, `seed:deltaops` exportan `DELTAOPS_DB_ROLE=owner`. Test de api-server corre con
+  `DELTAOPS_DB_ROLE=owner` (owner para truncar; los tests SQL de aislamiento usan deltaops_app).
+- **Seed wipe:** ya NO usa `SET session_replication_role=replica` (requiere superusuario);
+  usa `SET CONSTRAINTS ALL DEFERRED` + borrado topológico por FKs + `set_config` del tenant.
+- **Atributos runtime verificados EN deltaops_app:** super=f, bypassrls=f, createrole=f,
+  createdb=f, replication=f, posee 0 objetos, 166 FORCE, DDL denegado. Aislamiento A/B: cross
+  SELECT/INSERT/UPDATE/DELETE/IDOR bloqueados; sin-contexto/tenant-inexistente = 0 filas.
+- **Regresión:** typecheck+build OK; todas las suites verdes (api-server 220/220). Flakiness
+  conocida en kernel (lease-race) y module-ordenes/sesion.pg (contención outbox compartido):
+  verde al correr en serie/aislado; NO es regresión.
+- ROLLBACK runtime: borrar `DELTAOPS_APP_PASSWORD` → vuelve a DATABASE_URL sin tocar código.
+- NO se comiteó. NO se inició DGP-023.6.

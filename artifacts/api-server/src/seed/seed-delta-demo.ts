@@ -100,18 +100,80 @@ function unwrap<T>(r: Result<T, KernelError>, ctx: string): T {
  * usuario admin (se reafirma idempotentemente en `seedAdmin`). El `kernel_outbox`
  * global se acota por `payload->>'tenantId'`. Sólo actúa sobre la base real.
  */
+/**
+ * DGP-023.5 (FASE 12): calcula un orden de borrado que respeta las FKs entre
+ * las tablas dadas (hijas antes que padres). Las FKs hacia tablas fuera del
+ * conjunto se ignoran (o son diferidas). Ante ciclos, cae al orden alfabético
+ * recibido (las FKs diferibles cubren el resto).
+ */
+async function ordenBorradoTopologico(
+  cliente: import("@workspace/db").DbPoolClient,
+  tablas: string[],
+): Promise<string[]> {
+  const set = new Set(tablas);
+  // dependsOn[hija] = conjunto de padres (tablas referenciadas por FK)
+  const dependsOn = new Map<string, Set<string>>();
+  for (const t of tablas) dependsOn.set(t, new Set());
+  const { rows } = await cliente.query<{ child: string; parent: string }>(
+    `SELECT c.conrelid::regclass::text AS child_full,
+            c.confrelid::regclass::text AS parent_full,
+            split_part(c.conrelid::regclass::text, '.', 2) AS child,
+            split_part(c.confrelid::regclass::text, '.', 2) AS parent
+       FROM pg_constraint c
+       JOIN pg_namespace n ON n.oid = c.connamespace
+      WHERE c.contype = 'f' AND n.nspname = 'deltaops'`,
+  );
+  for (const { child, parent } of rows) {
+    if (child === parent) continue; // autorreferencia: diferida
+    if (set.has(child) && set.has(parent)) {
+      dependsOn.get(child)!.add(parent);
+    }
+  }
+  // Kahn: emitir hijas (sin dependientes pendientes) primero → borrar primero.
+  const resultado: string[] = [];
+  const visitado = new Set<string>();
+  const visitando = new Set<string>();
+  const visit = (t: string): void => {
+    if (visitado.has(t) || visitando.has(t)) return; // ciclo: se ignora arista
+    visitando.add(t);
+    for (const parent of dependsOn.get(t) ?? []) visit(parent);
+    visitando.delete(t);
+    visitado.add(t);
+    resultado.push(t);
+  };
+  // Ordenar de forma que los padres se emitan después → invertimos al final.
+  for (const t of tablas) visit(t);
+  // `resultado` tiene padres al final (post-orden) → borrar en orden inverso:
+  // primero las hijas (que aparecen antes de sus padres en post-orden? no),
+  // post-orden DFS coloca padres antes que hijas cuando hija→padre; queremos
+  // borrar hijas primero, así que invertimos.
+  return resultado.reverse();
+}
+
 async function wipeDeltaDemo(): Promise<void> {
   const cliente = await pool.connect();
   try {
     await cliente.query("begin");
-    await cliente.query("set local session_replication_role = replica");
+    // DGP-023.5 (FASE 12): el rol `deltaops_owner` NO es superusuario, por lo
+    // que NO puede `SET session_replication_role = replica`. En su lugar se
+    // difieren las FKs diferibles y se borra en orden topológico (hijos antes
+    // que padres), derivado de `pg_constraint`, para respetar las FKs no
+    // diferibles sin desactivar triggers de sistema.
+    await cliente.query("set constraints all deferred");
+    // Bajo FORCE RLS el owner queda sujeto a la política: fijar el contexto del
+    // tenant DEMO en la misma tx para que los DELETE alcancen sus filas.
+    await cliente.query("SELECT set_config('app.tenant_id', $1, true)", [DEMO_TENANT]);
     // Todas las tablas del esquema deltaops con columna tenant_id.
     const { rows } = await cliente.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.columns
         WHERE table_schema = 'deltaops' AND column_name = 'tenant_id'
         GROUP BY table_name ORDER BY table_name`,
     );
-    for (const { table_name } of rows) {
+    const ordered = await ordenBorradoTopologico(
+      cliente,
+      rows.map((r) => r.table_name),
+    );
+    for (const table_name of ordered) {
       await cliente.query(`DELETE FROM deltaops.${table_name} WHERE tenant_id = $1`, [DEMO_TENANT]);
     }
     // Outbox/dead-letter globales: acotar por el tenant en el payload.

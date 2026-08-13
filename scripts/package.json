@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
-    "seed:deltaops": "tsx ./src/seed-deltaops.ts",
+    "seed:deltaops": "DELTAOPS_DB_ROLE=owner tsx ./src/seed-deltaops.ts",
     "generate:module": "tsx ./src/generate-deltaops-module.ts",
     "kernel:demo": "tsx ./src/kernel-demo.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

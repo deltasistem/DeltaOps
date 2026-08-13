@@ -53,6 +53,9 @@ afterAll(async () => {
   const c = await pool.connect();
   try {
     await c.query("BEGIN");
+    // DGP-023.5 (FASE 11): bajo FORCE RLS el propio owner queda sujeto a la
+    // política; el borrado por tenant exige fijar el contexto en la misma tx.
+    await c.query("SELECT set_config('app.tenant_id', $1, true)", [TENANT]);
     for (const tbl of ["utl_lecturas", "utl_lecturas_read", "utl_recibos", "utl_eventos", "utl_sync_receipts"]) {
       await c.query(`DELETE FROM deltaops.${tbl} WHERE tenant_id = $1`, [TENANT]).catch(() => undefined);
     }
@@ -99,11 +102,15 @@ describe("API Server · idempotencia de opId bajo concurrencia (PG real)", () =>
     // Cinturón: EXACTAMENTE un hecho persistido para ese tenant+activo+opId.
     const c = await pool.connect();
     try {
+      // DGP-023.5: bajo FORCE RLS, `set_config(...,true)` es transaccional; la
+      // verificación debe leer dentro de la MISMA transacción que fija el tenant.
+      await c.query("BEGIN");
       await c.query("SELECT set_config('app.tenant_id', $1, true)", [TENANT]);
       const res = await c.query(
         `SELECT count(*)::int AS n FROM deltaops.utl_lecturas WHERE tenant_id=$1 AND op_id=$2`,
         [TENANT, opId],
       );
+      await c.query("COMMIT");
       expect(res.rows[0]?.["n"]).toBe(1);
     } finally {
       c.release();
@@ -131,11 +138,13 @@ describe("API Server · idempotencia de opId bajo concurrencia (PG real)", () =>
 
     const c = await pool.connect();
     try {
+      await c.query("BEGIN");
       await c.query("SELECT set_config('app.tenant_id', $1, true)", [TENANT]);
       const res = await c.query(
         `SELECT count(*)::int AS n FROM deltaops.utl_lecturas WHERE tenant_id=$1 AND op_id=$2`,
         [TENANT, opId],
       );
+      await c.query("COMMIT");
       expect(res.rows[0]?.["n"]).toBe(1);
     } finally {
       c.release();
