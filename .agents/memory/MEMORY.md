@@ -45,4 +45,5 @@
 - [Discovery Auth-RLS DGP-023.4](deltaops-auth-rls-discovery-dgp023-4.md) — login sobre tablas sin RLS por diseño + SECURITY DEFINER; motor es Replit Helium (no Neon); N-1 listarTenants y N-2 tenantId en valoraciones exigen código.
 - [Discovery Infra DGP-023.6](deltaops-infra-discovery-dgp023-6.md) — I-03 fallback silencioso a superusuario si falta el secret; CORS wildcard; health gate liveness-only; SESSION_SECRET reutilizado como HMAC.
 - [Discovery Lite LITE-01](deltaops-lite-discovery-01.md) — Lite = core intacto + composición (jamás módulos paralelos); preoperacional reutiliza Dynamic Forms+correctivo; GAPs G1–G7; OPERADOR no existe.
+- [Diseño Lite LITE-02](deltaops-lite-diseno-02.md) — capacidades como capa sobre RBAC (jamás jerarquía rígida); 4 dimensiones independientes del activo; DP-2 y DP-5 requieren decisión de Dirección.
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.
