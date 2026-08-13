@@ -507,13 +507,13 @@ La diferencia piloto↔producción es mayormente **de operabilidad y hardening**
 1. **¿Qué tan terminada está DeltaOps?** Dominio ~90 % (11 módulos maduros, ≈2 014 tests verdes); operabilidad de producción ~55 %.
 2. **Módulos realmente completos:** Referencia, Activos, Inventario, Abastecimiento, Planes, Preventivo, Correctivo, Utilización, Mano de obra, Costos, Analytics (🟢). Órdenes 🟢 con 2 tests PG flaky y deuda de `responsable` texto.
 3. **Módulos con deuda:** Utilización (GAP-FUEL-MONEY), Inventario (GAP-INV-CANT), Mano de obra (GAP-MO-PERIODO), Costos (GAP-FUEL-OT), Centro Operacional (supervisor por texto). Todos funcionales.
-4. **Bloquean piloto:** **`PLATFORM-CONSOLE-ACL` (CRÍTICO) — bloqueante duro hasta corregirse**; además, el pase visual móvil restante (teclado móvil + 768/1280 px; 390 px ya verificado) y limpiar el warning de hidratación `<a>`-en-`<a>` (MENOR).
+4. **Bloquean piloto:** **`PLATFORM-CONSOLE-ACL` (CRÍTICO) — bloqueante duro hasta corregirse**; además, el pase visual móvil restante (teclado móvil + 768/1280 px; 390 px ya verificado). *Trabajo de calidad recomendado pre-piloto (no bloqueante):* limpiar el warning de hidratación `<a>`-en-`<a>` (MENOR).
 5. **Bloquean producción general:** `PLATFORM-CONSOLE-ACL` (CRÍTICO), CORS abierto, rate-limiting ausente, cabeceras de seguridad ausentes, backups/monitoreo no declarados, RLS ausente en tablas de identidad, bundle 1,4 MB.
 6. **Se puede dejar para V2:** GAP-FUEL/INV, offline IndexedDB, tema server-side, paginación por cursor, limpieza de artefactos muertos.
 7. **Qué falta de verdad:** corregir el CRÍTICO `PLATFORM-CONSOLE-ACL`, hardening de producción, experiencia técnica mobile-first + RBAC granular. No faltan módulos de dominio.
 8. **Mínimo trabajo adicional:** **corregir `PLATFORM-CONSOLE-ACL`** (imprescindible para piloto Y producción) + DGP-023 (hardening, mínimo para producción); para piloto, además el pase visual móvil.
 9. **Cuántos DGP adicionales:** **3–4** (023 hardening, 024 RBAC/UX técnico, 025 exactitud financiera, 026 opcional escalabilidad).
-10. **Ruta recomendada:** Piloto controlado ahora → DGP-023 hardening → producción general → DGP-024/025 según feedback del piloto.
+10. **Ruta recomendada:** Aprobación de Dirección + fix mínimo del CRÍTICO `PLATFORM-CONSOLE-ACL` → **verificación negativa de TENANT_ADMIN contra CADA endpoint `/api/deltaops/platform/*`** (confirmar 403) → piloto controlado → DGP-023 hardening → producción general → DGP-024/025 según convenga.
 11. **Riesgos económicos/técnicos:** **fuga cross-tenant `PLATFORM-CONSOLE-ACL` (CRÍTICO, confidencialidad)**; BD única sin backup declarado (alto); ausencia de defensas perimetrales (medio-alto); costeo financiero incompleto de combustible/material (medio).
 12. **¿Detener funcionalidades y pasar a hardening/producción?** → **SÍ.** El producto tiene suficiente dominio; el valor marginal ahora está en madurar, endurecer y pilotar, no en añadir módulos.
 
