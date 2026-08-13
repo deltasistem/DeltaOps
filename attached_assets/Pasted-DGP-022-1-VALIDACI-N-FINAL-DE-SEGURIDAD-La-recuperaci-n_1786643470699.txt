@@ -1,0 +1,367 @@
+DGP-022.1 — VALIDACIÓN FINAL DE SEGURIDAD
+
+La recuperación del commit DGP-022.1 fue completada correctamente.
+
+HEAD actual:
+c820d89
+
+Workspace:
+LIMPIO
+
+El commit recuperado corresponde al fix original:
+9a02dab
+
+Ahora queda AUTORIZADA únicamente la VALIDACIÓN de DGP-022.1.
+
+NO realices nuevos cambios de código salvo que una prueba revele que el fix recuperado está incompleto. Si una prueba falla, DETENTE y reporta el fallo antes de modificar cualquier archivo.
+
+==================================================
+1. PREPARACIÓN
+==================================================
+
+Verifica primero:
+
+git status --short
+git log --oneline -3
+
+Después inicia/reinicia el API Server únicamente si es necesario para ejecutar las pruebas.
+
+NO realices migraciones.
+
+==================================================
+2. INVENTARIO DE ENDPOINTS
+==================================================
+
+Identifica desde el código REAL todos los endpoints bajo:
+
+/api/deltaops/platform/*
+
+Construye una lista exacta:
+
+método | endpoint | autorización esperada
+
+No asumir que son solamente los endpoints conocidos durante DGP-022.
+
+==================================================
+3. VALIDACIÓN DE AUTORIZACIÓN HTTP
+==================================================
+
+Para TODOS los endpoints de plataforma comprobar:
+
+SUPER_ADMIN
+→ acceso PERMITIDO.
+
+TENANT_ADMIN
+→ 403.
+
+SUPERVISOR
+→ 403.
+
+PLANIFICADOR
+→ 403.
+
+TECNICO
+→ 403.
+
+CONSULTA
+→ 403.
+
+ANÓNIMO
+→ 401 o código de autenticación canónico correspondiente.
+
+Las pruebas deben realizarse mediante HTTP directo autenticado.
+
+NO considerar suficiente la protección de la interfaz gráfica.
+
+==================================================
+4. PRUEBA CRÍTICA DEL HALLAZGO ORIGINAL
+==================================================
+
+Reproducir exactamente el escenario que descubrió DGP-022:
+
+Usuario:
+TENANT_ADMIN de delta-demo
+
+Intentar acceder directamente a:
+
+/api/deltaops/platform/*
+
+Resultado obligatorio:
+
+403
+
+No debe recibir:
+
+200
+201
+204
+
+ni ningún payload de datos de plataforma.
+
+==================================================
+5. CROSS-TENANT
+==================================================
+
+Comprobar específicamente que TENANT_ADMIN no pueda obtener mediante API:
+
+- auditoría de otros tenants;
+- storage de otros tenants;
+- usuarios/identidades de otros tenants;
+- agregados de plataforma;
+- información de otros tenants;
+- cualquier información perteneciente al dominio de plataforma.
+
+La prueba debe verificar el status HTTP y, cuando corresponda, que no exista payload sensible.
+
+==================================================
+6. SUPER_ADMIN
+==================================================
+
+Comprobar que SUPER_ADMIN conserva acceso legítimo.
+
+Debe poder:
+
+- acceder a la consola;
+- consumir los endpoints de plataforma;
+- consultar las superficies administrativas existentes.
+
+No modificar ni reducir sus capacidades.
+
+==================================================
+7. FRONTEND
+==================================================
+
+Verificar con navegador real:
+
+SUPER_ADMIN
+→ login
+→ /administracion/saas
+→ acceso permitido.
+
+TENANT_ADMIN
+→ login
+→ intentar /administracion/saas
+→ acceso denegado/redirección según contrato existente.
+
+Importante:
+
+La seguridad debe depender del backend.
+
+La UI no se considera evidencia suficiente de autorización.
+
+==================================================
+8. TESTS DE REGRESIÓN
+==================================================
+
+Ejecutar los tests relacionados con:
+
+- platform-console;
+- Identity;
+- RBAC;
+- api-server;
+- HTTP E2E.
+
+Después ejecutar la suite completa correspondiente.
+
+No aceptar tests omitidos como PASS.
+
+Reportar:
+
+suite
+tests
+pass
+fail
+skipped
+
+==================================================
+9. TYPECHECK Y BUILD
+==================================================
+
+Ejecutar:
+
+typecheck
+
+build
+
+Reportar resultados exactos.
+
+==================================================
+10. REVISIÓN DEL FIX
+==================================================
+
+Verificar que:
+
+artifacts/api-server/src/routes/deltaops/platform-console.ts
+
+utiliza autorización canónica y fail-closed.
+
+Confirmar específicamente que TENANT_ADMIN no pueda llegar a la autorización de plataforma mediante el alias legacy:
+
+admin
+
+No hacer cambios.
+
+==================================================
+11. NO REGRESIÓN EMPRESARIAL
+==================================================
+
+Comprobar que TENANT_ADMIN conserve sus capacidades normales en los módulos empresariales.
+
+No debe perder acceso a sus funcionalidades legítimas de:
+
+- Activos
+- Órdenes
+- Inventario
+- Planes
+- Abastecimiento
+- Preventivo
+- Correctivo
+- Utilización
+- Mano de obra
+- Costos
+- Analytics
+
+La corrección debe afectar exclusivamente la plataforma.
+
+==================================================
+12. SEGURIDAD FAIL-CLOSED
+==================================================
+
+Probar escenarios de:
+
+- rol ausente;
+- rol desconocido;
+- sesión inválida;
+- identidad inválida;
+- tenant ausente.
+
+Resultado esperado:
+
+DENEGADO.
+
+No debe existir ningún fallback que permita acceso a plataforma.
+
+==================================================
+13. CRITERIO DE PASS
+==================================================
+
+DGP-022.1 puede declararse PASS únicamente si:
+
+[ ] Todos los /api/deltaops/platform/* están protegidos.
+[ ] SUPER_ADMIN tiene acceso.
+[ ] TENANT_ADMIN recibe 403.
+[ ] SUPERVISOR recibe 403.
+[ ] PLANIFICADOR recibe 403.
+[ ] TECNICO recibe 403.
+[ ] CONSULTA recibe 403.
+[ ] Anónimo recibe 401/código canónico.
+[ ] Cross-tenant bloqueado.
+[ ] SUPER_ADMIN conserva funcionamiento.
+[ ] /administracion/saas funciona para SUPER_ADMIN.
+[ ] TENANT_ADMIN no puede acceder por API directa.
+[ ] Tests verdes.
+[ ] 0 skipped en las suites críticas.
+[ ] Typecheck PASS.
+[ ] Build PASS.
+[ ] E2E navegador PASS.
+[ ] Workspace limpio.
+
+==================================================
+14. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Realiza una revisión independiente de la corrección.
+
+La revisión debe comprobar específicamente:
+
+1. Que la autorización depende del rol/capacidad canónica.
+2. Que "admin" legacy ya no autoriza plataforma.
+3. Que no existe bypass por tenant.
+4. Que no existe bypass por frontend.
+5. Que todos los endpoints están cubiertos.
+6. Que SUPER_ADMIN continúa autorizado.
+7. Que TENANT_ADMIN queda completamente bloqueado.
+
+Si la revisión encuentra un CRÍTICO o MAYOR:
+
+DETENTE.
+
+No corrijas automáticamente.
+
+Reporta el hallazgo.
+
+Si todo está correcto:
+
+PASS.
+
+==================================================
+15. CIERRE
+==================================================
+
+Si todos los criterios pasan:
+
+Actualizar:
+
+docs/dgp/DGP-022.1-CIERRE-PLATFORM-CONSOLE-ACL.md
+
+con la evidencia real de esta validación.
+
+El informe debe incluir:
+
+- causa raíz;
+- corrección aplicada;
+- endpoints auditados;
+- matriz de roles;
+- evidencia HTTP;
+- evidencia cross-tenant;
+- SUPER_ADMIN;
+- E2E;
+- tests;
+- typecheck;
+- build;
+- revisión arquitectónica;
+- riesgos restantes;
+- commit;
+- estado final.
+
+Actualizar también la memoria del programa si corresponde.
+
+Después hacer commit del informe/evidencia solamente si es necesario según la convención del programa.
+
+Dejar:
+
+git status
+
+LIMPIO.
+
+==================================================
+16. REGLA FINAL
+==================================================
+
+NO iniciar DGP-023.
+
+NO implementar CORS.
+
+NO implementar rate limiting.
+
+NO implementar CSP/HSTS.
+
+NO modificar RLS.
+
+NO cambiar RBAC empresarial.
+
+NO modificar UX.
+
+NO agregar funcionalidades.
+
+Esta fase es exclusivamente la VALIDACIÓN Y CIERRE DE PLATFORM-CONSOLE-ACL.
+
+Si PASS:
+
+" DGP-022.1 VALIDADO Y CERRADO — PLATFORM-CONSOLE-ACL CORREGIDO "
+
+Si FAIL:
+
+" DGP-022.1 VALIDACIÓN FALLIDA — REQUIERE REVISIÓN "
+
+DETENTE después del informe.
