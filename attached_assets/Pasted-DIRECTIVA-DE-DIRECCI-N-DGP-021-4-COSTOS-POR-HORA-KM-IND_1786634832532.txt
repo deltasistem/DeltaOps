@@ -1,0 +1,854 @@
+DIRECTIVA DE DIRECCIÓN — DGP-021.4
+COSTOS POR HORA/KM + INDICADORES ECONÓMICOS DE MANTENIMIENTO
+
+Programa: DeltaOps
+Fase: DGP-021.4
+Estado: AUTORIZADA PARA IMPLEMENTACIÓN
+
+OBJETIVO
+
+Implementar la última fase del bloque DGP-021 para convertir los hechos económicos ya construidos en indicadores operacionales de mantenimiento por activo y período.
+
+El objetivo principal es poder responder con datos reales:
+
+- ¿Cuánto cuesta mantener cada activo?
+- ¿Cuánto cuesta mantenerlo por hora de operación?
+- ¿Cuánto cuesta mantenerlo por kilómetro?
+- ¿Qué componentes explican ese costo?
+- ¿Cómo evoluciona el costo de un activo?
+- ¿Qué activos tienen mayor costo de mantenimiento?
+- ¿Qué activos tienen mayor costo por hora o por kilómetro?
+
+Esta fase NO debe crear un sistema BI independiente ni reemplazar Analytics existente.
+
+Debe componerse sobre los contratos y fuentes de verdad ya existentes.
+
+==================================================
+1. REGLAS DE GOBIERNO
+==================================================
+
+ANTES DE IMPLEMENTAR:
+
+1. Realiza primero un DISCOVERY técnico interno del corpus real.
+2. Identifica exactamente qué contratos públicos, queries y read models pueden utilizarse.
+3. NO inventes endpoints, campos, relaciones, unidades ni datos.
+4. Si un dato necesario no existe, decláralo como GAP y falla cerrado.
+5. No uses SQL cross-module.
+6. No accedas directamente a tablas internas de otros módulos.
+7. No dupliques fuentes de verdad.
+8. No conviertas floats existentes en supuestos valores exactos.
+9. No utilices parseFloat, Number ni aritmética monetaria en frontend.
+10. No mezcles monedas.
+11. Nunca interpretar ausencia de información como cero.
+12. Backend es la autoridad de seguridad, tenancy y cálculo.
+13. Frontend solamente presenta datos provenientes de contratos.
+14. No modificar contratos congelados salvo que el Discovery demuestre que una extensión pública aditiva es estrictamente necesaria.
+15. Si se requiere una excepción arquitectónica, DETENTE y repórtala antes de implementar.
+
+NO comiences código hasta completar el Discovery y comprobar que el diseño es realizable con el corpus actual.
+
+==================================================
+2. FUENTES DE VERDAD OBLIGATORIAS
+==================================================
+
+El módulo de Costos debe componerse exclusivamente sobre:
+
+- DGP-019 Utilización:
+  historial de horómetro y odómetro.
+- DGP-020.2:
+  sesiones y duración real de trabajo.
+- DGP-020.3:
+  valoraciones de mano de obra.
+- DGP-021.0:
+  costos exactos de abastecimiento.
+- DGP-021.1:
+  hechos económicos.
+- DGP-021.2:
+  integración Inventario → Costos.
+- DGP-021.3:
+  composición de costos por OT y activo.
+- Activos:
+  identificación, tipo y configuración existente.
+- Analytics:
+  únicamente mediante los mecanismos públicos existentes.
+
+NO crear una segunda fuente de verdad para:
+
+- horómetro;
+- odómetro;
+- combustible;
+- sesiones;
+- mano de obra;
+- inventario;
+- abastecimiento;
+- hechos económicos.
+
+==================================================
+3. OBJETIVO ECONÓMICO
+==================================================
+
+Crear indicadores económicos derivados exclusivamente de hechos económicos válidos.
+
+La estructura conceptual debe ser:
+
+ACTIVO
+ ↓
+UTILIZACIÓN
+ ↓
+HORÓMETRO / ODÓMETRO
+ ↓
+COSTOS DE MANTENIMIENTO
+ ├── MANO DE OBRA
+ ├── MATERIALES / REPUESTOS
+ ├── COMBUSTIBLE cuando sea atribuible
+ └── OTROS
+ ↓
+INDICADORES
+ ├── COSTO TOTAL
+ ├── COSTO / HORA
+ └── COSTO / KM
+
+==================================================
+4. COSTO TOTAL
+==================================================
+
+El costo total debe derivarse de los hechos económicos válidos.
+
+Reglas:
+
+- CARGO suma.
+- ABONO resta.
+- Hechos anulados no deben contabilizarse como activos económicos.
+- No duplicar hechos.
+- No utilizar costoReal manual de la OT como fuente económica.
+- Mantener separación por moneda.
+- Nunca convertir monedas.
+- Nunca sumar COP + USD + CLP, etc.
+
+Ejemplo conceptual:
+
+COP:
+Mano de obra = 100000
+Materiales = 250000
+Otros = 50000
+
+Total COP = 400000
+
+USD:
+Materiales = 100
+
+Total USD = 100
+
+Son dos resultados independientes.
+
+==================================================
+5. COSTO POR HORA
+==================================================
+
+Implementar costo de mantenimiento por hora únicamente cuando exista:
+
+1. costo económico válido;
+2. horómetro válido;
+3. dos lecturas suficientes para determinar un delta;
+4. misma unidad;
+5. valores consistentes;
+6. período compatible.
+
+Fórmula:
+
+costo_por_hora =
+costo_mantenimiento_del_periodo /
+horas_de_operacion_del_periodo
+
+IMPORTANTE:
+
+El denominador debe provenir del HORÓMETRO de Utilización.
+
+NO utilizar:
+
+- horas de sesión de OT;
+- tiempo calendario;
+- duración de la OT;
+- duración de sesiones de trabajo;
+
+como sustituto del horómetro.
+
+Las sesiones representan trabajo realizado por personas.
+
+El horómetro representa utilización del activo.
+
+Son conceptos diferentes.
+
+==================================================
+6. COSTO POR KILÓMETRO
+==================================================
+
+Para activos que utilicen odómetro:
+
+costo_por_km =
+costo_mantenimiento_del_periodo /
+kilometros_recorridos_del_periodo
+
+Solo calcular cuando exista:
+
+- odómetro válido;
+- delta positivo y consistente;
+- unidad compatible;
+- costo económico suficiente.
+
+No calcular costo/km para maquinaria que no utilice odómetro, salvo que el contrato existente indique explícitamente que aplica.
+
+No asumir que todo activo es vehículo.
+
+==================================================
+7. PERÍODOS
+==================================================
+
+Evaluar los períodos que el contrato existente soporte.
+
+Como mínimo analizar:
+
+- actual;
+- últimos 30 días;
+- últimos 90 días;
+- año;
+- rango personalizado si ya existe contrato para ello.
+
+No crear períodos ficticios.
+
+El período debe aplicarse de forma consistente tanto al numerador como al denominador.
+
+Ejemplo:
+
+Si se calcula costo de los últimos 30 días:
+
+COSTO 30 DÍAS
+/
+HORAS DE OPERACIÓN 30 DÍAS
+
+No:
+
+COSTO 30 DÍAS
+/
+HORAS ACUMULADAS HISTÓRICAS
+
+==================================================
+8. DATOS INSUFICIENTES
+==================================================
+
+Esta regla es OBLIGATORIA.
+
+Nunca presentar:
+
+$0
+
+cuando realmente significa:
+
+"No hay información suficiente."
+
+Utilizar estados semánticos como:
+
+- COMPLETO
+- PARCIAL
+- SIN DATOS SUFICIENTES
+- PENDIENTE
+- NO APLICA
+
+según corresponda.
+
+Ejemplos:
+
+Activo sin horómetro:
+"Costo/hora: Sin datos suficientes"
+
+Activo sin odómetro:
+"Costo/km: No aplica"
+
+Activo con costos pero sin utilización:
+"Costo/hora: Sin datos suficientes"
+
+Activo con utilización pero sin costos:
+"Costo: Sin datos suficientes"
+
+No inventar denominadores.
+
+No dividir entre cero.
+
+==================================================
+9. CONSISTENCIA DE MEDIDORES
+==================================================
+
+Utilizar exclusivamente las lecturas válidas de Utilización.
+
+Respetar:
+
+- lecturas anuladas;
+- lecturas inconsistentes;
+- reinicios autorizados;
+- monotonicidad;
+- unidad;
+- fecha efectiva;
+- fecha de registro.
+
+No reconstruir historial leyendo directamente las tablas de Utilización.
+
+Utilizar el contrato público/read model correspondiente.
+
+Si el módulo de Utilización actual no expone una serie exacta suficiente para calcular el indicador:
+
+NO convertir floats existentes.
+
+Reportar GAP.
+
+Si es estrictamente necesario ampliar el contrato público, DETENER implementación y solicitar aprobación de Dirección antes de modificarlo.
+
+==================================================
+10. PRECISIÓN MONETARIA
+==================================================
+
+Mantener las reglas establecidas en DGP-021:
+
+- dinero como string decimal;
+- numeric(18,6);
+- BigInt/micros cuando corresponda;
+- cero float en cálculos económicos;
+- frontend nunca usa parseFloat/Number para dinero;
+- no notación científica;
+- redondeo solamente en la presentación o resultado final según contrato;
+- precisión determinista.
+
+Los indicadores derivados deben conservar precisión suficiente para evitar errores acumulativos.
+
+No utilizar:
+
+0.1 + 0.2
+
+como aritmética monetaria.
+
+Debe existir prueba específica contra valores float-inseguros.
+
+==================================================
+11. COSTO POR COMPONENTE
+==================================================
+
+El indicador debe poder descomponer el costo por:
+
+- Mano de obra
+- Materiales/Repuestos
+- Combustible, cuando exista atribución válida
+- Otros
+
+Y mostrar:
+
+Total
++
+Desglose
+
+sin duplicar hechos.
+
+Para combustible:
+
+IMPORTANTE:
+
+DGP-021.3 dejó documentado GAP-FUEL-MONEY:
+
+el dinero de Utilización actualmente no dispone de una serie exacta equivalente a los costos de Costos.
+
+Por tanto:
+
+NO sumar combustible monetario al costo total si el contrato no permite hacerlo de forma exacta.
+
+Puede mostrarse como:
+
+"Combustible: Sin datos suficientes"
+
+o
+
+"No incluido por falta de contrato económico exacto"
+
+según corresponda.
+
+NO convertir float a decimal exacto artificialmente.
+
+==================================================
+12. COSTO ACUMULADO POR ACTIVO
+==================================================
+
+Implementar composición por activo:
+
+- costo total por período;
+- costo por moneda;
+- componentes;
+- horas de operación;
+- kilómetros recorridos;
+- costo/hora;
+- costo/km.
+
+El activo debe ser derivado de las relaciones existentes.
+
+No aceptar activoId proveniente del frontend cuando exista una relación contractual que permita derivarlo.
+
+Mantener aislamiento tenant.
+
+==================================================
+13. COMPARATIVA ENTRE ACTIVOS
+==================================================
+
+Preparar una consulta/read model que permita ordenar activos por:
+
+- costo total;
+- costo/hora;
+- costo/km;
+- horas de utilización;
+- kilómetros;
+- costo de mano de obra;
+- costo de materiales;
+- costo de combustible cuando sea válido.
+
+IMPORTANTE:
+
+No comparar valores de monedas diferentes.
+
+La respuesta debe separar por moneda.
+
+Si dos activos tienen monedas diferentes:
+
+NO producir ranking combinado.
+
+==================================================
+14. TENDENCIAS
+==================================================
+
+Preparar series temporales económicas utilizando fuentes reales.
+
+Como mínimo evaluar:
+
+- costo mensual;
+- horas de utilización;
+- costo/hora;
+- kilómetros;
+- costo/km.
+
+Si algún indicador no tiene datos suficientes:
+
+no crear un valor artificial.
+
+Puede aparecer:
+
+"Sin datos suficientes"
+
+==================================================
+15. ANALYTICS
+==================================================
+
+Integrar los indicadores con el mecanismo Analytics ya existente.
+
+NO crear un dashboard BI paralelo.
+
+El objetivo es proporcionar datasets/read models operacionales que Analytics pueda consumir.
+
+Registrar las fuentes conforme al patrón existente.
+
+Los datasets deben documentar:
+
+- fuente;
+- período;
+- tenant;
+- activo;
+- moneda;
+- indicador;
+- unidad;
+- fecha;
+- calidad/estado del dato.
+
+No registrar secretos ni información sensible innecesaria.
+
+==================================================
+16. FRONTEND
+==================================================
+
+Integrar la información en las superficies existentes.
+
+No crear una aplicación paralela.
+
+Agregar donde corresponda:
+
+FICHA DEL ACTIVO:
+
+- costo total;
+- costo/hora;
+- costo/km;
+- horas de operación;
+- kilómetros;
+- desglose de costos;
+- período;
+- estado de calidad del dato.
+
+COSTOS:
+
+- resumen económico;
+- comparación;
+- tendencia;
+- componentes.
+
+ANALYTICS:
+
+- datasets existentes;
+- indicadores disponibles;
+- filtros ya soportados.
+
+El diseño debe respetar:
+
+- Design System;
+- tokens --do-*;
+- tema claro;
+- tema oscuro;
+- tema automático;
+- logo correcto por tema;
+- responsive;
+- móvil;
+- accesibilidad.
+
+No crear otro sistema de tema.
+
+==================================================
+17. UX
+==================================================
+
+La interfaz debe sentirse como una plataforma empresarial de mantenimiento.
+
+Evitar:
+
+- exceso de tarjetas;
+- apariencia de hoja Excel;
+- dashboards saturados;
+- colores arbitrarios;
+- gráficos sin significado;
+- métricas sin fuente.
+
+Priorizar:
+
+- jerarquía;
+- información accionable;
+- estados claros;
+- comparación sencilla;
+- contexto del activo.
+
+Los indicadores deben responder preguntas de operación.
+
+==================================================
+18. RBAC
+==================================================
+
+Utilizar únicamente capacidades existentes.
+
+TENANT_ADMIN:
+- consulta completa;
+- administración según capacidades existentes.
+
+SUPERVISOR:
+- lectura operacional/económica según capacidades.
+
+PLANIFICADOR:
+- lectura según capacidades.
+
+TECNICO:
+- solamente información que su rol pueda consultar;
+- no exponer información administrativa que no corresponda.
+
+CONSULTA:
+- solo lectura.
+
+SUPER_ADMIN:
+- permanece en la experiencia global de plataforma.
+
+Backend sigue siendo autoridad.
+
+No confiar en ocultamiento frontend.
+
+==================================================
+19. MULTITENANCY
+==================================================
+
+Todo indicador debe estar aislado por tenant.
+
+Tenant siempre:
+
+- desde sesión;
+- backend;
+- RLS.
+
+Nunca desde:
+
+- query param;
+- body;
+- header manipulable;
+- frontend.
+
+Crear pruebas explícitas:
+
+Tenant A no puede consultar datos de Tenant B.
+
+==================================================
+20. OFFLINE
+==================================================
+
+No crear una nueva cola.
+
+Los indicadores económicos NO deben inventarse offline.
+
+Si existen datos locales suficientes para mostrar un estado pendiente, etiquetarlo claramente.
+
+El valor oficial debe provenir del backend/read model.
+
+==================================================
+21. DISCOVERY OBLIGATORIO ANTES DEL CÓDIGO
+==================================================
+
+Antes de implementar debes generar:
+
+docs/dgp/DGP-021.4-DESCUBRIMIENTO.md
+
+Debe incluir:
+
+- fuentes consultadas;
+- contratos encontrados;
+- fórmulas posibles;
+- unidades;
+- precisión;
+- períodos;
+- monedas;
+- gaps;
+- riesgos;
+- decisiones;
+- endpoints existentes reutilizables;
+- endpoints nuevos solo si son estrictamente necesarios;
+- impacto en Analytics;
+- impacto frontend;
+- matriz RBAC;
+- estrategia de pruebas.
+
+Si encuentras que el contrato de Utilización no permite realizar costo/hora o costo/km de forma exacta:
+
+NO inventes una solución.
+
+Marca el GAP y DETENTE solicitando aprobación.
+
+==================================================
+22. IMPLEMENTACIÓN SOLO DESPUÉS DEL DISCOVERY
+==================================================
+
+Una vez comprobado que todo puede hacerse con contratos públicos existentes:
+
+Implementar en fases internas:
+
+021.4-A:
+dominio/read models/consultas económicas.
+
+021.4-B:
+costo/hora y costo/km.
+
+021.4-C:
+composición por activo y período.
+
+021.4-D:
+Analytics/datasets.
+
+021.4-E:
+frontend.
+
+021.4-F:
+pruebas y E2E.
+
+No crear DGP externos adicionales salvo que Dirección los apruebe.
+
+==================================================
+23. PRUEBAS OBLIGATORIAS
+==================================================
+
+Debe existir cobertura para:
+
+- precisión monetaria;
+- monedas mixtas;
+- cero real;
+- ausencia de datos;
+- horómetro;
+- odómetro;
+- lecturas inconsistentes;
+- lecturas anuladas;
+- períodos;
+- costo/hora;
+- costo/km;
+- división por cero;
+- activo sin medidor;
+- costo sin utilización;
+- utilización sin costo;
+- tenant A/B;
+- RBAC;
+- IDOR;
+- refresh;
+- logout/login;
+- responsive;
+- claro/oscuro/automático;
+- Analytics;
+- snapshot histórico;
+- concurrencia si existen mutaciones;
+- ausencia de SQL cross-module.
+
+==================================================
+24. E2E OBLIGATORIO
+==================================================
+
+Usar navegador real.
+
+Validar como mínimo:
+
+TENANT_ADMIN:
+- consulta completa;
+- ficha de activo;
+- costos;
+- indicadores.
+
+SUPERVISOR:
+- lectura económica.
+
+PLANIFICADOR:
+- lectura.
+
+TECNICO:
+- acceso limitado correctamente.
+
+CONSULTA:
+- solo lectura.
+
+Probar:
+
+- desktop 1280;
+- tablet 768;
+- móvil ~390;
+- tema claro;
+- tema oscuro;
+- refresh;
+- logout/re-login.
+
+Escenario económico real:
+
+ACTIVO
+→ lecturas de horómetro/odómetro
+→ OT
+→ mano de obra
+→ materiales
+→ costos
+→ cálculo costo/hora o costo/km
+→ visualización
+→ Analytics.
+
+No usar mocks para el escenario E2E principal.
+
+==================================================
+25. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Realizar al menos dos rondas independientes.
+
+R1:
+buscar defectos arquitectónicos, seguridad, precisión y fuentes de verdad.
+
+Corregir.
+
+R2:
+volver a revisar el diff completo y ejecutar personalmente las suites críticas.
+
+Solo cerrar con PASS si:
+
+- no existen hallazgos críticos;
+- no existen hallazgos mayores;
+- pruebas verdes;
+- typecheck limpio;
+- build verde;
+- OpenAPI sin drift;
+- tenant isolation verificada;
+- RBAC verificado.
+
+==================================================
+26. CRITERIO DE CIERRE
+==================================================
+
+DGP-021.4 solamente puede declararse CERRADO si:
+
+1. costo total por activo funciona;
+2. costo/hora funciona cuando corresponde;
+3. costo/km funciona cuando corresponde;
+4. monedas permanecen separadas;
+5. ausencia ≠ cero;
+6. no se inventan datos;
+7. fuentes de verdad están preservadas;
+8. Analytics recibe datasets reales;
+9. frontend está integrado;
+10. claro/oscuro funcionan;
+11. móvil funciona;
+12. RBAC funciona;
+13. RLS funciona;
+14. E2E real PASS;
+15. revisión arquitectónica PASS;
+16. typecheck PASS;
+17. build PASS;
+18. OpenAPI drift PASS;
+19. documentación actualizada;
+20. memoria del programa actualizada.
+
+==================================================
+27. IMPORTANTE — NO AVANZAR AUTOMÁTICAMENTE
+==================================================
+
+Al finalizar:
+
+ENTREGAR INFORME OFICIAL DE CIERRE DGP-021.4.
+
+NO iniciar DGP-022 automáticamente.
+
+Esperar aprobación explícita de Dirección.
+
+El informe debe incluir:
+
+- qué se implementó;
+- qué contratos se reutilizaron;
+- qué contratos nuevos se crearon;
+- fórmulas;
+- fuentes de verdad;
+- precisión;
+- monedas;
+- RBAC;
+- RLS;
+- pruebas;
+- E2E;
+- revisión arquitectónica;
+- revisión visual;
+- GAPs;
+- deuda técnica;
+- commits;
+- estado final.
+
+DIRECTIVA FINAL:
+
+La prioridad es CORRECCIÓN, TRAZABILIDAD Y VERACIDAD DEL DATO.
+
+Es preferible mostrar:
+
+"Sin datos suficientes"
+
+que fabricar un indicador.
+
+Es preferible detener una implementación por un GAP contractual que crear una dependencia ilegal.
+
+Es preferible una funcionalidad menor pero auditable que un dashboard visualmente impresionante con datos incorrectos.
+
+NO INVENTAR.
+NO DUPLICAR FUENTES DE VERDAD.
+NO ROMPER CONTRATOS.
+NO SALTARSE RBAC/RLS.
+NO USAR FLOAT PARA DINERO.
+NO MEZCLAR MONEDAS.
+NO CONVERTIR AUSENCIA EN CERO.
+NO CREAR SQL CROSS-MODULE.
+NO INICIAR DGP-022 AUTOMÁTICAMENTE.
