@@ -214,3 +214,128 @@ body {
   box-shadow: none;
   opacity: 0.5;
 }
+
+/* =========================================================================
+ * DGP-021.3 (§30.3–§30.9) · Login empresarial de dos zonas.
+ *  - Zona A (branding): fondo OSCURO fijo por diseño (degradado sutil), logo
+ *    variante oscura, titular, chip corporativo y footer discreto.
+ *  - Zona B (formulario): superficie del TEMA EFECTIVO (claro/oscuro/auto).
+ * Responsive §30.6: 1280 dos columnas · 768 branding compacto arriba · 390
+ * formulario+logo prioritarios (una columna, sin overflow). Targets ≥48px.
+ * Sólo tokens --do-*. Sin segundo sistema de temas.
+ * ====================================================================== */
+.do-login {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  background: var(--do-bg);
+}
+.do-login__brand-zone {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--do-sp-8);
+  padding: clamp(var(--do-sp-8), 4vw, var(--do-sp-16));
+  color: var(--do-blanco);
+  /* Fondo oscuro con degradado sutil (rojo de marca muy tenue → océano). */
+  background:
+    radial-gradient(120% 90% at 12% 8%, color-mix(in srgb, var(--do-rojo) 26%, transparent) 0%, transparent 46%),
+    radial-gradient(120% 120% at 100% 100%, color-mix(in srgb, var(--do-rojo) 14%, transparent) 0%, transparent 40%),
+    linear-gradient(160deg, var(--do-gris-900) 0%, var(--do-oceano) 70%);
+}
+.do-login__brand-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-5);
+  max-width: 34rem;
+}
+.do-login__titular {
+  margin: 0;
+  font-size: clamp(var(--do-text-2xl), 3.4vw, var(--do-text-4xl));
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.do-login__subtitulo {
+  margin: 0;
+  font-size: var(--do-text-base);
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--do-blanco) 78%, transparent);
+  max-width: 32rem;
+}
+.do-login__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--do-sp-3);
+  margin-top: var(--do-sp-2);
+  padding: var(--do-sp-3) var(--do-sp-4);
+  border-radius: var(--do-radius-lg);
+  background: color-mix(in srgb, var(--do-blanco) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--do-blanco) 14%, transparent);
+  width: fit-content;
+}
+.do-login__chip-icono {
+  font-size: var(--do-text-lg);
+  line-height: 1;
+}
+.do-login__brand-footer {
+  color: color-mix(in srgb, var(--do-blanco) 70%, transparent);
+}
+.do-login__form-zone {
+  display: grid;
+  place-items: center;
+  padding: clamp(var(--do-sp-4), 3vw, var(--do-sp-10));
+  background: var(--do-bg);
+}
+.do-login__form-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-6);
+  background: var(--do-surface);
+  border: 1px solid var(--do-borde);
+  border-radius: var(--do-radius-lg);
+  padding: clamp(var(--do-sp-6), 3vw, var(--do-sp-8));
+  box-shadow: var(--do-shadow-lg);
+}
+.do-login__form-brand {
+  display: none; /* En desktop la marca vive en la zona A. */
+}
+.do-login__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-2);
+}
+
+/* 768px: branding compacto en franja superior; formulario debajo (§30.6). */
+@media (max-width: 900px) {
+  .do-login {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .do-login__brand-zone {
+    padding: var(--do-sp-8);
+    gap: var(--do-sp-5);
+  }
+  .do-login__brand-footer { display: none; }
+  .do-login__titular { font-size: var(--do-text-2xl); }
+  .do-login__subtitulo { display: none; }
+}
+
+/* 390px: formulario + logo prioritarios; se oculta la zona de branding para
+   maximizar el foco, mostrando el logo dentro de la tarjeta. Sin overflow. */
+@media (max-width: 560px) {
+  .do-login { grid-template-rows: 1fr; }
+  .do-login__brand-zone { display: none; }
+  .do-login__form-zone { padding: var(--do-sp-4); align-items: start; }
+  .do-login__form-card { box-shadow: none; border: none; background: transparent; padding: var(--do-sp-4); }
+  .do-login__form-brand {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--do-sp-2);
+  }
+}

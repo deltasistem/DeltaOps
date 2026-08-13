@@ -22,6 +22,7 @@ import {
   I18nProvider,
   useI18n,
 } from "../components/advanced";
+import { Logo } from "../components/core";
 
 const PASOS = [
   { id: "a", etiqueta: "Datos", descripcion: "Información básica" },
@@ -193,6 +194,45 @@ describe("ThemeProvider / useTheme", () => {
 
   it("useTheme lanza error fuera del proveedor", () => {
     expect(() => renderHook(() => useTheme())).toThrow(/ThemeProvider/);
+  });
+});
+
+/* ------------------------------ Logo (auto) ----------------------------- */
+
+describe("Logo · selección de variante por tema (DGP-021.3 §30.2)", () => {
+  const srcDe = () => (screen.getByRole("img") as HTMLImageElement).getAttribute("src") ?? "";
+
+  it("imagotipo-auto usa el asset CLARO cuando el tema efectivo es claro", () => {
+    render(
+      <ThemeProvider temaInicial="light">
+        <Logo variant="imagotipo-auto" />
+      </ThemeProvider>,
+    );
+    expect(srcDe()).toContain("logo-color-negro");
+  });
+
+  it("imagotipo-auto cambia al asset OSCURO (Full color-Blanco) al pasar a oscuro", async () => {
+    const { result } = renderHook(() => useTheme(), {
+      wrapper: ({ children }) => (
+        <ThemeProvider temaInicial="light">
+          <Logo variant="imagotipo-auto" />
+          {children}
+        </ThemeProvider>
+      ),
+    });
+    expect(srcDe()).toContain("logo-color-negro");
+    // El ThemeProvider togglea `.dark` en <html>; el Logo lo observa por
+    // MutationObserver (entrega asíncrona), así que dejamos correr los microtasks.
+    await act(async () => {
+      result.current.setTema("dark");
+      await Promise.resolve();
+    });
+    expect(srcDe()).toContain("logo-full-color-blanco");
+  });
+
+  it("la variante oscura explícita SIEMPRE usa el asset Full color-Blanco", () => {
+    render(<Logo variant="imagotipo-oscuro" />);
+    expect(srcDe()).toContain("logo-full-color-blanco");
   });
 });
 

@@ -1,0 +1,128 @@
+/**
+ * DGP-021.3 · Tipos de LECTURA de la composición de costos.
+ *
+ * Estos tipos ESPEJAN el contrato del backend (`GET /composicion/ot|activo`). El
+ * DINERO viaja SIEMPRE como CADENA decimal exacta (punto fijo numeric(18,6)); el
+ * frontend NUNCA lo convierte a `number` ni lo recalcula: sólo lo FORMATEA.
+ */
+
+/** Estado de un componente o del agregado (§8). Nunca $0 para ausencia (§4). */
+export type EstadoCosto =
+  | "COMPLETO"
+  | "PARCIAL"
+  | "SIN_DATOS_SUFICIENTES"
+  | "PENDIENTE"
+  | "NO_APLICA";
+
+/** Total económico de UNA moneda (series separadas; nunca se mezclan, §6). */
+export interface TotalMoneda {
+  readonly moneda: string;
+  /** Neto = cargos − abonos, CADENA decimal exacta. */
+  readonly total: string;
+  readonly cargos: string;
+  readonly abonos: string;
+  /** Nº de hechos que aportan a esta moneda. */
+  readonly componentes: number;
+}
+
+/** Evidencia individual (hecho/valoración) que respalda un componente (§18). */
+export interface Evidencia {
+  readonly fuente?: string;
+  readonly origen?: string;
+  readonly tipo?: string;
+  readonly moneda?: string;
+  readonly valor?: string;
+  readonly naturaleza?: "CARGO" | "ABONO";
+  readonly cuando?: string;
+  readonly quien?: string;
+  readonly costoId?: string;
+  readonly sesionId?: string;
+  readonly movimientoId?: string;
+  readonly articuloId?: string;
+  readonly identityId?: string;
+  readonly estado?: string;
+  readonly [k: string]: unknown;
+}
+
+/** Pendiente de materialización o de valoración (jamás se asume $0). */
+export interface Pendiente {
+  readonly fuente?: string;
+  readonly movimientoId?: string;
+  readonly sesionId?: string;
+  readonly articuloId?: string;
+  readonly moneda?: string;
+  readonly cantidad?: string;
+  readonly unidad?: string;
+  readonly motivo?: string;
+  readonly estado?: string;
+  readonly cuando?: string;
+  readonly [k: string]: unknown;
+}
+
+/** Componente económico (mano de obra / materiales / otros). */
+export interface Componente {
+  readonly tipo: "MANO_OBRA" | "MATERIALES" | "OTROS";
+  readonly estado: EstadoCosto;
+  readonly porMoneda: readonly TotalMoneda[];
+  readonly evidencia?: readonly Evidencia[];
+  readonly pendientes?: readonly Pendiente[];
+}
+
+/** Combustible del activo (CONTEXTUAL) — separado del total económico. */
+export interface CombustibleActivo {
+  readonly tipo?: string;
+  readonly estado: "CONTEXTUAL" | "SIN_DATOS_SUFICIENTES" | "NO_APLICA";
+  readonly atribuibleAOt?: string;
+  readonly precisionOrigen?: string;
+  readonly tanqueos?: number;
+  readonly tanqueosSinCosto?: number;
+  readonly porMoneda?: readonly { moneda: string; costoOrigen: string; litros: string; tanqueos: number }[];
+  readonly nota?: string;
+}
+
+/** Combustible en la OT (SIEMPRE NO_APLICA). */
+export interface CombustibleOt {
+  readonly tipo?: string;
+  readonly estado: "NO_APLICA";
+  readonly atribuibleAOt?: string;
+  readonly porMoneda?: readonly TotalMoneda[];
+  readonly nota?: string;
+}
+
+export interface RangoResuelto {
+  readonly desde: string | null;
+  readonly hasta: string | null;
+}
+
+/** Composición de costos de una OT. */
+export interface ComposicionOt {
+  readonly ot: string;
+  readonly periodo: string;
+  readonly rango: RangoResuelto;
+  readonly estado: EstadoCosto;
+  readonly componentes: {
+    readonly manoObra: Componente;
+    readonly materiales: Componente;
+    readonly otros: Componente;
+    readonly combustible: CombustibleOt;
+  };
+  readonly totalesPorMoneda: readonly TotalMoneda[];
+  readonly pendientesMaterializacion: readonly Pendiente[];
+}
+
+/** Composición de costos de un activo (con combustible contextual). */
+export interface ComposicionActivo {
+  readonly activo: string;
+  readonly periodo: string;
+  readonly rango: RangoResuelto;
+  readonly estado: EstadoCosto;
+  readonly componentes: {
+    readonly manoObra: Componente;
+    readonly materiales: Componente;
+    readonly otros: Componente;
+    readonly combustible: CombustibleActivo;
+  };
+  readonly totalesPorMoneda: readonly TotalMoneda[];
+  readonly costoPorHora: { readonly estado: string; readonly nota?: string };
+  readonly costoPorKm: { readonly estado: string; readonly nota?: string };
+}

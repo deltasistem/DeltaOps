@@ -38,6 +38,7 @@ import { TRANSICIONES, ETIQUETA_ESTADO, TONO_ESTADO } from "../lib/ordenes/const
 import { BadgeEstado, BadgePrioridad, vencimientoSla } from "../lib/ordenes/componentes";
 import { PanelSesion } from "../lib/ordenes/PanelSesion";
 import { SeccionManoDeObra } from "../lib/manodeobra/SeccionManoDeObra";
+import { SeccionCostosOt } from "../lib/costos/SeccionCostosOt";
 import type { OrdenRow } from "../lib/ordenes/tipos";
 import { TabEjecucion } from "./ordenes/tab-ejecucion";
 import { TabDocumentacionOrden } from "./ordenes/tab-documentacion";
@@ -187,6 +188,10 @@ function TabResumen({ orden }: { orden: OrdenRow }) {
       <PanelSesion orden={orden} conHistorial />
       {/* DGP-020.3 · Mano de obra de la OT (técnico, tiempo, tarifa, costo, estado). */}
       <SeccionManoDeObra ordenId={orden.id} />
+      {/* DGP-021.3 · Costos de mantenimiento de la OT (composición por componente y moneda). */}
+      <div style={{ gridColumn: "1 / -1" }}>
+        <SeccionCostosOt ordenId={orden.id} />
+      </div>
     </div>
   );
 }

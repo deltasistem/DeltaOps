@@ -113,102 +113,132 @@ export default function Login() {
 
   return (
     <ThemeProvider>
-      <div
-        className="do-root"
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background: "var(--do-bg)",
-          padding: "var(--do-sp-4)",
-        }}
-      >
-        <main
-          style={{
-            width: "100%",
-            maxWidth: 420,
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--do-sp-6)",
-            background: "var(--do-surface)",
-            border: "1px solid var(--do-borde)",
-            borderRadius: "var(--do-radio-lg, 12px)",
-            padding: "var(--do-sp-8)",
-          }}
-        >
-          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "var(--do-sp-3)", alignItems: "center" }}>
-            <Logo variant="imagotipo" width={160} alt="DeltaOps" />
-            <h1 style={{ fontSize: "var(--do-text-xl)", margin: 0 }}>
-              {membresias ? "Selecciona tu empresa" : "Iniciar sesión"}
-            </h1>
-            <p style={{ color: "var(--do-texto-suave)", margin: 0, fontSize: "var(--do-text-sm)" }}>
-              {membresias
-                ? "Perteneces a varias empresas. Elige con cuál deseas ingresar."
-                : "Plataforma empresarial de gestión de mantenimiento."}
-            </p>
-          </div>
+      <div className="do-root do-login">
+        {/* Zona A · BRANDING corporativo (fondo oscuro con degradado sutil). El
+            logo usa la variante para fondos oscuros (delta rojo + tipografía
+            crema); nunca pierde contraste porque esta zona es oscura por diseño. */}
+        <BrandingLogin />
 
-          {expirada && !error && !membresias && (
-            <Alert variant="advertencia" titulo="Sesión expirada">
-              Tu sesión expiró por seguridad. Vuelve a iniciar sesión.
-            </Alert>
-          )}
+        {/* Zona B · FORMULARIO limpio (superficie del tema efectivo). */}
+        <main className="do-login__form-zone" aria-labelledby="login-titulo">
+          <div className="do-login__form-card">
+            {/* Logo prioritario en móvil (§30.6): en desktop la marca vive en la
+                zona A, aquí se refuerza con el imagotipo automático por tema. */}
+            <div className="do-login__form-brand">
+              <Logo variant="imagotipo-auto" width={148} alt="DeltaOps" />
+            </div>
 
-          <div aria-live="assertive">
-            {error && (
-              <Alert variant="error" titulo={error.titulo} onClose={() => setError(null)}>
-                {error.descripcion}
+            <div className="do-login__head">
+              <h1 id="login-titulo" style={{ fontSize: "var(--do-text-2xl)", margin: 0, lineHeight: 1.2 }}>
+                {membresias ? "Selecciona tu empresa" : "Iniciar sesión"}
+              </h1>
+              <p style={{ color: "var(--do-texto-suave)", margin: 0, fontSize: "var(--do-text-sm)" }}>
+                {membresias
+                  ? "Perteneces a varias empresas. Elige con cuál deseas ingresar."
+                  : "Accede a tu plataforma de gestión de mantenimiento."}
+              </p>
+            </div>
+
+            {expirada && !error && !membresias && (
+              <Alert variant="advertencia" titulo="Sesión expirada">
+                Tu sesión expiró por seguridad. Vuelve a iniciar sesión.
               </Alert>
             )}
-          </div>
 
-          {membresias ? (
-            <SelectorTenant
-              membresias={membresias}
-              cargando={cargando}
-              onElegir={(tenantId) => void ingresar(tenantId)}
-              onVolver={() => {
-                setMembresias(null);
-                setError(null);
-              }}
-            />
-          ) : (
-            <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-5)" }} noValidate>
-              <Field label="Correo electrónico" required>
-                <Input
-                  type="email"
-                  name="email"
-                  autoComplete="username"
-                  placeholder="nombre@empresa.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </Field>
-              <Field label="Contraseña" required>
-                <PasswordInput
-                  name="password"
-                  autoComplete="current-password"
-                  placeholder="Tu contraseña"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </Field>
-              <Button type="submit" variant="primario" disabled={cargando || !email || !password}>
-                {cargando ? "Ingresando…" : "Ingresar"}
-              </Button>
-              <div style={{ textAlign: "center" }}>
-                <Button variant="fantasma" size="sm" onClick={() => setLocation("/recuperar")} type="button">
-                  ¿Olvidaste tu contraseña?
+            <div aria-live="assertive">
+              {error && (
+                <Alert variant="error" titulo={error.titulo} onClose={() => setError(null)}>
+                  {error.descripcion}
+                </Alert>
+              )}
+            </div>
+
+            {membresias ? (
+              <SelectorTenant
+                membresias={membresias}
+                cargando={cargando}
+                onElegir={(tenantId) => void ingresar(tenantId)}
+                onVolver={() => {
+                  setMembresias(null);
+                  setError(null);
+                }}
+              />
+            ) : (
+              <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-5)" }} noValidate>
+                <Field label="Correo electrónico" required>
+                  <Input
+                    type="email"
+                    name="email"
+                    autoComplete="username"
+                    placeholder="nombre@empresa.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </Field>
+                <Field label="Contraseña" required>
+                  <PasswordInput
+                    name="password"
+                    autoComplete="current-password"
+                    placeholder="Tu contraseña"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Button type="submit" variant="primario" disabled={cargando || !email || !password} style={{ minHeight: 48 }}>
+                  {cargando ? "Ingresando…" : "Ingresar"}
                 </Button>
-              </div>
-            </form>
-          )}
+                <div style={{ textAlign: "center" }}>
+                  <Button variant="fantasma" size="sm" onClick={() => setLocation("/recuperar")} type="button" style={{ minHeight: 48 }}>
+                    ¿Olvidaste tu contraseña?
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
         </main>
       </div>
     </ThemeProvider>
+  );
+}
+
+/**
+ * Zona de BRANDING del login (§30.3–§30.5). Composición corporativa sobre fondo
+ * oscuro con degradado sutil: logo, marca «DeltaOps», titular grande, subtítulo
+ * operacional, descripción breve, chip «Plataforma corporativa / Acceso
+ * controlado y auditado» y footer discreto. Es SIEMPRE oscura por diseño, por lo
+ * que el logo usa la variante para fondos oscuros. NO inventa cifras/clientes.
+ */
+function BrandingLogin() {
+  return (
+    <aside className="do-login__brand-zone" aria-hidden="false">
+      <div className="do-login__brand-top">
+        <Logo variant="imagotipo-oscuro" width={160} alt="DeltaOps" />
+      </div>
+
+      <div className="do-login__brand-main">
+        <h2 className="do-login__titular">Plataforma empresarial de gestión de mantenimiento</h2>
+        <p className="do-login__subtitulo">
+          Órdenes de trabajo, activos, inventario y costos en un solo lugar, con
+          trazabilidad y control operacional.
+        </p>
+
+        <div className="do-login__chip" role="note">
+          <span className="do-login__chip-icono" aria-hidden="true">🛡️</span>
+          <span>
+            <strong style={{ display: "block", fontSize: "var(--do-text-sm)" }}>Plataforma corporativa</strong>
+            <span style={{ fontSize: "var(--do-text-xs)", opacity: 0.85 }}>Acceso controlado y auditado</span>
+          </span>
+        </div>
+      </div>
+
+      <footer className="do-login__brand-footer">
+        <strong style={{ display: "block", fontSize: "var(--do-text-xs)", letterSpacing: "0.04em" }}>DELTAOPS</strong>
+        <span style={{ fontSize: "var(--do-text-xs)", opacity: 0.75 }}>Gestión de mantenimiento empresarial</span>
+      </footer>
+    </aside>
   );
 }
 

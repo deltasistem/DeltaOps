@@ -34,7 +34,7 @@ export function AuthLayout({
           }}
         >
           <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "var(--do-sp-3)", alignItems: "center" }}>
-            <Logo variant="imagotipo" width={160} alt="DeltaOps" />
+            <Logo variant="imagotipo-auto" width={160} alt="DeltaOps" />
             <h1 style={{ fontSize: "var(--do-text-xl)", margin: 0 }}>{titulo}</h1>
             {descripcion && (
               <p style={{ color: "var(--do-texto-suave)", margin: 0, fontSize: "var(--do-text-sm)" }}>{descripcion}</p>

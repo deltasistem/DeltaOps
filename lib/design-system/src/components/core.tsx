@@ -2,7 +2,7 @@
  * DGP-005 · Componentes núcleo del Design System DeltaOps.
  * Todos consumen exclusivamente tokens (--do-*). Prohibido hardcodear valores.
  */
-import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useEffect, useState, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 
 function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -93,15 +93,72 @@ export function Divider({ vertical = false, className, ...rest }: { vertical?: b
 
 import logoColorNegro from "../assets/logo-color-negro.png";
 import logoBlanco from "../assets/logo-blanco.png";
+import logoFullColorBlanco from "../assets/logo-full-color-blanco.png";
 import isotipoColor from "../assets/isotipo-color.png";
 
-export type LogoVariant = "imagotipo" | "imagotipo-oscuro" | "isotipo";
+// DGP-021.3 (§30.1/§30.2) · variantes del imagotipo:
+//   - `imagotipo`        → delta a color + tipografía NEGRA (fondos CLAROS).
+//   - `imagotipo-oscuro` → «Full color-Blanco»: delta ROJO + tipografía crema
+//                          (fondos OSCUROS). Reemplaza el antiguo todo-blanco;
+//                          `imagotipo-oscuro-legacy` conserva el blanco puro por
+//                          si alguna superficie lo requiere explícitamente.
+//   - `imagotipo-auto`   → selección AUTOMÁTICA según el tema EFECTIVO del
+//                          ThemeProvider GLOBAL (nunca recolorea; sólo elige asset).
+export type LogoVariant =
+  | "imagotipo"
+  | "imagotipo-oscuro"
+  | "imagotipo-oscuro-legacy"
+  | "imagotipo-auto"
+  | "isotipo";
 
-const LOGO_SRC: Record<LogoVariant, string> = {
+const LOGO_SRC: Record<Exclude<LogoVariant, "imagotipo-auto">, string> = {
   imagotipo: logoColorNegro,
-  "imagotipo-oscuro": logoBlanco,
+  "imagotipo-oscuro": logoFullColorBlanco,
+  "imagotipo-oscuro-legacy": logoBlanco,
   isotipo: isotipoColor,
 };
+
+/**
+ * ¿El tema EFECTIVO es oscuro? Lee el estado que el `ThemeProvider` GLOBAL aplica
+ * al `<html>` (clase `.dark`, que ya resuelve `auto` contra el sistema) y, como
+ * respaldo, `data-do-theme` + `prefers-color-scheme`. NO crea un segundo sistema
+ * de temas ni escribe nada: sólo OBSERVA para elegir el asset correcto.
+ */
+function usaTemaOscuro(): boolean {
+  const suscribe = (cb: () => void): (() => void) => {
+    if (typeof window === "undefined") return () => undefined;
+    const raiz = document.documentElement;
+    const mo = new MutationObserver(cb);
+    mo.observe(raiz, { attributes: true, attributeFilter: ["class", "data-do-theme"] });
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    mq?.addEventListener?.("change", cb);
+    return () => {
+      mo.disconnect();
+      mq?.removeEventListener?.("change", cb);
+    };
+  };
+  const leer = (): boolean => {
+    if (typeof document === "undefined") return false;
+    const raiz = document.documentElement;
+    if (raiz.classList.contains("dark")) return true;
+    const tema = raiz.getAttribute("data-do-theme");
+    if (tema === "dark") return true;
+    if (tema === "light") return false;
+    // Sin ThemeProvider montado o tema 'auto' sin clase aplicada: preferencia del SO.
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  };
+  return useTemaOscuroImpl(suscribe, leer);
+}
+
+function useTemaOscuroImpl(suscribe: (cb: () => void) => () => void, leer: () => boolean): boolean {
+  const [oscuro, setOscuro] = useState<boolean>(() => leer());
+  useEffect(() => {
+    setOscuro(leer());
+    return suscribe(() => setOscuro(leer()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return oscuro;
+}
 
 /** Tamaños mínimos oficiales (Brandbook pág. 3): imagotipo 90px, isotipo 20px. */
 export interface LogoProps extends HTMLAttributes<HTMLSpanElement> {
@@ -112,12 +169,19 @@ export interface LogoProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 export function Logo({ variant = "imagotipo", width, alt = "DELTA", className, ...rest }: LogoProps) {
-  const minimo = variant === "isotipo" ? 20 : 90;
+  // Selección AUTOMÁTICA por tema efectivo (§30.2): claro → color/negro; oscuro
+  // → «Full color-Blanco» (delta rojo + tipografía crema). El logo nunca pierde
+  //   contraste con el fondo del tema.
+  const oscuro = usaTemaOscuro();
+  const resuelto: Exclude<LogoVariant, "imagotipo-auto"> =
+    variant === "imagotipo-auto" ? (oscuro ? "imagotipo-oscuro" : "imagotipo") : variant;
+
+  const minimo = resuelto === "isotipo" ? 20 : 90;
   const ancho = Math.max(width ?? minimo, minimo);
-  const clase = variant === "isotipo" ? "do-logo--isotipo" : "do-logo--imagotipo";
+  const clase = resuelto === "isotipo" ? "do-logo--isotipo" : "do-logo--imagotipo";
   return (
     <span className={cx("do-logo", clase, className)} {...rest}>
-      <img src={LOGO_SRC[variant]} width={ancho} alt={alt} />
+      <img src={LOGO_SRC[resuelto]} width={ancho} alt={alt} />
     </span>
   );
 }

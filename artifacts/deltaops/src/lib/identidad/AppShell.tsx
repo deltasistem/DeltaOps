@@ -37,7 +37,10 @@ import type { Sesion } from "./tipos";
 function Marca() {
   const branding = useBranding();
   if (branding.esDeltaOficial || !branding.logoUrl) {
-    return <Logo variant="imagotipo" width={132} alt={branding.nombreApp} />;
+    // DGP-021.3 (§30.1/§31) · el shell/nav vive sobre una superficie que cambia
+    // con el tema; `imagotipo-auto` elige el asset por tema efectivo para NO
+    // perder contraste en oscuro (delta rojo + tipografía crema).
+    return <Logo variant="imagotipo-auto" width={132} alt={branding.nombreApp} />;
   }
   // Logo permitido del tenant (URL segura), con alto controlado por token.
   return (
