@@ -1,0 +1,812 @@
+DGP-021.2 — INTEGRACIÓN INVENTARIO → COSTOS DE MANTENIMIENTO
+
+DIRECTIVA DE DIRECCIÓN
+
+DGP-021 Discovery = PASS.
+DGP-021.0 = PASS.
+DGP-021.1 = PASS.
+
+Se autoriza implementar ahora DGP-021.2.
+
+OBJETIVO:
+
+Conectar los movimientos físicos de materiales/repuestos de Inventario con los hechos económicos de module-costos.
+
+El resultado debe permitir demostrar:
+
+ARTÍCULO
+→ CANTIDAD CONSUMIDA
+→ MOVIMIENTO DE INVENTARIO
+→ OT
+→ ACTIVO
+→ COSTO UNITARIO SNAPSHOT
+→ COSTO TOTAL
+→ HECHO ECONÓMICO
+
+IMPORTANTE:
+
+No modificar la fuente de verdad de Inventario.
+
+No duplicar el dominio de Inventario.
+
+No convertir module-costos en un inventario paralelo.
+
+==================================================
+1. REVISIÓN PREVIA OBLIGATORIA
+==================================================
+
+Antes de implementar:
+
+Revisar nuevamente:
+
+- DGP-021 Discovery.
+- DGP-021.0.
+- DGP-021.1.
+- module-inventario completo.
+- module-abastecimiento.
+- module-ordenes.
+- module-activos.
+- api-server.
+- contratos públicos.
+- read models.
+- comandos de inventario.
+- movimientos de inventario.
+- recursos de OT.
+- costo exacto de abastecimiento.
+
+No asumir que el movimiento actual de inventario equivale automáticamente a consumo de mantenimiento.
+
+Determinar exactamente qué movimiento representa:
+
+- entrada;
+- salida;
+- consumo;
+- devolución;
+- ajuste;
+- traslado;
+- otro.
+
+Si existe ambigüedad:
+
+detenerse y documentarla antes de implementar.
+
+==================================================
+2. FUENTE DE VERDAD
+==================================================
+
+Inventario continúa siendo la fuente de verdad del movimiento físico.
+
+Abastecimiento continúa siendo la fuente de verdad del costo promedio ponderado de recepciones.
+
+Órdenes continúa siendo la fuente de verdad de la OT y su activo.
+
+module-costos continúa siendo la fuente de verdad de los hechos económicos materializados.
+
+No copiar entidades completas entre módulos.
+
+==================================================
+3. CAMINO OBJETIVO
+==================================================
+
+Implementar la composición:
+
+Movimiento de Inventario
+        ↓
+Artículo
+        ↓
+Cantidad
+        ↓
+OT verificable
+        ↓
+Activo derivado de OT
+        ↓
+Contrato DGP-021.0
+        ↓
+Costo promedio ponderado
+        ↓
+Snapshot
+        ↓
+cos_hechos
+
+Cada paso debe ser verificable.
+
+Si algún paso no puede demostrarse con contratos públicos:
+
+GAP.
+
+No utilizar SQL directo contra tablas internas de otro módulo.
+
+==================================================
+4. ATRIBUCIÓN A OT
+==================================================
+
+Determinar cómo se relaciona actualmente una salida de inventario con una OT.
+
+Si la relación existente es:
+
+- referencia textual;
+- ID no validado;
+- campo opcional;
+- referencia histórica;
+
+documentarlo.
+
+Para materializar un hecho económico de mantenimiento, la OT debe ser verificable mediante contrato público.
+
+No aceptar una OT arbitraria enviada desde frontend si el movimiento de inventario ya tiene una referencia canónica.
+
+==================================================
+5. ACTIVO
+==================================================
+
+El activo debe derivarse de la OT cuando exista una relación canónica.
+
+NO confiar en:
+
+activoId enviado desde frontend.
+
+No permitir:
+
+OT-001
++
+activo-999
+
+si OT-001 pertenece realmente a activo-123.
+
+El hecho económico debe guardar el activo correcto derivado de la OT.
+
+==================================================
+6. COSTO
+==================================================
+
+Utilizar exclusivamente:
+
+modulo.abastecimiento.costos-exactos
+
+de DGP-021.0.
+
+PROHIBIDO:
+
+- abs_costos_read;
+- endpoint legacy float;
+- ultimoCosto;
+- costoEstandar;
+- parseFloat;
+- Number;
+- conversiones float.
+
+El costo utilizado debe ser:
+
+costo promedio ponderado de recepciones
+
+por:
+
+ARTÍCULO + MONEDA
+
+según la semántica aprobada en DGP-021.0.
+
+==================================================
+7. SNAPSHOT
+==================================================
+
+Al materializar el consumo:
+
+congelar:
+
+- artículo;
+- cantidad;
+- unidad;
+- costo unitario;
+- costo total;
+- moneda;
+- fuente;
+- referencia del movimiento;
+- OT;
+- activo;
+- fecha;
+- identidad;
+- evidencia.
+
+Posteriores cambios del costo promedio ponderado NO deben modificar el hecho histórico.
+
+Ejemplo:
+
+Salida:
+10 unidades
+
+Costo promedio:
+"35000.123456"
+
+Costo materializado:
+
+"350001.234560"
+
+Posteriormente el costo promedio cambia.
+
+El hecho histórico debe continuar mostrando:
+
+"350001.234560"
+
+No recalcular automáticamente.
+
+==================================================
+8. PRECISIÓN
+==================================================
+
+Mantener decimal string-safe extremo a extremo.
+
+PostgreSQL numeric
+→ driver string
+→ dominio string
+→ API string.
+
+No utilizar:
+
+parseFloat
+Number
+Math.round
+floats.
+
+La multiplicación debe realizarse mediante aritmética decimal segura según el patrón establecido en DGP-020.3/DGP-021.1.
+
+Definir y probar:
+
+cantidad
+×
+costoUnitario
+=
+costoTotal
+
+sin pérdida de precisión.
+
+==================================================
+9. CANTIDAD
+==================================================
+
+Determinar la precisión real permitida para cantidades de inventario.
+
+No asumir que todas las cantidades son enteros.
+
+Evaluar:
+
+- unidades;
+- kg;
+- litros;
+- metros;
+- otras unidades existentes.
+
+Conservar la precisión definida por Inventario.
+
+No cambiar la semántica de unidades.
+
+==================================================
+10. UNIDADES
+==================================================
+
+No mezclar unidades incompatibles.
+
+Ejemplo:
+
+10 kg
+
+NO pueden convertirse automáticamente en:
+
+10 unidades.
+
+Si Inventario ya posee unidad de medida:
+
+utilizar el contrato existente.
+
+No crear un sistema paralelo de unidades.
+
+==================================================
+11. MONEDAS
+==================================================
+
+El costo proviene de DGP-021.0 por:
+
+artículo + moneda.
+
+Si existen varias monedas para un mismo artículo:
+
+NO elegir arbitrariamente.
+
+NO convertir.
+
+Determinar comportamiento correcto:
+
+- exigir moneda;
+- devolver varias alternativas;
+- o marcar GAP.
+
+La decisión debe estar sustentada por el contrato real.
+
+Nunca sumar monedas distintas.
+
+==================================================
+12. ESTADOS
+==================================================
+
+Determinar qué sucede cuando un movimiento de inventario:
+
+- está confirmado;
+- está pendiente;
+- está anulado;
+- es devuelto;
+- es ajustado.
+
+No materializar un costo definitivo desde un movimiento que todavía no sea un hecho físico confirmado.
+
+Si el contrato no permite distinguirlo:
+
+documentar GAP.
+
+==================================================
+13. DEVOLUCIONES
+==================================================
+
+Investigar específicamente cómo Inventario representa devoluciones.
+
+No asumir que una devolución es simplemente una salida negativa.
+
+Si existe contrato explícito:
+
+componerlo.
+
+Si no existe:
+
+documentar GAP.
+
+La devolución debe evitar duplicar costos.
+
+Si se requiere reversión:
+
+debe quedar auditada.
+
+Nunca borrar el hecho económico original.
+
+==================================================
+14. ANULACIONES
+==================================================
+
+Si el movimiento origen se anula después de materializar el costo:
+
+no borrar el hecho económico.
+
+Debe existir un mecanismo de compensación/anulación compatible con module-costos.
+
+El resultado debe permitir reconstruir:
+
+hecho original
++
+anulación/corrección
+
+Si el contrato de Inventario no permite detectar esta situación:
+
+documentar GAP.
+
+==================================================
+15. IDEMPOTENCIA
+==================================================
+
+La materialización debe ser idempotente.
+
+Utilizar el identificador de operación/origen apropiado.
+
+Definir una identidad determinista para:
+
+Movimiento Inventario
+→ Hecho Económico
+
+No generar múltiples hechos para el mismo consumo.
+
+Probar:
+
+mismo evento dos veces.
+
+Resultado:
+
+exactamente un hecho.
+
+==================================================
+16. CONCURRENCIA
+==================================================
+
+Probar contra PostgreSQL real:
+
+- dos materializaciones simultáneas del mismo movimiento;
+- dos movimientos diferentes;
+- mismo movimiento con diferentes opId;
+- materialización + anulación simultánea cuando aplique.
+
+Resultado determinista.
+
+No confiar solamente en validaciones frontend.
+
+==================================================
+17. ORQUESTACIÓN
+==================================================
+
+El corpus no posee suscripción cross-módulo general.
+
+Seguir el patrón aprobado:
+
+api-server
+→ orquestación
+→ module-costos.
+
+La materialización debe ser:
+
+- fail-safe;
+- idempotente;
+- recuperable;
+- auditable.
+
+Si Inventario completa correctamente un movimiento pero module-costos falla:
+
+NO romper el movimiento físico.
+
+Debe quedar:
+
+PENDIENTE / NO MATERIALIZADO / equivalente contractual.
+
+No inventar estado si el módulo no lo soporta.
+
+Debe existir una forma de recuperación.
+
+==================================================
+18. OFFLINE
+==================================================
+
+Revisar si las salidas de Inventario pueden producirse offline.
+
+Si existen:
+
+determinar exactamente cuándo se considera el movimiento confirmado.
+
+No materializar un costo económico definitivo usando información local no confirmada.
+
+Utilizar la cola offline existente.
+
+NO crear segunda cola.
+
+Probar:
+
+offline
+→ sincronización
+→ movimiento confirmado
+→ materialización económica.
+
+==================================================
+19. AUDITORÍA
+==================================================
+
+El hecho económico debe permitir responder:
+
+¿Qué artículo?
+
+¿Qué cantidad?
+
+¿De qué movimiento de Inventario?
+
+¿De qué bodega?
+
+¿Para qué OT?
+
+¿Sobre qué activo?
+
+¿Qué costo unitario?
+
+¿Qué moneda?
+
+¿Qué costo total?
+
+¿De qué recepción/costo promedio provino?
+
+¿Quién ejecutó el movimiento?
+
+¿Quién materializó el hecho?
+
+¿Cuándo?
+
+¿Qué opId?
+
+¿Qué ocurrió si posteriormente fue anulado?
+
+No duplicar toda la entidad de Inventario.
+
+Conservar referencias suficientes.
+
+==================================================
+20. RBAC
+==================================================
+
+Mantener autorización en los módulos de origen.
+
+No otorgar a module-costos capacidad para saltarse las reglas de Inventario.
+
+La materialización automática debe ejecutarse mediante el mecanismo de servicio aprobado.
+
+El usuario no debe poder crear arbitrariamente:
+
+"consumo = 10 unidades"
+
+sin pasar por el contrato de Inventario correspondiente.
+
+==================================================
+21. RLS
+==================================================
+
+Probar:
+
+Tenant A → movimiento A → costo A = PASS.
+
+Tenant A → movimiento B = REJECT.
+
+Tenant B → OT A = REJECT.
+
+Tenant B → activo A = REJECT.
+
+No aceptar tenantId arbitrario.
+
+No utilizar filtros frontend.
+
+==================================================
+22. READ MODELS
+==================================================
+
+Extender los read models de module-costos únicamente para permitir:
+
+- costos por OT;
+- costos por activo;
+- costos por artículo;
+- costos por movimiento;
+- costos por moneda;
+- trazabilidad del origen.
+
+NO crear todavía:
+
+- costo total OT consolidado;
+- costo total activo consolidado;
+- costo/hora;
+- costo/km;
+- dashboards.
+
+Eso será posterior.
+
+==================================================
+23. FRONTEND
+==================================================
+
+No crear todavía dashboard de costos.
+
+Si se necesita una visualización para E2E:
+
+usar una superficie operacional mínima.
+
+Debe mostrar claramente:
+
+- artículo;
+- cantidad;
+- costo unitario;
+- costo total;
+- moneda;
+- OT;
+- activo;
+- origen.
+
+No crear gráficos ejecutivos.
+
+==================================================
+24. SEED DEMO
+==================================================
+
+El informe DGP-021.1 indicó:
+
+"el tenant demo carece de catálogos de abastecimiento sembrados".
+
+Resolver únicamente lo necesario para que DGP-021.2 pueda ejecutar un escenario real:
+
+- artículo;
+- recepción;
+- costo promedio ponderado;
+- movimiento de inventario;
+- OT;
+- activo.
+
+El seed debe ser:
+
+- idempotente;
+- tenant-scoped;
+- reproducible.
+
+No introducir datos ficticios que no representen contratos reales.
+
+==================================================
+25. PRUEBAS OBLIGATORIAS
+==================================================
+
+Crear pruebas para:
+
+1. movimiento válido.
+2. artículo válido.
+3. OT válida.
+4. activo derivado.
+5. costo exacto.
+6. cantidad decimal.
+7. costo total exacto.
+8. snapshot.
+9. cambio posterior del costo.
+10. ausencia de costo.
+11. múltiples monedas.
+12. movimiento inválido.
+13. OT inválida.
+14. tenant incorrecto.
+15. identidad incorrecta.
+16. anulación.
+17. devolución si el contrato existe.
+18. mismo movimiento dos veces.
+19. concurrencia.
+20. offline si aplica.
+21. RLS.
+22. RBAC.
+23. OpenAPI.
+24. regresión de Inventario.
+25. regresión de module-costos.
+
+==================================================
+26. E2E REAL
+==================================================
+
+Ejecutar navegador/API real con tenant demo:
+
+1. Crear/verificar artículo.
+2. Crear/verificar recepción.
+3. Confirmar costo promedio ponderado.
+4. Crear/verificar movimiento de salida.
+5. Asociarlo a OT mediante el mecanismo contractual existente.
+6. Confirmar activo derivado de OT.
+7. Materializar costo.
+8. Verificar snapshot.
+9. Cambiar posteriormente el costo de origen.
+10. Verificar que el histórico no cambió.
+11. Consultar costo por OT.
+12. Consultar costo por activo.
+13. Probar aislamiento tenant.
+14. Probar RBAC.
+15. Probar reintento/idempotencia.
+
+Si Inventario no permite alguna operación desde UI:
+
+usar el contrato API real para la validación.
+
+No usar mocks para afirmar integración real.
+
+==================================================
+27. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Ejecutar revisión independiente.
+
+Buscar especialmente:
+
+- duplicación de Inventario;
+- duplicación de Abastecimiento;
+- floats;
+- pérdida de precisión;
+- costo incorrecto;
+- activo incorrecto;
+- OT arbitraria;
+- snapshot mutable;
+- múltiples hechos por un movimiento;
+- bypass RLS;
+- bypass RBAC;
+- falta de recuperación;
+- segunda cola offline;
+- materialización antes de confirmación física;
+- devolución incorrecta;
+- anulación incorrecta.
+
+R1 FAIL
+→ corregir
+→ R2.
+
+Solo PASS sin críticos/mayores.
+
+==================================================
+28. CRITERIOS DE CIERRE
+==================================================
+
+DGP-021.2 solo puede cerrarse PASS cuando:
+
+1. Inventario continúa siendo fuente de verdad física.
+2. Abastecimiento continúa siendo fuente de verdad del costo promedio.
+3. module-costos continúa siendo fuente de verdad del hecho económico.
+4. Existe relación verificable movimiento→OT.
+5. Existe relación verificable OT→activo.
+6. Costo exacto viene exclusivamente de DGP-021.0.
+7. No existe float.
+8. Snapshot es inmutable.
+9. Monedas no se mezclan.
+10. Idempotencia funciona.
+11. Concurrencia funciona.
+12. RLS funciona.
+13. RBAC funciona.
+14. Anulación es auditable.
+15. Devoluciones están resueltas o declaradas GAP.
+16. Offline está resuelto o declarado GAP.
+17. Seed demo reproducible.
+18. Read models funcionan.
+19. E2E real PASS.
+20. OpenAPI sin drift.
+21. Tests verdes.
+22. Revisión arquitectónica PASS.
+
+==================================================
+29. PROHIBICIONES
+==================================================
+
+NO implementar todavía:
+
+- costo total OT consolidado;
+- costo total activo consolidado;
+- costo/hora;
+- costo/km;
+- Analytics ejecutivo;
+- dashboards;
+- conversión de monedas;
+- impuestos;
+- facturación;
+- costo estándar;
+- último costo;
+- integración de otros costos.
+
+Estos pertenecen a fases posteriores.
+
+==================================================
+30. ENTREGABLE FINAL
+==================================================
+
+Generar:
+
+INFORME OFICIAL DE CIERRE — DGP-021.2
+
+Debe contener:
+
+- arquitectura;
+- fuente de verdad;
+- movimiento→costo;
+- OT→activo;
+- costo exacto;
+- snapshot;
+- precisión;
+- monedas;
+- idempotencia;
+- concurrencia;
+- offline;
+- anulaciones;
+- devoluciones;
+- auditoría;
+- RLS;
+- RBAC;
+- read models;
+- seed;
+- OpenAPI;
+- pruebas;
+- E2E;
+- revisión arquitectónica;
+- GAPs;
+- deuda;
+- commits.
+
+==================================================
+31. REGLA FINAL
+==================================================
+
+DGP-021.2 NO debe iniciar DGP-021.3 automáticamente.
+
+Al completar:
+
+DETENERSE.
+
+Esperar aprobación explícita de Dirección.
