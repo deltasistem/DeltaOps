@@ -9,29 +9,30 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import type { PlatformRuntime } from "@workspace/platform";
 import { deltaopsRuntime } from "./reference-runtime";
+import { requireIdentity, requireSuperAdmin } from "../../deltaops/identity/middleware";
 
 const router: IRouter = Router();
 
 /**
- * Control de acceso: la Consola Técnica expone metadatos operativos
- * (auditoría, colas, almacenamiento) y exige sesión autenticada de DeltaOps.
+ * Control de acceso (DGP-022.1 · cierre de PLATFORM-CONSOLE-ACL).
+ *
+ * La Consola Técnica expone metadatos GLOBALES de la plataforma (auditoría,
+ * colas, almacenamiento, storage) potencialmente cross-tenant. Su autorización
+ * debe depender EXCLUSIVAMENTE del rol REAL de plataforma (canónico
+ * `SUPER_ADMIN`, al que se eleva el legacy `platform_admin`).
+ *
+ * Se compone el contrato canónico ya existente, FAIL-CLOSED:
+ *   1) `requireIdentity`     → exige sesión Enterprise coherente (identidad
+ *      ACTIVA + membresía ACTIVA + tenant OPERATIVO + epoch vigente). Sin sesión
+ *      válida ⇒ 401 canónico (`AUTH_REQUIRED`).
+ *   2) `requireSuperAdmin`   → exige `esSuperAdmin(ctx.rolCanonico)`. Cualquier
+ *      otro rol (TENANT_ADMIN, SUPERVISOR, PLANIFICADOR, TECNICO, CONSULTA) ⇒ 403.
+ *
+ * NUNCA se autoriza por el rol legacy `admin`, por membresía de tenant, por
+ * nombre de tenant, por permisos de módulo ni por ausencia de tenant. El rol
+ * canónico proviene de la membresía sellada en la sesión (jamás del cliente).
  */
-router.use("/deltaops/platform", async (req, res, next): Promise<void> => {
-  const userId = req.session?.deltaopsUserId;
-  if (!userId) {
-    res.status(401).json({ error: "No autenticado" });
-    return;
-  }
-  // Mínimo privilegio: la consola expone metadatos globales (colas, auditoría,
-  // almacenamiento), reservados a administradores de plataforma.
-  const rows = await pool.query(`SELECT rol FROM deltaops.users WHERE id = $1`, [userId]);
-  const rol = rows.rows[0]?.rol;
-  if (rol !== "platform_admin" && rol !== "admin") {
-    res.status(403).json({ error: "Requiere rol de administrador de plataforma" });
-    return;
-  }
-  next();
-});
+router.use("/deltaops/platform", requireIdentity, requireSuperAdmin);
 
 /** Runtime compartido de DeltaOps (Kernel + Plataforma + Reference Module). */
 function platform(): PlatformRuntime {

@@ -61,6 +61,19 @@ const PASS_DEMO = credencialDemo(CLAVES_ENV.DEMO_ADMIN);
 const PASS_PLAT = credencialDemo(CLAVES_ENV.PLATFORM_ADMIN);
 const PASS_AB = credencialDemo(CLAVES_ENV.DEMO_SUPERVISOR); // reutiliza un default dev
 
+// DGP-022.1 · roles adicionales para el barrido PLATFORM-CONSOLE-ACL. Emails
+// únicos por corrida (aislamiento del seed y de otros archivos que corren en
+// paralelo contra la MISMA BD dev). Cada uno con su membresía por rol canónico.
+const PASS_SUP = credencialDemo(CLAVES_ENV.DEMO_SUPERVISOR);
+const PASS_PLN = credencialDemo(CLAVES_ENV.DEMO_PLANIFICADOR);
+const PASS_TEC = credencialDemo(CLAVES_ENV.DEMO_TECNICO);
+const PASS_CON = credencialDemo(CLAVES_ENV.DEMO_CONSULTA);
+const EMAIL_SUP = `plat.sup.${RUN}@delta.test`;
+const EMAIL_PLN = `plat.pln.${RUN}@delta.test`;
+const EMAIL_TEC = `plat.tec.${RUN}@delta.test`;
+const EMAIL_CON = `plat.con.${RUN}@delta.test`;
+const EMAIL_TA_B = `plat.ta-b.${RUN}@delta.test`; // TENANT_ADMIN del tenant B (cross-tenant)
+
 let server: Server;
 let base = "";
 
@@ -146,6 +159,14 @@ beforeAll(async () => {
   await asegurarIdentidad(EMAIL_AB, "AB Tester", PASS_AB, "delta-demo", "TENANT_ADMIN");
   await asegurarIdentidad(EMAIL_AB, "AB Tester", PASS_AB, TENANT_B, "SUPERVISOR");
 
+  // DGP-022.1: un actor por cada rol no-plataforma en delta-demo (tenant A) y un
+  // TENANT_ADMIN adicional en el tenant B único (para el cross-tenant A/B).
+  await asegurarIdentidad(EMAIL_SUP, "Sup Plat", PASS_SUP, "delta-demo", "SUPERVISOR");
+  await asegurarIdentidad(EMAIL_PLN, "Pln Plat", PASS_PLN, "delta-demo", "PLANIFICADOR");
+  await asegurarIdentidad(EMAIL_TEC, "Tec Plat", PASS_TEC, "delta-demo", "TECNICO");
+  await asegurarIdentidad(EMAIL_CON, "Con Plat", PASS_CON, "delta-demo", "CONSULTA");
+  await asegurarIdentidad(EMAIL_TA_B, "TA Tenant B", PASS_DEMO, TENANT_B, "TENANT_ADMIN");
+
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => resolve());
   });
@@ -162,7 +183,11 @@ afterAll(async () => {
     for (const tbl of ["idn_invitations", "idn_password_resets", "idn_memberships", "idn_roles", "ntf_email_outbox", "platform_audit", "ten_tenants"]) {
       await c.query(`DELETE FROM deltaops.${tbl} WHERE tenant_id = $1`, [TENANT_B]).catch(() => undefined);
     }
-    await c.query(`DELETE FROM deltaops.idn_identities WHERE lower(email) = ANY($1)`, [[EMAIL_PLAT.toLowerCase(), EMAIL_AB.toLowerCase()]]).catch(() => undefined);
+    await c.query(`DELETE FROM deltaops.idn_identities WHERE lower(email) = ANY($1)`, [[
+      EMAIL_PLAT.toLowerCase(), EMAIL_AB.toLowerCase(),
+      EMAIL_SUP.toLowerCase(), EMAIL_PLN.toLowerCase(), EMAIL_TEC.toLowerCase(), EMAIL_CON.toLowerCase(),
+      EMAIL_TA_B.toLowerCase(),
+    ]]).catch(() => undefined);
   } finally {
     c.release();
   }
@@ -361,5 +386,117 @@ describe("E2E · recuperación neutra y logout", () => {
     const claveInvalida = `${PASS_DEMO}-invalida`;
     const r = await c.req("POST", "/deltaops/auth/login", { email: "admin@delta.demo", password: claveInvalida, tenantId: "delta-demo" });
     expect(r.status).toBe(401);
+  });
+});
+
+/* ==================================================================== */
+/* DGP-022.1 · CIERRE DE PLATFORM-CONSOLE-ACL                            */
+/* -------------------------------------------------------------------- */
+/* Barrido de TODOS los endpoints de la consola de plataforma           */
+/* (`/api/deltaops/platform/*`) por CADA rol. Regla objetivo:           */
+/*   - SUPER_ADMIN            → permitido (2xx/5xx de negocio, NUNCA     */
+/*                              401/403).                                */
+/*   - TENANT_ADMIN (A y B)   → 403 (NO acepta 'admin' legacy).          */
+/*   - SUPERVISOR/PLANIFICADOR/TECNICO/CONSULTA → 403.                   */
+/*   - ANÓNIMO                → 401 canónico (AUTH_REQUIRED).            */
+/* Se enumeran desde el código real (10 endpoints de solo lectura). Las */
+/* superficies /health,/ready,/info,/metrics NO pertenecen a la consola */
+/* (liveness pública sin datos de tenant) y quedan fuera de este ACL.   */
+/* ==================================================================== */
+describe("E2E · PLATFORM-CONSOLE-ACL (DGP-022.1) — barrido endpoints × roles", () => {
+  // Enumeración EXACTA de la consola (platform-console.ts). Todos GET.
+  const ENDPOINTS_PLATAFORMA = [
+    "/deltaops/platform/services",
+    "/deltaops/platform/capabilities",
+    "/deltaops/platform/dependencies",
+    "/deltaops/platform/knowledge-graph",
+    "/deltaops/platform/services/health",
+    "/deltaops/platform/queues",
+    "/deltaops/platform/jobs",
+    "/deltaops/platform/logs",
+    "/deltaops/platform/storage",
+    "/deltaops/platform/config-defaults",
+  ] as const;
+
+  async function loginCliente(email: string, password: string, tenantId: string) {
+    const c = crearCliente();
+    const login = await c.req("POST", "/deltaops/auth/login", { email, password, tenantId });
+    expect(login.status).toBe(200);
+    return { c, login };
+  }
+
+  it("ANÓNIMO ⇒ 401 AUTH_REQUIRED en TODOS los endpoints de plataforma", async () => {
+    for (const ep of ENDPOINTS_PLATAFORMA) {
+      const c = crearCliente();
+      const r = await c.req("GET", ep);
+      expect(r.status, `anónimo ${ep}`).toBe(401);
+      expect(r.json?.code, `anónimo ${ep} code`).toBe("AUTH_REQUIRED");
+    }
+  });
+
+  it("SUPER_ADMIN ⇒ PERMITIDO en TODOS los endpoints (jamás 401/403)", async () => {
+    const { c, login } = await loginCliente(EMAIL_PLAT, PASS_PLAT, TENANT_B);
+    expect(login.json.rol).toBe("SUPER_ADMIN");
+    for (const ep of ENDPOINTS_PLATAFORMA) {
+      const r = await c.req("GET", ep);
+      expect(r.status, `super-admin ${ep}`).not.toBe(401);
+      expect(r.status, `super-admin ${ep}`).not.toBe(403);
+      expect(r.status, `super-admin ${ep}`).toBeLessThan(500);
+    }
+  });
+
+  it("TENANT_ADMIN tenant A (delta-demo) ⇒ 403 en TODOS (NO acepta 'admin' legacy)", async () => {
+    const { c, login } = await loginCliente("admin@delta.demo", PASS_DEMO, "delta-demo");
+    expect(login.json.rol).toBe("TENANT_ADMIN");
+    for (const ep of ENDPOINTS_PLATAFORMA) {
+      const r = await c.req("GET", ep);
+      expect(r.status, `tenant-admin-A ${ep}`).toBe(403);
+      expect(r.json?.code, `tenant-admin-A ${ep} code`).toBe("FORBIDDEN");
+    }
+  });
+
+  it("TENANT_ADMIN tenant B ⇒ 403 en TODOS (aislamiento cross-tenant)", async () => {
+    const { c, login } = await loginCliente(EMAIL_TA_B, PASS_DEMO, TENANT_B);
+    expect(login.json.rol).toBe("TENANT_ADMIN");
+    for (const ep of ENDPOINTS_PLATAFORMA) {
+      const r = await c.req("GET", ep);
+      expect(r.status, `tenant-admin-B ${ep}`).toBe(403);
+    }
+  });
+
+  it.each([
+    ["SUPERVISOR", EMAIL_SUP, PASS_SUP],
+    ["PLANIFICADOR", EMAIL_PLN, PASS_PLN],
+    ["TECNICO", EMAIL_TEC, PASS_TEC],
+    ["CONSULTA", EMAIL_CON, PASS_CON],
+  ])("rol %s ⇒ 403 en TODOS los endpoints de plataforma", async (rol, email, pass) => {
+    const { c, login } = await loginCliente(email as string, pass as string, "delta-demo");
+    expect(login.json.rol).toBe(rol);
+    for (const ep of ENDPOINTS_PLATAFORMA) {
+      const r = await c.req("GET", ep);
+      expect(r.status, `${rol} ${ep}`).toBe(403);
+      expect(r.json?.code, `${rol} ${ep} code`).toBe("FORBIDDEN");
+    }
+  });
+
+  it("CROSS-TENANT (repetición DGP-022): TENANT_ADMIN delta-demo NO ve /logs ni /storage ajenos", async () => {
+    const { c } = await loginCliente("admin@delta.demo", PASS_DEMO, "delta-demo");
+    // Los endpoints que en DGP-022 devolvían 200 con datos cross-tenant ahora 403,
+    // por lo que NO puede existir ningún tenant_id/agregado ajeno en la respuesta.
+    for (const ep of ["/deltaops/platform/logs", "/deltaops/platform/storage", "/deltaops/platform/queues", "/deltaops/platform/jobs"]) {
+      const r = await c.req("GET", ep);
+      expect(r.status, `cross-tenant ${ep}`).toBe(403);
+      const s = JSON.stringify(r.json ?? {});
+      expect(s, `cross-tenant ${ep} sin fuga`).not.toMatch(/tenant_id|deltaops|delta-demo/);
+    }
+  });
+
+  it("FAIL-CLOSED: sesión incompleta (sin rolCanonico) ⇒ 401, jamás fallback", async () => {
+    // Una cookie sin contexto Enterprise completo no puede autorizar plataforma.
+    // Se ejerce con un cliente sin login (contexto ausente ⇒ 401 canónico).
+    const c = crearCliente();
+    const r = await c.req("GET", "/deltaops/platform/logs");
+    expect(r.status).toBe(401);
+    expect(r.json?.code).toBe("AUTH_REQUIRED");
   });
 });
