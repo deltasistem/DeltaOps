@@ -40,4 +40,5 @@
 - [Indicadores DGP-021.4](deltaops-indicadores-dgp021-4.md) — extensión aditiva de contrato congelado solo con aprobación; series intersectadas al rango pedido; paginar o fallar cerrado; ratios BigInt intra-tramo; re-seed tras cada suite PG.
 - [Auditoría DGP-022](deltaops-auditoria-dgp022.md) — CRÍTICO abierto PLATFORM-CONSOLE-ACL (TENANT_ADMIN lee /platform/* cross-tenant); probar API directa por rol, no solo la ruta UI; piloto condicionado, producción NO sin hardening.
 - [Hardening DGP-023](deltaops-hardening-dgp023.md) — H-01 cerrado (SGMA retirado en 023.2, health gate → /deltaops/platform/health); H-02 abierto: RLS inactiva (app conecta como superusuario rolbypassrls); resto del hardening pendiente.
+- [Discovery RLS DGP-023.3](deltaops-rls-discovery-dgp023-3.md) — RLS inefectiva por bypass+ownership (ambas); STOP-1 login withGlobal sin tenant; tenantId en payload outbox no es invariante.
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.
