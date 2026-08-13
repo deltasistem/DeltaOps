@@ -17,6 +17,11 @@ description: Hallazgos CRÍTICOS/ALTOS abiertos de la auditoría de producción 
 - Sin headers de seguridad (CSP/HSTS/X-Content-Type-Options/…); `X-Powered-By` expuesto.
 - Sin backups/DR/rollback documentados; sin RPO/RTO.
 
+## H-01 profundizado (DGP-023-H01, análisis de dependencias)
+- La superficie legacy (43 rutas, 9 tablas `public.*` con ~52 filas demo) **NO es eliminable unilateralmente**: `artifacts/sgma` es un producto vivo (workflow corriendo, deploy configurado) que la consume vía hooks generados desde `lib/api-spec/openapi.yaml` (`baseUrl:/api`). Retirar paths del contrato rompe su compilación al regenerar el cliente.
+- **DeltaOps probado independiente:** cero referencias a hooks/rutas/tablas legacy en `artifacts/deltaops` y en `lib/module-*`/`routes/deltaops/*`; esquemas disjuntos (public.* vs deltaops.*, sin FKs cruzadas); `seed-sgma` es script manual sin cableado.
+- Recomendación entregada: **B) aislamiento temporal** ya (cerrar CRUD anónimo sin romper sgma) → luego C (migrar) o A (eliminar) según decida Dirección el futuro de sgma. Pendiente de decisión.
+
 ## Contexto durable
 - **Why:** una lectura anónima que devuelve datos de negocio y una RLS que el motor ignora son contención rota, no "mejores prácticas". El programa distingue bloqueante real de preferencia.
 - **How to apply:** antes de cualquier piloto real hay que resolver H-01 (exposición anónima inmediata); antes de producción general, H-02 + ALTOS. Roadmap propuesto DGP-023.1..023.8 (HTTP/API → Auth/Sesiones → RLS/Multitenancy → Infra/Secrets → Backups/DR → Observabilidad → Frontend/Perf → validación final). No iniciar ninguna sub-fase sin aprobación expresa.
