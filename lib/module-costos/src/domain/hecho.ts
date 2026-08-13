@@ -68,6 +68,19 @@ export interface IdentidadHecho {
   readonly activoId: string | null;
   /** Identidad canónica atribuible (p.ej. autorizante de OTROS). null si no aplica. */
   readonly identityId: string | null;
+  /**
+   * DGP-021.2 · Trazabilidad de ORIGEN FÍSICO. Movimiento de inventario que
+   * originó el hecho (MATERIAL vía orquestación). Es la identidad determinista
+   * movimiento→hecho: `opId = "inv:" + movimientoId` garantiza 1 hecho por
+   * movimiento. NULL cuando el hecho NO proviene de un movimiento (p.ej. OTROS).
+   */
+  readonly movimientoId: string | null;
+  /**
+   * DGP-021.2 · Artículo/ítem del hecho (read model «por artículo»). Para
+   * MATERIAL es el `articuloId` de Abastecimiento (== `itemId` de inventario);
+   * NULL cuando no aplica.
+   */
+  readonly articuloId: string | null;
   /** opId de la materialización (idempotencia durable). */
   readonly opId: string;
 }
@@ -112,6 +125,10 @@ export interface EntradaMaterializar {
   readonly otId: string;
   readonly activoId: string | null;
   readonly identityId: string | null;
+  /** DGP-021.2 · Movimiento de inventario de origen (null si no aplica). */
+  readonly movimientoId?: string | null;
+  /** DGP-021.2 · Artículo/ítem del hecho (null si no aplica). */
+  readonly articuloId?: string | null;
   readonly opId: string;
   readonly cantidad: Dinero;
   readonly unidad: string;
@@ -149,6 +166,8 @@ export function materializar(e: EntradaMaterializar): Result<HechoEconomico, Ker
     otId: e.otId,
     activoId: e.activoId,
     identityId: e.identityId,
+    movimientoId: e.movimientoId ?? null,
+    articuloId: e.articuloId ?? null,
     opId: e.opId,
     estado: "ACTIVO",
     registradoAt: e.registradoAt,

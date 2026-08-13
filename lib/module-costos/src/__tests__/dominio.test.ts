@@ -65,6 +65,13 @@ describe("DGP-021.1 · dinero string-safe", () => {
     const r2 = multiplicar("0.500000", "0.000001");
     expect(r2.ok && r2.value).toBe("0.000001");
   });
+
+  it("DGP-021.2 · cantidad decimal × costo unitario de escala 6 es EXACTO", () => {
+    // Caso de la directiva: NO asumir cantidades enteras; escala real (18,6).
+    // 10.000000 × 35000.123456 = 350001.234560 (exacto, sin float).
+    const r = multiplicar("10.000000", "35000.123456");
+    expect(r.ok && r.value).toBe("350001.234560");
+  });
 });
 
 describe("DGP-021.1 · hecho económico", () => {
@@ -81,6 +88,23 @@ describe("DGP-021.1 · hecho económico", () => {
   it("materializar RECHAZA moneda vacía y origen vacío", () => {
     expect(materializar(base({ moneda: "   " })).ok).toBe(false);
     expect(materializar(base({ origen: { originType: "", originId: "x" } })).ok).toBe(false);
+  });
+
+  it("DGP-021.2 · congela trazabilidad de ORIGEN (movimientoId/articuloId)", () => {
+    const r = materializar(base({
+      tipo: "MATERIAL",
+      origen: { originType: "inventario.movimiento", originId: "mov-77" },
+      movimientoId: "mov-77",
+      articuloId: "art-1",
+    }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.movimientoId).toBe("mov-77");
+    expect(r.value.articuloId).toBe("art-1");
+    // Sin trazabilidad (OTROS manual): ambos null por defecto.
+    const otros = materializar(base());
+    expect(otros.ok && otros.value.movimientoId).toBeNull();
+    expect(otros.ok && otros.value.articuloId).toBeNull();
   });
 
   it("anular es auditable y NO toca el snapshot", () => {

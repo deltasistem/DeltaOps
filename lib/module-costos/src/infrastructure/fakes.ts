@@ -64,6 +64,8 @@ export class FakeHechoRepository implements HechoRepository {
     let rows = [...this.data.values()].filter((h) => h.tenantId === tenantId);
     if (filtro.otId) rows = rows.filter((h) => h.otId === filtro.otId);
     if (filtro.activoId) rows = rows.filter((h) => h.activoId === filtro.activoId);
+    if (filtro.movimientoId) rows = rows.filter((h) => h.movimientoId === filtro.movimientoId);
+    if (filtro.articuloId) rows = rows.filter((h) => h.articuloId === filtro.articuloId);
     if (filtro.tipo) rows = rows.filter((h) => h.tipo === filtro.tipo);
     if (filtro.moneda) rows = rows.filter((h) => h.snapshot.moneda === filtro.moneda);
     if (filtro.estado) rows = rows.filter((h) => h.estado === filtro.estado);

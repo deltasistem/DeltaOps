@@ -170,6 +170,8 @@ function hechoAResultado(h: HechoEconomico): Record<string, unknown> {
     otId: h.otId,
     activoId: h.activoId,
     identityId: h.identityId,
+    movimientoId: h.movimientoId ?? null,
+    articuloId: h.articuloId ?? null,
     opId: h.opId,
     estado: h.estado,
     cantidad: h.snapshot.cantidad,
@@ -263,11 +265,19 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
       // activo, consume el contrato público de costo exacto y CONGELA el snapshot.
       (deps) => ({
         name: `${MODULO}.hecho.materializar-material`,
+        // DGP-021.2 · ANTI-BYPASS (§20): la vía CANÓNICA de MATERIAL es el
+        // movimiento físico de inventario. El comando EXIGE `movimientoId` (origen
+        // determinista) y sólo lo invoca la ORQUESTACIÓN de servicio del api-server
+        // tras confirmar un movimiento; NO se puede fabricar un consumo de MATERIAL
+        // sin un movimiento real. La única vía manual queda en `materializar-otros`
+        // (tipo OTROS). Justificación documentada: DGP-021.2 §D5 (extensión de la
+        // MISMA serie 021.x, no de un contrato congelado ajeno).
         inputSchema: z.object({
           opId: opIdSchema,
           costoId: z.string().uuid().optional(),
           otId: z.string().min(1),
           articuloId: z.string().min(1),
+          movimientoId: z.string().min(1, "movimientoId es obligatorio: MATERIAL sólo se materializa desde un movimiento de inventario"),
           cantidad: dineroSchema,
           unidad: z.string().min(1),
           moneda: z.string().min(1),
@@ -302,16 +312,22 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
             costoId: input.costoId ?? crypto.randomUUID(),
             tenantId: tenant.value,
             tipo: "MATERIAL",
-            origen: { originType: "abastecimiento.costo-exacto", originId: input.articuloId },
+            // ORIGEN físico determinista: el movimiento de inventario. El costo
+            // EXACTO sigue viniendo de Abastecimiento (se guarda crudo en `fuente`).
+            origen: { originType: "inventario.movimiento", originId: input.movimientoId },
             otId: input.otId,
             activoId: ot.value.activoId,
             identityId: null,
+            movimientoId: input.movimientoId,
+            articuloId: input.articuloId,
             opId: input.opId,
             cantidad: input.cantidad,
             unidad: input.unidad,
             costoUnitario: exacto.costoUnitario,
             moneda: input.moneda,
             fuente: {
+              // Trazabilidad de ORIGEN (movimiento) + copia CRUDA del costo exacto.
+              movimientoId: input.movimientoId,
               articuloId: exacto.articuloId,
               moneda: exacto.moneda,
               metodoValoracion: exacto.metodoValoracion,
@@ -501,6 +517,9 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
         inputSchema: z.object({
           otId: z.string().optional(),
           activoId: z.string().optional(),
+          // DGP-021.2 · read models de trazabilidad: por movimiento y por artículo.
+          movimientoId: z.string().optional(),
+          articuloId: z.string().optional(),
           tipo: z.enum([...TIPOS_HECHO] as [string, ...string[]]).optional(),
           moneda: z.string().optional(),
           estado: z.enum([...ESTADOS_HECHO] as [string, ...string[]]).optional(),
@@ -516,6 +535,8 @@ export function costosModule(adapters: ModuleAdapters): PlatformServiceDefinitio
           const r = await adapters.hechos.listar(tenant.value, {
             otId: input.otId,
             activoId: input.activoId,
+            movimientoId: input.movimientoId,
+            articuloId: input.articuloId,
             tipo: input.tipo as TipoHecho | undefined,
             moneda: input.moneda,
             estado: input.estado as EstadoHecho | undefined,

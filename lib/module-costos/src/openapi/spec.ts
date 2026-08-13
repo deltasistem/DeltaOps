@@ -83,12 +83,13 @@ export function construirOpenApi(): Record<string, unknown> {
         costoId: str({ format: "uuid" }),
         otId: str({ description: "OT verificada por contrato público; el activo se DERIVA de la relación canónica" }),
         articuloId: str({ description: "Artículo cuyo costo EXACTO se snapshotea (DGP-021.0)" }),
+        movimientoId: str({ description: "DGP-021.2 ANTI-BYPASS (§20): movimiento de inventario de ORIGEN (OBLIGATORIO). MATERIAL sólo se materializa desde un movimiento físico confirmado; la orquestación de servicio deriva el opId determinista inv:<movimientoId>. NO existe MATERIAL manual." }),
         cantidad: dineroReq,
         unidad: str(),
         moneda: str({ description: "Moneda del hecho; debe existir costo exacto en esa moneda (SIN COSTO ≠ 0)" }),
         ocurridoAt: str({ format: "date-time" }),
       },
-      ["opId", "otId", "articuloId", "cantidad", "unidad", "moneda"],
+      ["opId", "otId", "articuloId", "movimientoId", "cantidad", "unidad", "moneda"],
     ),
     MaterializarOtros: obj(
       {
@@ -117,6 +118,8 @@ export function construirOpenApi(): Record<string, unknown> {
         originType: str(), originId: str(),
         otId: str(), activoId: str({ nullable: true, description: "Derivado de la OT; null si la OT no tiene activo principal" }),
         identityId: str({ nullable: true }),
+        movimientoId: str({ nullable: true, description: "DGP-021.2 · movimiento de inventario de origen (null si el hecho no proviene de un movimiento, p.ej. OTROS)" }),
+        articuloId: str({ nullable: true, description: "DGP-021.2 · artículo/ítem del hecho (null si no aplica)" }),
         opId: str(),
         estado: str({ enum: ["ACTIVO", "ANULADO"] }),
         cantidad: dineroCanon, unidad: str(),
@@ -176,9 +179,11 @@ export function construirOpenApi(): Record<string, unknown> {
   });
   add(`${BASE}/hechos`, "get", {
     tags: ["Consulta"], operationId: "costos.hechos",
-    summary: "Listar hechos económicos (por OT/activo/tipo/moneda/período/estado)",
+    summary: "Listar hechos económicos (por OT/activo/movimiento/artículo/tipo/moneda/período/estado)",
     parameters: [
       queryParam("otId", "Filtro por OT"), queryParam("activoId", "Filtro por activo"),
+      queryParam("movimientoId", "DGP-021.2 · Filtro por movimiento de inventario (trazabilidad de origen)"),
+      queryParam("articuloId", "DGP-021.2 · Filtro por artículo/ítem"),
       queryParam("tipo", "MATERIAL | COMBUSTIBLE | MANO_DE_OBRA | OTROS"),
       queryParam("moneda", "Filtro por moneda (serie por moneda; nunca se suman)"),
       queryParam("estado", "ACTIVO | ANULADO"),

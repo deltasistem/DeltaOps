@@ -10,6 +10,7 @@ import { db, deltaopsUsersTable } from "@workspace/db";
 import type { ExecutionContext, KernelError, Result } from "@workspace/kernel";
 import { ColaSyncSchema, MODULO } from "@workspace/module-inventario";
 import { inventarioRuntime, contextForInventario } from "./inventario-runtime";
+import { orquestarDesdeMover } from "./costos-orquestador";
 
 const router: IRouter = Router();
 const BASE = "/deltaops/inventario";
@@ -190,8 +191,18 @@ router.post(`${BASE}/series`, async (req, res) => {
 
 // Existencias / movimientos
 router.post(`${BASE}/mover`, async (req, res) => {
-  send(res, await exec(ctxOf(res), `${MODULO}.mover`, req.body));
+  const ctx = ctxOf(res);
+  const r = await exec(ctx, `${MODULO}.mover`, req.body);
   await drain();
+  // DGP-021.2 · ORQUESTACIÓN inventario→costos (§17/§18): SÓLO tras la confirmación
+  // en servidor del movimiento. FAIL-SAFE: el orquestador NUNCA rompe el movimiento
+  // físico (captura sus fallos como PENDIENTE recuperable). El tenant proviene del
+  // contexto de sesión (RLS), jamás del cuerpo.
+  if (r.ok) {
+    const tenant = (ctx.metadata as Record<string, unknown>)["tenantId"];
+    await orquestarDesdeMover(r.value, typeof tenant === "string" ? tenant : undefined);
+  }
+  send(res, r);
 });
 
 // Reservas

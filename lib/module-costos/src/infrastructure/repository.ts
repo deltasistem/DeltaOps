@@ -70,6 +70,8 @@ function hechoDeFila(row: Record<string, unknown>): HechoEconomico {
     otId: String(row["ot_id"]),
     activoId: row["activo_id"] == null ? null : String(row["activo_id"]),
     identityId: row["identity_id"] == null ? null : String(row["identity_id"]),
+    movimientoId: row["movimiento_id"] == null ? null : String(row["movimiento_id"]),
+    articuloId: row["articulo_id"] == null ? null : String(row["articulo_id"]),
     opId: String(row["op_id"]),
     estado: String(row["estado"]) as EstadoHecho,
     registradoAt: dt(row["registrado_at"]),
@@ -89,11 +91,12 @@ function hechoDeFila(row: Record<string, unknown>): HechoEconomico {
   };
 }
 
-const COLS_HECHO = `(costo_id, tenant_id, tipo, origin_type, origin_id, ot_id, activo_id, identity_id, op_id, estado, cantidad, unidad, costo_unitario, costo_total, moneda, fuente, ocurrido_at, registrado_at, registrado_por, anulado_at, anulado_por, motivo_anulacion)`;
+const COLS_HECHO = `(costo_id, tenant_id, tipo, origin_type, origin_id, ot_id, activo_id, identity_id, movimiento_id, articulo_id, op_id, estado, cantidad, unidad, costo_unitario, costo_total, moneda, fuente, ocurrido_at, registrado_at, registrado_por, anulado_at, anulado_por, motivo_anulacion)`;
 
 function argsHecho(h: HechoEconomico): unknown[] {
   return [
-    h.costoId, h.tenantId, h.tipo, h.origen.originType, h.origen.originId, h.otId, h.activoId, h.identityId, h.opId, h.estado,
+    h.costoId, h.tenantId, h.tipo, h.origen.originType, h.origen.originId, h.otId, h.activoId, h.identityId,
+    h.movimientoId ?? null, h.articuloId ?? null, h.opId, h.estado,
     h.snapshot.cantidad, h.snapshot.unidad, h.snapshot.costoUnitario, h.snapshot.costoTotal, h.snapshot.moneda,
     JSON.stringify(h.snapshot.fuente), h.snapshot.ocurridoAt, h.registradoAt, h.registradoPor,
     h.anuladoAt, h.anuladoPor, h.motivoAnulacion,
@@ -121,7 +124,7 @@ export class PgHechoStore implements HechoRepository {
       // concurrentes con el mismo opId ⇒ una sola fila (el segundo ve inserted=false).
       const r = await pgSessionOf(uow).query(
         `INSERT INTO deltaops.cos_hechos ${COLS_HECHO}
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20,$21,$22)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19,$20,$21,$22,$23,$24)
          ON CONFLICT (tenant_id, op_id) DO NOTHING
          RETURNING (xmax = 0) AS inserted`,
         argsHecho(h),
@@ -156,6 +159,8 @@ export class PgHechoStore implements HechoRepository {
         };
         if (filtro.otId) push("ot_id=?", filtro.otId);
         if (filtro.activoId) push("activo_id=?", filtro.activoId);
+        if (filtro.movimientoId) push("movimiento_id=?", filtro.movimientoId);
+        if (filtro.articuloId) push("articulo_id=?", filtro.articuloId);
         if (filtro.tipo) push("tipo=?", filtro.tipo);
         if (filtro.moneda) push("moneda=?", filtro.moneda);
         if (filtro.estado) push("estado=?", filtro.estado);

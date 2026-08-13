@@ -77,6 +77,10 @@ export interface CostoExactoPort {
 export interface FiltroHechos {
   readonly otId?: string;
   readonly activoId?: string;
+  /** DGP-021.2 · Read model «por movimiento» (trazabilidad de origen físico). */
+  readonly movimientoId?: string;
+  /** DGP-021.2 · Read model «por artículo/ítem». */
+  readonly articuloId?: string;
   readonly tipo?: TipoHecho;
   readonly moneda?: string;
   readonly estado?: EstadoHecho;

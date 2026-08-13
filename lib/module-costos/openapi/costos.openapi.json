@@ -355,7 +355,7 @@
           "Consulta"
         ],
         "operationId": "costos.hechos",
-        "summary": "Listar hechos económicos (por OT/activo/tipo/moneda/período/estado)",
+        "summary": "Listar hechos económicos (por OT/activo/movimiento/artículo/tipo/moneda/período/estado)",
         "parameters": [
           {
             "name": "otId",
@@ -374,6 +374,24 @@
               "type": "string"
             },
             "description": "Filtro por activo"
+          },
+          {
+            "name": "movimientoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "DGP-021.2 · Filtro por movimiento de inventario (trazabilidad de origen)"
+          },
+          {
+            "name": "articuloId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "DGP-021.2 · Filtro por artículo/ítem"
           },
           {
             "name": "tipo",
@@ -603,6 +621,10 @@
             "type": "string",
             "description": "Artículo cuyo costo EXACTO se snapshotea (DGP-021.0)"
           },
+          "movimientoId": {
+            "type": "string",
+            "description": "DGP-021.2 ANTI-BYPASS (§20): movimiento de inventario de ORIGEN (OBLIGATORIO). MATERIAL sólo se materializa desde un movimiento físico confirmado; la orquestación de servicio deriva el opId determinista inv:<movimientoId>. NO existe MATERIAL manual."
+          },
           "cantidad": {
             "type": "string",
             "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
@@ -624,6 +646,7 @@
           "opId",
           "otId",
           "articuloId",
+          "movimientoId",
           "cantidad",
           "unidad",
           "moneda"
@@ -736,6 +759,16 @@
           "identityId": {
             "type": "string",
             "nullable": true
+          },
+          "movimientoId": {
+            "type": "string",
+            "nullable": true,
+            "description": "DGP-021.2 · movimiento de inventario de origen (null si el hecho no proviene de un movimiento, p.ej. OTROS)"
+          },
+          "articuloId": {
+            "type": "string",
+            "nullable": true,
+            "description": "DGP-021.2 · artículo/ítem del hecho (null si no aplica)"
           },
           "opId": {
             "type": "string"

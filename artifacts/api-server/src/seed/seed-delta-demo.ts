@@ -35,6 +35,7 @@ import { utilizacionRuntime, principalUtilizacion } from "../routes/deltaops/uti
 import { MODULO as MODULO_UTL } from "@workspace/module-utilizacion";
 import { manodeobraRuntime, principalManodeobra } from "../routes/deltaops/manodeobra-runtime";
 import { MODULO as MODULO_MDO, CATEGORIAS_CANONICAS } from "@workspace/module-manodeobra";
+import { orquestarDesdeMover, reprocesarPendientes } from "../routes/deltaops/costos-orquestador";
 
 /* ------------------------------ Identidad DEMO --------------------------- */
 
@@ -193,7 +194,7 @@ async function seedEnterpriseIdentity(): Promise<void> {
   const modulosDemo = [
     "referencia", "activos", "ordenes", "inventario", "planes",
     "abastecimiento", "preventivo", "correctivo", "analytics", "utilizacion",
-    "manodeobra",
+    "manodeobra", "costos",
   ];
   await crearTenant({
     tenantId: DEMO_TENANT,
@@ -2040,6 +2041,195 @@ async function seedManoDeObra(): Promise<void> {
   log(`Mano de Obra: ${CATEGORIAS_CANONICAS.length} categorías canónicas + recurso Ana Soto (tecnico-mecanico) + tarifa 40000 CLP/HORA`);
 }
 
+/* ------------------- Costos: cadena Inventario→Costos (DGP-021.2) ------- */
+/**
+ * Siembra la CADENA COMPLETA que demuestra la integración
+ * ARTÍCULO→CANTIDAD→MOVIMIENTO→OT→ACTIVO→COSTO EXACTO→`cos_hechos`, por VÍAS
+ * OFICIALES y de punta a punta:
+ *
+ *   1) Un par ARTÍCULO(abastecimiento)==ITEM(inventario) con EL MISMO id (GAP-INV-ART:
+ *      `itemId(inventario) === articuloId(abastecimiento)`), moneda **CLP** (la del
+ *      tenant DEMO; nunca hardcode de otra moneda).
+ *   2) Costo EXACTO real por PROMEDIO PONDERADO: dos órdenes de compra a precios
+ *      distintos, cada una recibida en su totalidad ⇒ `abs_costos_read` acumula un
+ *      promedio ponderado autoritativo (numeric(18,6), NUNCA convertido).
+ *   3) Una OT REAL con ACTIVO PRINCIPAL (activo DEMO existente) — la fuente del
+ *      activo que Costos deriva vía `modulo.ordenes.detalle`.
+ *   4) Un movimiento de SALIDA-CONSUMO (`modulo.inventario.mover`, familia
+ *      `consumo`) del item, ATRIBUIDO a esa OT, que dispara el ORQUESTADOR real
+ *      (`orquestarDesdeMover`) — la MISMA vía del endpoint `/mover` en producción.
+ *   5) Reproceso idempotente de pendientes como red de seguridad (opId
+ *      determinista `inv:<movimientoId>` ⇒ nunca duplica el hecho).
+ *
+ * IDEMPOTENTE: ids/opId deterministas + guardas por estado real de la OC. Reejecutar
+ * el seed NO duplica artículos, OCs, recepciones, movimientos ni hechos.
+ */
+async function seedCostosMantenimiento(activoIds: Map<string, string>): Promise<void> {
+  // Par ARTÍCULO==ITEM: un ÚNICO id compartido honra GAP-INV-ART (el orquestador
+  // usa el itemId del movimiento como articuloId para el costo exacto).
+  const COSTID = idDet("costos:art-item:REP-CLP");
+  const MONEDA_TENANT = "CLP"; // moneda del tenant DEMO (declarada en Enterprise)
+
+  /* --- (a) Inventario: item dedicado con el id compartido --------------- */
+  const inv = inventarioRuntime();
+  const ctxInv = ctxCon(principalInventario("seed-demo", "admin"));
+  const cmdInv = (n: string, i: unknown) => inv.platform.kernel.commands.execute(ctxInv, n, i);
+  const drainInv = () => drenarCompleto(inv.platform.kernel);
+  const bodegaCentral = idDet("bodega:central");
+  const ubicA = idDet("ubic:A");
+
+  unwrap(await cmdInv("modulo.inventario.crear-item", {
+    id: COSTID, opId: "seed:costos:item:REP-CLP", sku: "REP-CLP-001",
+    nombre: "Repuesto crítico valorizado (CLP)", estado: "activo",
+    tipoItem: "consumible", unidadBase: { clave: "unidad" }, modoTrazabilidad: "sin-lote",
+  }), "costos.crear-item REP-CLP");
+  await drainInv();
+
+  /* --- (b) Abastecimiento: catálogos CLP + artículo con el mismo id ----- */
+  const abs = abastecimientoRuntime();
+  const ctxAbs = ctxCon(principalAbastecimiento("seed-demo", "admin"));
+  const cmdAbs = (n: string, i: unknown) => abs.platform.kernel.commands.execute(ctxAbs, n, i);
+  const qAbs = (n: string, i: unknown) => abs.platform.kernel.queries.execute(ctxAbs, n, i);
+  const drainAbs = () => drenarCompleto(abs.platform.kernel);
+
+  // Moneda del tenant (CLP) en el catálogo de abastecimiento (upsert idempotente).
+  unwrap(await cmdAbs("modulo.abastecimiento.catalogo-upsert", { catalogo: "monedas", clave: MONEDA_TENANT, etiqueta: "Peso chileno" }), "costos.abs.catalogo monedas/CLP");
+  await drainAbs();
+
+  // Artículo con id === COSTID (invariante GAP-INV-ART), moneda CLP,
+  // promedio-ponderado, ligado al item de inventario por su mismo id.
+  unwrap(await cmdAbs("modulo.abastecimiento.crear-articulo", {
+    id: COSTID, opId: "seed:costos:art:REP-CLP",
+    nombre: "Repuesto crítico valorizado (compra, CLP)", tipo: "componente", unidad: "unidad",
+    metodoValoracion: "promedio-ponderado", moneda: MONEDA_TENANT, inventarioItemId: COSTID,
+  }), "costos.abs.crear-articulo REP-CLP");
+  await drainAbs();
+
+  // Proveedor dedicado (moneda CLP).
+  const provId = idDet("costos:prov:REP-CLP");
+  unwrap(await cmdAbs("modulo.abastecimiento.crear-proveedor", {
+    id: provId, opId: "seed:costos:prov:REP-CLP",
+    razonSocial: "Repuestos Valorizados Chile Ltda.", tipo: "distribuidor", monedaPreferida: MONEDA_TENANT,
+  }), "costos.abs.crear-proveedor REP-CLP");
+  await drainAbs();
+
+  // Helper de transición de OC (crear→aprobar→enviar), idempotente por estado.
+  const ORDEN_OC = ["borrador", "aprobada", "enviada", "parcialmenteRecibida", "recibida"];
+  const ocEstado = async (id: string): Promise<{ estado: string; version: number } | null> => {
+    const r = await qAbs("modulo.abastecimiento.orden-compra", { id });
+    if (!r.ok || !r.value) return null;
+    const v = r.value as { estado?: string; version?: number };
+    return { estado: v.estado ?? "borrador", version: v.version ?? 0 };
+  };
+  const transicionarOC = async (id: string, acciones: string[]) => {
+    for (const accion of acciones) {
+      const st = await ocEstado(id);
+      if (!st) break;
+      const objetivo = accion === "aprobar" ? "aprobada" : accion === "enviar" ? "enviada" : "";
+      if (objetivo && ORDEN_OC.indexOf(st.estado) >= ORDEN_OC.indexOf(objetivo)) continue;
+      unwrap(await cmdAbs("modulo.abastecimiento.transicionar-orden-compra", {
+        id, accion, expectedVersion: st.version, opId: `seed:costos:oc-tr:${id}:${accion}`,
+      }), `costos.abs.transicionar-orden-compra ${accion}`);
+      await drainAbs();
+    }
+  };
+
+  // (c) Dos OCs a precios DISTINTOS, cada una recibida en su totalidad ⇒ el
+  //     read model de costo exacto acumula un PROMEDIO PONDERADO real (CLP).
+  //       OC-1: 100 uds × 3500 CLP  ⇒ acumulado 350.000 / 100
+  //       OC-2:  50 uds × 4100 CLP  ⇒ promedio ponderado = 555.000 / 150 = 3700 CLP
+  const comprasCostos: { token: string; cantidad: number; precio: number }[] = [
+    { token: "OC1", cantidad: 100, precio: 3500 },
+    { token: "OC2", cantidad: 50, precio: 4100 },
+  ];
+  for (const c of comprasCostos) {
+    const ocId = idDet(`costos:oc:${c.token}`);
+    unwrap(await cmdAbs("modulo.abastecimiento.crear-orden-compra", {
+      id: ocId, opId: `seed:costos:oc:${c.token}`, proveedorId: provId, moneda: MONEDA_TENANT,
+      condicionesPago: "credito-30", condicionesEntrega: "en-bodega",
+      lineas: [
+        {
+          numero: 1, articuloId: COSTID,
+          cantidad: { valor: c.cantidad, unidad: "unidad" },
+          precioUnitario: { moneda: MONEDA_TENANT, monto: c.precio },
+          toleranciaSobreRecepcion: 0.05,
+          referencia: { tipo: "inventario-item", id: COSTID },
+          bodega: { tipo: "bodega", id: bodegaCentral },
+        },
+      ],
+    }), `costos.abs.crear-orden-compra ${c.token}`);
+    await drainAbs();
+    await transicionarOC(ocId, ["aprobar", "enviar"]);
+
+    // Recepción TOTAL: escribe la entrada de costo (promedio ponderado) en
+    // `abs_costos_read`. Guarda por estado: si ya está recibida, se omite.
+    const st = await ocEstado(ocId);
+    if (st && st.estado === "enviada") {
+      const rec = unwrap(await cmdAbs("modulo.abastecimiento.registrar-recepcion", {
+        id: idDet(`costos:rec:${c.token}`), opId: `seed:costos:rec:${c.token}`,
+        ordenCompraId: ocId, expectedVersion: st.version,
+        lineas: [{ numeroLineaOC: 1, cantidad: { valor: c.cantidad, unidad: "unidad" }, bodega: { tipo: "bodega", id: bodegaCentral } }],
+      }), `costos.abs.registrar-recepcion ${c.token}`) as { recepcionId: string };
+      await drainAbs();
+      // MATERIALIZA la recepción a Inventario (vía oficial): crea la ENTRADA de
+      // stock real del item COSTID (necesaria para el consumo posterior) y drena
+      // el outbox de Inventario para proyectar el movimiento.
+      unwrap(await cmdAbs("modulo.abastecimiento.materializar-recepcion", {
+        recepcionId: rec.recepcionId, opId: `seed:costos:mat:${c.token}`,
+        bodegaId: bodegaCentral, ubicacionId: ubicA,
+      }), `costos.abs.materializar-recepcion ${c.token}`);
+      await drainAbs();
+      await drenarCompleto(inv.platform.kernel);
+    }
+  }
+  // Reproyección final del módulo (equivalencia por replay) por si el outbox
+  // COMPARTIDO fue reclamado por otro runtime durante el seed.
+  unwrap(await cmdAbs("modulo.abastecimiento.reproyectar", {}), "costos.reproyectar abastecimiento");
+  await drainAbs();
+
+  /* --- (d) OT REAL con ACTIVO PRINCIPAL (fuente del activo derivado) ----- */
+  const ord = ordenesRuntime();
+  const ctxOrd = ctxCon(principalOrdenes("seed-demo", "admin"));
+  const cmdOrd = (n: string, i: unknown) => ord.platform.kernel.commands.execute(ctxOrd, n, i);
+  const drainOrd = () => drenarCompleto(ord.platform.kernel);
+  const otId = idDet("costos:ot:consumo-valorizado");
+  // Activo DEMO real (Generador Cummins) para el activo principal de la OT.
+  const activoId = activoIds.get("GEN-001") ?? [...activoIds.values()][0];
+  unwrap(await cmdOrd("modulo.ordenes.crear", {
+    id: otId, opId: `seed:costos:ot:${otId}`,
+    titulo: "OT · Consumo valorizado (Inventario→Costos)", tipo: "correctiva", prioridad: "alta",
+    ...(activoId ? { activoPrincipal: { activoId, entityRef: `activo:${activoId}`, rol: "principal" } } : {}),
+  }), "costos.ordenes.crear OT consumo");
+  await drainOrd();
+
+  /* --- (e) SALIDA-CONSUMO atribuida a la OT ⇒ dispara el ORQUESTADOR ----- */
+  // Idempotente: `mover` por opId; el orquestador por opId determinista
+  // `inv:<movimientoId>` (uq_cos_hechos_opid) ⇒ nunca duplica el hecho.
+  const movimientoId = idDet("costos:mov:consumo-valorizado");
+  const rMover = unwrap(await cmdInv("modulo.inventario.mover", {
+    movimientoId, opId: "seed:costos:mov:consumo",
+    itemId: COSTID, bodegaId: bodegaCentral, ubicacionId: ubicA,
+    tipo: "consumo", motivo: "orden-trabajo", cantidad: 12,
+    referencia: { tipo: "ot", id: otId },
+  }), "costos.inventario.mover consumo") as { movimientoId?: string; inventarioId?: string };
+  // El movimiento debe PROYECTARSE al read model antes de que el orquestador lo
+  // lea por contrato (`modulo.inventario.movimientos`).
+  await drainInv();
+
+  // Orquestación real (misma vía del endpoint `/mover`): materializa el hecho.
+  const res = await orquestarDesdeMover(rMover, DEMO_TENANT);
+  await drainInv();
+
+  // Red de seguridad idempotente: reprocesa pendientes NO resueltos del tenant.
+  const rep = await reprocesarPendientes(DEMO_TENANT);
+
+  log(
+    `Costos (Inventario→Costos): item==artículo ${COSTID.slice(0, 8)} · promedio ponderado 3700 CLP (2 recepciones) · ` +
+    `OT con activo ${activoId ? activoId.slice(0, 8) : "—"} · consumo 12 uds ⇒ orquestador=${res.estado ?? (res.aplicable ? "?" : "no-aplicable")} · ` +
+    `reproceso={total:${rep.total},materializados:${rep.materializados},pendientes:${rep.pendientes}}`,
+  );
+}
+
 export async function seedDeltaDemo(): Promise<void> {
   console.log(`\nSeed DEMO oficial DGP-011.3 — tenant "${DEMO_TENANT}" (${DEMO_EMPRESA})`);
   await wipeDeltaDemo();
@@ -2055,6 +2245,7 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedCorrectivo(activoIds, invIds);
   await seedUtilizacion(activoIds);
   await seedManoDeObra();
+  await seedCostosMantenimiento(activoIds);
   await seedPlataforma(activoIds);
   await seedAnalytics();
   console.log("Seed DEMO completado.\n");

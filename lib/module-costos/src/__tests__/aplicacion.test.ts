@@ -52,7 +52,7 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
 
   it("MATERIAL: verifica OT, DERIVA activo de la OT y congela el costo exacto", async () => {
     const h = must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, {
-      opId: "op-material-1", otId: "ot1", articuloId: "art1", cantidad: "2.000000", unidad: "UN", moneda: "COP",
+      opId: "op-material-1", otId: "ot1", articuloId: "art1", movimientoId: "mov-art1", cantidad: "2.000000", unidad: "UN", moneda: "COP",
     })) as Record<string, unknown>;
     expect(h["activoId"]).toBe("act-9"); // derivado, NO del frontend
     expect(h["costoUnitario"]).toBe("1500.250000");
@@ -62,18 +62,18 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
   });
 
   it("MATERIAL: OT inexistente ⇒ 404; SIN COSTO exacto ⇒ rechazo (≠ 0)", async () => {
-    const noOt = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-404-noot", otId: "zzz", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" });
+    const noOt = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-404-noot", otId: "zzz", articuloId: "art1", movimientoId: "mov-art1", cantidad: "1", unidad: "UN", moneda: "COP" });
     expect(noOt.ok).toBe(false);
-    const sinCosto = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-sincosto", otId: "ot1", articuloId: "art-sin", cantidad: "1", unidad: "UN", moneda: "COP" });
+    const sinCosto = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-sincosto", otId: "ot1", articuloId: "art-sin", movimientoId: "mov-art-sin", cantidad: "1", unidad: "UN", moneda: "COP" });
     expect(sinCosto.ok).toBe(false);
     // moneda sin costo exacto tampoco materializa
-    const otraMoneda = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-otramoneda", otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "USD" });
+    const otraMoneda = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-otramoneda", otId: "ot1", articuloId: "art1", movimientoId: "mov-art1", cantidad: "1", unidad: "UN", moneda: "USD" });
     expect(otraMoneda.ok).toBe(false);
   });
 
   it("SNAPSHOT INMUTABLE: cambiar el costo origen NO altera el hecho ya materializado", async () => {
     const h = must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, {
-      opId: "op-snap-1", otId: "ot1", articuloId: "art1", cantidad: "1.000000", unidad: "UN", moneda: "COP",
+      opId: "op-snap-1", otId: "ot1", articuloId: "art1", movimientoId: "mov-art1", cantidad: "1.000000", unidad: "UN", moneda: "COP",
     })) as Record<string, unknown>;
     expect(h["costoUnitario"]).toBe("1500.250000");
     // El costo origen cambia radicalmente...
@@ -126,8 +126,8 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
     rt.fakes!.costoExacto.set(TENANT, "artU", [
       { articuloId: "artU", moneda: "USD", metodoValoracion: "PROMEDIO_PONDERADO", costoUnitario: "2.000000", cantidadAcumulada: "5.000000", actualizadoAt: "2024-01-01T00:00:00.000Z" },
     ]);
-    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-pm-cop", otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" }));
-    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-pm-usd", otId: "ot1", articuloId: "artU", cantidad: "1", unidad: "UN", moneda: "USD" }));
+    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-pm-cop", otId: "ot1", articuloId: "art1", movimientoId: "mov-art1", cantidad: "1", unidad: "UN", moneda: "COP" }));
+    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-pm-usd", otId: "ot1", articuloId: "artU", movimientoId: "mov-artU", cantidad: "1", unidad: "UN", moneda: "USD" }));
     const r = must(await query(ctx(), `${MODULO}.hechos.por-moneda`, { otId: "ot1" })) as { monedas: { moneda: string; hechos: unknown[] }[] };
     const monedas = r.monedas.map((m) => m.moneda).sort();
     expect(monedas).toEqual(["COP", "USD"]);
@@ -144,7 +144,7 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
 
   it("IDEMPOTENCIA INVARIANTE: TODA mutación sin opId ⇒ RECHAZADA (§16)", async () => {
     // MATERIAL sin opId
-    const mat = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" });
+    const mat = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { otId: "ot1", articuloId: "art1", movimientoId: "mov-art1", cantidad: "1", unidad: "UN", moneda: "COP" });
     expect(mat.ok).toBe(false);
     // OTROS sin opId
     const otr = await exec(ctx("u1"), `${MODULO}.hecho.materializar-otros`, { otId: "ot1", concepto: "x", cantidad: "1", unidad: "UN", costoUnitario: "10", moneda: "COP" });
@@ -159,10 +159,41 @@ describe("DGP-021.1 · Costos · aplicación (Fakes)", () => {
   });
 
   it("opId ACOTADO: vacío, demasiado corto o con espacios ⇒ RECHAZADO", async () => {
-    const base = { otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP" };
+    const base = { otId: "ot1", articuloId: "art1", movimientoId: "mov-art1", cantidad: "1", unidad: "UN", moneda: "COP" };
     for (const bad of ["", "corto", "   ", "con espacio 12345"]) {
       const r = await exec(ctx(), `${MODULO}.hecho.materializar-material`, { ...base, opId: bad });
       expect(r.ok).toBe(false);
     }
+  });
+
+  it("DGP-021.2 ANTI-BYPASS: MATERIAL SIN movimientoId ⇒ RECHAZADO (§20)", async () => {
+    // La vía canónica de MATERIAL es el movimiento físico; sin movimientoId no
+    // se puede fabricar un consumo de material.
+    const r = await exec(ctx(), `${MODULO}.hecho.materializar-material`, {
+      opId: "op-nobypass-1", otId: "ot1", articuloId: "art1", cantidad: "1", unidad: "UN", moneda: "COP",
+    });
+    expect(r.ok).toBe(false);
+    // Con movimientoId sí procede + fija originType=inventario.movimiento.
+    const h = must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, {
+      opId: "op-nobypass-2", otId: "ot1", articuloId: "art1", movimientoId: "mov-55", cantidad: "1", unidad: "UN", moneda: "COP",
+    })) as Record<string, unknown>;
+    expect(h["originType"]).toBe("inventario.movimiento");
+    expect(h["originId"]).toBe("mov-55");
+    expect(h["movimientoId"]).toBe("mov-55");
+    expect(h["articuloId"]).toBe("art1");
+  });
+
+  it("DGP-021.2 · read models por MOVIMIENTO y por ARTÍCULO (trazabilidad)", async () => {
+    rt.fakes!.costoExacto.set(TENANT, "artU", [
+      { articuloId: "artU", moneda: "USD", metodoValoracion: "PROMEDIO_PONDERADO", costoUnitario: "2.000000", cantidadAcumulada: "5.000000", actualizadoAt: "2024-01-01T00:00:00.000Z" },
+    ]);
+    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-rm-aaa", otId: "ot1", articuloId: "art1", movimientoId: "mov-A", cantidad: "1", unidad: "UN", moneda: "COP" }));
+    must(await exec(ctx(), `${MODULO}.hecho.materializar-material`, { opId: "op-rm-bbb", otId: "ot1", articuloId: "artU", movimientoId: "mov-B", cantidad: "1", unidad: "UN", moneda: "USD" }));
+    const porMov = must(await query(ctx(), `${MODULO}.hechos`, { movimientoId: "mov-A" })) as { hechos: Record<string, unknown>[] };
+    expect(porMov.hechos.length).toBe(1);
+    expect(porMov.hechos[0]!["movimientoId"]).toBe("mov-A");
+    const porArt = must(await query(ctx(), `${MODULO}.hechos`, { articuloId: "artU" })) as { hechos: Record<string, unknown>[] };
+    expect(porArt.hechos.length).toBe(1);
+    expect(porArt.hechos[0]!["articuloId"]).toBe("artU");
   });
 });

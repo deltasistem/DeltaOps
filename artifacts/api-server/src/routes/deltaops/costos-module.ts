@@ -15,6 +15,7 @@ import { db, deltaopsUsersTable } from "@workspace/db";
 import type { ExecutionContext, KernelError, Result } from "@workspace/kernel";
 import { MODULO } from "@workspace/module-costos";
 import { costosRuntime, contextForCostos } from "./costos-runtime";
+import { listarPendientes, reprocesarPendientes, type EstadoPendiente } from "./costos-orquestador";
 import { aRolCanonico } from "../../deltaops/identity/rbac";
 
 const router: IRouter = Router();
@@ -89,15 +90,49 @@ router.get(`${BASE}/hechos/por-moneda`, async (req, res) => {
   }));
 });
 
-// Colección de hechos económicos (filtros por OT/activo/tipo/moneda/estado).
+// Colección de hechos económicos (filtros por OT/activo/movimiento/artículo/
+// tipo/moneda/estado). DGP-021.2 añade los read models de trazabilidad de origen.
 router.get(`${BASE}/hechos`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.hechos`, {
     otId: strQuery(req.query.otId),
     activoId: strQuery(req.query.activoId),
+    movimientoId: strQuery(req.query.movimientoId),
+    articuloId: strQuery(req.query.articuloId),
     tipo: strQuery(req.query.tipo),
     moneda: strQuery(req.query.moneda),
     estado: strQuery(req.query.estado),
   }));
+});
+
+/* --------------------- Pendientes de materialización (DGP-021.2) --------- */
+// Trazabilidad/recuperación de la orquestación inventario→costos. Tenant del
+// contexto (RLS). Visibilidad = permiso de lectura del módulo.
+router.get(`${BASE}/pendientes`, async (req, res) => {
+  try {
+    const ctx = ctxOf(res);
+    const tenant = (ctx.metadata as Record<string, unknown>)["tenantId"];
+    const estado = strQuery(req.query.estado) as EstadoPendiente | undefined;
+    const filas = typeof tenant === "string"
+      ? await listarPendientes(tenant, estado)
+      : await listarPendientes(undefined, estado);
+    res.json({ pendientes: filas });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Reproceso idempotente de pendientes NO resueltos (opId determinista ⇒ sin
+// duplicados). Requiere permiso de materialización (se valida vía el propio
+// comando de costos que se dispara internamente).
+router.post(`${BASE}/pendientes/reprocesar`, async (req, res) => {
+  try {
+    const ctx = ctxOf(res);
+    const tenant = (ctx.metadata as Record<string, unknown>)["tenantId"];
+    const resumen = await reprocesarPendientes(typeof tenant === "string" ? tenant : undefined);
+    res.json(resumen);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 // Detalle de un hecho (RUTA ANIDADA ⇒ tenant del contexto evita IDOR).
