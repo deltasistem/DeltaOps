@@ -1,0 +1,1045 @@
+DIRECTIVA DE DIRECCIÓN — DGP-022
+PRODUCT MATURATION & OPERATIONAL INTEGRATION
+
+Programa: DeltaOps
+Fase: DGP-022
+Tipo: DISCOVERY + AUDITORÍA FUNCIONAL, ARQUITECTÓNICA Y DE PRODUCTO
+Estado: AUTORIZADA
+IMPORTANTE: ESTA FASE NO AUTORIZA IMPLEMENTACIÓN AUTOMÁTICA
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Realizar una auditoría integral del producto DeltaOps construido hasta DGP-021.4 para determinar:
+
+1. Qué funcionalidades están realmente terminadas.
+2. Qué funcionalidades funcionan pero requieren maduración.
+3. Qué gaps son realmente bloqueantes para producción.
+4. Qué deuda técnica debe resolverse antes de producción.
+5. Qué funcionalidades son opcionales y pueden pasar a V2.
+6. Qué inconsistencias existen entre módulos.
+7. Qué experiencia tiene cada rol.
+8. Si DeltaOps puede considerarse un MVP empresarial funcional.
+9. Qué falta para llevar la plataforma a producción real.
+10. Cuáles son los siguientes pasos recomendados y su prioridad.
+
+ESTA FASE ES PRINCIPALMENTE DE DESCUBRIMIENTO.
+
+NO implementar código salvo correcciones mínimas explícitamente autorizadas por una excepción posterior.
+
+NO iniciar DGP-023 automáticamente.
+
+==================================================
+2. PRINCIPIO DE DIRECCIÓN
+==================================================
+
+NO queremos seguir desarrollando funcionalidades simplemente por desarrollar.
+
+A partir de esta fase la prioridad cambia:
+
+ANTES:
+"¿Qué módulo falta?"
+
+AHORA:
+"¿La plataforma que ya tenemos está realmente lista para ser utilizada por una empresa?"
+
+La auditoría debe evaluar el producto como un sistema completo.
+
+Debe distinguir claramente:
+
+CRÍTICO
+MAYOR
+IMPORTANTE
+MENOR
+OPORTUNIDAD
+V2 / FUTURO
+
+No convertir cada observación en un DGP.
+
+==================================================
+3. CORPUS OBLIGATORIO
+==================================================
+
+Auditar el corpus real construido hasta:
+
+- DGP-000
+- DGP-017
+- DGP-018
+- DGP-019
+- DGP-020
+- DGP-021.4
+
+Especial atención a:
+
+Activos
+Órdenes
+Inventario
+Planes
+Preventivo
+Correctivo
+Abastecimiento
+Utilización
+Mano de obra
+Costos
+Analytics
+Referencia
+Identidad
+Multitenancy
+Offline
+QR
+Design System
+AppShell
+Login
+Centro Operacional
+
+No asumir que un informe anterior implica que la funcionalidad continúa intacta.
+
+Verificar contra el código actual.
+
+==================================================
+4. PRIMERA TAREA — INVENTARIO REAL
+==================================================
+
+Construir un inventario de todas las capacidades actuales.
+
+Para cada capacidad registrar:
+
+- módulo;
+- funcionalidad;
+- ruta;
+- endpoint/contrato;
+- rol que puede utilizarla;
+- estado;
+- fuente de datos;
+- dependencia;
+- pruebas existentes;
+- E2E existente;
+- estado responsive;
+- estado claro/oscuro;
+- offline cuando aplique;
+- riesgos;
+- GAP relacionado.
+
+Clasificar:
+
+🟢 COMPLETA
+🟡 FUNCIONAL CON DEUDA
+🟠 INCOMPLETA
+🔴 BLOQUEANTE
+⚪ V2 / FUTURO
+
+NO confiar solamente en nombres de archivos.
+
+==================================================
+5. MATRIZ FUNCIONAL DE PRODUCTO
+==================================================
+
+Crear una matriz completa:
+
+### REFERENCIA
+
+Evaluar:
+
+- catálogos;
+- tipos;
+- estados;
+- configuraciones;
+- unidades;
+- parámetros;
+- búsqueda;
+- consistencia.
+
+### ACTIVOS
+
+Evaluar:
+
+- creación;
+- edición;
+- estado;
+- ubicación;
+- clasificación;
+- documentos;
+- relaciones;
+- QR;
+- horómetro;
+- odómetro;
+- utilización;
+- combustible;
+- mantenimiento;
+- costos;
+- historial;
+- ficha 360°.
+
+### ÓRDENES
+
+Evaluar:
+
+- creación;
+- planificación;
+- asignación;
+- identidad;
+- estados;
+- ejecución;
+- sesiones;
+- pausas;
+- tiempos;
+- recursos;
+- repuestos;
+- cierre;
+- validación;
+- historial;
+- costos;
+- offline;
+- permisos.
+
+### INVENTARIO
+
+Evaluar:
+
+- artículos;
+- bodegas;
+- entradas;
+- salidas;
+- movimientos;
+- existencias;
+- consumo;
+- devoluciones;
+- trazabilidad;
+- relación con OT;
+- costos.
+
+### ABASTECIMIENTO
+
+Evaluar:
+
+- solicitudes;
+- recepción;
+- costos;
+- proveedores;
+- trazabilidad;
+- costo promedio ponderado;
+- integración con Inventario.
+
+### PLANES / PREVENTIVO
+
+Evaluar:
+
+- planes;
+- periodicidad;
+- horómetro;
+- odómetro;
+- próxima ocurrencia;
+- generación de OT;
+- historial;
+- cumplimiento.
+
+### CORRECTIVO
+
+Evaluar:
+
+- registro;
+- diagnóstico;
+- ejecución;
+- cierre;
+- relación con OT;
+- evidencias.
+
+### UTILIZACIÓN
+
+Evaluar:
+
+- horómetro;
+- odómetro;
+- historial;
+- inconsistencias;
+- reinicios;
+- tanqueos;
+- consumo;
+- offline;
+- sincronización.
+
+### MANO DE OBRA
+
+Evaluar:
+
+- categorías;
+- recursos;
+- tarifas;
+- vigencias;
+- sesiones;
+- valoración;
+- snapshots;
+- costo;
+- histórico.
+
+### COSTOS
+
+Evaluar:
+
+- hechos económicos;
+- materiales;
+- mano de obra;
+- combustible;
+- otros;
+- composición OT;
+- composición activo;
+- costo/hora;
+- costo/km;
+- monedas;
+- períodos;
+- comparativa;
+- tendencias.
+
+### ANALYTICS
+
+Evaluar:
+
+- fuentes;
+- datasets;
+- indicadores;
+- cobertura;
+- trazabilidad;
+- filtros;
+- permisos;
+- ausencia de datos.
+
+==================================================
+6. CENTRO OPERACIONAL
+==================================================
+
+Auditar si realmente responde:
+
+"¿Qué está pasando y qué debo hacer ahora?"
+
+Evaluar:
+
+- resumen;
+- alertas;
+- trabajo del día;
+- pendientes;
+- SLA;
+- órdenes sin asignar;
+- críticos;
+- accesos rápidos;
+- módulos;
+- administración;
+- contexto por rol.
+
+Verificar que cada rol reciba información relevante.
+
+No convertir el Centro en dashboard ejecutivo.
+
+==================================================
+7. EXPERIENCIA POR ROL
+==================================================
+
+Auditar individualmente:
+
+SUPER_ADMIN
+TENANT_ADMIN
+SUPERVISOR
+PLANIFICADOR
+TECNICO
+CONSULTA
+
+Para cada rol responder:
+
+1. ¿Qué ve al iniciar sesión?
+2. ¿Cuál es su punto de partida?
+3. ¿Qué puede consultar?
+4. ¿Qué puede crear?
+5. ¿Qué puede modificar?
+6. ¿Qué puede ejecutar?
+7. ¿Qué NO debería ver?
+8. ¿La navegación tiene sentido?
+9. ¿Puede completar sus tareas sin pasar por módulos innecesarios?
+
+Especial atención al TECNICO.
+
+El flujo ideal debe poder ser:
+
+QR
+→ Activo
+→ OT
+→ Iniciar sesión
+→ Ejecutar
+→ Registrar medición
+→ Registrar repuesto
+→ Pausar/reanudar
+→ Finalizar
+→ Cerrar
+
+No implementar cambios.
+
+Solo evaluar.
+
+==================================================
+8. EXPERIENCIA MÓVIL
+==================================================
+
+Auditar aproximadamente:
+
+390 px
+768 px
+1280 px
+
+Evaluar:
+
+- navegación;
+- tablas;
+- formularios;
+- botones;
+- QR;
+- ejecución de OT;
+- sesiones;
+- lecturas;
+- tanqueos;
+- inventario;
+- costos;
+- modales;
+- teclado;
+- overflow;
+- accesibilidad.
+
+La aplicación debe priorizar mobile-first para técnicos.
+
+Identificar cualquier módulo que todavía se comporte como aplicación exclusivamente desktop.
+
+==================================================
+9. TEMA Y BRANDING
+==================================================
+
+Auditar:
+
+- tema claro;
+- tema oscuro;
+- automático;
+- persistencia;
+- AppShell;
+- login;
+- logo claro;
+- logo oscuro;
+- módulos;
+- consola SUPER_ADMIN;
+- design system.
+
+Debe existir una sola autoridad de tema.
+
+No crear ThemeProviders paralelos.
+
+Verificar que el logo oficial utilizado sea legible en:
+
+- claro;
+- oscuro;
+- login;
+- AppShell;
+- móvil.
+
+==================================================
+10. UX / UI
+==================================================
+
+Realizar revisión visual de toda la plataforma.
+
+Evaluar:
+
+- jerarquía;
+- densidad;
+- consistencia;
+- lenguaje;
+- navegación;
+- feedback;
+- estados vacíos;
+- loading;
+- errores;
+- confirmaciones;
+- formularios;
+- tablas;
+- tarjetas;
+- iconografía;
+- tipografía;
+- colores;
+- accesibilidad.
+
+IMPORTANTE:
+
+No buscar que todo se vea "bonito" solamente.
+
+Evaluar si la interfaz ayuda realmente a trabajar.
+
+Debe sentirse como una plataforma empresarial de mantenimiento.
+
+No como una colección de CRUDs.
+
+==================================================
+11. INTEGRACIÓN ENTRE MÓDULOS
+==================================================
+
+Auditar los principales flujos end-to-end.
+
+### Flujo 1
+
+Activo
+→ OT
+→ ejecución
+→ sesión
+→ mano de obra
+→ costo
+
+### Flujo 2
+
+Activo
+→ OT
+→ repuesto
+→ Inventario
+→ costo
+
+### Flujo 3
+
+Abastecimiento
+→ recepción
+→ costo
+→ Inventario
+→ consumo
+→ costo mantenimiento
+
+### Flujo 4
+
+Activo
+→ horómetro
+→ plan preventivo
+→ próxima ocurrencia
+→ OT
+
+### Flujo 5
+
+Activo
+→ tanqueo
+→ utilización
+→ consumo
+
+### Flujo 6
+
+Activo
+→ costos
+→ costo/hora
+→ Analytics
+
+Determinar dónde existe integración real y dónde solamente existe navegación.
+
+==================================================
+12. DATOS Y CALIDAD
+==================================================
+
+Auditar:
+
+- datos demo;
+- datos reales simulados;
+- datos vacíos;
+- datos inconsistentes;
+- históricos;
+- anulaciones;
+- snapshots;
+- unidades;
+- monedas;
+- precisión;
+- timestamps;
+- tenant isolation.
+
+Regla absoluta:
+
+SIN DATOS ≠ CERO.
+
+Identificar cualquier lugar donde se viole esta regla.
+
+==================================================
+13. SEGURIDAD
+==================================================
+
+Auditar:
+
+- autenticación;
+- sesión;
+- identidad canónica;
+- RBAC;
+- capacidades;
+- RLS;
+- tenant isolation;
+- IDOR;
+- endpoints directos;
+- deep links;
+- frontend gates;
+- backend enforcement;
+- offline;
+- sincronización;
+- opId;
+- concurrencia.
+
+Realizar pruebas negativas donde sea posible sin modificar contratos.
+
+Especial atención:
+
+- TECNICO intentando acceder a información de otro técnico;
+- usuario tenant A accediendo a tenant B;
+- CONSULTA intentando mutar;
+- usuario sin permiso intentando acceder por URL directa;
+- manipulación de identityId;
+- manipulación de tenantId;
+- manipulación de activoId;
+- manipulación de OT.
+
+==================================================
+14. OFFLINE FIRST
+==================================================
+
+Auditar si realmente existe una estrategia offline coherente.
+
+Inventariar:
+
+- cola;
+- módulos que utilizan OfflineProvider;
+- operaciones soportadas;
+- operaciones no soportadas;
+- idempotencia;
+- ocurridoAt;
+- registradoAt;
+- conflictos;
+- sincronización;
+- feedback visual;
+- recuperación.
+
+No crear una segunda cola.
+
+Identificar operaciones que aparentan funcionar offline pero realmente no lo hacen.
+
+==================================================
+15. RENDIMIENTO
+==================================================
+
+Auditar:
+
+- endpoints;
+- queries;
+- paginación;
+- payloads;
+- frontend;
+- chunks;
+- tiempos de carga;
+- listas grandes;
+- tablas;
+- read models;
+- consultas agregadas.
+
+Especial atención a:
+
+- warning chunk >500 kB;
+- queries que cargan demasiado;
+- agregaciones frontend;
+- ausencia de paginación;
+- llamadas repetidas;
+- N+1;
+- polling innecesario.
+
+NO optimizar todavía.
+
+Solo identificar.
+
+==================================================
+16. ARQUITECTURA
+==================================================
+
+Auditar:
+
+- separación de módulos;
+- contratos públicos;
+- ports/adapters;
+- CQRS;
+- read models;
+- Workflow;
+- Identity;
+- RLS;
+- eventos;
+- outbox;
+- orquestación;
+- OfflineProvider;
+- Design System.
+
+Buscar:
+
+- SQL cross-module;
+- dependencias ilegales;
+- duplicación de dominio;
+- lógica de negocio en React;
+- contratos duplicados;
+- autorización frontend como única barrera;
+- fuentes de verdad múltiples.
+
+==================================================
+17. DEPENDENCIAS EXTERNAS
+==================================================
+
+Inventariar:
+
+- Neon;
+- DigitalOcean;
+- GitHub;
+- Cloudflare;
+- servicios de correo;
+- almacenamiento;
+- cualquier API externa;
+- dependencias npm;
+- servicios críticos.
+
+Para cada uno:
+
+- función;
+- criticidad;
+- dependencia;
+- riesgo;
+- alternativa;
+- costo si es conocido por configuración del proyecto.
+
+NO inventar precios.
+
+==================================================
+18. PRODUCCIÓN
+==================================================
+
+Evaluar qué necesita DeltaOps para ser desplegado como producto real.
+
+Revisar:
+
+- variables de entorno;
+- secretos;
+- configuración;
+- base de datos;
+- migraciones;
+- backups;
+- recuperación;
+- logs;
+- health checks;
+- monitoreo;
+- errores;
+- seguridad;
+- HTTPS;
+- dominio;
+- CORS;
+- rate limiting;
+- sesiones;
+- correo;
+- archivos;
+- almacenamiento;
+- despliegue;
+- rollback;
+- seed;
+- datos demo.
+
+IMPORTANTE:
+
+Distinguir:
+
+"funciona en desarrollo"
+
+de:
+
+"está listo para producción".
+
+==================================================
+19. COSTO DE OPERACIÓN
+==================================================
+
+No realizar compras ni cambios.
+
+Solo inventariar costos ya identificables desde configuración real:
+
+- hosting;
+- base de datos;
+- almacenamiento;
+- servicios;
+- licencias;
+- herramientas de desarrollo.
+
+No asumir precios.
+
+No recomendar migraciones todavía.
+
+El objetivo es identificar el costo operativo mínimo aproximado del producto actual.
+
+==================================================
+20. DEUDA TÉCNICA
+==================================================
+
+Consolidar todas las deudas existentes de:
+
+DGP-018
+DGP-019
+DGP-020
+DGP-021
+
+Eliminar duplicados.
+
+Clasificar:
+
+CRÍTICA
+ALTA
+MEDIA
+BAJA
+V2
+
+Especial atención:
+
+- GAP-FUEL-MONEY
+- GAP-FUEL-OT
+- GAP-MO-PERIODO
+- GAPs de inventario
+- desasignación
+- supervisor por texto
+- persistencia server-side del tema
+- toast systems
+- chunk >500 kB
+- mockup-sandbox
+- login E2E
+- cualquier nuevo GAP encontrado.
+
+==================================================
+21. DEFINICIÓN DE MVP
+==================================================
+
+Este es uno de los entregables MÁS IMPORTANTES.
+
+Definir qué funcionalidades son necesarias para declarar:
+
+"MVP DeltaOps listo para una primera empresa piloto."
+
+Separar:
+
+MUST HAVE
+SHOULD HAVE
+COULD HAVE
+V2
+
+No decidir solamente por dificultad técnica.
+
+Priorizar por:
+
+- operación;
+- seguridad;
+- trazabilidad;
+- mantenimiento;
+- confiabilidad;
+- valor empresarial.
+
+==================================================
+22. CRITERIO DE PRODUCCIÓN
+==================================================
+
+Crear una matriz:
+
+CAPACIDAD
+→ ESTADO
+→ BLOQUEA PRODUCCIÓN
+→ SE PUEDE DEJAR PARA V2
+→ RIESGO
+→ RECOMENDACIÓN
+
+Determinar explícitamente:
+
+¿DeltaOps está listo para piloto?
+
+¿DeltaOps está listo para producción general?
+
+¿DeltaOps necesita una fase adicional de hardening?
+
+No responder con optimismo automático.
+
+Si no está listo, explicar exactamente por qué.
+
+==================================================
+23. NO IMPLEMENTAR
+==================================================
+
+Durante DGP-022:
+
+NO:
+
+- crear nuevos módulos;
+- crear nuevas migraciones;
+- modificar contratos;
+- rediseñar frontend;
+- cambiar arquitectura;
+- modificar RBAC;
+- modificar RLS;
+- cambiar base de datos;
+- iniciar DGP-023.
+
+EXCEPCIÓN:
+
+Si se encuentra un defecto CRÍTICO de seguridad que pueda corregirse de forma mínima y segura, documentarlo y solicitar aprobación antes de tocar código.
+
+==================================================
+24. ENTREGABLE
+==================================================
+
+Crear:
+
+docs/dgp/DGP-022-DESCUBRIMIENTO.md
+
+El documento debe contener como mínimo:
+
+1. Resumen ejecutivo.
+2. Estado real de la plataforma.
+3. Inventario funcional.
+4. Matriz por módulo.
+5. Matriz por rol.
+6. Centro Operacional.
+7. Experiencia móvil.
+8. UX/UI.
+9. Tema/branding.
+10. Integraciones.
+11. Calidad de datos.
+12. Seguridad.
+13. Offline.
+14. Rendimiento.
+15. Arquitectura.
+16. Dependencias.
+17. Producción.
+18. Costos operativos.
+19. Deuda técnica.
+20. GAPs.
+21. MVP.
+22. V2.
+23. Recomendación de Dirección.
+24. Próximas fases sugeridas.
+25. Riesgos.
+26. Conclusión.
+
+Cada afirmación importante debe tener evidencia:
+
+archivo:línea
+contrato
+test
+E2E
+captura cuando aplique.
+
+==================================================
+25. REVISIÓN INDEPENDIENTE
+==================================================
+
+Realizar revisión arquitectónica independiente del documento.
+
+La revisión debe comprobar:
+
+- afirmaciones contra código real;
+- estado de los módulos;
+- rutas;
+- contratos;
+- seguridad;
+- producción;
+- MVP;
+- deuda;
+- GAPs.
+
+Si el revisor encuentra afirmaciones no demostradas:
+
+corregir el documento.
+
+No ocultar problemas para obtener PASS.
+
+==================================================
+26. CRITERIO DE CIERRE
+==================================================
+
+DGP-022 se cierra únicamente cuando:
+
+- Discovery completo;
+- corpus auditado;
+- inventario funcional completo;
+- seguridad revisada;
+- RBAC/RLS revisados;
+- offline revisado;
+- UX revisada;
+- móvil revisado;
+- producción evaluada;
+- costos identificados;
+- deuda consolidada;
+- MVP definido;
+- V2 definida;
+- riesgos identificados;
+- recomendación clara de Dirección;
+- revisión independiente PASS;
+- documento committeado;
+- git status limpio.
+
+NO requiere código.
+
+==================================================
+27. RESULTADO ESPERADO
+==================================================
+
+Al finalizar quiero una respuesta clara a estas preguntas:
+
+1. ¿Qué tan terminada está realmente DeltaOps?
+2. ¿Qué módulos están realmente completos?
+3. ¿Qué módulos tienen deuda?
+4. ¿Qué problemas bloquean un piloto?
+5. ¿Qué problemas bloquean producción general?
+6. ¿Qué podemos dejar para V2?
+7. ¿Qué funcionalidades realmente faltan?
+8. ¿Cuál es el mínimo trabajo adicional necesario?
+9. ¿Cuántos DGP adicionales recomienda el análisis?
+10. ¿Cuál es la ruta recomendada para cerrar el producto?
+11. ¿Qué riesgos económicos/técnicos existen?
+12. ¿Podemos detener el desarrollo de funcionalidades y pasar a hardening/producción?
+
+NO inventar respuestas.
+
+Las respuestas deben surgir de la auditoría.
+
+==================================================
+28. DIRECTIVA FINAL
+==================================================
+
+ESTA FASE ES DE MADURACIÓN Y AUDITORÍA.
+
+NO queremos más funcionalidades por inercia.
+
+Queremos saber si lo construido realmente resuelve el problema empresarial.
+
+La pregunta central es:
+
+"¿DeltaOps ya puede ser utilizada por una empresa para gestionar su mantenimiento de forma confiable?"
+
+Si la respuesta es NO:
+
+explicar exactamente qué falta.
+
+Si la respuesta es SÍ para piloto:
+
+demostrar por qué.
+
+Si la respuesta es SÍ para producción:
+
+demostrarlo con evidencia.
+
+Si existe una diferencia entre piloto y producción:
+
+separarla claramente.
+
+NO iniciar ninguna fase posterior.
+
+NO implementar código.
+
+NO crear migraciones.
+
+NO crear endpoints.
+
+NO cambiar contratos.
+
+NO cambiar arquitectura.
+
+NO inventar funcionalidades.
+
+NO maquillar deuda técnica.
+
+ENTREGAR ÚNICAMENTE EL INFORME OFICIAL DE CIERRE DGP-022-DESCUBRIMIENTO Y ESPERAR LA APROBACIÓN EXPLÍCITA DE DIRECCIÓN.
