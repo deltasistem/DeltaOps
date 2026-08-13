@@ -1,0 +1,96 @@
+DGP-023-H01 — DISCOVERY DE SUPERFICIE LEGACY SGMA
+
+La Dirección ha revisado DGP-023 y confirma que H-01 es CRÍTICO:
+
+Los routers legacy SGMA exponen CRUD sin autenticación ni tenant:
+- /api/work-orders
+- /api/assets
+- dashboard
+- spare-parts
+- locations
+- work-centers
+- technicians
+- suppliers
+- maintenance-plans
+
+NO IMPLEMENTAR NINGÚN CAMBIO.
+
+NO agregar autenticación.
+NO eliminar rutas.
+NO eliminar tablas.
+NO modificar RLS.
+NO modificar frontend.
+NO modificar backend.
+
+Realizar exclusivamente un análisis de dependencias.
+
+Determinar:
+
+1. Todas las rutas legacy involucradas y sus métodos HTTP.
+
+2. Qué archivos/frontend llaman actualmente estas rutas.
+
+3. Qué módulos de DeltaOps importan o dependen de estos routers.
+
+4. Qué jobs, workflows, seeds o scripts dependen de ellos.
+
+5. Qué tablas public.* utilizan.
+
+6. Si esas tablas contienen datos reales necesarios para DeltaOps o datos exclusivamente legacy/prototipo.
+
+7. Buscar referencias textuales a cada endpoint en todo el repositorio.
+
+8. Buscar referencias a las tablas utilizadas por esos routers.
+
+9. Determinar si eliminar completamente la superficie SGMA rompería alguna funcionalidad actual de DeltaOps.
+
+10. Si existe dependencia real, documentar exactamente cuál.
+
+11. Si NO existe dependencia real, demostrarlo con evidencia de código.
+
+12. Proponer una de estas opciones:
+
+A. ELIMINACIÓN TOTAL
+B. AISLAMIENTO TEMPORAL
+C. MIGRACIÓN Y POSTERIOR ELIMINACIÓN
+D. MANTENER, pero proteger correctamente
+
+Para cada opción indicar:
+- impacto;
+- archivos afectados;
+- tablas afectadas;
+- riesgo;
+- esfuerzo;
+- dependencias;
+- recomendación.
+
+IMPORTANTE:
+
+No asumir que "legacy" significa que puede eliminarse.
+No asumir que "public.*" significa que no importa.
+La decisión debe basarse exclusivamente en dependencias reales encontradas.
+
+Crear únicamente:
+
+docs/dgp/DGP-023-H01-DESCUBRIMIENTO.md
+
+No modificar ningún otro archivo.
+
+Realizar revisión independiente del documento.
+
+Si no existen dependencias y la eliminación es segura, recomendar explícitamente ELIMINACIÓN TOTAL.
+
+Si existen dependencias, detenerse y documentarlas.
+
+Criterio de cierre:
+
+- código sin cambios;
+- DB sin cambios;
+- contratos sin cambios;
+- documento con evidencia;
+- revisión independiente PASS;
+- git limpio salvo el documento.
+
+NO iniciar DGP-023.1.
+
+DETENERSE después del informe.
