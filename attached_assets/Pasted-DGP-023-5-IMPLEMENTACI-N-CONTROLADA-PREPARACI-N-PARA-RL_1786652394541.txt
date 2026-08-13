@@ -1,0 +1,458 @@
+DGP-023.5 — IMPLEMENTACIÓN CONTROLADA: PREPARACIÓN PARA RLS EFECTIVA Y SEPARACIÓN DE ROLES POSTGRESQL
+
+ESTADO: IMPLEMENTACIÓN CONTROLADA.
+Esta fase implementa únicamente los cambios necesarios derivados de DGP-023.4.
+
+OBJETIVOS:
+1. Corregir N-1: listarTenants bajo withGlobal sobre ten_tenants con RLS.
+2. Corregir N-2: tenantId ausente en eventos de valoración de Mano de Obra.
+3. Introducir la separación de responsabilidades PostgreSQL preparada en DGP-023.4.
+4. Ejecutar smoke tests controlados de capacidades PostgreSQL.
+5. Preparar la transición a RLS efectiva sin romper login, SUPER_ADMIN, runtime, outbox, offline, migraciones ni seed.
+
+NO ampliar el alcance.
+
+REGLAS DE SEGURIDAD:
+- No eliminar RLS existente.
+- No eliminar políticas existentes.
+- No desactivar permanentemente RLS.
+- No dejar el runtime usando superuser como solución final.
+- No conceder BYPASSRLS al runtime.
+- No conceder CREATEDB al runtime.
+- No conceder CREATEROLE al runtime.
+- No conceder ownership de tablas al runtime.
+- No introducir SECURITY DEFINER genérico.
+- Toda función SECURITY DEFINER debe tener owner deltaops_owner, search_path fijo y privilegios mínimos.
+- No mostrar credenciales, passwords, tokens ni connection strings en logs, informes o commits.
+- Nunca hardcodear secretos.
+- Todo cambio debe ser reversible.
+
+FASE 0 — SNAPSHOT Y PRECONDICIONES
+
+Antes de modificar nada:
+
+1. Registrar:
+   - HEAD actual.
+   - git status.
+   - migraciones actuales.
+   - cantidad de tablas deltaops.
+   - owners actuales.
+   - roles actuales.
+   - políticas RLS.
+   - tablas con FORCE RLS.
+   - runtime actual.
+2. Crear punto de rollback/tag:
+   pre-dgp-023.5
+3. Confirmar workspace limpio.
+4. Si alguna precondición falla, DETENERSE.
+
+FASE 1 — CORREGIR N-1
+
+Problema:
+listarTenants utiliza withGlobal sobre ten_tenants, tabla protegida por RLS.
+
+Objetivo:
+SUPER_ADMIN debe poder listar tenants sin depender de BYPASSRLS.
+
+Investigar primero el contrato actual.
+
+Implementar la solución de menor privilegio compatible con la arquitectura.
+
+Preferencia:
+usar un puerto/consulta administrativa explícita y fail-closed, no ampliar privilegios globales del runtime.
+
+Si se requiere SECURITY DEFINER:
+
+- función específica;
+- owner deltaops_owner;
+- search_path explícito;
+- sin SQL dinámico;
+- parámetros explícitos;
+- solamente SELECT necesario;
+- nunca aceptar tenantId desde frontend para elevar acceso;
+- únicamente accesible desde el contexto autorizado de SUPER_ADMIN;
+- registrar/auditar la decisión.
+
+No modificar otras consultas withGlobal.
+
+Agregar pruebas:
+- SUPER_ADMIN puede listar tenants.
+- TENANT_ADMIN no puede listar tenants de plataforma.
+- SUPERVISOR/PLANIFICADOR/TECNICO/CONSULTA no pueden.
+- anónimo no puede.
+- tenant context no puede utilizarse para elevar privilegios.
+
+FASE 2 — CORREGIR N-2
+
+Problema:
+eventos de valoración de Mano de Obra no propagan tenantId en dos puntos de emisión.
+
+Localizar exactamente ambos builders/emisores.
+
+Corregir el origen del evento.
+
+Regla:
+tenantId debe provenir exclusivamente del contexto autenticado/UoW/aggregate válido.
+
+Nunca:
+- body;
+- frontend;
+- parámetro libre;
+- identidad proporcionada por cliente.
+
+Verificar que el envelope del outbox persista tenantId.
+
+Agregar pruebas:
+1. valoración nueva contiene tenantId.
+2. ambos puntos de emisión contienen tenantId.
+3. replay conserva tenantId.
+4. /sync conserva tenantId.
+5. reprocesamiento conserva tenantId.
+6. evento de tenant A nunca aparece como tenant B.
+7. eventos existentes sin tenantId quedan identificados como históricos y no deben ser falsificados retroactivamente sin una migración explícitamente aprobada.
+
+No inventar tenantId para los 163 eventos históricos.
+
+FASE 3 — SMOKE TEST DE CAPACIDADES POSTGRESQL
+
+Antes de cambiar el runtime real:
+
+Crear un procedimiento controlado y reversible para comprobar en el PostgreSQL actual:
+
+- CREATE ROLE LOGIN.
+- CREATE ROLE NOLOGIN.
+- GRANT.
+- REVOKE.
+- ALTER OWNER.
+- SECURITY DEFINER.
+- search_path fijo.
+- conexión con rol LOGIN.
+- rol LOGIN sin BYPASSRLS.
+- rol LOGIN sin SUPERUSER.
+- rol LOGIN sin CREATEDB.
+- rol LOGIN sin CREATEROLE.
+- permisos DML.
+- acceso a secuencias.
+- FORCE ROW LEVEL SECURITY.
+
+IMPORTANTE:
+Si el smoke test requiere crear roles reales, utilizar nombres temporales inequívocos:
+
+dgp235_test_owner
+dgp235_test_rw
+dgp235_test_app
+
+Nunca reutilizar nombres productivos.
+
+Guardar evidencia de:
+- qué operaciones funcionaron;
+- qué operaciones fueron rechazadas;
+- permisos efectivos;
+- rol resultante.
+
+Eliminar los roles temporales después de la prueba.
+
+Si la eliminación no es posible:
+DETENERSE y documentar.
+
+FASE 4 — CREACIÓN DE ROLES PRODUCTIVOS
+
+Solo después de que FASE 3 sea PASS.
+
+Crear:
+
+deltaops_owner
+- owner de objetos;
+- DDL/migraciones/seed;
+- NO usado por runtime.
+
+deltaops_app_rw
+- NOLOGIN;
+- permisos DML estrictamente necesarios.
+
+deltaops_app
+- LOGIN;
+- runtime;
+- NOSUPERUSER;
+- NOBYPASSRLS;
+- NOCREATEDB;
+- NOCREATEROLE;
+- NOREPLICATION;
+- no owner.
+
+No utilizar credenciales hardcodeadas.
+
+Las credenciales deben entrar mediante variables/secret manager del entorno.
+
+Si el entorno no permite almacenar una credencial segura:
+DETENERSE.
+
+FASE 5 — PRIVILEGIOS
+
+Derivar privilegios del código real.
+
+No conceder:
+
+GRANT ALL
+
+ni:
+
+GRANT ALL ON SCHEMA
+
+ni:
+
+GRANT ALL ON DATABASE
+
+si no son estrictamente necesarios.
+
+Separar:
+- CONNECT;
+- USAGE;
+- SELECT;
+- INSERT;
+- UPDATE;
+- DELETE;
+- sequences;
+- EXECUTE.
+
+Documentar cualquier privilegio excepcional.
+
+FASE 6 — OWNERSHIP
+
+Transferir ownership de los objetos enumerados en DGP-023.4 a:
+
+deltaops_owner
+
+Incluyendo los objetos que realmente correspondan:
+
+- tablas;
+- sequences;
+- schema;
+- funciones;
+- views;
+- triggers.
+
+No asumir que existen objetos no inventariados.
+
+Verificar:
+- deltaops_app no es owner;
+- deltaops_app_rw no es owner;
+- deltaops_owner sí es owner de los objetos previstos.
+
+FASE 7 — DATABASE_MIGRATION_URL
+
+Separar:
+
+DATABASE_MIGRATION_URL
+=
+deltaops_owner
+
+Runtime:
+DATABASE_URL
+=
+deltaops_app
+
+No permitir que el runtime ejecute DDL.
+
+Auditar startup y scripts para confirmar que la aplicación no ejecuta migraciones automáticamente.
+
+FASE 8 — PREPARACIÓN RLS
+
+NO activar FORCE RLS sobre las 174 tablas todavía si las fases anteriores no están PASS.
+
+Primero verificar:
+
+- todas las tablas tenant-scoped tienen política;
+- las políticas usan el contexto correcto;
+- tenant context se establece dentro de la transacción;
+- no existe tenant proveniente del body;
+- /sync no acepta tenant;
+- system:utilizacion-sync funciona con el nuevo modelo.
+
+Para las tablas globales:
+
+idn_identities
+idn_memberships
+users
+sessions
+
+mantener la decisión de DGP-023.4:
+sin RLS, privilegios explícitos mínimos y defensas específicas.
+
+Para:
+kernel_outbox
+kernel_dead_letter
+ntf_email_templates
+
+aplicar exactamente la política definida en DGP-023.4 según su naturaleza real.
+
+No inventar políticas.
+
+FASE 9 — VALIDACIÓN ANTES DE FORCE RLS
+
+Conectar realmente como deltaops_app y ejecutar:
+
+1. Login.
+2. Logout.
+3. Refresh.
+4. SUPER_ADMIN.
+5. TENANT_ADMIN.
+6. SUPERVISOR.
+7. PLANIFICADOR.
+8. TECNICO.
+9. CONSULTA.
+10. Centro Operacional.
+11. Activos.
+12. Órdenes.
+13. Inventario.
+14. Abastecimiento.
+15. Utilización.
+16. Mano de Obra.
+17. Costos.
+18. Analytics.
+19. Offline/sync.
+20. Timeline.
+21. QR.
+
+Si falla cualquier operación por privilegios:
+NO aumentar privilegios automáticamente.
+Diagnosticar primero.
+
+FASE 10 — ACTIVACIÓN CONTROLADA DE FORCE RLS
+
+Solo si FASES 0–9 son PASS.
+
+Activar FORCE RLS únicamente en las tablas tenant-scoped que correspondan.
+
+No activar FORCE RLS ciegamente sobre tablas globales.
+
+Después de cada grupo:
+- prueba tenant A;
+- prueba tenant B;
+- prueba SUPER_ADMIN;
+- prueba CONSULTA;
+- prueba acceso sin contexto.
+
+Si falla:
+ROLLBACK DE LA FASE, no parchear permisos a ciegas.
+
+FASE 11 — PRUEBAS DE AISLAMIENTO
+
+Obligatorias:
+
+A → A = permitido.
+A → B = rechazado.
+B → A = rechazado.
+
+Para:
+SELECT
+INSERT
+UPDATE
+DELETE
+
+Probar además:
+- IDOR;
+- tenant inexistente;
+- sesión inválida;
+- tenant context ausente;
+- tenant context manipulado;
+- identityId de otro tenant;
+- /sync;
+- outbox;
+- reprocesamiento;
+- principal system:utilizacion-sync.
+
+Verificar directamente:
+
+current_user
+session_user
+rolsuper
+rolbypassrls
+rolcreaterole
+rolcreatedb
+
+El runtime debe demostrar:
+
+rolsuper = false
+rolbypassrls = false
+rolcreaterole = false
+rolcreatedb = false
+
+FASE 12 — REGRESIÓN COMPLETA
+
+Ejecutar:
+
+- module tests;
+- PG real;
+- api-server;
+- deltaops;
+- analytics;
+- utilización;
+- costos;
+- OpenAPI drift;
+- typecheck;
+- build;
+- E2E navegador;
+- E2E offline;
+- matriz completa de roles;
+- tenant A/B.
+
+No aceptar:
+skipped tests
+por causa de esta fase.
+
+FASE 13 — ROLLBACK
+
+Documentar y probar el procedimiento de rollback.
+
+Rollback permitido:
+- código → git revert;
+- roles → revocar/eliminar según dependencia;
+- ownership → restaurar mediante owner conocido;
+- configuración → restaurar variables;
+- RLS → revertir únicamente dentro de ventana controlada.
+
+IMPORTANTE:
+El rollback NO puede dejar como arquitectura permanente al runtime superuser.
+
+CRITERIO DE CIERRE
+
+DGP-023.5 PASS únicamente si:
+
+- N-1 corregido.
+- N-2 corregido.
+- smoke test PostgreSQL PASS.
+- roles separados funcionando.
+- runtime no superuser.
+- runtime no BYPASSRLS.
+- runtime no owner.
+- migration role separado.
+- privilegios mínimos.
+- login funcionando.
+- SUPER_ADMIN funcionando.
+- 6 roles funcionando.
+- tenant A/B aislados.
+- RLS efectiva.
+- FORCE RLS validada donde corresponda.
+- outbox funcionando.
+- offline funcionando.
+- system:utilizacion-sync funcionando.
+- migraciones funcionando mediante DATABASE_MIGRATION_URL.
+- suites completas verdes.
+- E2E real PASS.
+- rollback documentado.
+- revisión arquitectónica independiente PASS.
+
+Si cualquiera de estos criterios falla:
+NO declarar PASS.
+Documentar FAIL, causa raíz y detenerse.
+
+Al finalizar:
+crear informe:
+
+docs/dgp/DGP-023.5-CIERRE-RLS-POSTGRES.md
+
+Actualizar memoria del programa.
+
+NO iniciar DGP-023.6 automáticamente.
+DETENERSE y esperar aprobación explícita de Dirección.

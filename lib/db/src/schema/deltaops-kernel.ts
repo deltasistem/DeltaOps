@@ -25,6 +25,9 @@ export const kernelOutboxTable = deltaopsSchema.table("kernel_outbox", {
   processedAt: timestamp("processed_at", { withTimezone: true }),
   attempts: integer("attempts").notNull().default(0),
   claimedUntil: timestamp("claimed_until", { withTimezone: true }),
+  // DGP-023.5 (N-2): tenant del envelope, poblado desde payload->>'tenantId'.
+  // Aditivo/nullable: filas históricas sin tenantId quedan NULL (no se falsifican).
+  tenantId: varchar("tenant_id", { length: 255 }),
 });
 
 export const kernelDeadLetterTable = deltaopsSchema.table("kernel_dead_letter", {
@@ -35,4 +38,6 @@ export const kernelDeadLetterTable = deltaopsSchema.table("kernel_dead_letter", 
   failureReason: text("failure_reason").notNull(),
   attempts: integer("attempts").notNull(),
   deadAt: timestamp("dead_at", { withTimezone: true }).notNull().defaultNow(),
+  // DGP-023.5 (N-2): tenant del envelope, poblado desde payload->>'tenantId'.
+  tenantId: varchar("tenant_id", { length: 255 }),
 });

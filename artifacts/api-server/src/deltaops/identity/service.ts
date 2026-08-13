@@ -102,10 +102,22 @@ export async function obtenerTenant(tenantId: string): Promise<Tenant | null> {
   });
 }
 
-/** Lista global de tenants (SOLO SUPER_ADMIN; RLS omitida por superusuario). */
+/**
+ * Lista global de tenants (SOLO SUPER_ADMIN — autorización en la capa HTTP con
+ * `requireSuperAdmin`). DGP-023.5 (N-1): NO depende ya del BYPASS de superusuario.
+ *
+ * `ten_tenants` tiene RLS, por lo que el rol runtime `deltaops_app` (no-owner,
+ * no-bypass) vería 0 filas con un `SELECT` directo bajo `withGlobal`. El acceso
+ * cross-tenant se obtiene mediante la función SECURITY DEFINER acotada
+ * `deltaops.tenants_para_super_admin()` (owner `deltaops_owner`, search_path fijo,
+ * sin parámetros, solo SELECT), que el guard SUPER_ADMIN ya autorizó. La función
+ * NUNCA acepta tenantId del cliente para elevar acceso.
+ */
 export async function listarTenants(): Promise<Tenant[]> {
   return withGlobal(async (client) => {
-    const r = await client.query(`SELECT * FROM deltaops.ten_tenants ORDER BY codigo`);
+    const r = await client.query(
+      `SELECT * FROM deltaops.tenants_para_super_admin()`,
+    );
     return r.rows.map(mapTenant);
   });
 }

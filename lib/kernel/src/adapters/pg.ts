@@ -45,6 +45,18 @@ export function pgSessionOf(uow: UnitOfWork): PoolClient {
   );
 }
 
+/**
+ * DGP-023.5 (N-2): extrae `tenantId` del envelope del evento para persistirlo en
+ * la columna aditiva `tenant_id` del outbox. La fuente es el `payload.tenantId`
+ * (server-side, inyectado por los emisores de dominio). Si el evento aún no lo
+ * porta (eventos legacy), se persiste NULL — se identifica como histórico y NO se
+ * falsifica. Nunca se acepta tenant desde el cliente.
+ */
+function tenantIdDe(payload: Record<string, unknown>): string | null {
+  const t = payload["tenantId"];
+  return typeof t === "string" && t.length > 0 ? t : null;
+}
+
 async function insertOutbox(
   client: PoolClient,
   events: readonly DomainEvent[],
@@ -52,9 +64,16 @@ async function insertOutbox(
   for (const e of events) {
     await client.query(
       `INSERT INTO deltaops.kernel_outbox
-         (id, event_type, payload, correlation_id, occurred_at)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [e.id, e.type, JSON.stringify(e.payload), e.correlationId, e.occurredAt],
+         (id, event_type, payload, correlation_id, occurred_at, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        e.id,
+        e.type,
+        JSON.stringify(e.payload),
+        e.correlationId,
+        e.occurredAt,
+        tenantIdDe(e.payload),
+      ],
     );
   }
 }
@@ -263,8 +282,8 @@ export class PgDeadLetterStore implements DeadLetterStorePort {
     try {
       await this.pool.query(
         `INSERT INTO deltaops.kernel_dead_letter
-           (id, event_type, payload, correlation_id, failure_reason, attempts)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (id, event_type, payload, correlation_id, failure_reason, attempts, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO NOTHING`,
         [
           record.id,
@@ -273,6 +292,7 @@ export class PgDeadLetterStore implements DeadLetterStorePort {
           record.correlationId,
           reason,
           record.attempts,
+          tenantIdDe(record.payload),
         ],
       );
       return ok(undefined);

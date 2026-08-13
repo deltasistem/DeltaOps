@@ -235,8 +235,15 @@ function tarifaAResultado(t: Tarifa): Record<string, unknown> {
   };
 }
 
-function valoracionAResultado(v: Valoracion): Record<string, unknown> {
+function valoracionAResultado(
+  v: Valoracion,
+  tenantId: string,
+): Record<string, unknown> {
   return {
+    // DGP-023.5 (N-2): el payload de valoración DEBE portar `tenantId` para que
+    // el outbox y sus handlers sean autosuficientes bajo RLS efectiva. El tenant
+    // proviene EXCLUSIVAMENTE del contexto server-side (nunca del body/cliente).
+    tenantId,
     sesionId: v.sesionId,
     ordenId: v.ordenId,
     activoId: v.activoId,
@@ -288,7 +295,7 @@ async function procesarSesionInterno(
 ): Promise<Result<Record<string, unknown>, KernelError>> {
   const previa = await adapters.valoraciones.buscar(tenant, sesionId);
   if (!previa.ok) return previa;
-  if (previa.value) return ok({ ...valoracionAResultado(previa.value), yaExistia: true });
+  if (previa.value) return ok({ ...valoracionAResultado(previa.value, tenant), yaExistia: true });
 
   const dur = await adapters.ordenes.duracionesDeSesion(tenant, sesionId);
   if (!dur.ok) return dur;
@@ -329,11 +336,11 @@ async function procesarSesionInterno(
   if (!reg.ok) return reg;
   if (!reg.value.insertada) {
     const actual = await adapters.valoraciones.buscar(tenant, sesionId);
-    if (actual.ok && actual.value) return ok({ ...valoracionAResultado(actual.value), yaExistia: true });
-    return ok({ ...valoracionAResultado(valorada.value), yaExistia: true });
+    if (actual.ok && actual.value) return ok({ ...valoracionAResultado(actual.value, tenant), yaExistia: true });
+    return ok({ ...valoracionAResultado(valorada.value, tenant), yaExistia: true });
   }
 
-  const emitido = await emitir(adapters, ctx, uow, tenant, VALORACION_REGISTRADA, valoracionAResultado(valorada.value));
+  const emitido = await emitir(adapters, ctx, uow, tenant, VALORACION_REGISTRADA, valoracionAResultado(valorada.value, tenant));
   if (!emitido.ok) return emitido;
   const aud = await audit(deps.audit, uow, ctx, tenant, MODULO, "valoracion:registrar", sesionId, {
     estado: valorada.value.estado,
@@ -341,7 +348,7 @@ async function procesarSesionInterno(
     tarifaId: valorada.value.tarifaId,
   });
   if (!aud.ok) return aud;
-  return ok({ ...valoracionAResultado(valorada.value), yaExistia: false });
+  return ok({ ...valoracionAResultado(valorada.value, tenant), yaExistia: false });
 }
 
 /**
@@ -393,7 +400,7 @@ async function resumenPorOrden(
     efectivoMsTotal,
     costoPorMoneda: [...porMoneda.entries()].map(([moneda, micros]) => ({ moneda, costo: microsACadena(micros) })),
     valoraciones: valoradas.map((v) => ({
-      ...valoracionAResultado(v),
+      ...valoracionAResultado(v, tenant),
       nombre: nombres.value[v.identityId] ?? null,
       esPropia: yo !== null && v.identityId === yo,
     })),
@@ -781,11 +788,11 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           if (!nueva.ok) return nueva;
           const upd = await adapters.valoraciones.reemplazar(uow, nueva.value);
           if (!upd.ok) return upd;
-          const em = await emitir(adapters, ctx, uow, tenant.value, VALORACION_REVALORADA, valoracionAResultado(nueva.value));
+          const em = await emitir(adapters, ctx, uow, tenant.value, VALORACION_REVALORADA, valoracionAResultado(nueva.value, tenant.value));
           if (!em.ok) return em;
           const aud = await audit(deps.audit, uow, ctx, tenant.value, MODULO, "valoracion:revalorar", input.sesionId, { estadoAnterior: previa.value.estado, estadoNuevo: nueva.value.estado });
           if (!aud.ok) return aud;
-          return sellarSi(adapters, ctx, uow, tenant.value, `${MODULO}.valoracion.revalorar`, input.opId, valoracionAResultado(nueva.value));
+          return sellarSi(adapters, ctx, uow, tenant.value, `${MODULO}.valoracion.revalorar`, input.opId, valoracionAResultado(nueva.value, tenant.value));
         },
       }),
     ],
@@ -872,7 +879,7 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           if (!r.ok) return r;
           const yo = alcance.restringido ? alcance.identityId : identidadDeSesionSuave(ctx);
           const filas = alcance.restringido ? r.value.filter((v) => v.identityId === alcance.identityId) : r.value;
-          return ok({ valoraciones: filas.map((v) => ({ ...valoracionAResultado(v), esPropia: yo !== null && v.identityId === yo })) });
+          return ok({ valoraciones: filas.map((v) => ({ ...valoracionAResultado(v, tenant.value), esPropia: yo !== null && v.identityId === yo })) });
         },
       }),
       /* -------------------- mias (técnico: SOLO su identidad canónica) -------------------- */
@@ -888,7 +895,7 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           if (!yo) return fail(KernelErrors.forbidden("mano de obra: falta la identidad canónica autenticada (identityId)"));
           const r = await adapters.valoraciones.listarPorIdentidad(tenant.value, yo);
           if (!r.ok) return r;
-          return ok({ valoraciones: r.value.map((v) => ({ ...valoracionAResultado(v), esPropia: true })) });
+          return ok({ valoraciones: r.value.map((v) => ({ ...valoracionAResultado(v, tenant.value), esPropia: true })) });
         },
       }),
       /* -------------------- resumen (tiempo+costo por OT, con pendientes) -------------------- */
@@ -922,7 +929,7 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           }
           const r = await adapters.valoraciones.listarPorEstado(tenant.value, ["SIN_TARIFA", "SIN_RECURSO"]);
           if (!r.ok) return r;
-          return ok({ pendientes: r.value.map(valoracionAResultado) });
+          return ok({ pendientes: r.value.map((v) => valoracionAResultado(v, tenant.value)) });
         },
       }),
       /* -------------------- costo-estimado (sesión ABIERTA) -------------------- */
