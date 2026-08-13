@@ -7,8 +7,7 @@ description: Hallazgos CRÍTICOS/ALTOS abiertos de la auditoría de producción 
 
 ## Estado de los CRÍTICOS
 - **H-01 — CERRADO (DGP-023.2):** SGMA retirado por completo (frontend, 10 routers legacy, 9 tablas public.*, seed, contratos). Rutas legacy ⇒ 404. Tag `pre-retiro-sgma` + backup `backups/sgma-public-pre-drop.sql` (gitignored) para rollback.
-- **H-02 — ABIERTO — RLS inactiva en runtime:** la app conecta a Postgres como superusuario `postgres` (`rolbypassrls=true`) ⇒ todas las políticas RLS se ignoran; el aislamiento multitenant depende 100% de la capa de app (`set_config('app.tenant_id')` + WHERE por repo). Tablas de negocio con `relforcerowsecurity=f`.
-  **Decisión requerida:** rol de aplicación no-superuser + FORCE RLS antes de producción.
+- **H-02 — CERRADO (DGP-023.5):** runtime conecta como `deltaops_app` (sin superuser/bypass/ownership; DDL denegado); FORCE RLS en 166 tablas (ten_tenants en ENABLE por la función SECURITY DEFINER de N-1); ownership en `deltaops_owner`; migraciones/seed como owner vía env. Aislamiento A/B verificado como deltaops_app. Rollback: retirar DELTAOPS_APP_PASSWORD devuelve el pool a DATABASE_URL (solo ventana controlada, jamás final).
 
 ## Lecciones del retiro (DGP-023.2)
 - El health gate de deploy del api-server ahora apunta a `/api/deltaops/platform/health` (no existe `/api/healthz`).
