@@ -41,4 +41,5 @@
 - [Auditoría DGP-022](deltaops-auditoria-dgp022.md) — CRÍTICO abierto PLATFORM-CONSOLE-ACL (TENANT_ADMIN lee /platform/* cross-tenant); probar API directa por rol, no solo la ruta UI; piloto condicionado, producción NO sin hardening.
 - [Hardening DGP-023](deltaops-hardening-dgp023.md) — H-01 cerrado (SGMA retirado en 023.2, health gate → /deltaops/platform/health); H-02 abierto: RLS inactiva (app conecta como superusuario rolbypassrls); resto del hardening pendiente.
 - [Discovery RLS DGP-023.3](deltaops-rls-discovery-dgp023-3.md) — RLS inefectiva por bypass+ownership (ambas); STOP-1 login withGlobal sin tenant; tenantId en payload outbox no es invariante.
+- [Discovery Auth-RLS DGP-023.4](deltaops-auth-rls-discovery-dgp023-4.md) — login sobre tablas sin RLS por diseño + SECURITY DEFINER; motor es Replit Helium (no Neon); N-1 listarTenants y N-2 tenantId en valoraciones exigen código.
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.
