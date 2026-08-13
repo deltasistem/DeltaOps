@@ -12,7 +12,7 @@
  * negocio, jamás con un cero monetario.
  */
 import type { BadgeVariant } from "@workspace/design-system";
-import type { EstadoCosto } from "./tipos";
+import type { EstadoCosto, EstadoIndicador } from "./tipos";
 
 const RE_DECIMAL = /^-?\d+(\.\d+)?$/;
 
@@ -80,6 +80,73 @@ export const TONO_ESTADO: Record<EstadoCosto, BadgeVariant> = {
   PENDIENTE: "info",
   NO_APLICA: "neutro",
 };
+
+/** Etiqueta legible de un estado de indicador (DGP-021.4). */
+export const ETIQUETA_ESTADO_INDICADOR: Record<EstadoIndicador, string> = {
+  COMPLETO: "Completo",
+  PARCIAL: "Parcial",
+  SIN_DATOS_SUFICIENTES: "Sin datos suficientes",
+  NO_APLICA: "No aplica",
+};
+
+/** Tono del Badge por estado de indicador. */
+export const TONO_ESTADO_INDICADOR: Record<EstadoIndicador, BadgeVariant> = {
+  COMPLETO: "exito",
+  PARCIAL: "advertencia",
+  SIN_DATOS_SUFICIENTES: "neutro",
+  NO_APLICA: "neutro",
+};
+
+/**
+ * Formatea un RATIO económico (costo por unidad física) string-safe: formatea el
+ * importe exacto en su moneda y añade la unidad («/h» o «/km»). Nunca convierte a
+ * float para operar; delega en `Intl` la cadena decimal exacta. Devuelve `null` si
+ * el valor/moneda no son válidos.
+ */
+export function formatearRatio(
+  valor: string | null | undefined,
+  moneda: string | null | undefined,
+  unidad: string,
+  locale = "es-CO",
+): string | null {
+  const money = formatearMoneda(valor, moneda, locale);
+  if (money == null) return null;
+  return `${money}/${unidad}`;
+}
+
+/**
+ * Formatea una magnitud física (horas / km) que llega como CADENA exacta del
+ * backend, con su unidad. No hace aritmética. Devuelve `null` si no es válida.
+ */
+export function formatearMagnitud(
+  valor: string | null | undefined,
+  unidad: string,
+  locale = "es-CO",
+): string | null {
+  const n = formatearNumero(valor, locale);
+  if (n == null) return null;
+  return `${n} ${unidad}`;
+}
+
+/** Nombre legible de una unidad de medidor. */
+export const ETIQUETA_UNIDAD: Record<string, string> = {
+  h: "horas",
+  km: "km",
+};
+
+/** Mes «YYYY-MM» a etiqueta legible (p. ej. «may 2024»). Sin dependencia de zona. */
+export function formatearMes(mes: string, locale = "es"): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(mes);
+  if (!m) return mes;
+  const anio = Number(m[1]);
+  const mesIdx = Number(m[2]) - 1;
+  if (mesIdx < 0 || mesIdx > 11) return mes;
+  try {
+    return new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(new Date(Date.UTC(anio, mesIdx, 1)));
+  } catch {
+    return mes;
+  }
+}
 
 /** Nombres de presentación de los componentes económicos (lenguaje operacional, §21). */
 export const ETIQUETA_COMPONENTE: Record<string, string> = {

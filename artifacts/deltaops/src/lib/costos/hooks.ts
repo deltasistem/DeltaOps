@@ -6,7 +6,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { costosFetch } from "./api";
 import type { PeriodoClave } from "./constantes";
-import type { ComposicionOt, ComposicionActivo } from "./tipos";
+import type {
+  ComposicionOt,
+  ComposicionActivo,
+  ComparativaActivos,
+  TendenciaActivo,
+} from "./tipos";
 
 export interface EstadoAsync<T> {
   datos: T | null;
@@ -82,6 +87,48 @@ export function useComposicionActivo(
     async (signal) => {
       if (!activoId) return null;
       return (await costosFetch<ComposicionActivo>(`/composicion/activo/${encodeURIComponent(activoId)}${query}`, {
+        signal,
+        toleraNoEncontrado: true,
+      })) ?? null;
+    },
+    [activoId ?? "", query],
+  );
+}
+
+/**
+ * DGP-021.4 · Comparativa entre activos (§13). El backend devuelve SERIES POR MONEDA
+ * (nunca ranking combinado). Lista vacía ⇒ no consulta.
+ */
+export function useComparativa(
+  activoIds: readonly string[],
+  filtro: FiltroPeriodo = {},
+): EstadoAsync<ComparativaActivos | null> {
+  const query = qs(filtro);
+  const ids = activoIds.filter((x) => x.trim() !== "");
+  const csv = ids.join(",");
+  const sep = query ? "&" : "?";
+  return useConsulta<ComparativaActivos | null>(
+    async (signal) => {
+      if (ids.length === 0) return null;
+      return (await costosFetch<ComparativaActivos>(
+        `/comparativa${query}${sep}activos=${encodeURIComponent(csv)}`,
+        { signal },
+      )) ?? null;
+    },
+    [csv, query],
+  );
+}
+
+/** DGP-021.4 · Tendencia mensual de un activo (§14). `null` activoId ⇒ no consulta. */
+export function useTendencia(
+  activoId: string | null,
+  filtro: FiltroPeriodo = {},
+): EstadoAsync<TendenciaActivo | null> {
+  const query = qs(filtro);
+  return useConsulta<TendenciaActivo | null>(
+    async (signal) => {
+      if (!activoId) return null;
+      return (await costosFetch<TendenciaActivo>(`/tendencia/activo/${encodeURIComponent(activoId)}${query}`, {
         signal,
         toleraNoEncontrado: true,
       })) ?? null;

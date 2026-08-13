@@ -72,8 +72,8 @@ describe("VistaCostosActivo · combustible fuera del total económico", () => {
       combustible: combFloat,
     },
     totalesPorMoneda: [{ moneda: "CLP", total: "50000.000000", cargos: "50000.000000", abonos: "0.000000", componentes: 1 }],
-    costoPorHora: { estado: "SIN_DATOS_SUFICIENTES", nota: "n/a" },
-    costoPorKm: { estado: "SIN_DATOS_SUFICIENTES", nota: "n/a" },
+    costoPorHora: { tipoMedidor: "horometro", unidad: "h", estado: "SIN_DATOS_SUFICIENTES", delta: null, tramos: 0, porMoneda: [], nota: "n/a" },
+    costoPorKm: { tipoMedidor: "odometro", unidad: "km", estado: "NO_APLICA", delta: null, tramos: 0, porMoneda: [], nota: "Sin odómetro" },
   };
 
   const noop = () => undefined;

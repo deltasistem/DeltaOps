@@ -72,6 +72,7 @@ import UtilizacionLecturaNueva from '@/pages/utilizacion-lectura-nueva';
 import UtilizacionTanqueos from '@/pages/utilizacion-tanqueos';
 import UtilizacionTanqueoNuevo from '@/pages/utilizacion-tanqueo-nuevo';
 import UtilizacionResumen from '@/pages/utilizacion-resumen';
+import CostosPage from '@/pages/costos';
 import AnalyticsHome from '@/pages/analytics-home';
 import AnalyticsIndicadores from '@/pages/analytics-indicadores';
 import AnalyticsIndicador from '@/pages/analytics-indicador';
@@ -195,6 +196,7 @@ function Router() {
       <Route path="/utilizacion/tanqueos/nuevo" component={UtilizacionTanqueoNuevo} />
       <Route path="/utilizacion/tanqueos" component={UtilizacionTanqueos} />
       <Route path="/utilizacion/resumen" component={UtilizacionResumen} />
+      <Route path="/costos" component={CostosPage} />
       <Route path="/analytics" component={AnalyticsHome} />
       <Route path="/analytics/indicadores" component={AnalyticsIndicadores} />
       <Route path="/analytics/indicadores/:clave" component={AnalyticsIndicador} />

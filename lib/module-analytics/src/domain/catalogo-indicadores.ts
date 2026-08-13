@@ -381,6 +381,25 @@ export const CATALOGO_INDICADORES: readonly EspecIndicador[] = [
     unidad: "conteo",
     formato: "entero",
   },
+  {
+    // DGP-021.4 (ADITIVO): hace VISIBLE y renderizable el dataset `costos` en la
+    // superficie Analytics existente. Es un CONTEO (nunca aritmética sobre dinero:
+    // el dinero viaja como cadena exacta en el hecho, se preserva, no se opera aquí).
+    // Cuenta las series de indicador económico (costo/hora, costo/km) COMPLETAS por
+    // activo/moneda en el período. Los importes exactos por moneda quedan en el hecho
+    // para inspección; no se suman en el motor genérico.
+    clave: "cobertura-indicadores-costo",
+    nombre: "Cobertura de indicadores de costo",
+    descripcion: "Cantidad de series de indicador económico (costo/hora, costo/km) con dato COMPLETO por activo y moneda en el periodo",
+    categoria: "costos",
+    fuente: { modulo: "costos", dataset: "indicadores" },
+    expresion: {
+      tipo: "conteo",
+      filtros: [{ dimension: "estado", campo: "estado", operador: "eq", valor: "COMPLETO" }],
+    },
+    unidad: "conteo",
+    formato: "entero",
+  },
 ];
 
 /** Claves de todos los indicadores del sistema (para verificación). */

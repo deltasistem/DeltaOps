@@ -7,7 +7,8 @@
  * período por componente y POR MONEDA (nunca mezclado), estado de la información
  * y el COMBUSTIBLE claramente SEPARADO como valor CONTEXTUAL (no atribuible a
  * OT, precisión de origen aproximada). «Sin datos suficientes» ≠ «$0» (§4).
- * costo/hora y costo/km quedan diferidos a DGP-021.4 (se anuncia, no se inventa).
+ * DGP-021.4: costo/hora y costo/km REALES por moneda + horas/km del período y
+ * estado de calidad por indicador (NO APLICA para km sin odómetro, etc.).
  *
  * RBAC de presentación (§22): se oculta a quien no puede leer. Responsive §22,
  * tema §23. No duplica la ficha: es una sección más de la ficha operacional.
@@ -19,7 +20,7 @@ import { capacidadesCostos } from "./capacidades";
 import { useComposicionActivo, type FiltroPeriodo } from "./hooks";
 import { mensajeDeError } from "./api";
 import { PERIODOS, type PeriodoClave } from "./constantes";
-import { EstadoBadge, TotalesPorMoneda, TarjetaComponente, TarjetaCombustible } from "./componentes";
+import { EstadoBadge, TotalesPorMoneda, TarjetaComponente, TarjetaCombustible, TarjetaIndicador } from "./componentes";
 import type { ComposicionActivo } from "./tipos";
 
 export interface VistaCostosActivoProps {
@@ -144,38 +145,27 @@ export function VistaCostosActivo(props: VistaCostosActivoProps) {
             {/* Combustible CONTEXTUAL, claramente separado del total económico. */}
             <TarjetaCombustible c={datos.componentes.combustible} />
 
-            {/* Ratios operacionales (diferidos a DGP-021.4). */}
-            <div
-              style={{
-                display: "grid",
-                gap: "var(--do-sp-3)",
-                gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))",
-              }}
-            >
-              <RatioPendiente titulo="Costo por hora" nota={datos.costoPorHora.nota} />
-              <RatioPendiente titulo="Costo por km" nota={datos.costoPorKm.nota} />
+            {/* Indicadores económicos operacionales (DGP-021.4): costo/hora y costo/km,
+                por moneda, con estado de calidad. Ausencia ≠ $0 (§4). */}
+            <div>
+              <div style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)", marginBottom: "var(--do-sp-2)" }}>
+                Indicadores por uso (mismo período)
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gap: "var(--do-sp-3)",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))",
+                }}
+              >
+                <TarjetaIndicador titulo="Costo por hora" ind={datos.costoPorHora} />
+                <TarjetaIndicador titulo="Costo por km" ind={datos.costoPorKm} />
+              </div>
             </div>
           </div>
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function RatioPendiente({ titulo, nota }: { titulo: string; nota?: string }) {
-  return (
-    <div
-      style={{
-        border: "1px dashed var(--do-borde)",
-        borderRadius: "var(--do-radius-md)",
-        padding: "var(--do-sp-3)",
-        minWidth: 0,
-      }}
-    >
-      <div style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>{titulo}</div>
-      <div style={{ fontWeight: 600, color: "var(--do-texto-suave)" }}>Próximamente</div>
-      {nota && <div style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>{nota}</div>}
-    </div>
   );
 }
 

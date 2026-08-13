@@ -1931,6 +1931,13 @@ async function seedUtilizacion(activoIds: Map<string, string>): Promise<void> {
   // Activos con medidor: excavadora (horómetro) y camión (odómetro). Ids DEMO.
   const maq = activoIds.get("MAQ-001") ?? idDet("activo:MAQ-001");
   const cam = activoIds.get("CAM-001") ?? idDet("activo:CAM-001");
+  // GEN-001 (generador) acumula el COSTO de mantenimiento valorizado (ver
+  // `seedCostosMantenimiento`: la OT de consumo lo tiene como activo principal).
+  // Sin horómetro, su costo/hora sería SIN_DATOS_SUFICIENTES; con lecturas
+  // crecientes en la MISMA ventana (ene–feb 2026) el E2E muestra un costo/hora
+  // REAL. Un generador NO tiene odómetro ⇒ su costo/km es NO_APLICA (estado
+  // semántico deseado, jamás $0). DGP-021.4-E §8.
+  const gen = activoIds.get("GEN-001") ?? idDet("activo:GEN-001");
 
   // Lecturas crecientes de horómetro (excavadora) — se propagan a Activos.
   const lecturasHoro = [
@@ -1946,6 +1953,25 @@ async function seedUtilizacion(activoIds: Map<string, string>): Promise<void> {
         fechaHora: l.fecha, origen: "manual",
       }),
       `utl.lectura MAQ-001 #${i}`,
+    );
+    await drain();
+  }
+
+  // Lecturas de horómetro para GEN-001 (activo con costo de mantenimiento).
+  // Δ total 300 h en la ventana ene–feb 2026 ⇒ denominador exacto del costo/hora.
+  const lecturasGen = [
+    { valor: 500, fecha: "2026-01-05T08:00:00.000Z" },
+    { valor: 640, fecha: "2026-01-22T08:00:00.000Z" },
+    { valor: 800, fecha: "2026-02-01T08:00:00.000Z" },
+  ];
+  for (const [i, l] of lecturasGen.entries()) {
+    unwrap(
+      await cmd(`${MODULO_UTL}.registrar-lectura`, {
+        opId: `seed:utl:lec:GEN-001:${i}`,
+        activoId: gen, tipoMedidor: "horometro", valor: l.valor, unidad: "h",
+        fechaHora: l.fecha, origen: "manual",
+      }),
+      `utl.lectura GEN-001 #${i}`,
     );
     await drain();
   }
@@ -1987,7 +2013,7 @@ async function seedUtilizacion(activoIds: Map<string, string>): Promise<void> {
     await drain();
   }
 
-  log(`Utilización: ${lecturasHoro.length + lecturasOdo.length} lecturas + ${tanqueos.length} tanqueos (MAQ-001, CAM-001)`);
+  log(`Utilización: ${lecturasHoro.length + lecturasOdo.length + lecturasGen.length} lecturas + ${tanqueos.length} tanqueos (MAQ-001, CAM-001, GEN-001)`);
 }
 
 /* --------------------------- Mano de Obra (DGP-020.3) -------------------- */

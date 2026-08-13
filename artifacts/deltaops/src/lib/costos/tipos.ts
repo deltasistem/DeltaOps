@@ -134,6 +134,46 @@ export interface ComposicionOt {
   readonly pendientesMaterializacion: readonly Pendiente[];
 }
 
+/**
+ * DGP-021.4 · Estado de un INDICADOR económico (costo/hora, costo/km). Distinto de
+ * `EstadoCosto`: aquí NO hay PENDIENTE (los indicadores se derivan de dato exacto).
+ * Ausencia ≠ 0 (§4): SIN_DATOS_SUFICIENTES y NO_APLICA nunca se muestran como «0».
+ */
+export type EstadoIndicador =
+  | "COMPLETO"
+  | "PARCIAL"
+  | "SIN_DATOS_SUFICIENTES"
+  | "NO_APLICA";
+
+/**
+ * Ratio económico de UNA moneda (string-safe). El backend ya lo calculó EXACTO
+ * (numeric 18,6); el frontend SÓLO lo formatea, jamás lo recalcula.
+ */
+export interface RatioMoneda {
+  readonly moneda: string;
+  /** Costo total del período/moneda (cadena decimal exacta). */
+  readonly costoTotal: string;
+  /** Valor del ratio: costoTotal / denominador (cadena decimal exacta). */
+  readonly valor: string;
+}
+
+/**
+ * Indicador de un medidor (horómetro→costo/hora u odómetro→costo/km). El denominador
+ * (`delta`) es el avance EXACTO del medidor por tramos (nunca cruza reinicios); los
+ * ratios van POR MONEDA (una serie por moneda; jamás combinadas).
+ */
+export interface IndicadorMedidor {
+  readonly tipoMedidor: "horometro" | "odometro";
+  readonly unidad: "h" | "km";
+  readonly estado: EstadoIndicador;
+  /** Avance EXACTO del medidor (horas / km), cadena decimal, o null si no computable. */
+  readonly delta: string | null;
+  /** Nº de tramos considerados (reinicios + 1). */
+  readonly tramos: number;
+  readonly porMoneda: readonly RatioMoneda[];
+  readonly nota?: string;
+}
+
 /** Composición de costos de un activo (con combustible contextual). */
 export interface ComposicionActivo {
   readonly activo: string;
@@ -147,6 +187,70 @@ export interface ComposicionActivo {
     readonly combustible: CombustibleActivo;
   };
   readonly totalesPorMoneda: readonly TotalMoneda[];
-  readonly costoPorHora: { readonly estado: string; readonly nota?: string };
-  readonly costoPorKm: { readonly estado: string; readonly nota?: string };
+  /** DGP-021.4: indicadores económicos reales (sustituyen los placeholders diferidos). */
+  readonly costoPorHora: IndicadorMedidor;
+  readonly costoPorKm: IndicadorMedidor;
+}
+
+/** Indicadores económicos de un activo/período (endpoint `/indicadores/activo`). */
+export interface IndicadoresActivo {
+  readonly activo: string;
+  readonly periodo: string;
+  readonly rango: RangoResuelto;
+  readonly totalesPorMoneda: readonly TotalMoneda[];
+  readonly costoPorHora: IndicadorMedidor;
+  readonly costoPorKm: IndicadorMedidor;
+}
+
+/** Fila de un activo dentro de la serie por moneda de la comparativa (§13). */
+export interface FilaComparativa {
+  readonly activoId: string;
+  /** Costo total del activo en esta moneda (cadena exacta). */
+  readonly total: string;
+  /** Ratio costo/hora en esta moneda, o null si no aplica/no hay dato. */
+  readonly costoPorHora: string | null;
+  /** Ratio costo/km en esta moneda, o null si no aplica/no hay dato. */
+  readonly costoPorKm: string | null;
+}
+
+/** Serie de comparativa de UNA moneda (nunca se combinan monedas, §13). */
+export interface SerieComparativa {
+  readonly moneda: string;
+  readonly activos: readonly FilaComparativa[];
+}
+
+/** Comparativa entre activos (endpoint `/comparativa`). */
+export interface ComparativaActivos {
+  readonly periodo: string;
+  readonly rango: RangoResuelto;
+  /** Una serie por moneda; ordenamiento cliente dentro de cada moneda. */
+  readonly rankingPorMoneda: readonly SerieComparativa[];
+  readonly activos: readonly {
+    readonly activo: string;
+    readonly totalesPorMoneda: readonly TotalMoneda[];
+    readonly costoPorHora: IndicadorMedidor;
+    readonly costoPorKm: IndicadorMedidor;
+  }[];
+}
+
+/** Punto mensual de la tendencia (§14). Huecos = null, JAMÁS 0. */
+export interface PuntoTendencia {
+  readonly mes: string;
+  readonly estado: "COMPLETO" | "SIN_DATOS_SUFICIENTES";
+  /** Costo por moneda del mes, o null si no hay datos (nunca 0). */
+  readonly costoPorMoneda: readonly TotalMoneda[] | null;
+  /** Horas de operación del mes (cadena exacta) o null. */
+  readonly horas: string | null;
+  /** Km del mes (cadena exacta) o null. */
+  readonly km: string | null;
+  readonly costoPorHora: readonly RatioMoneda[] | null;
+  readonly costoPorKm: readonly RatioMoneda[] | null;
+}
+
+/** Tendencia mensual de un activo (endpoint `/tendencia/activo`). */
+export interface TendenciaActivo {
+  readonly activo: string;
+  readonly periodo: string;
+  readonly rango: RangoResuelto;
+  readonly puntos: readonly PuntoTendencia[];
 }

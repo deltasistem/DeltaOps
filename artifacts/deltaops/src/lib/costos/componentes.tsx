@@ -12,24 +12,37 @@ import {
   formatearMoneda,
   formatearNumero,
   formatearFecha,
+  formatearRatio,
+  formatearMagnitud,
   ETIQUETA_ESTADO,
   TONO_ESTADO,
+  ETIQUETA_ESTADO_INDICADOR,
+  TONO_ESTADO_INDICADOR,
+  ETIQUETA_UNIDAD,
   ETIQUETA_COMPONENTE,
   SIN_DATOS_TEXTO,
 } from "./formato";
 import type {
   Componente,
   EstadoCosto,
+  EstadoIndicador,
   TotalMoneda,
   Evidencia,
   Pendiente,
   CombustibleActivo,
+  IndicadorMedidor,
 } from "./tipos";
 
 /** Badge de estado (§8): COMPLETO/PARCIAL/SIN DATOS SUFICIENTES/PENDIENTE/NO APLICA. */
 export function EstadoBadge({ estado }: { estado: EstadoCosto }) {
   const tono: BadgeVariant = TONO_ESTADO[estado] ?? "neutro";
   return <Badge variant={tono}>{ETIQUETA_ESTADO[estado] ?? estado}</Badge>;
+}
+
+/** Badge de estado de INDICADOR económico (DGP-021.4). */
+export function EstadoIndicadorBadge({ estado }: { estado: EstadoIndicador }) {
+  const tono: BadgeVariant = TONO_ESTADO_INDICADOR[estado] ?? "neutro";
+  return <Badge variant={tono}>{ETIQUETA_ESTADO_INDICADOR[estado] ?? estado}</Badge>;
 }
 
 /** Fila de dato compacta. */
@@ -275,6 +288,76 @@ export function TarjetaCombustible({ c }: { c: CombustibleActivo }) {
                 ))}
               </ul>
             </details>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * DGP-021.4 · Tarjeta de un INDICADOR económico (costo/hora o costo/km).
+ *
+ * Presenta el estado semántico, el avance del medidor (horas/km del período) y el
+ * ratio POR MONEDA (nunca combinadas). La ausencia se muestra explícita (§4): jamás
+ * «$0». NO APLICA (p. ej. km sin odómetro) se rotula sin inventar valor.
+ * String-safe: sólo formatea cadenas exactas del backend (§26).
+ */
+export function TarjetaIndicador({ titulo, ind }: { titulo: string; ind: IndicadorMedidor }) {
+  const unidadLegible = ETIQUETA_UNIDAD[ind.unidad] ?? ind.unidad;
+  const noAplica = ind.estado === "NO_APLICA";
+  const sinDatos = ind.estado === "SIN_DATOS_SUFICIENTES";
+  const magnitud = formatearMagnitud(ind.delta, ind.unidad);
+  return (
+    <div
+      style={{
+        border: "1px solid var(--do-borde)",
+        borderRadius: "var(--do-radius-lg)",
+        padding: "var(--do-sp-4)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--do-sp-3)",
+        minWidth: 0,
+        background: "var(--do-surface)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--do-sp-3)", flexWrap: "wrap" }}>
+        <strong>{titulo}</strong>
+        <EstadoIndicadorBadge estado={ind.estado} />
+      </div>
+
+      {noAplica ? (
+        <span style={{ color: "var(--do-texto-suave)", fontWeight: 600 }}>
+          {ETIQUETA_ESTADO_INDICADOR.NO_APLICA}
+          {ind.nota && <div style={{ fontWeight: 400, fontSize: "var(--do-text-xs)" }}>{ind.nota}</div>}
+        </span>
+      ) : sinDatos || ind.porMoneda.length === 0 ? (
+        <span style={{ color: "var(--do-texto-suave)", fontWeight: 600 }}>
+          {SIN_DATOS_TEXTO}
+          {ind.nota && <div style={{ fontWeight: 400, fontSize: "var(--do-text-xs)" }}>{ind.nota}</div>}
+        </span>
+      ) : (
+        <>
+          {/* Ratio por moneda (una línea por moneda; nunca mezcladas). */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-2)" }}>
+            {ind.porMoneda.map((r) => {
+              const ratio = formatearRatio(r.valor, r.moneda, ind.unidad) ?? `${r.valor} ${r.moneda}/${ind.unidad}`;
+              return (
+                <div key={r.moneda} style={{ minWidth: 0 }}>
+                  <strong style={{ fontSize: "var(--do-text-lg)", fontVariantNumeric: "tabular-nums" }}>{ratio}</strong>
+                  <div style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>
+                    Costo {formatearMoneda(r.costoTotal, r.moneda) ?? `${r.costoTotal} ${r.moneda}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Denominador: avance del medidor en el período. */}
+          {magnitud && (
+            <div style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>
+              {unidadLegible === "horas" ? "Horas de operación" : "Distancia recorrida"}: <span style={{ fontVariantNumeric: "tabular-nums" }}>{magnitud}</span>
+              {ind.tramos > 1 && ` · ${ind.tramos} tramos (medidor reiniciado)`}
+            </div>
           )}
         </>
       )}
