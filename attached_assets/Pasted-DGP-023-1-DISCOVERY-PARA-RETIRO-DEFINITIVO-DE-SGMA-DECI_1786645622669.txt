@@ -1,0 +1,449 @@
+DGP-023.1 — DISCOVERY PARA RETIRO DEFINITIVO DE SGMA
+
+DECISIÓN DE DIRECCIÓN
+
+SGMA queda oficialmente RETIRADO.
+
+La Dirección confirma que:
+
+- SGMA nunca salió a producción.
+- DeltaOps es el producto final y único producto que continuará.
+- No necesitamos mantener SGMA operativo.
+- No se desea implementar autenticación ni hardening sobre SGMA.
+- El objetivo es eliminar SGMA y su superficie legacy de forma segura.
+
+IMPORTANTE:
+
+ESTA FASE ES SOLO DISCOVERY.
+
+NO borrar archivos.
+NO modificar código.
+NO modificar DB.
+NO ejecutar migraciones destructivas.
+NO eliminar tablas todavía.
+NO modificar DeltaOps.
+NO modificar infraestructura.
+NO hacer commits destructivos.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Determinar exactamente qué puede eliminarse de SGMA sin afectar DeltaOps ni ninguna infraestructura necesaria del programa.
+
+El objetivo final será retirar:
+
+- artifacts/sgma
+- routers legacy SGMA
+- tablas public.* de SGMA
+- seed-sgma
+- contratos OpenAPI exclusivamente utilizados por SGMA
+- hooks/clientes exclusivamente utilizados por SGMA
+- tests exclusivamente SGMA
+- workflows exclusivos SGMA
+- documentación exclusiva SGMA
+- configuraciones exclusivas SGMA
+
+Pero NADA debe eliminarse durante este Discovery.
+
+==================================================
+2. AUDITORÍA DE DEPENDENCIAS
+==================================================
+
+Buscar exhaustivamente referencias a:
+
+- artifacts/sgma
+- rutas /api/work-orders
+- /api/assets
+- /api/dashboard
+- /api/spare-parts
+- /api/locations
+- /api/work-centers
+- /api/technicians
+- /api/suppliers
+- /api/maintenance-plans
+- tablas public.*
+- seed-sgma
+- schemas SGMA
+- hooks generados para SGMA
+- clientes API SGMA
+- workflows SGMA
+- artifact.toml de SGMA
+- scripts de build/deploy SGMA
+
+Clasificar cada referencia:
+
+A. Exclusiva de SGMA → candidata a eliminación.
+
+B. Compartida con DeltaOps → NO eliminar.
+
+C. Infraestructura compartida → conservar.
+
+D. Referencia histórica/documental → evaluar.
+
+E. Referencia huérfana → candidata a limpieza.
+
+==================================================
+3. DELTAOPS
+==================================================
+
+Confirmar nuevamente que DeltaOps no depende de:
+
+- routers SGMA;
+- tablas SGMA;
+- hooks SGMA;
+- OpenAPI SGMA;
+- seed-sgma;
+- frontend SGMA;
+- runtime SGMA.
+
+Hacer búsqueda exhaustiva en:
+
+artifacts/deltaops
+artifacts/api-server/src/deltaops
+lib/module-*
+lib/*
+tests relacionados con DeltaOps
+workflows
+scripts
+
+Resultado requerido:
+
+Matriz de dependencias con archivo y línea.
+
+==================================================
+4. BASE DE DATOS
+==================================================
+
+Inventariar exactamente las tablas SGMA.
+
+Confirmar:
+
+- nombre;
+- esquema;
+- cantidad de registros;
+- FK entrantes;
+- FK salientes;
+- vistas;
+- índices;
+- triggers;
+- funciones;
+- secuencias;
+- referencias desde otras tablas;
+- referencias desde código.
+
+Determinar si las tablas pueden eliminarse mediante una migración futura segura.
+
+IMPORTANTE:
+
+NO ejecutar DROP.
+
+==================================================
+5. API LEGACY
+==================================================
+
+Enumerar todos los routers SGMA y sus rutas.
+
+Determinar cuáles pueden eliminarse completamente.
+
+Confirmar si alguna ruta legacy es utilizada por:
+
+- DeltaOps;
+- scripts;
+- health checks;
+- CI/CD;
+- monitoring;
+- documentación;
+- otro frontend.
+
+==================================================
+6. OPENAPI / API CLIENT
+==================================================
+
+Determinar exactamente qué partes de:
+
+lib/api-spec/openapi.yaml
+
+corresponden exclusivamente a SGMA.
+
+Determinar si eliminar esos contratos afecta:
+
+- api-client-react;
+- generación de clientes;
+- DeltaOps;
+- typecheck;
+- build.
+
+NO modificar OpenAPI durante Discovery.
+
+==================================================
+7. FRONTEND SGMA
+==================================================
+
+Inventariar:
+
+- páginas;
+- componentes;
+- hooks;
+- servicios;
+- assets;
+- estilos;
+- configuración;
+- dependencias npm exclusivas.
+
+Determinar qué archivos desaparecerían con el retiro.
+
+==================================================
+8. WORKFLOWS Y DEPLOY
+==================================================
+
+Buscar referencias a SGMA en:
+
+- artifact.toml
+- package.json
+- scripts
+- workflows
+- CI/CD
+- Docker
+- procesos de deploy
+- PM2/systemd si existen
+- configuración del VPS
+- variables de entorno
+- health checks
+
+Determinar si existe algún proceso que actualmente espere SGMA.
+
+==================================================
+9. GITHUB
+==================================================
+
+Determinar si SGMA tiene:
+
+- workflow propio;
+- build propio;
+- deploy propio;
+- scripts propios;
+- ramas;
+- referencias en documentación.
+
+No borrar historial Git.
+
+El retiro debe poder hacerse mediante commits normales y reversibles.
+
+==================================================
+10. DATOS
+==================================================
+
+Confirmar qué datos existen actualmente en SGMA.
+
+Clasificar:
+
+- datos de demostración;
+- datos de prueba;
+- datos potencialmente valiosos;
+- datos que pueden eliminarse.
+
+Dado que SGMA nunca salió a producción, verificar que no existan datos operativos reales que debamos conservar.
+
+NO borrar datos todavía.
+
+==================================================
+11. RIESGO DE ELIMINACIÓN
+==================================================
+
+Crear matriz:
+
+Elemento | Dependencia | Impacto | Riesgo | Acción
+
+Clasificar:
+
+- ELIMINAR
+- CONSERVAR
+- MIGRAR
+- REVISAR
+- NO TOCAR
+
+==================================================
+12. PLAN DE RETIRO
+==================================================
+
+Diseñar posteriormente una secuencia segura.
+
+Proponer algo similar a:
+
+FASE A
+Eliminar consumo de SGMA.
+
+FASE B
+Eliminar frontend SGMA.
+
+FASE C
+Eliminar API legacy SGMA.
+
+FASE D
+Eliminar contratos exclusivos.
+
+FASE E
+Eliminar seeds/scripts.
+
+FASE F
+Eliminar tablas public.* mediante migración.
+
+FASE G
+Limpiar configuración/workflows/dependencias.
+
+FASE H
+Validación completa de DeltaOps.
+
+Pero modificar esta secuencia si el análisis demuestra una mejor estrategia.
+
+==================================================
+13. ROLLBACK
+==================================================
+
+Aunque SGMA será retirado, definir cómo revertir el cambio si:
+
+- aparece una dependencia inesperada;
+- falla el build;
+- falla DeltaOps;
+- falla el deploy.
+
+El historial Git debe permitir recuperación del código.
+
+Para DB, determinar qué backup/mecanismo sería necesario antes del DROP.
+
+==================================================
+14. CRITERIOS DE ACEPTACIÓN FUTUROS
+==================================================
+
+Después de implementar el retiro deberán verificarse como mínimo:
+
+DeltaOps:
+
+- login;
+- sesión;
+- RBAC;
+- Centro Operacional;
+- Activos;
+- Órdenes;
+- Inventario;
+- Abastecimiento;
+- Planes;
+- Preventivo;
+- Correctivo;
+- Utilización;
+- Mano de obra;
+- Costos;
+- Analytics;
+- SUPER_ADMIN;
+- TENANT_ADMIN;
+- SUPERVISOR;
+- PLANIFICADOR;
+- TECNICO;
+- CONSULTA.
+
+Además:
+
+- typecheck;
+- tests;
+- build;
+- OpenAPI drift;
+- E2E;
+- multitenancy;
+- RLS;
+- navegación;
+- login/logout;
+- refresh;
+- tema claro/oscuro;
+- responsive.
+
+No debe quedar ninguna regresión causada por retirar SGMA.
+
+==================================================
+15. ¿QUÉ NO HACER?
+==================================================
+
+NO:
+
+- migrar SGMA a DeltaOps;
+- reutilizar código SGMA en DeltaOps sin justificarlo;
+- modificar módulos DeltaOps para adaptarse a SGMA;
+- crear una autenticación para SGMA;
+- implementar RLS SGMA;
+- crear RBAC SGMA;
+- conservar SGMA "por si acaso" dentro de producción;
+- borrar datos sin confirmar su naturaleza;
+- borrar tablas sin verificar FK/dependencias.
+
+SGMA es un producto retirado.
+
+==================================================
+16. ENTREGABLE
+==================================================
+
+Crear únicamente:
+
+docs/dgp/DGP-023.1-DISCOVERY-RETIRO-SGMA.md
+
+El documento debe contener:
+
+1. inventario completo;
+2. dependencias;
+3. matriz de riesgo;
+4. elementos eliminables;
+5. elementos que deben conservarse;
+6. impacto sobre DeltaOps;
+7. estrategia de retiro;
+8. estrategia de rollback;
+9. migración DB propuesta;
+10. validación posterior;
+11. criterios de aceptación;
+12. decisiones pendientes.
+
+==================================================
+17. REVISIÓN INDEPENDIENTE
+==================================================
+
+La revisión debe verificar:
+
+- referencias reales;
+- dependencias reales;
+- tablas;
+- FK;
+- API;
+- frontend;
+- workflows;
+- CI/CD;
+- scripts;
+- DeltaOps;
+- base de datos.
+
+No aceptar conclusiones basadas únicamente en nombres o suposiciones.
+
+Si aparece una dependencia real:
+
+FAIL y documentarla.
+
+Si el análisis demuestra que SGMA puede retirarse:
+
+PASS.
+
+==================================================
+18. CIERRE
+==================================================
+
+Si PASS:
+
+"DGP-023.1 DISCOVERY — RETIRO SGMA APROBABLE"
+
+Si aparece dependencia bloqueante:
+
+"DGP-023.1 DETENIDO — DEPENDENCIA REQUIERE DECISIÓN"
+
+DETENTE después del Discovery.
+
+NO IMPLEMENTES EL RETIRO.
+
+NO INICIES DGP-023.2.
+
+ESPERA APROBACIÓN EXPLÍCITA DE DIRECCIÓN.
