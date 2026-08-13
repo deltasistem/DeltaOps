@@ -1,5 +1,7 @@
 # ARQUITECTURA_ACTUAL.md
 
+> **DOCUMENTO HISTÓRICO — SGMA retirado (DGP-023.2, 2026-08-13).** SGMA nunca llegó a producción y fue reemplazado por DeltaOps. Este documento describe el prototipo SGMA ya retirado y se conserva SOLO como referencia histórica; no refleja el estado actual del sistema.
+
 > Auditoría técnica del sistema **SGMA — Sistema de Gestión de Mantenimiento**
 > Fecha de auditoría: 2026-07-30
 > Naturaleza: **informe de solo lectura**. No se modificó código, arquitectura, base de datos ni dependencias.

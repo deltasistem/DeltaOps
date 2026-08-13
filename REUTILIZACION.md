@@ -1,5 +1,7 @@
 # REUTILIZACION.md
 
+> **DOCUMENTO HISTÓRICO — SGMA retirado (DGP-023.2, 2026-08-13).** SGMA nunca llegó a producción y fue reemplazado por DeltaOps. Este documento describe el prototipo SGMA ya retirado y se conserva SOLO como referencia histórica; no refleja el estado actual del sistema.
+
 > Clasificación pieza por pieza del proyecto **SGMA** de cara a la refactorización hacia una plataforma **EAM modular, multiempresa y multitenant**.
 > Categorías: **REUTILIZAR** (tal cual o con cambios mínimos) · **REFACTORIZAR** (conservar la idea, rediseñar la implementación) · **ELIMINAR** (no sirve al nuevo alcance).
 > Documento de solo lectura. No se modificó, refactorizó ni eliminó nada.

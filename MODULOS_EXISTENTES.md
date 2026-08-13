@@ -1,5 +1,7 @@
 # MODULOS_EXISTENTES.md
 
+> **DOCUMENTO HISTÓRICO — SGMA retirado (DGP-023.2, 2026-08-13).** SGMA nunca llegó a producción y fue reemplazado por DeltaOps. Este documento describe el prototipo SGMA ya retirado y se conserva SOLO como referencia histórica; no refleja el estado actual del sistema.
+
 > Inventario completo de módulos del sistema **SGMA** en su estado actual.
 > Documento de solo lectura. No se modificó código.
 
