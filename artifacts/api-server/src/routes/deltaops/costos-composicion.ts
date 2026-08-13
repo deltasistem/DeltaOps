@@ -315,9 +315,23 @@ async function pendientesMaterial(s: Sesion, otId: string): Promise<Record<strin
 
 /**
  * Combustible del activo (CONTEXTUAL, §3). GAP-FUEL-OT: sin relación combustible→OT
- * ⇒ nunca es costo directo de una OT. GAP-FUEL-MONEY: el dinero de tanqueo es float
- * en su módulo (congelado) ⇒ NO se integra al total económico string-safe; se
- * presenta el valor de ORIGEN tal cual, separado por moneda y marcado como no-exacto.
+ * ⇒ nunca es costo directo de una OT.
+ *
+ * GAP-FUEL-MONEY (DGP-021.3 R1, §26/§27): el dinero de tanqueo es float en su módulo
+ * de origen (serie 019, congelado). Esta fase NO produce NINGÚN agregado monetario de
+ * combustible: está PROHIBIDO sumar `costoTotal` (o `litros` como magnitud de dinero)
+ * en floating point. Por tanto NO existe `costoOrigen` total ni `porMoneda` sumado.
+ *
+ * En su lugar se exponen, de forma estrictamente CONTEXTUAL:
+ *  - el CONTEO de tanqueos (entero) — total, con costo y sin costo de origen,
+ *  - un desglose por moneda que es SOLO un CONTEO de tanqueos (entero), sin dinero,
+ *  - la lista de tanqueos INDIVIDUALES con su valor de ORIGEN tal cual (sin sumar),
+ *    para trazabilidad. Cada `costoOrigen` es el string del valor float de origen de
+ *    ESE tanqueo (no un agregado). `litros` se emite por tanqueo como cantidad física
+ *    de origen, sin agregarse.
+ *
+ * Queda DECLARADO el GAP: no habrá total monetario de combustible por moneda hasta que
+ * la serie 019 exponga cadenas decimales exactas (numeric string-safe).
  */
 async function combustibleContextual(
   s: Sesion,
@@ -336,39 +350,61 @@ async function combustibleContextual(
   const filtrados = tanqueos.filter((t) => enRango(t["fechaHora"], rango));
 
   if (filtrados.length === 0) {
-    return { ok: true, value: { atribuibleAOt: "NO_APLICA", estado: "SIN_DATOS_SUFICIENTES", porMoneda: [], tanqueos: 0 } };
+    return {
+      ok: true,
+      value: {
+        atribuibleAOt: "NO_APLICA", estado: "SIN_DATOS_SUFICIENTES",
+        precisionOrigen: "float-utilizacion-no-exacto",
+        gapMoneda: "GAP-FUEL-MONEY", conteoPorMoneda: [], eventos: [],
+        tanqueos: 0, tanqueosConCosto: 0, tanqueosSinCosto: 0,
+      },
+    };
   }
-  // Agrupa por moneda SIN convertir. El costoTotal es de origen float (marcado).
-  const porMoneda = new Map<string, { costoOrigen: number; tanqueos: number; litros: number }>();
+
+  // SOLO conteos enteros por moneda (jamás sumas monetarias/float) + eventos crudos.
+  const conteoMoneda = new Map<string, number>();
+  const eventos: Record<string, unknown>[] = [];
   let sinCosto = 0;
+  let conCosto = 0;
   for (const t of filtrados) {
     const moneda = typeof t["moneda"] === "string" && t["moneda"] !== "" ? String(t["moneda"]) : null;
     const costo = t["costoTotal"];
-    const litros = typeof t["litros"] === "number" ? (t["litros"] as number) : 0;
-    if (moneda === null || typeof costo !== "number") {
+    const tieneCosto = moneda !== null && typeof costo === "number";
+    if (tieneCosto) {
+      conCosto += 1;
+      conteoMoneda.set(moneda, (conteoMoneda.get(moneda) ?? 0) + 1); // conteo ENTERO
+    } else {
       sinCosto += 1;
-      continue;
     }
-    const acc = porMoneda.get(moneda) ?? { costoOrigen: 0, tanqueos: 0, litros: 0 };
-    // NOTA: suma en el módulo de origen (float, no-exacto). Se marca explícitamente.
-    acc.costoOrigen += costo;
-    acc.tanqueos += 1;
-    acc.litros += litros;
-    porMoneda.set(moneda, acc);
+    // Valor de ORIGEN por tanqueo, tal cual, SIN agregar (sólo trazabilidad).
+    eventos.push({
+      tanqueoId: t["id"] ?? t["tanqueoId"] ?? null,
+      cuando: t["fechaHora"] ?? null,
+      moneda: moneda,
+      // String del valor float de ORIGEN de ESTE tanqueo; no es un total.
+      costoOrigen: typeof costo === "number" ? String(costo) : null,
+      litros: typeof t["litros"] === "number" ? String(t["litros"] as number) : null,
+    });
   }
+
   return {
     ok: true,
     value: {
       // §3: NUNCA como costo directo de la OT.
       atribuibleAOt: "NO_APLICA",
-      // Contextual del activo en período; valor de origen no-exacto (GAP-FUEL-MONEY).
-      estado: porMoneda.size > 0 ? "CONTEXTUAL" : "SIN_DATOS_SUFICIENTES",
+      // Contextual del activo en período; los valores de ORIGEN son no-exactos.
+      estado: conCosto > 0 || filtrados.length > 0 ? "CONTEXTUAL" : "SIN_DATOS_SUFICIENTES",
       precisionOrigen: "float-utilizacion-no-exacto",
+      // GAP declarado: sin totales monetarios de combustible hasta que 019 exponga
+      // cadenas decimales exactas.
+      gapMoneda: "GAP-FUEL-MONEY",
       tanqueos: filtrados.length,
+      tanqueosConCosto: conCosto,
       tanqueosSinCosto: sinCosto,
-      porMoneda: [...porMoneda.entries()].sort().map(([moneda, v]) => ({
-        moneda, costoOrigen: String(v.costoOrigen), litros: String(v.litros), tanqueos: v.tanqueos,
-      })),
+      // Desglose por moneda = SOLO conteo entero de tanqueos (sin dinero).
+      conteoPorMoneda: [...conteoMoneda.entries()].sort().map(([moneda, tanqueos]) => ({ moneda, tanqueos })),
+      // Valores de origen por tanqueo, individuales, sin sumar.
+      eventos,
     },
   };
 }

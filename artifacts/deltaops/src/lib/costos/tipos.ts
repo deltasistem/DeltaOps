@@ -68,15 +68,39 @@ export interface Componente {
   readonly pendientes?: readonly Pendiente[];
 }
 
-/** Combustible del activo (CONTEXTUAL) — separado del total económico. */
+/** Un tanqueo individual con su valor de ORIGEN tal cual (sin agregar). */
+export interface EventoCombustible {
+  readonly tanqueoId?: string | null;
+  readonly cuando?: string | null;
+  readonly moneda?: string | null;
+  /** Valor de ORIGEN de ESTE tanqueo (float del módulo 019), como cadena; no es un total. */
+  readonly costoOrigen?: string | null;
+  /** Litros de ESTE tanqueo, como cadena; magnitud física de origen, no agregada. */
+  readonly litros?: string | null;
+}
+
+/**
+ * Combustible del activo (CONTEXTUAL) — SEPARADO del total económico.
+ *
+ * DGP-021.3 R1 (§26): esta fase NO expone NINGÚN agregado monetario de combustible
+ * (GAP-FUEL-MONEY: el dinero de origen es float en la serie 019, congelado). No hay
+ * `porMoneda`/`costoOrigen` sumado. Sólo se exponen conteos ENTEROS de tanqueos y los
+ * valores de origen POR tanqueo (`eventos`), estrictamente contextuales y no-exactos.
+ */
 export interface CombustibleActivo {
   readonly tipo?: string;
   readonly estado: "CONTEXTUAL" | "SIN_DATOS_SUFICIENTES" | "NO_APLICA";
   readonly atribuibleAOt?: string;
   readonly precisionOrigen?: string;
+  /** Marca del GAP declarado: sin totales monetarios de combustible en esta fase. */
+  readonly gapMoneda?: string;
   readonly tanqueos?: number;
+  readonly tanqueosConCosto?: number;
   readonly tanqueosSinCosto?: number;
-  readonly porMoneda?: readonly { moneda: string; costoOrigen: string; litros: string; tanqueos: number }[];
+  /** Desglose por moneda = SOLO conteo entero de tanqueos (sin dinero). */
+  readonly conteoPorMoneda?: readonly { moneda: string; tanqueos: number }[];
+  /** Tanqueos individuales con su valor de origen (sin sumar). */
+  readonly eventos?: readonly EventoCombustible[];
   readonly nota?: string;
 }
 

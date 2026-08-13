@@ -180,10 +180,17 @@ export function TarjetaComponente({ c }: { c: Componente }) {
 
 /**
  * Combustible CONTEXTUAL del activo (§3): SIEMPRE separado del total económico y
- * marcado como valor de ORIGEN no-exacto. Nunca atribuible a una OT.
+ * nunca atribuible a una OT.
+ *
+ * DGP-021.3 R1 (§26): NO se muestra ningún TOTAL monetario de combustible (el dinero
+ * de origen es float, GAP-FUEL-MONEY). Sólo se presentan CONTEOS de tanqueos por
+ * moneda y, opcionalmente, los valores de ORIGEN por tanqueo individual (no sumados),
+ * marcados como referenciales/no-exactos.
  */
 export function TarjetaCombustible({ c }: { c: CombustibleActivo }) {
-  const porMoneda = c.porMoneda ?? [];
+  const conteo = c.conteoPorMoneda ?? [];
+  const eventos = c.eventos ?? [];
+  const sinDatos = (c.tanqueos ?? 0) === 0;
   return (
     <div
       style={{
@@ -202,29 +209,74 @@ export function TarjetaCombustible({ c }: { c: CombustibleActivo }) {
         <Badge variant="info">Contextual</Badge>
       </div>
       <p style={{ margin: 0, color: "var(--do-texto-suave)", fontSize: "var(--do-text-sm)" }}>
-        Valor de referencia del activo en el período. No se suma al total económico
-        de mantenimiento (precisión de origen aproximada) ni se atribuye a órdenes.
+        Referencia operacional del activo en el período. No se suma al total económico
+        de mantenimiento ni se atribuye a órdenes. Los valores de origen son
+        aproximados; no se calcula ningún total monetario de combustible en esta fase.
       </p>
-      {porMoneda.length === 0 ? (
+      {sinDatos ? (
         <span style={{ color: "var(--do-texto-suave)", fontWeight: 600 }}>{SIN_DATOS_TEXTO}</span>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-2)" }}>
-          {porMoneda.map((m) => (
-            <div key={m.moneda} style={{ minWidth: 0 }}>
-              <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-                ≈ {formatearMoneda(m.costoOrigen, m.moneda) ?? `${m.costoOrigen} ${m.moneda}`}
-              </strong>
-              <div style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>
-                {m.tanqueos} tanqueo(s) · {formatearNumero(m.litros) ?? m.litros} L
+        <>
+          {/* Conteo de tanqueos (entero) por moneda — SIN dinero. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)" }}>
+            <span>
+              <strong style={{ fontVariantNumeric: "tabular-nums" }}>{c.tanqueos}</strong> tanqueo(s) en el período
+            </span>
+            {conteo.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-2)" }}>
+                {conteo.map((m) => (
+                  <Badge key={m.moneda} variant="neutro">
+                    {m.moneda}: {m.tanqueos} tanqueo(s)
+                  </Badge>
+                ))}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {typeof c.tanqueosSinCosto === "number" && c.tanqueosSinCosto > 0 && (
-        <span style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>
-          {c.tanqueosSinCosto} tanqueo(s) sin costo registrado.
-        </span>
+            )}
+            {typeof c.tanqueosSinCosto === "number" && c.tanqueosSinCosto > 0 && (
+              <span style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>
+                {c.tanqueosSinCosto} tanqueo(s) sin costo de origen registrado.
+              </span>
+            )}
+          </div>
+
+          {/* Valores de ORIGEN por tanqueo, individuales (no sumados). */}
+          {eventos.length > 0 && (
+            <details>
+              <summary style={{ cursor: "pointer", color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>
+                Ver {eventos.length} tanqueo(s) con su valor de origen (aprox., sin sumar)
+              </summary>
+              <ul style={{ margin: "var(--do-sp-2) 0 0", padding: 0, display: "grid", gap: "var(--do-sp-2)" }}>
+                {eventos.map((e, i) => (
+                  <li
+                    key={e.tanqueoId ?? i}
+                    style={{
+                      listStyle: "none",
+                      border: "1px solid var(--do-borde)",
+                      borderRadius: "var(--do-radius-md)",
+                      padding: "var(--do-sp-2) var(--do-sp-3)",
+                      fontSize: "var(--do-text-xs)",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "var(--do-sp-2) var(--do-sp-4)",
+                      alignItems: "baseline",
+                    }}
+                  >
+                    <span style={{ color: "var(--do-texto-suave)" }}>{formatearFecha(e.cuando ?? undefined)}</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {e.costoOrigen != null && e.moneda
+                        ? `≈ ${e.costoOrigen} ${e.moneda}`
+                        : "Sin costo de origen"}
+                    </span>
+                    {e.litros != null && (
+                      <span style={{ color: "var(--do-texto-suave)" }}>
+                        {formatearNumero(e.litros) ?? e.litros} L
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
       )}
     </div>
   );

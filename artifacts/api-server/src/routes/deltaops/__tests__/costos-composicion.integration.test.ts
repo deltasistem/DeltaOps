@@ -233,9 +233,72 @@ suite("DGP-021.3 · Composición de costos (OT + Activo) · PostgreSQL", { timeo
     expect(comb.estado).toBe("CONTEXTUAL");
     expect(comb.atribuibleAOt).toBe("NO_APLICA");
     expect(comb.tanqueos).toBe(2);
+    // R1 (§26): combustible NO produce agregado monetario. El desglose por moneda es
+    // SOLO conteo entero de tanqueos; no existe costoOrigen/total ni porMoneda sumado.
+    expect(comb.gapMoneda).toBe("GAP-FUEL-MONEY");
+    expect(comb.porMoneda).toBeUndefined();
+    expect(comb.conteoPorMoneda).toEqual([{ moneda: "CLP", tanqueos: 2 }]);
+    expect(comb.tanqueosConCosto).toBe(2);
+    // Los eventos exponen valores de ORIGEN individuales (sin sumar).
+    expect(comb.eventos).toHaveLength(2);
+    for (const e of comb.eventos) expect(typeof e.costoOrigen === "string" || e.costoOrigen === null).toBe(true);
     // Ausencia (activo sin tanqueos) ⇒ SIN_DATOS, jamás 0.
     const vac = await componerActivo(SUP(T_A), ACT_VACIO, TOTAL);
     expect(vac.ok && (vac.value as any).componentes.combustible.estado).toBe("SIN_DATOS_SUFICIENTES");
+  });
+
+  it("(R1) combustible con floats fraccionarios: NO se produce ni consume suma monetaria; queda fuera de los totales económicos", async () => {
+    const ACT_FUEL = `act-fuel-${RUN}`;
+    // Tres tanqueos con valores de origen fraccionarios que, sumados como float,
+    // producirían el clásico error de coma flotante (0.1+0.2 !== 0.3).
+    await seedTanqueo(T_A, ACT_FUEL, "CLP", 0.1, 1.1, "2024-05-06T07:00:00.000Z");
+    await seedTanqueo(T_A, ACT_FUEL, "CLP", 0.2, 2.2, "2024-05-07T07:00:00.000Z");
+    await seedTanqueo(T_A, ACT_FUEL, "USD", 10.005, 3.33, "2024-05-08T07:00:00.000Z");
+
+    const act = await componerActivo(SUP(T_A), ACT_FUEL, TOTAL);
+    expect(act.ok).toBe(true);
+    if (!act.ok) return;
+    const v = act.value as any;
+    const comb = v.componentes.combustible;
+
+    // Contextual, marcado no-exacto, GAP declarado.
+    expect(comb.estado).toBe("CONTEXTUAL");
+    expect(comb.precisionOrigen).toBe("float-utilizacion-no-exacto");
+    expect(comb.gapMoneda).toBe("GAP-FUEL-MONEY");
+
+    // NO existe NINGÚN agregado monetario: ni costoOrigen total, ni porMoneda sumado.
+    expect(comb.costoOrigen).toBeUndefined();
+    expect(comb.porMoneda).toBeUndefined();
+
+    // El desglose por moneda es SOLO conteo entero de tanqueos (sin dinero).
+    expect(comb.conteoPorMoneda).toEqual([
+      { moneda: "CLP", tanqueos: 2 },
+      { moneda: "USD", tanqueos: 1 },
+    ]);
+    // Ningún objeto del desglose por moneda contiene campos monetarios.
+    for (const c of comb.conteoPorMoneda) {
+      expect(c.costoOrigen).toBeUndefined();
+      expect(c.total).toBeUndefined();
+      expect(Object.keys(c).sort()).toEqual(["moneda", "tanqueos"]);
+    }
+
+    // Los eventos exponen el valor de ORIGEN de CADA tanqueo, sin sumar: el string es
+    // exactamente el de origen (no un total float mal redondeado).
+    const clpEventos = comb.eventos.filter((e: any) => e.moneda === "CLP").map((e: any) => e.costoOrigen).sort();
+    expect(clpEventos).toEqual(["0.1", "0.2"]); // valores individuales, jamás "0.30000000000000004"
+    const usd = comb.eventos.find((e: any) => e.moneda === "USD");
+    expect(usd.costoOrigen).toBe("10.005");
+    // Ningún costoOrigen de evento es la suma de otros (no hay agregación).
+    for (const e of comb.eventos) expect(e.costoOrigen).not.toBe("0.30000000000000004");
+
+    // Combustible NUNCA entra al total económico string-safe (sigue fuera).
+    // El activo no tiene mano de obra/materiales ⇒ totales económicos vacíos.
+    expect(v.totalesPorMoneda).toEqual([]);
+
+    // Limpieza local.
+    await conTenant(T_A, async (c) => {
+      await c.query(`DELETE FROM deltaops.utl_tanqueos_read WHERE tenant_id=$1 AND activo_id=$2`, [T_A, ACT_FUEL]).catch(() => undefined);
+    });
   });
 
   it("(5)(6) multimoneda: OT y activo separan CLP y USD SIN mezclar", async () => {
