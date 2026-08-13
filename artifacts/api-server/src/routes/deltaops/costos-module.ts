@@ -16,6 +16,7 @@ import type { ExecutionContext, KernelError, Result } from "@workspace/kernel";
 import { MODULO } from "@workspace/module-costos";
 import { costosRuntime, contextForCostos } from "./costos-runtime";
 import { listarPendientes, reprocesarPendientes, type EstadoPendiente } from "./costos-orquestador";
+import { componerOt, componerActivo, resolverPeriodo, type Sesion } from "./costos-composicion";
 import { aRolCanonico } from "../../deltaops/identity/rbac";
 
 const router: IRouter = Router();
@@ -41,6 +42,15 @@ router.use(BASE, async (req, res, next): Promise<void> => {
   // autorizante en costos manuales (nunca del cuerpo de la petición).
   const rolCanonico = req.session?.rolCanonico ?? aRolCanonico(user.rol);
   res.locals.ctx = contextForCostos(String(user.id), rolCanonico, user.tenant, req.session?.identityId);
+  // DGP-021.3 · datos de sesión para la COMPOSICIÓN (orquesta manodeobra/costos/
+  // utilización con el PRINCIPAL de sesión; cada módulo aplica su RBAC y su RLS).
+  // TENANT SÓLO de sesión (§17): nunca del frontend.
+  res.locals.sesion = {
+    userId: String(user.id),
+    rol: rolCanonico,
+    tenant: user.tenant,
+    identityId: req.session?.identityId,
+  };
   next();
 });
 
@@ -104,6 +114,26 @@ router.get(`${BASE}/hechos`, async (req, res) => {
     moneda: strQuery(req.query.moneda),
     estado: strQuery(req.query.estado),
   }));
+});
+
+/* ---------------- Composición de costos de mantenimiento (DGP-021.3) ----- */
+// LECTURA de orquestación: compone mano de obra + materiales + otros (+ combustible
+// contextual del activo) por moneda, con estados COMPLETO/PARCIAL/SIN_DATOS/
+// PENDIENTE/NO_APLICA (§8). RBAC de lectura por rol canónico (P_READ ya presente en
+// el contexto). Tenant SÓLO de sesión (§17); `otId`/`activoId` de la URL se leen
+// bajo el tenant de sesión ⇒ IDOR-safe/cross-tenant seguro (RLS).
+function sesionOf(res: { locals: Record<string, unknown> }): Sesion {
+  return res.locals.sesion as Sesion;
+}
+
+router.get(`${BASE}/composicion/ot/:otId`, async (req, res) => {
+  const rango = resolverPeriodo(strQuery(req.query.periodo), new Date(), strQuery(req.query.desde), strQuery(req.query.hasta));
+  send(res, await componerOt(sesionOf(res), req.params.otId, rango));
+});
+
+router.get(`${BASE}/composicion/activo/:activoId`, async (req, res) => {
+  const rango = resolverPeriodo(strQuery(req.query.periodo), new Date(), strQuery(req.query.desde), strQuery(req.query.hasta));
+  send(res, await componerActivo(sesionOf(res), req.params.activoId, rango));
 });
 
 /* --------------------- Pendientes de materialización (DGP-021.2) --------- */

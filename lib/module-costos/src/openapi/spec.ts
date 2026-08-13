@@ -144,6 +144,58 @@ export function construirOpenApi(): Record<string, unknown> {
       ["costoId", "tipo", "naturaleza", "otId", "estado", "cantidad", "costoUnitario", "costoTotal", "moneda"],
     ),
     SerieMoneda: obj({ moneda: str(), hechos: arr(ref("Hecho")) }, ["moneda", "hechos"]),
+
+    // ---- DGP-021.3 · Composición de costos de mantenimiento (LECTURA) ----
+    // Total económico POR MONEDA (§6): series separadas, NUNCA se suman/convierten
+    // monedas. Neto = Σ CARGO − Σ ABONO en punto fijo string (numeric(18,6)).
+    TotalMoneda: obj(
+      {
+        moneda: str(),
+        total: dineroCanon, cargos: dineroCanon, abonos: dineroCanon,
+        componentes: int({ description: "Nº de hechos que aportan a esta moneda" }),
+      },
+      ["moneda", "total", "cargos", "abonos", "componentes"],
+    ),
+    // Estado del componente/agregado (§8): jamás $0 para ausencia (§4).
+    EstadoCosto: str({
+      enum: ["COMPLETO", "PARCIAL", "SIN_DATOS_SUFICIENTES", "PENDIENTE", "NO_APLICA"],
+      description: "COMPLETO/PARCIAL/SIN_DATOS_SUFICIENTES/PENDIENTE/NO_APLICA. Se distingue $0 real de SIN_DATOS_SUFICIENTES (§4).",
+    }),
+    // Un componente económico (mano de obra | materiales | otros).
+    ComponenteCosto: obj(
+      {
+        tipo: str({ enum: ["MANO_OBRA", "MATERIALES", "OTROS"] }),
+        estado: ref("EstadoCosto"),
+        porMoneda: arr(ref("TotalMoneda")),
+        evidencia: arr(objAny()),
+        pendientes: arr(objAny()),
+      },
+      ["tipo", "estado", "porMoneda"],
+    ),
+    // Composición de una OT: combustible SIEMPRE NO_APLICA (GAP-FUEL-OT).
+    ComposicionOt: obj(
+      {
+        ot: str(),
+        periodo: str(), rango: objAny(),
+        estado: ref("EstadoCosto"),
+        componentes: objAny(),
+        totalesPorMoneda: arr(ref("TotalMoneda")),
+        pendientesMaterializacion: arr(objAny()),
+      },
+      ["ot", "estado", "componentes", "totalesPorMoneda"],
+    ),
+    // Composición de un activo: combustible CONTEXTUAL (float de origen, separado).
+    ComposicionActivo: obj(
+      {
+        activo: str(),
+        periodo: str(), rango: objAny(),
+        estado: ref("EstadoCosto"),
+        componentes: objAny(),
+        totalesPorMoneda: arr(ref("TotalMoneda")),
+        costoPorHora: objAny(), costoPorKm: objAny(),
+      },
+      ["activo", "estado", "componentes", "totalesPorMoneda"],
+    ),
   };
 
   const paths: Record<string, Record<string, unknown>> = {};
@@ -205,6 +257,30 @@ export function construirOpenApi(): Record<string, unknown> {
     responses: { "200": jsonOk(obj({ monedas: arr(ref("SerieMoneda")) }, ["monedas"])), ...errores("401", "403") },
   });
 
+  // ---- DGP-021.3 · Composición de costos de mantenimiento (orquestación de LECTURA) ----
+  // Componen mano de obra (manodeobra) + materiales/otros (costos) + combustible
+  // contextual del activo (utilización). Total POR MONEDA (§6), estados §8. RBAC de
+  // lectura por rol canónico; tenant SÓLO de sesión (§17); IDOR-safe (RLS).
+  const periodoParam = queryParam("periodo", "Período por fechas REALES del hecho (§10): actual | 30d | 90d | anio | rango | total (omitido ⇒ total).");
+  const rangoDesde = queryParam("desde", "Con periodo=rango: límite inferior ISO (inclusive).");
+  const rangoHasta = queryParam("hasta", "Con periodo=rango: límite superior ISO (inclusive).");
+  add(`${BASE}/composicion/ot/{otId}`, "get", {
+    tags: ["Composición"], operationId: "costos.composicion.ot",
+    summary: "Composición de costos de mantenimiento de una OT (mano de obra + materiales + otros)",
+    description:
+      "Compone por moneda (sin conversión, §6) el costo económico de la OT: mano de obra (valoraciones de DGP-020.3), materiales y otros (hechos económicos de module-costos, CARGO−ABONO), y los PENDIENTES de materialización. El COMBUSTIBLE es NO_APLICA en la OT (sin contrato de atribución combustible→OT, GAP-FUEL-OT). NO usa el costoReal manual de la OT (§13). Dinero string-safe.",
+    parameters: [pathParam("otId", "Orden de trabajo (leída bajo el tenant de sesión; IDOR-safe)"), periodoParam, rangoDesde, rangoHasta],
+    responses: { "200": jsonOk(ref("ComposicionOt")), ...errores("401", "403", "404") },
+  });
+  add(`${BASE}/composicion/activo/{activoId}`, "get", {
+    tags: ["Composición"], operationId: "costos.composicion.activo",
+    summary: "Composición del costo operacional/histórico de un activo",
+    description:
+      "Compone por moneda (sin conversión) el costo del activo: mano de obra, materiales, otros y COMBUSTIBLE CONTEXTUAL (tanqueos de DGP-019, separado del total económico y marcado como valor de origen no-exacto, GAP-FUEL-MONEY). Preparado para DGP-021.4 (costo/hora por horómetro, costo/km por odómetro). Dinero económico string-safe.",
+    parameters: [pathParam("activoId", "Activo (leído bajo el tenant de sesión; IDOR-safe)"), periodoParam, rangoDesde, rangoHasta],
+    responses: { "200": jsonOk(ref("ComposicionActivo")), ...errores("401", "403", "404") },
+  });
+
   return {
     openapi: "3.0.3",
     info: {
@@ -218,7 +294,7 @@ export function construirOpenApi(): Record<string, unknown> {
         "Errores kernel→HTTP: AUTH→403, NF→404, CFL→409, VAL→400, INF→500.",
     },
     servers: [{ url: "/", description: "API DeltaOps" }],
-    tags: [{ name: "Materialización" }, { name: "Consulta" }],
+    tags: [{ name: "Materialización" }, { name: "Consulta" }, { name: "Composición" }],
     paths,
     components: { schemas },
   };

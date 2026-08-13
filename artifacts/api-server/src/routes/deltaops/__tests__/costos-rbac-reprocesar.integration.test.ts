@@ -145,4 +145,39 @@ suite("DGP-021.2 · RBAC reprocesar pendientes (HTTP real)", () => {
     const bad = await fetch(`${baseUrl}/api/deltaops/costos/hechos?naturaleza=NETO`);
     expect(bad.status).toBe(400);
   });
+
+  /* ---------------------- DGP-021.3 · Composición (HTTP) ------------------- */
+
+  it("DGP-021.3 · GET /composicion/ot/:otId ⇒ 200 con estructura de composición (SUPERVISOR)", async () => {
+    sesionActual = { deltaopsUserId: idSupervisor, rolCanonico: "SUPERVISOR" };
+    const res = await fetch(`${baseUrl}/api/deltaops/costos/composicion/ot/ot-http-${RUN}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, any>;
+    // Tenant nuevo sin datos ⇒ SIN_DATOS_SUFICIENTES (nunca $0), estructura completa.
+    expect(body.estado).toBe("SIN_DATOS_SUFICIENTES");
+    expect(body.componentes.manoObra.estado).toBe("SIN_DATOS_SUFICIENTES");
+    expect(body.componentes.materiales.estado).toBe("SIN_DATOS_SUFICIENTES");
+    // §3/§7: combustible NUNCA es costo directo de la OT.
+    expect(body.componentes.combustible.estado).toBe("NO_APLICA");
+    expect(Array.isArray(body.totalesPorMoneda)).toBe(true);
+  });
+
+  it("DGP-021.3 · GET /composicion/activo/:activoId ⇒ 200 con combustible contextual (CONSULTA, sólo lectura)", async () => {
+    sesionActual = { deltaopsUserId: idSupervisor, rolCanonico: "CONSULTA" };
+    const res = await fetch(`${baseUrl}/api/deltaops/costos/composicion/activo/act-http-${RUN}?periodo=90d`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, any>;
+    expect(body.periodo).toBe("90d");
+    expect(body.componentes.combustible.estado).toBe("SIN_DATOS_SUFICIENTES");
+    // Preparado para DGP-021.4 (no implementado aún).
+    expect(body.costoPorHora.estado).toBe("SIN_DATOS_SUFICIENTES");
+  });
+
+  it("DGP-021.3 · composición sin sesión ⇒ 401 (tenant SÓLO de sesión, §17)", async () => {
+    sesionActual = null;
+    const ot = await fetch(`${baseUrl}/api/deltaops/costos/composicion/ot/x`);
+    expect(ot.status).toBe(401);
+    const act = await fetch(`${baseUrl}/api/deltaops/costos/composicion/activo/x`);
+    expect(act.status).toBe(401);
+  });
 });

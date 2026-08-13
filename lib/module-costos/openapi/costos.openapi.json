@@ -17,6 +17,9 @@
     },
     {
       "name": "Consulta"
+    },
+    {
+      "name": "Composición"
     }
   ],
   "paths": {
@@ -493,6 +496,186 @@
           }
         }
       }
+    },
+    "/api/deltaops/costos/composicion/ot/{otId}": {
+      "get": {
+        "tags": [
+          "Composición"
+        ],
+        "operationId": "costos.composicion.ot",
+        "summary": "Composición de costos de mantenimiento de una OT (mano de obra + materiales + otros)",
+        "description": "Compone por moneda (sin conversión, §6) el costo económico de la OT: mano de obra (valoraciones de DGP-020.3), materiales y otros (hechos económicos de module-costos, CARGO−ABONO), y los PENDIENTES de materialización. El COMBUSTIBLE es NO_APLICA en la OT (sin contrato de atribución combustible→OT, GAP-FUEL-OT). NO usa el costoReal manual de la OT (§13). Dinero string-safe.",
+        "parameters": [
+          {
+            "name": "otId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Orden de trabajo (leída bajo el tenant de sesión; IDOR-safe)"
+          },
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Período por fechas REALES del hecho (§10): actual | 30d | 90d | anio | rango | total (omitido ⇒ total)."
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite inferior ISO (inclusive)."
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite superior ISO (inclusive)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComposicionOt"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deltaops/costos/composicion/activo/{activoId}": {
+      "get": {
+        "tags": [
+          "Composición"
+        ],
+        "operationId": "costos.composicion.activo",
+        "summary": "Composición del costo operacional/histórico de un activo",
+        "description": "Compone por moneda (sin conversión) el costo del activo: mano de obra, materiales, otros y COMBUSTIBLE CONTEXTUAL (tanqueos de DGP-019, separado del total económico y marcado como valor de origen no-exacto, GAP-FUEL-MONEY). Preparado para DGP-021.4 (costo/hora por horómetro, costo/km por odómetro). Dinero económico string-safe.",
+        "parameters": [
+          {
+            "name": "activoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Activo (leído bajo el tenant de sesión; IDOR-safe)"
+          },
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Período por fechas REALES del hecho (§10): actual | 30d | 90d | anio | rango | total (omitido ⇒ total)."
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite inferior ISO (inclusive)."
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Con periodo=rango: límite superior ISO (inclusive)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComposicionActivo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (KRN-NF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -798,6 +981,179 @@
         "required": [
           "moneda",
           "hechos"
+        ],
+        "additionalProperties": false
+      },
+      "TotalMoneda": {
+        "type": "object",
+        "properties": {
+          "moneda": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales)."
+          },
+          "cargos": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales)."
+          },
+          "abonos": {
+            "type": "string",
+            "pattern": "^\\d{1,12}\\.\\d{6}$",
+            "description": "Monto en PUNTO FIJO canónico numeric(18,6) como cadena (6 decimales)."
+          },
+          "componentes": {
+            "type": "integer",
+            "description": "Nº de hechos que aportan a esta moneda"
+          }
+        },
+        "required": [
+          "moneda",
+          "total",
+          "cargos",
+          "abonos",
+          "componentes"
+        ],
+        "additionalProperties": false
+      },
+      "EstadoCosto": {
+        "type": "string",
+        "enum": [
+          "COMPLETO",
+          "PARCIAL",
+          "SIN_DATOS_SUFICIENTES",
+          "PENDIENTE",
+          "NO_APLICA"
+        ],
+        "description": "COMPLETO/PARCIAL/SIN_DATOS_SUFICIENTES/PENDIENTE/NO_APLICA. Se distingue $0 real de SIN_DATOS_SUFICIENTES (§4)."
+      },
+      "ComponenteCosto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "MANO_OBRA",
+              "MATERIALES",
+              "OTROS"
+            ]
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoCosto"
+          },
+          "porMoneda": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TotalMoneda"
+            }
+          },
+          "evidencia": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "pendientes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "tipo",
+          "estado",
+          "porMoneda"
+        ],
+        "additionalProperties": false
+      },
+      "ComposicionOt": {
+        "type": "object",
+        "properties": {
+          "ot": {
+            "type": "string"
+          },
+          "periodo": {
+            "type": "string"
+          },
+          "rango": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoCosto"
+          },
+          "componentes": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "totalesPorMoneda": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TotalMoneda"
+            }
+          },
+          "pendientesMaterializacion": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "ot",
+          "estado",
+          "componentes",
+          "totalesPorMoneda"
+        ],
+        "additionalProperties": false
+      },
+      "ComposicionActivo": {
+        "type": "object",
+        "properties": {
+          "activo": {
+            "type": "string"
+          },
+          "periodo": {
+            "type": "string"
+          },
+          "rango": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoCosto"
+          },
+          "componentes": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "totalesPorMoneda": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TotalMoneda"
+            }
+          },
+          "costoPorHora": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "costoPorKm": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "activo",
+          "estado",
+          "componentes",
+          "totalesPorMoneda"
         ],
         "additionalProperties": false
       }
