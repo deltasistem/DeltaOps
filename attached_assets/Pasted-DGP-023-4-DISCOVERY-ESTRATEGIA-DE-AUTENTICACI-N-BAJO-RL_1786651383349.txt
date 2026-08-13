@@ -1,0 +1,293 @@
+DGP-023.4 — DISCOVERY: ESTRATEGIA DE AUTENTICACIÓN BAJO RLS Y VALIDACIÓN DE ROLES POSTGRESQL
+
+ESTADO: SOLO DISCOVERY.
+NO IMPLEMENTAR.
+
+Objetivo:
+Diseñar y validar, contra el corpus real y el PostgreSQL/Neon actualmente utilizado por DeltaOps, la estrategia necesaria para activar RLS efectiva sin romper el login, las sesiones, migraciones, seed, outbox ni el aislamiento multi-tenant.
+
+Contexto obligatorio:
+DGP-023.3 confirmó:
+- runtime conectado como postgres superuser con rolbypassrls=true;
+- las 174 tablas deltaops pertenecen al mismo owner;
+- 167 tienen RLS pero actualmente es inefectiva;
+- 7 tablas no tienen RLS;
+- login utiliza withGlobal para identidad/membresías sin contexto tenant;
+- tenant se fija server-side mediante set_config('app.tenant_id', ..., true);
+- no existe actualmente rol separado de aplicación ni de migración.
+
+STOP-1 y STOP-2 de DGP-023.3 deben resolverse antes de cualquier implementación.
+
+REGLAS DE GOBIERNO:
+1. NO crear roles.
+2. NO cambiar passwords.
+3. NO cambiar ownership.
+4. NO ejecutar ALTER TABLE.
+5. NO activar FORCE RLS.
+6. NO modificar código productivo.
+7. NO modificar migraciones.
+8. NO modificar OpenAPI.
+9. NO modificar frontend.
+10. NO reiniciar servicios por cambios.
+11. Solo consultas de catálogo, SELECT, inspección de código y pruebas no mutantes.
+12. Nunca mostrar credenciales, secretos ni connection strings en el informe.
+13. Si una prueba requiere una mutación, detenerse y documentarla como requisito de la siguiente fase.
+
+ENTREGABLE:
+Crear únicamente:
+docs/dgp/DGP-023.4-DESCUBRIMIENTO-AUTH-RLS.md
+
+El documento debe contener evidencia archivo:línea y evidencia SQL/catálogo cuando corresponda.
+
+INVESTIGACIÓN 1 — LOGIN Y RLS
+
+Auditar exactamente:
+- flujo completo de login;
+- withGlobal;
+- tablas consultadas;
+- identidad;
+- membresías;
+- users;
+- sessions;
+- tenant;
+- auth_epoch;
+- cualquier función/puerto de identidad utilizado durante login.
+
+Determinar:
+- qué consultas necesitan ejecutarse sin tenant;
+- cuáles pueden ejecutarse con tenant;
+- cuáles son globales por naturaleza;
+- qué mínima capacidad privilegiada necesitaría el login;
+- si puede resolverse mediante una función SQL SECURITY DEFINER;
+- si existe otra alternativa más segura;
+- qué riesgos tendría cada alternativa.
+
+No inventar capacidades.
+
+INVESTIGACIÓN 2 — MODELO DE ROLES PROPUESTO
+
+Auditar si el diseño propuesto en DGP-023.3 es técnicamente viable:
+
+deltaops_owner
+- propietario de objetos;
+- DDL/migraciones;
+- NO usado por runtime.
+
+deltaops_app_rw
+- NOLOGIN;
+- grupo de privilegios DML estrictamente necesarios.
+
+deltaops_app
+- LOGIN;
+- runtime;
+- no superuser;
+- no BYPASSRLS;
+- no CREATEDB;
+- no CREATEROLE;
+- no REPLICATION;
+- no ownership de tablas deltaops.
+
+Determinar qué privilegios reales necesita cada uno:
+- CONNECT
+- USAGE schema
+- SELECT
+- INSERT
+- UPDATE
+- DELETE
+- SEQUENCE
+- EXECUTE
+- otros, si realmente existen.
+
+No asumir privilegios: derivarlos del código real.
+
+INVESTIGACIÓN 3 — OWNERSHIP
+
+Inventariar:
+- owner de database;
+- owner de schema;
+- owner de las 174 tablas;
+- owner de sequences;
+- owner de views;
+- owner de funciones;
+- owner de triggers si aplica.
+
+Determinar qué objetos deben cambiar de owner para que FORCE RLS sea efectiva.
+
+IMPORTANTE:
+No ejecutar cambios.
+Solo producir el plan exacto.
+
+INVESTIGACIÓN 4 — LAS 7 TABLAS SIN RLS
+
+Auditar individualmente:
+
+- idn_memberships
+- users
+- idn_identities
+- sessions
+- kernel_outbox
+- kernel_dead_letter
+- ntf_email_templates
+
+Para cada una determinar:
+- ¿debe tener RLS?
+- ¿es tenant-scoped?
+- ¿es global?
+- ¿debe usar FORCE RLS?
+- ¿qué política necesita?
+- ¿qué operaciones requiere?
+- ¿qué consumidores existen?
+- ¿qué riesgo aparece si se deja sin RLS?
+
+Especial atención:
+users contiene password_hash.
+sessions contiene información de sesión.
+idn_memberships es crítica para tenant isolation.
+kernel_outbox puede contener eventos globales o tenant-scoped.
+Los 163 eventos sin tenantId encontrados en DGP-023.3 deben analizarse nuevamente y clasificarse.
+
+INVESTIGACIÓN 5 — WITHGLOBAL
+
+Encontrar todas las llamadas a:
+- withGlobal
+- withTenant
+- set_config
+- current_setting
+- cualquier wrapper equivalente.
+
+Construir una matriz:
+
+| Operación | Contexto | Tenant requerido | Tabla | Riesgo con RLS |
+|-----------|----------|------------------|-------|----------------|
+
+Determinar si withGlobal está realmente limitado a login o si existen otros usos.
+
+INVESTIGACIÓN 6 — IDENTIDAD Y AUTH
+
+Determinar si el login podría funcionar bajo:
+
+A) rol runtime + RLS normal
+B) rol/función SQL SECURITY DEFINER específica
+C) conexión separada para autenticación
+D) otro mecanismo ya existente en el corpus
+
+Para cada alternativa:
+- seguridad;
+- privilegio;
+- complejidad;
+- impacto;
+- rollback;
+- riesgo de escalación;
+- recomendación.
+
+No seleccionar una alternativa solo por conveniencia.
+
+INVESTIGACIÓN 7 — NEON
+
+Usando únicamente capacidades realmente verificables del entorno actual, determinar:
+
+- si pueden existir múltiples roles PostgreSQL LOGIN;
+- si pueden crearse roles NOLOGIN;
+- si puede transferirse ownership;
+- si puede utilizarse SECURITY DEFINER;
+- si pueden ejecutarse GRANT/REVOKE;
+- si existen restricciones específicas del proveedor;
+- si el proyecto actual permite el modelo propuesto.
+
+NO revelar:
+- passwords;
+- tokens;
+- connection strings;
+- secretos.
+
+Si una capacidad no puede verificarse sin ejecutar una operación mutante, marcarla como NO VERIFICADA y explicar qué prueba controlada deberá ejecutarse posteriormente.
+
+INVESTIGACIÓN 8 — MIGRACIONES
+
+Auditar cómo se ejecutan actualmente:
+- Drizzle;
+- migrations;
+- seeds;
+- scripts SQL;
+- startup;
+- deploy.
+
+Determinar qué rol debe utilizar cada operación.
+
+Objetivo:
+El runtime jamás debe necesitar privilegios de DDL.
+
+INVESTIGACIÓN 9 — ROLLBACK
+
+Diseñar rollback por fases:
+
+Fase A
+creación/configuración de roles
+
+Fase B
+privilegios
+
+Fase C
+ownership
+
+Fase D
+RLS/FORCE RLS
+
+Fase E
+runtime
+
+Cada fase debe tener:
+- precondición;
+- cambio;
+- validación;
+- criterio de abortar;
+- rollback.
+
+El rollback nunca debe consistir en volver permanentemente a postgres superuser como solución final.
+
+INVESTIGACIÓN 10 — PRUEBAS DE SEGURIDAD FUTURAS
+
+Diseñar la batería que deberá ejecutarse cuando se implemente:
+
+1. tenant A no puede leer tenant B;
+2. tenant A no puede insertar en tenant B;
+3. tenant A no puede actualizar tenant B;
+4. tenant A no puede eliminar tenant B;
+5. consulta sin tenant falla cerrado;
+6. tenant inexistente falla cerrado;
+7. sesión inválida falla cerrado;
+8. login continúa funcionando;
+9. SUPER_ADMIN continúa funcionando;
+10. system:utilizacion-sync continúa funcionando;
+11. /sync continúa funcionando;
+12. outbox continúa funcionando;
+13. replay/reprocesamiento continúa funcionando;
+14. migraciones continúan funcionando;
+15. seeds continúan funcionando.
+
+Además diseñar pruebas específicas para demostrar que:
+- el runtime no es superuser;
+- rol runtime no tiene BYPASSRLS;
+- runtime no es owner;
+- FORCE RLS está activa donde corresponda;
+- un acceso SQL directo con tenant incorrecto es rechazado.
+
+CRITERIO DE ÉXITO
+
+El Discovery queda PASS únicamente si:
+- STOP-1 queda resuelto mediante un diseño técnicamente concreto;
+- STOP-2 queda verificado o claramente marcado como capacidad pendiente de prueba controlada;
+- se conoce el modelo de roles;
+- se conoce el modelo de ownership;
+- se conoce el tratamiento de las 7 tablas sin RLS;
+- se conoce cómo preservar login;
+- se conoce cómo ejecutar migraciones sin privilegios de runtime;
+- existe plan de rollback;
+- existe matriz de pruebas;
+- no se ha modificado código ni DB.
+
+Si alguna afirmación no puede demostrarse, marcarla explícitamente como NO VERIFICADA.
+
+DETENERSE AL FINAL.
+NO iniciar DGP-023.5 automáticamente.
+Esperar aprobación explícita de Dirección.
