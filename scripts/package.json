@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
-    "seed-sgma": "tsx ./src/seed-sgma.ts",
     "seed:deltaops": "tsx ./src/seed-deltaops.ts",
     "generate:module": "tsx ./src/generate-deltaops-module.ts",
     "kernel:demo": "tsx ./src/kernel-demo.ts",

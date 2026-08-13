@@ -1,7 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
-import router from "./routes";
 import deltaopsRouter from "./routes/deltaops";
 import identityRouter from "./routes/deltaops/identity";
 import platformConsoleRouter from "./routes/deltaops/platform-console";
@@ -23,7 +22,10 @@ import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
 import { deltaopsMetricsMiddleware } from "./deltaops/metrics";
 import { deltaopsErrorHandler } from "./deltaops/errors";
-import { enforceEntitlements, requireIdentityForModules } from "./deltaops/identity/middleware";
+import {
+  enforceEntitlements,
+  requireIdentityForModules,
+} from "./deltaops/identity/middleware";
 import { instalarProveedorNotificaciones } from "./deltaops/identity/notification-provider";
 
 const app: Express = express();
@@ -98,7 +100,9 @@ app.use("/api", analyticsModuleRouter);
 app.use("/api", utilizacionModuleRouter);
 app.use("/api", manodeobraModuleRouter);
 app.use("/api", costosModuleRouter);
-app.use("/api", router);
+// DGP-023.2: router legacy SGMA retirado (routers /assets, /work-orders, /dashboard,
+// /spare-parts, /locations, /work-centers, /technicians, /suppliers, /maintenance-plans,
+// /healthz). Health gate migrado a /api/deltaops/platform/health.
 app.use("/api/deltaops", deltaopsErrorHandler);
 
 export default app;

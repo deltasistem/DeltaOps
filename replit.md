@@ -1,18 +1,24 @@
-# SGMA — Sistema de Gestión de Mantenimiento
+# DeltaOps — Plataforma de Gestión de Mantenimiento
 
-SGMA is a Spanish (Colombian) CMMS/EAM maintenance platform for a logistics company (fertilizers, coal, general cargo) that maintains heavy machinery and static equipment. It covers assets, work orders, preventive maintenance, spare-parts inventory, locations, work centers, personnel, and suppliers, with a KPI dashboard. Inspired by IBM Maximo, SAP PM, UpKeep, and Fiix.
+> **SGMA retirado — nunca llegó a producción — reemplazado por DeltaOps.** (DGP-023.2, 2026-08-13.)
+> El prototipo SGMA (frontend `artifacts/sgma`, routers legacy `/api/*`, tablas `public.*`, `seed-sgma`,
+> contratos OpenAPI exclusivos) fue eliminado por completo. DeltaOps (esquema `deltaops.*`, rutas
+> `/api/deltaops/*`) es el producto único que continúa. La documentación histórica de SGMA se conserva
+> (`MODULOS_EXISTENTES.md`, `ARQUITECTURA_ACTUAL.md`, `REUTILIZACION.md`, `docs/dgp/`).
+
+DeltaOps is a Spanish (Colombian) CMMS/EAM maintenance platform for a logistics company (fertilizers, coal, general cargo) that maintains heavy machinery and static equipment. It covers assets, work orders, preventive maintenance, spare-parts inventory, locations, work centers, personnel, and suppliers, with a KPI dashboard — implemented as multitenant DeltaOps modules under `deltaops.*`.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server
-- `pnpm --filter @workspace/sgma run dev` — run the SGMA web frontend (Vite)
+- `pnpm --filter @workspace/deltaops run dev` — run the DeltaOps web frontend (Vite)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run typecheck:libs` — build composite libs (run after editing `lib/*`)
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only; interactive)
 - `pnpm --filter @workspace/db run push-force` — non-interactive push (still needs TTY for constraint prompts; apply such DDL via SQL)
-- `pnpm --filter @workspace/scripts run seed-sgma` — seed demo data
+- `pnpm --filter @workspace/api-server run seed:demo` — seed DeltaOps demo data
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -27,12 +33,11 @@ SGMA is a Spanish (Colombian) CMMS/EAM maintenance platform for a logistics comp
 
 ## Where things live
 
-- DB schema (source of truth): `lib/db/src/schema/` — 9 tables: locations, work_centers, assets, technicians, suppliers, spare_parts, work_orders, maintenance_plans, stock_movements
-- API contract (source of truth): OpenAPI spec in `lib/api-spec/`; generated hooks in `lib/api-client-react/src/generated/`, Zod in `@workspace/api-zod`
-- API route handlers: `artifacts/api-server/src/routes/` (registered in `routes/index.ts`)
-- Frontend pages: `artifacts/sgma/src/pages/` (routes wired in `src/App.tsx`)
-- Formatting helpers: `artifacts/sgma/src/lib/format.ts` (currency/date/badge)
-- Seed script: `scripts/src/seed-sgma.ts`
+- DB schema (source of truth): `lib/db/src/schema/` — DeltaOps `deltaops.*` schemas (`deltaops-*.ts`); migrations in `lib/db/migrations/deltaops/`. (Las 9 tablas legacy SGMA `public.*` fueron retiradas en DGP-023.2.)
+- API contract (source of truth): OpenAPI spec in `lib/api-spec/` (solo `/deltaops/*` + `Error`); generated hooks in `lib/api-client-react/src/generated/`, Zod in `@workspace/api-zod`
+- API route handlers: `artifacts/api-server/src/routes/deltaops/` (montados en `app.ts`)
+- Frontend pages: `artifacts/deltaops/src/pages/` (routes wired in `src/App.tsx`)
+- Seed script: `scripts/src/seed-deltaops.ts` / `pnpm --filter @workspace/api-server run seed:demo`
 
 ## Architecture decisions
 

@@ -1,12 +1,4 @@
-export * from "./locations";
-export * from "./work-centers";
-export * from "./assets";
-export * from "./technicians";
-export * from "./suppliers";
-export * from "./spare-parts";
-export * from "./work-orders";
-export * from "./maintenance-plans";
-export * from "./stock-movements";
+// DGP-023.2: schemas Drizzle exclusivos SGMA (public.*) retirados.
 export * from "./deltaops";
 export * from "./deltaops-kernel";
 export * from "./deltaops-platform";
