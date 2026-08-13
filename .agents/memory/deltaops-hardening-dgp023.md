@@ -5,11 +5,16 @@ description: Hallazgos CRÍTICOS/ALTOS abiertos de la auditoría de producción 
 
 # DGP-023 — Discovery de hardening para producción (sin código)
 
-## CRÍTICOS abiertos (bloquean producción; pendientes de decisión de Dirección)
-- **H-01 — CRUD legacy SGMA sin autenticación:** los routers legacy (`/api/work-orders`, `/api/assets`, `dashboard`, `spare-parts`, `locations`, `work-centers`, `technicians`, `suppliers`, `maintenance-plans`) se montan SIN sesión ni tenant. Verificado: GET anónimo ⇒ 200 con datos; POST/PATCH/DELETE presentes. Los datos vivos son prototipo (`public.*`), pero la superficie es explotable.
-  **Decisión requerida:** autenticar, aislar por tenant, o eliminar la superficie legacy.
-- **H-02 — RLS inactiva en runtime:** la app conecta a Postgres como superusuario `postgres` (`rolbypassrls=true`) ⇒ todas las políticas RLS se ignoran; el aislamiento multitenant depende 100% de la capa de app (`set_config('app.tenant_id')` + WHERE por repo). Tablas de negocio con `relforcerowsecurity=f`.
+## Estado de los CRÍTICOS
+- **H-01 — CERRADO (DGP-023.2):** SGMA retirado por completo (frontend, 10 routers legacy, 9 tablas public.*, seed, contratos). Rutas legacy ⇒ 404. Tag `pre-retiro-sgma` + backup `backups/sgma-public-pre-drop.sql` (gitignored) para rollback.
+- **H-02 — ABIERTO — RLS inactiva en runtime:** la app conecta a Postgres como superusuario `postgres` (`rolbypassrls=true`) ⇒ todas las políticas RLS se ignoran; el aislamiento multitenant depende 100% de la capa de app (`set_config('app.tenant_id')` + WHERE por repo). Tablas de negocio con `relforcerowsecurity=f`.
   **Decisión requerida:** rol de aplicación no-superuser + FORCE RLS antes de producción.
+
+## Lecciones del retiro (DGP-023.2)
+- El health gate de deploy del api-server ahora apunta a `/api/deltaops/platform/health` (no existe `/api/healthz`).
+- Al retirar una superficie de un contrato compartido: editar solo paths/schemas exclusivos y regenerar clientes en el MISMO cambio (Error/useDeltaops* se conservaron); routers+spec+codegen atómico evitó romper typecheck.
+- Los "errores legacy" en logs durante validación pueden ser los propios curls de verificación negativa — atribuir origen antes de tratarlos como regresión.
+- Los 400 `KRN-VAL-001` en `inventario/catalogos/tipos|estados` desde el frontend son deuda preexistente ajena al retiro (página carga igual).
 
 ## ALTOS (bloquean producción)
 - Tablas de identidad sin RLS (`idn_memberships`, `users`, `idn_identities`, `sessions`).
