@@ -104,18 +104,25 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     // Órdenes: 7 del ciclo de vida (seedOrdenes) + 7 preventivas del motor de
     // Planes + 4 preventivas del módulo Preventivo (seedPreventivo) + 2
     // CORRECTIVAS materializadas por Correctivo (seedCorrectivo, generar-orden
-    // -correctiva, tipo canónico "correctiva") = 20.
-    expect(antes.ordenes).toBe(20);
-    expect(antes.items).toBe(12);
-    // Abastecimiento: 10 artículos, 4 proveedores, 4 solicitudes (3 del seed de
-    // Abastecimiento + 1 AUTOMÁTICA generada por Correctivo ante faltante de stock,
-    // origen tipo "orden"), 2 cotizaciones, 2 órdenes de compra, 2 recepciones.
-    expect(antes.absArticulos).toBe(10);
-    expect(antes.absProveedores).toBe(4);
+    // -correctiva, tipo canónico "correctiva") + 1 OT de la cadena Inventario→
+    // Costos (seedCostosMantenimiento, DGP-021.2) = 21.
+    expect(antes.ordenes).toBe(21);
+    // Items: 12 del mandato + 1 dedicado de la cadena Inventario→Costos
+    // (REP-CLP-001, cuyo id == articuloId de Abastecimiento; GAP-INV-ART) = 13.
+    expect(antes.items).toBe(13);
+    // Abastecimiento: 10 artículos + 1 de la cadena Inventario→Costos (REP-CLP,
+    // id == item de Inventario) = 11; 4 proveedores + 1 dedicado (CLP) = 5;
+    // 4 solicitudes (3 del seed de Abastecimiento + 1 AUTOMÁTICA generada por
+    // Correctivo ante faltante de stock, origen tipo "orden"; la cadena de Costos
+    // NO usa solicitud); 2 cotizaciones; 2 órdenes de compra + 2 de la cadena de
+    // Costos (a precios distintos para el promedio ponderado) = 4; 2 recepciones
+    // + 2 de la cadena de Costos = 4.
+    expect(antes.absArticulos).toBe(11);
+    expect(antes.absProveedores).toBe(5);
     expect(antes.absSolicitudes).toBe(4);
     expect(antes.absCotizaciones).toBe(2);
-    expect(antes.absOrdenes).toBe(2);
-    expect(antes.absRecepciones).toBe(2);
+    expect(antes.absOrdenes).toBe(4);
+    expect(antes.absRecepciones).toBe(4);
     // Preventivo (DGP-014): 3 programas publicados, 8 actividades (DAG),
     // 4 generaciones materializadas y 3 programaciones (reprog/susp/excl).
     expect(antes.prvProgramas).toBe(3);
@@ -187,10 +194,12 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
       [DEMO_TENANT],
     );
     const row = mats.rows[0] as { total: number; con_mov: number; distintas: number };
-    // 3 líneas ingresables materializadas: parcial(fil+rod) + total(fil).
-    // (La línea 2 de la total es 'averiado' ⇒ NO ingresa a Inventario.)
-    expect(Number(row.total)).toBe(3);
-    expect(Number(row.con_mov)).toBe(3);
+    // 5 líneas ingresables materializadas: 3 del seed de Abastecimiento
+    // (parcial[fil+rod] + total[fil]; la línea 2 de la total es 'averiado' ⇒ NO
+    // ingresa a Inventario) + 2 de la cadena Inventario→Costos (una recepción
+    // TOTAL por cada OC de la cadena, DGP-021.2).
+    expect(Number(row.total)).toBe(5);
+    expect(Number(row.con_mov)).toBe(5);
     expect(Number(row.distintas)).toBe(Number(row.total)); // dedup: sin duplicados
 
     const aplicadas = await pool.query(
@@ -198,16 +207,17 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
         WHERE tenant_id = $1 AND estado = 'aplicada'`,
       [DEMO_TENANT],
     );
-    expect(Number(aplicadas.rows[0]?.n ?? 0)).toBe(3);
+    expect(Number(aplicadas.rows[0]?.n ?? 0)).toBe(5);
 
     // Evidencia en Inventario: existen movimientos de entrada cuya referencia es
     // una recepción del módulo Abastecimiento (enlace real, no duplicado por opId).
+    // 3 del seed de Abastecimiento + 2 de la cadena Inventario→Costos (DGP-021.2).
     const movs = await pool.query(
       `SELECT count(*)::int AS n FROM deltaops.inv_movimientos_read
         WHERE tenant_id = $1 AND (datos->'referencia'->>'tipo') = 'recepcion'`,
       [DEMO_TENANT],
     );
-    expect(Number(movs.rows[0]?.n ?? 0)).toBe(3);
+    expect(Number(movs.rows[0]?.n ?? 0)).toBe(5);
 
     // Costos del catálogo actualizados (abs_costos_read poblado para los artículos
     // recibidos, en la moneda USD).
@@ -583,7 +593,9 @@ describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () =>
     expect(porClave["ot-abiertas"]).toBe(3);
     expect(porClave["compras-generadas"]).toBe(4);
     expect(porClave["reincidencias"]).toBe(2);
-    expect(porClave["consumo-inventario"]).toBe(2);
+    // 2 del consumo correctivo original + 12 del consumo valorizado de la cadena
+    // Inventario→Costos (seedCostosMantenimiento, DGP-021.2) = 14.
+    expect(porClave["consumo-inventario"]).toBe(14);
   });
 
   it("AISLAMIENTO ANALYTICS · un tenant ajeno no ve datos del DEMO", async () => {

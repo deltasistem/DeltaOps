@@ -105,8 +105,25 @@ router.get(`${BASE}/hechos`, async (req, res) => {
 });
 
 /* --------------------- Pendientes de materialización (DGP-021.2) --------- */
+// Permiso de MATERIALIZACIÓN del módulo (mismo que exigen los comandos
+// `hecho.materializar-material|otros`: `authorization.permissions=[P_MATERIALIZAR]`).
+// Se deriva del `MODULO` exportado (idéntico a como lo compone `principalCostos`),
+// sin introducir permisos nuevos. §20: sólo materialización/administración puede
+// disparar el reproceso; CONSULTA/TECNICO son de sola lectura en costos.
+const P_MATERIALIZAR = `${MODULO}.materializar`;
+
+/** Espeja `PermissionResolver.hasPermission` del kernel (comodín `*` incluido). */
+function puedeMaterializar(ctx: ExecutionContext): boolean {
+  const permisos = ctx.principal.permisos ?? [];
+  return permisos.includes("*") || permisos.includes(P_MATERIALIZAR);
+}
+
 // Trazabilidad/recuperación de la orquestación inventario→costos. Tenant del
-// contexto (RLS). Visibilidad = permiso de lectura del módulo.
+// contexto (RLS). DECISIÓN (§20): la LECTURA de pendientes es trazabilidad de
+// costos y queda cubierta por la visibilidad de lectura del módulo que ya tienen
+// CONSULTA/TECNICO/SUPERVISOR (permiso `P_READ`); NO requiere permiso de
+// materialización. El registro es tenant-scoped (RLS por el tenant del contexto),
+// de sólo lectura y sin datos sensibles adicionales ⇒ no se restringe más.
 router.get(`${BASE}/pendientes`, async (req, res) => {
   try {
     const ctx = ctxOf(res);
@@ -122,11 +139,18 @@ router.get(`${BASE}/pendientes`, async (req, res) => {
 });
 
 // Reproceso idempotente de pendientes NO resueltos (opId determinista ⇒ sin
-// duplicados). Requiere permiso de materialización (se valida vía el propio
-// comando de costos que se dispara internamente).
+// duplicados). El reproceso ejecuta la materialización con el principal de
+// SERVICIO (no el del llamante), por lo que el permiso del comando NO alcanza a
+// verificar al solicitante. GUARDA EXPLÍCITA en la frontera HTTP: sólo roles con
+// permiso de MATERIALIZACIÓN (SUPERVISOR/PLANIFICADOR/admin) pueden dispararlo;
+// TECNICO/CONSULTA ⇒ 403 (§20 separación consulta/materialización/administración).
 router.post(`${BASE}/pendientes/reprocesar`, async (req, res) => {
   try {
     const ctx = ctxOf(res);
+    if (!puedeMaterializar(ctx)) {
+      res.status(403).json({ error: `Permiso denegado: ${P_MATERIALIZAR}`, code: "KRN-AUTH-002" });
+      return;
+    }
     const tenant = (ctx.metadata as Record<string, unknown>)["tenantId"];
     const resumen = await reprocesarPendientes(typeof tenant === "string" ? tenant : undefined);
     res.json(resumen);
