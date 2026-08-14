@@ -132,6 +132,95 @@ export function modulosVisibles(sesion: Pick<Sesion, "modulos">): { modulo: Modu
   }));
 }
 
+/* ---------------------- Navegación por proceso (Lite) ------------------- */
+
+/**
+ * DELTAOPS LITE-03 §1 · Navegación agrupada por PROCESO operacional (no por
+ * arquitectura técnica). Reagrupa las MISMAS rutas/entitlements existentes en
+ * grupos legibles (INICIO / MANTENIMIENTO / EQUIPOS / INVENTARIO / INDICADORES
+ * / ADMINISTRACIÓN). No crea rutas nuevas ni elimina ninguna: sólo compone la
+ * presentación. La visibilidad de cada ítem sigue gobernada por el entitlement
+ * de módulo (`moduloHabilitado`) y/o la capacidad de administración del rol; el
+ * backend sigue siendo la autoridad (403), nunca se confía en ocultar.
+ */
+export interface ItemNav {
+  readonly clave: string;
+  readonly nombre: string;
+  readonly ruta: string;
+}
+
+export interface GrupoNav {
+  readonly clave: string;
+  readonly titulo: string;
+  readonly items: ItemNav[];
+}
+
+/**
+ * Construye los grupos de navegación visibles para la sesión. Cada ítem sólo se
+ * incluye si su módulo está habilitado (o, en Administración, si el rol tiene la
+ * capacidad correspondiente). Los grupos vacíos se omiten. El módulo emergente
+ * Utilización (sin enum en el contrato) se decide con su guard dedicado pasado
+ * por el llamador para no acoplar este helper a esa capa.
+ */
+export function gruposNavegacion(
+  sesion: Pick<Sesion, "rol" | "modulos">,
+  opciones?: { utilizacionVisible?: boolean },
+): GrupoNav[] {
+  const tiene = (m: Modulo): boolean => sesion.modulos.includes(m);
+  const admin = esAdminEmpresa(sesion.rol);
+  const superAdmin = esSuperAdmin(sesion.rol);
+  const grupos: GrupoNav[] = [];
+
+  // MANTENIMIENTO · trabajo operativo (órdenes, correctivo, preventivo, planes).
+  const mantenimiento: ItemNav[] = [];
+  if (tiene("ordenes")) mantenimiento.push({ clave: "ordenes", nombre: "Órdenes", ruta: "/ordenes" });
+  if (tiene("correctivo")) mantenimiento.push({ clave: "correctivo", nombre: "Correctivo", ruta: "/correctivo/solicitudes" });
+  if (tiene("preventivo")) mantenimiento.push({ clave: "preventivo", nombre: "Preventivo", ruta: "/preventivo/programas" });
+  if (tiene("planes")) mantenimiento.push({ clave: "planes", nombre: "Planes", ruta: "/planes" });
+  if (mantenimiento.length > 0) grupos.push({ clave: "mantenimiento", titulo: "Mantenimiento", items: mantenimiento });
+
+  // EQUIPOS · activos + utilización.
+  const equipos: ItemNav[] = [];
+  if (tiene("activos")) equipos.push({ clave: "activos", nombre: "Activos", ruta: "/activos" });
+  if (opciones?.utilizacionVisible) equipos.push({ clave: "utilizacion", nombre: "Utilización", ruta: "/utilizacion/lecturas" });
+  if (equipos.length > 0) grupos.push({ clave: "equipos", titulo: "Equipos", items: equipos });
+
+  // INVENTARIO · inventario + abastecimiento.
+  const inventario: ItemNav[] = [];
+  if (tiene("inventario")) inventario.push({ clave: "inventario", nombre: "Inventario", ruta: "/inventario" });
+  if (tiene("abastecimiento")) inventario.push({ clave: "abastecimiento", nombre: "Abastecimiento", ruta: "/abastecimiento/solicitudes" });
+  if (inventario.length > 0) grupos.push({ clave: "inventario", titulo: "Inventario", items: inventario });
+
+  // INDICADORES · analytics + costos.
+  const indicadores: ItemNav[] = [];
+  if (tiene("analytics")) indicadores.push({ clave: "analytics", nombre: "Analytics", ruta: "/analytics" });
+  // Costos es una superficie propia (/costos) sin enum de módulo; se ofrece a
+  // roles con capacidad de consulta administrativa/supervisión.
+  if (tiene("analytics") && (admin || sesion.rol === "SUPERVISOR" || sesion.rol === "PLANIFICADOR")) {
+    indicadores.push({ clave: "costos", nombre: "Costos", ruta: "/costos" });
+  }
+  if (indicadores.length > 0) grupos.push({ clave: "indicadores", titulo: "Indicadores", items: indicadores });
+
+  // Referencia (catálogo transversal) se ofrece dentro de Indicadores/otros sólo
+  // si el módulo está habilitado, conservando su acceso sin ensuciar el nav.
+  if (tiene("referencia")) {
+    grupos.push({ clave: "referencia", titulo: "Referencia", items: [{ clave: "referencia", nombre: "Referencia", ruta: "/referencia" }] });
+  }
+
+  // ADMINISTRACIÓN · por capacidad de administración del rol (no entitlement).
+  const administracion: ItemNav[] = [];
+  if (admin) {
+    administracion.push({ clave: "usuarios", nombre: "Usuarios", ruta: "/administracion/usuarios" });
+    administracion.push({ clave: "configuracion", nombre: "Configuración", ruta: "/administracion/configuracion" });
+  }
+  if (superAdmin) {
+    administracion.push({ clave: "saas", nombre: "Administración SaaS", ruta: "/administracion/saas" });
+  }
+  if (administracion.length > 0) grupos.push({ clave: "administracion", titulo: "Administración", items: administracion });
+
+  return grupos;
+}
+
 /* ------------------------------- Landing -------------------------------- */
 
 /**

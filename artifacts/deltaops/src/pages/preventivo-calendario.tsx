@@ -13,7 +13,7 @@ import React, { useMemo, useState } from "react";
 import { useSearch } from "wouter";
 import {
   PageHeader, Section, Card, CardContent, CardHeader, Button, Spinner,
-  EmptyState, ErrorState, Badge, Progress, Table,
+  EmptyState, ErrorState, Badge, Progress, Table, Select,
 } from "@workspace/design-system";
 import { ShellPreventivo } from "../lib/preventivo/Shell";
 import { useProgramacionesGlobales, useProgramas, useActividades } from "../lib/preventivo/hooks";
@@ -105,9 +105,11 @@ function Selector({ etiqueta, valor, onChange, opciones }: { etiqueta: string; v
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)", fontSize: "var(--do-text-sm)" }}>
       <span style={{ color: "var(--do-texto-suave)" }}>{etiqueta}</span>
-      <select value={valor} onChange={(e) => onChange(e.target.value)} style={{ padding: "var(--do-sp-1) var(--do-sp-2)", borderRadius: "var(--do-radio)", border: "1px solid var(--do-borde)", background: "var(--do-surface)", color: "inherit", minWidth: 160 }}>
-        {opciones.map((o) => <option key={o.valor} value={o.valor}>{o.etiqueta}</option>)}
-      </select>
+      <span style={{ minWidth: 160, display: "inline-block" }}>
+        <Select size="sm" value={valor} onChange={(e) => onChange(e.target.value)} aria-label={etiqueta}>
+          {opciones.map((o) => <option key={o.valor} value={o.valor}>{o.etiqueta}</option>)}
+        </Select>
+      </span>
     </label>
   );
 }

@@ -5,7 +5,7 @@
  * acciones de transición de estado (con confirmación), edición y etiqueta QR.
  */
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import {
   PageHeader,
   Section,
@@ -20,12 +20,11 @@ import {
   Spinner,
   ErrorState,
 } from "@workspace/design-system";
+import { MapPin, User, Wrench, ClipboardPlus, History, Building2, ShieldQuestion, FilePlus2 } from "lucide-react";
 import { ShellActivos } from "../lib/activos/Shell";
 import { useOffline } from "../lib/offline/contexto";
 import { useDetalle, useCatalogo } from "../lib/activos/hooks";
 import {
-  etiquetaEstado,
-  variantEstado,
   transicionesDesde,
   type ActivoRow,
   type EtiquetaQr,
@@ -49,8 +48,12 @@ import { TabCorrectivo } from "./ficha/tab-correctivo";
 import { leerParam } from "../lib/ecosistema/deep-links";
 import { PanelOperacional } from "../lib/utilizacion/PanelOperacional";
 import { utilizacionVisible } from "../lib/utilizacion/capacidades";
+import { estadoVisual } from "../lib/utilizacion/ficha-operacional";
 import { capacidadesActivos } from "../lib/activos/capacidades";
 import { useSesion } from "../lib/identidad/sesion";
+import { moduloHabilitado } from "../lib/identidad/rbac";
+import { centroDeRegistro } from "../lib/centro/contexto";
+import { urlNuevaOrden, urlOrdenesDeActivo } from "../lib/ecosistema/deep-links";
 
 export default function ActivosFichaPage() {
   const [, params] = useRoute("/activos/:id");
@@ -103,25 +106,55 @@ function Ficha({ id }: { id: string }) {
     }
   }
 
+  // LITE-03 §5 · Acciones operacionales del equipo. "Crear OT" requiere el
+  // módulo Órdenes habilitado y un rol con escritura (no CONSULTA); el backend
+  // sigue siendo la autoridad. "Registrar novedad" y "Preoperacional" NO existen
+  // como flujo en esta app (fuera de alcance): se muestran deshabilitados con
+  // texto honesto, nunca ocultos silenciosamente ni simulados.
+  const puedeCrearOrden = !!sesion && moduloHabilitado(sesion, "ordenes") && sesion.rol !== "CONSULTA";
+
   return (
     <>
       <PageHeader
         titulo={a.nombre}
         descripcion={`${a.codigoEmpresarial} · ${a.tipo}`}
         acciones={
-          <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
-            <Badge variant={variantEstado(a.estado)}>{etiquetaEstado(a.estado)}</Badge>
+          <div style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {puedeCrearOrden && (
+              <Link href={urlNuevaOrden({ activo: a.id, activoEtiqueta: a.nombre })}>
+                <Button variant="primario" size="sm">
+                  <ClipboardPlus size={16} aria-hidden="true" /> Crear OT
+                </Button>
+              </Link>
+            )}
+            <Link href={urlOrdenesDeActivo(a.id)}>
+              <Button variant="secundario" size="sm">
+                <History size={16} aria-hidden="true" /> Ver historial
+              </Button>
+            </Link>
             {capActivos.editar && (
               <Button variant="secundario" size="sm" onClick={() => setEditando(true)}>Editar</Button>
             )}
             {transiciones.map((t) => (
-              <Button key={t.accion} variant="primario" size="sm" onClick={() => setAccionConfirm({ accion: t.accion, etiqueta: t.etiqueta })}>
+              <Button key={t.accion} variant="fantasma" size="sm" onClick={() => setAccionConfirm({ accion: t.accion, etiqueta: t.etiqueta })}>
                 {t.etiqueta}
               </Button>
             ))}
           </div>
         }
       />
+
+      <CabeceraOperacional a={a} />
+
+      {/* Acciones no disponibles en esta app (honestas, deshabilitadas). §5 */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-2)" }}>
+        <Button variant="fantasma" size="sm" disabled title="Preoperacional no está disponible en esta versión.">
+          <ShieldQuestion size={16} aria-hidden="true" /> Preoperacional (no disponible)
+        </Button>
+        <Button variant="fantasma" size="sm" disabled title="El registro de novedades no está disponible en esta versión.">
+          <FilePlus2 size={16} aria-hidden="true" /> Registrar novedad (no disponible)
+        </Button>
+      </div>
 
       {mensaje && (
         <Alert variant={mensaje.tono === "exito" ? "exito" : mensaje.tono === "error" ? "error" : "info"} titulo={mensaje.texto} />
@@ -173,6 +206,54 @@ function Ficha({ id }: { id: string }) {
         <EdicionModal a={a} onCerrar={() => setEditando(false)} onGuardado={() => { setEditando(false); recargar(); }} />
       )}
     </>
+  );
+}
+
+/**
+ * LITE-03 §5 · CABECERA OPERACIONAL del equipo: jerarquía "estado del equipo"
+ * primero (semáforo + badge), luego contexto operacional (centro de costos,
+ * ubicación, responsable, equipo de mantenimiento). Sólo datos REALES del read
+ * model (`datos`); cada dato ausente muestra "—" (nunca cero simulado). No
+ * inventa estados ni campos: reutiliza `estadoVisual` (mapeo canónico) y
+ * `centroDeRegistro`.
+ */
+function CabeceraOperacional({ a }: { a: ActivoRow }) {
+  const ev = estadoVisual(a.estado);
+  const d = a.datos ?? {};
+  const txt = (k: string): string => {
+    const v = d[k];
+    return typeof v === "string" && v !== "" ? v : "—";
+  };
+  const centro = centroDeRegistro(d) ?? "—";
+  const ubicacion = a.ubicacionId && a.ubicacionId !== "" ? a.ubicacionId : txt("ubicacion");
+  const responsable = txt("responsable");
+  const equipoMtto = ((): string => {
+    const v = d["equipoMantenimiento"] ?? d["cuadrilla"] ?? d["equipoMtto"];
+    return typeof v === "string" && v !== "" ? v : "—";
+  })();
+  const item = (icono: React.ReactNode, etiqueta: string, valor: string) => (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)", minWidth: 0 }}>
+      <span aria-hidden="true" style={{ color: "var(--do-texto-suave)", display: "inline-flex" }}>{icono}</span>
+      <span style={{ fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)", textTransform: "uppercase", letterSpacing: "var(--do-tracking-etiquetas)" }}>{etiqueta}</span>
+      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{valor}</span>
+    </div>
+  );
+  return (
+    <Card>
+      <CardContent>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--do-sp-3) var(--do-sp-5)" }}>
+          {/* Estado del equipo · primer nivel de la jerarquía */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)" }}>
+            <span className={`do-semaforo do-semaforo--${ev.semaforo}`} title={ev.etiqueta} aria-hidden="true" />
+            <Badge variant={ev.variante}>{ev.etiqueta}</Badge>
+          </div>
+          {item(<Building2 size={16} />, "Centro", centro)}
+          {item(<MapPin size={16} />, "Ubicación", ubicacion)}
+          {item(<User size={16} />, "Responsable", responsable)}
+          {item(<Wrench size={16} />, "Equipo mantenimiento", equipoMtto)}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -103,11 +103,26 @@ export function normalizarOpcionesCatalogo(datos: unknown): OpcionCatalogo[] {
   return out;
 }
 
-export function useCatalogo(nombre: string): EstadoAsync<OpcionCatalogo[]> {
+export interface OpcionesCatalogo {
+  /**
+   * Trata el 401 como error normal (sin redirigir a /login). Para consumidores de
+   * PRESENTACIÓN que se montan pronto (p. ej. el selector de centro del AppShell):
+   * un 401 transitorio en el ciclo login/logout→login NO debe navegar el
+   * navegador a /login; se degrada a lista vacía. Ver LITE-03 · fix de carrera.
+   */
+  toleraNoAutorizado?: boolean;
+}
+
+export function useCatalogo(nombre: string, opciones?: OpcionesCatalogo): EstadoAsync<OpcionCatalogo[]> {
+  const toleraNoAutorizado = opciones?.toleraNoAutorizado ?? false;
   return useConsulta<OpcionCatalogo[]>(
     (signal) =>
-      activosFetch<unknown>(`/catalogos/${nombre}`, { signal }).then(normalizarOpcionesCatalogo),
-    [nombre],
+      // Nombre vacío = consulta deshabilitada (p. ej. el módulo no aplica): se
+      // resuelve a lista vacía sin tocar la red, evitando `/catalogos/` inválido.
+      nombre
+        ? activosFetch<unknown>(`/catalogos/${nombre}`, { signal, toleraNoAutorizado }).then(normalizarOpcionesCatalogo)
+        : Promise.resolve<OpcionCatalogo[]>([]),
+    [nombre, toleraNoAutorizado],
   );
 }
 

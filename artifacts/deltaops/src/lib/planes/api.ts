@@ -40,6 +40,15 @@ export interface FetchOpts {
   signal?: AbortSignal;
   /** No lanza en 404; devuelve `null`. Útil para endpoints opcionales. */
   toleraNoEncontrado?: boolean;
+  /**
+   * No redirige a /login en 401: lanza el error como uno más. Para consultas de
+   * PRESENTACIÓN que se disparan al montar (Home/AppShell) justo tras
+   * login/logout→login: un 401 transitorio (cookie recién emitida aún no
+   * propagada a la petición inmediata) NO debe arrastrar el navegador a /login.
+   * La AUTORIDAD de redirección es EXCLUSIVAMENTE la sesión (useSesion). El
+   * llamador degrada el error a estado vacío. Ver LITE-03 · fix carrera post-login.
+   */
+  toleraNoAutorizado?: boolean;
 }
 
 /**
@@ -56,7 +65,9 @@ export async function planesFetch<T = unknown>(path: string, opts: FetchOpts = {
     signal: opts.signal,
   });
   if (res.status === 401) {
-    window.location.assign(`${import.meta.env.BASE_URL}login`);
+    if (!opts.toleraNoAutorizado) {
+      window.location.assign(`${import.meta.env.BASE_URL}login`);
+    }
     throw new PlanesApiError({ status: 401, error: "No autenticado" });
   }
   const data = await parse(res);

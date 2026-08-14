@@ -220,6 +220,39 @@ export function plantillaFiltrosListado(
   return validarDefinicion(def);
 }
 
+/**
+ * DELTAOPS LITE-03 §4 · Filtros AVANZADOS del listado (bloque "Más filtros").
+ * Complementa a los filtros PRIORITARIOS que la página de Activos expone como
+ * controles destacados (Centro de costos, Estado, Tipo, Ubicación): aquí quedan
+ * sólo los secundarios (categoría, familia, criticidad, responsable), colapsados
+ * por defecto para reducir ruido sin perder capacidad. Mismo `filtros` de estado
+ * que los prioritarios: no duplica campos con ellos.
+ */
+export function plantillaFiltrosAvanzados(
+  opciones: Partial<Record<NombreCatalogo, OpcionSeleccion[]>> = {},
+): DefinicionFormulario {
+  const op = (c: NombreCatalogo): OpcionSeleccion[] => opciones[c] ?? [];
+  const def: DefinicionFormulario = {
+    clave: "activo.filtros.avanzados",
+    titulo: "Más filtros",
+    nodos: [
+      {
+        clase: "contenedor",
+        clave: "f",
+        tipo: "grupo",
+        etiqueta: "Campos",
+        hijos: [
+          campo({ clave: "categoria", tipo: "select", etiqueta: "Categoría", opciones: op("categorias") }),
+          campo({ clave: "familia", tipo: "select", etiqueta: "Familia", opciones: op("familias") }),
+          campo({ clave: "criticidad", tipo: "select", etiqueta: "Criticidad", opciones: op("criticidades") }),
+          campo({ clave: "responsable", tipo: "texto", etiqueta: "Responsable" }),
+        ],
+      },
+    ],
+  };
+  return validarDefinicion(def);
+}
+
 /** Filtros de la línea de tiempo. */
 export function plantillaFiltrosTimeline(estados: OpcionSeleccion[]): DefinicionFormulario {
   const def: DefinicionFormulario = {

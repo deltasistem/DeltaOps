@@ -109,6 +109,49 @@
 }
 
 /* =====================================================================
+ * DELTAOPS LITE-03 §1 · Navegación agrupada por PROCESO.
+ * Cada grupo muestra un título tenue + sus ítems. En escritorio los grupos son
+ * clústeres horizontales separados por un divisor sutil; en móvil (cajón del
+ * AppShell, columna) el título encabeza su bloque y los ítems se apilan.
+ * Sólo tokens --do-*; hereda el color de texto del shell (legible en claro/oscuro).
+ * ===================================================================== */
+.do-nav-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-1);
+}
+.do-nav-grupo__titulo {
+  font-size: var(--do-text-xs);
+  font-weight: 700;
+  letter-spacing: var(--do-tracking-etiquetas, 0.06em);
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--do-shell-texto) 62%, transparent);
+  padding: 0 var(--do-sp-2);
+}
+.do-nav-grupo__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--do-sp-1);
+}
+/* Escritorio: los grupos fluyen en línea; cada grupo apila su título encima de
+   sus ítems (en fila), con un divisor sutil entre grupos. */
+@media (min-width: 768px) {
+  .do-nav-grupo {
+    flex-direction: column;
+    gap: 2px;
+    padding-left: var(--do-sp-3);
+    border-left: var(--do-border-fino) solid color-mix(in srgb, var(--do-shell-texto) 14%, transparent);
+  }
+  .do-nav-grupo__items {
+    flex-direction: row;
+    gap: var(--do-sp-1);
+  }
+  .do-nav-grupo__titulo {
+    font-size: 0.625rem;
+  }
+}
+
+/* =====================================================================
  * DIRECTIVA CONSISTENCIA VISUAL · Req 8 — Sin desbordamiento horizontal.
  *
  * CAUSA RAÍZ del scroll horizontal de página en móvil (~390px):

@@ -11,7 +11,7 @@
  *
  * El backend es la autoridad: 401/403 aquí son datos que el AppShell interpreta.
  */
-import React, { createContext, useCallback, useContext, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { obtenerSesion, logout as apiLogout, switchTenant } from "./endpoints";
 import { IdentidadError } from "./api";
@@ -58,7 +58,25 @@ export function SesionProvider({ children }: { children: React.ReactNode }) {
     staleTime: 30_000,
   });
 
-  const sesion = consulta.data ?? null;
+  // Fuente de la SESIÓN: la cache de React Query leída de forma SÍNCRONA vía
+  // `useSyncExternalStore`, no el `consulta.data` del observador.
+  //
+  // CAUSA RAÍZ (cuelgue del 2.º login, login→logout→login): `establecerSesion`
+  // hace `qc.setQueryData(sesion)` (síncrono) y navega a `/` en el mismo tick.
+  // El re-render de la navegación (wouter) monta el dispatcher `/` de inmediato,
+  // pero el observador de `useQuery` NOTIFICA de forma DIFERIDA, así que
+  // `consulta.data` aún reflejaba `null` en ese primer render → el dispatcher
+  // veía `{cargando:false, sesion:null}` y rebotaba a `/login` (aterrizabas en
+  // login pese al 200; el 1.º login no fallaba porque la query estaba `pending`
+  // y el dispatcher esperaba en el spinner). `useSyncExternalStore` fuerza una
+  // lectura CONSISTENTE y síncrona del snapshot de la cache en cada render:
+  // cuando el dispatcher se monta, ya ve la sesión recién sembrada. No inventa
+  // datos: es el mismo valor que `setQueryData` acaba de escribir.
+  const sesion = useSyncExternalStore<Sesion | null>(
+    (onChange) => qc.getQueryCache().subscribe(() => onChange()),
+    () => qc.getQueryData<Sesion>(CLAVE_SESION) ?? null,
+    () => qc.getQueryData<Sesion>(CLAVE_SESION) ?? null,
+  );
 
   // Persistir el tenant activo y purgar colas offline de tenants ajenos: una
   // cola de otro tenant nunca debe reutilizarse en el contexto actual.

@@ -42,12 +42,22 @@ export interface FetchOpts {
   signal?: AbortSignal;
   /** No lanza en 404; devuelve `null`. Útil para endpoints opcionales. */
   toleraNoEncontrado?: boolean;
+  /**
+   * No redirige a /login en 401: lanza `ActivosApiError(401)` como un error más.
+   * Reservado para peticiones de PRESENTACIÓN que se disparan de forma temprana
+   * (p. ej. el catálogo de centros de costos del AppShell): un 401 transitorio
+   * tras login/logout→login NO debe arrastrar el navegador entero a /login (esa
+   * es competencia EXCLUSIVA de la sesión, `useSesion`). El llamador degrada el
+   * error a estado vacío. Ver LITE-03 · fix de carrera post-login.
+   */
+  toleraNoAutorizado?: boolean;
 }
 
 /**
  * Ejecuta una petición al módulo. Lanza `ActivosApiError` en fallo salvo que
  * `toleraNoEncontrado` esté activo y el estado sea 404 (devuelve `null`).
- * Redirige a /login en 401.
+ * Redirige a /login en 401, SALVO que `toleraNoAutorizado` esté activo (en cuyo
+ * caso lanza el error para que el llamador degrade sin navegar).
  */
 export async function activosFetch<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -58,7 +68,9 @@ export async function activosFetch<T = unknown>(path: string, opts: FetchOpts = 
     signal: opts.signal,
   });
   if (res.status === 401) {
-    window.location.assign(`${import.meta.env.BASE_URL}login`);
+    if (!opts.toleraNoAutorizado) {
+      window.location.assign(`${import.meta.env.BASE_URL}login`);
+    }
     throw new ActivosApiError({ status: 401, error: "No autenticado" });
   }
   const data = await parse(res);

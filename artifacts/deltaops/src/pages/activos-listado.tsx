@@ -15,6 +15,7 @@ import {
   Badge,
   Button,
   SearchInput,
+  Select,
   Field,
   Pagination,
   EmptyState,
@@ -22,12 +23,28 @@ import {
   Spinner,
   KpiCard,
 } from "@workspace/design-system";
+import { SlidersHorizontal } from "lucide-react";
 import { ShellActivos } from "../lib/activos/Shell";
 import { useListado, useCatalogo, buscar, filtrarLocal } from "../lib/activos/hooks";
 import { etiquetaEstado, variantEstado, ESTADOS_ACTIVO, type ActivoRow } from "../lib/activos/tipos";
 import { FormularioDinamico } from "../lib/forms/FormularioDinamico";
-import { plantillaFiltrosListado } from "../lib/forms/plantillas";
+import { plantillaFiltrosAvanzados } from "../lib/forms/plantillas";
+import { useCentroCostos, CENTRO_TODOS, centroDeRegistro } from "../lib/centro/contexto";
 import type { ValoresFormulario } from "../lib/forms/tipos";
+
+/** Etiqueta legible del centro de costos de una fila (o "—"). */
+function centroDeActivo(a: ActivoRow, etiquetas: Map<string, string>): string {
+  const clave = centroDeRegistro(a.datos);
+  if (!clave) return "—";
+  return etiquetas.get(clave) ?? clave;
+}
+
+/** Ubicación legible de una fila (`ubicacionId` o `datos.ubicacion`). */
+function ubicacionDeActivo(a: ActivoRow): string {
+  if (a.ubicacionId && a.ubicacionId !== "") return a.ubicacionId;
+  const u = a.datos?.["ubicacion"];
+  return typeof u === "string" && u !== "" ? u : "—";
+}
 
 const POR_PAGINA = 12;
 
@@ -41,11 +58,13 @@ export default function ActivosListadoPage() {
 
 function Listado() {
   const [, navegar] = useLocation();
+  const centroCtx = useCentroCostos();
   const [vista, setVista] = useState<"tabla" | "tarjetas">("tabla");
   const [pagina, setPagina] = useState(1);
   const [q, setQ] = useState("");
   const [resultadosBusqueda, setResultadosBusqueda] = useState<ActivoRow[] | null>(null);
   const [busquedaServidor, setBusquedaServidor] = useState<boolean | null>(null);
+  const [masFiltros, setMasFiltros] = useState(false);
 
   const [filtros, setFiltros] = useState<Record<string, string | undefined>>({});
   const { datos, cargando, error, recargar } = useListado(filtros);
@@ -55,21 +74,34 @@ function Listado() {
   const familias = useCatalogo("familias");
   const criticidades = useCatalogo("criticidades");
   const ubicaciones = useCatalogo("ubicaciones");
+  const centros = useCatalogo("centros-costo");
 
-  // Filtros como Dynamic Form: definición declarativa + renderer genérico.
+  // LITE-03 §3 · Contexto de CENTRO DE COSTOS: el filtro local por centro se
+  // siembra con el contexto de navegación activo (barra superior). El backend
+  // NO garantiza filtrar por centro (vive en `datos`), así que se aplica en
+  // CLIENTE (GAP documentado): coherente y sin cambiar el contrato.
+  const [filtroCentro, setFiltroCentro] = useState<string>(CENTRO_TODOS);
+  useEffect(() => {
+    setFiltroCentro(centroCtx.centro);
+    setPagina(1);
+  }, [centroCtx.centro]);
+
+  // Mapa clave→etiqueta de centros (para mostrar nombres legibles en la tabla).
+  const etiquetasCentro = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of centros.datos ?? []) m.set(o.valor, o.etiqueta);
+    return m;
+  }, [centros.datos]);
+
+  // Filtros AVANZADOS (colapsables) como Dynamic Form: sólo campos secundarios.
   const defFiltros = useMemo(
     () =>
-      plantillaFiltrosListado(
-        ESTADOS_ACTIVO.map((e) => ({ valor: e, etiqueta: etiquetaEstado(e) })),
-        {
-          tipos: (tipos.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
-          categorias: (categorias.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
-          familias: (familias.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
-          criticidades: (criticidades.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
-          ubicaciones: (ubicaciones.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
-        },
-      ),
-    [tipos.datos, categorias.datos, familias.datos, criticidades.datos, ubicaciones.datos],
+      plantillaFiltrosAvanzados({
+        categorias: (categorias.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
+        familias: (familias.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
+        criticidades: (criticidades.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
+      }),
+    [categorias.datos, familias.datos, criticidades.datos],
   );
 
   // Búsqueda rápida con degradación.
@@ -93,13 +125,24 @@ function Listado() {
     };
   }, [q]);
 
-  const base = datos ?? [];
+  // Base filtrada por CENTRO DE COSTOS en cliente (GAP: el read model no filtra
+  // por centro). Cambiar de centro re-filtra la experiencia: nunca duplica datos.
+  const base = useMemo(() => {
+    const todo = datos ?? [];
+    if (filtroCentro === CENTRO_TODOS) return todo;
+    return todo.filter((a) => centroDeRegistro(a.datos) === filtroCentro);
+  }, [datos, filtroCentro]);
   // Aplicar búsqueda: servidor (si existe) o filtro cliente.
   const filtradoBusqueda = useMemo(() => {
     if (q.trim().length < 2) return base;
-    if (resultadosBusqueda !== null) return resultadosBusqueda; // servidor
+    if (resultadosBusqueda !== null) {
+      // Los resultados de servidor también se acotan al centro activo (cliente).
+      return filtroCentro === CENTRO_TODOS
+        ? resultadosBusqueda
+        : resultadosBusqueda.filter((a) => centroDeRegistro(a.datos) === filtroCentro);
+    }
     return filtrarLocal(base, q);
-  }, [base, q, resultadosBusqueda]);
+  }, [base, q, resultadosBusqueda, filtroCentro]);
 
   const total = filtradoBusqueda.length;
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
@@ -145,25 +188,101 @@ function Listado() {
         <KpiCard titulo="Fuera de servicio" valor={String(resumen.porEstado["FUERA_SERVICIO"] ?? 0)} />
       </div>
 
-      <Section titulo="Filtros">
+      <Section titulo="Buscar equipos">
         <Card>
           <CardContent>
-            <div style={{ marginBottom: "var(--do-sp-3)", maxWidth: 420 }}>
-              <Field label="Búsqueda rápida" htmlFor="q">
+            {/* Búsqueda PROMINENTE (LITE-03 §4): primer control, ancho generoso. */}
+            <div style={{ marginBottom: "var(--do-sp-4)" }}>
+              <Field label="Buscar equipo" htmlFor="q">
                 <SearchInput
                   id="q"
                   value={q}
-                  placeholder="Nombre, código o tipo…"
+                  placeholder="Nombre, código o tipo del equipo…"
                   onChange={(e) => { setQ(e.target.value); setPagina(1); }}
                   onClear={() => setQ("")}
                 />
               </Field>
             </div>
-            <FormularioDinamico
-              definicion={defFiltros}
-              valores={filtros as ValoresFormulario}
-              onCambio={alCambiarFiltros}
-            />
+
+            {/* Filtros PRIORITARIOS: Centro de costos · Estado · Tipo · Ubicación.
+                El filtro de CENTRO sólo se ofrece si el catálogo `centros-costo`
+                del tenant tiene entradas: con catálogo vacío una opción única
+                "Todos los centros" sería un control engañoso (no filtra nada), así
+                que se OMITE por completo y se conservan los otros filtros. */}
+            <div style={{ display: "grid", gap: "var(--do-sp-3)", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))" }}>
+              {(centros.datos ?? []).length > 0 && (
+                <Field label="Centro de costos" htmlFor="f-centro">
+                  <Select
+                    id="f-centro"
+                    value={filtroCentro}
+                    onChange={(e) => { setFiltroCentro(e.target.value); setPagina(1); }}
+                  >
+                    <option value={CENTRO_TODOS}>Todos los centros</option>
+                    {(centros.datos ?? []).map((o) => (
+                      <option key={o.valor} value={o.valor}>{o.etiqueta}</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+              <Field label="Estado" htmlFor="f-estado">
+                <Select
+                  id="f-estado"
+                  value={filtros.estado ?? ""}
+                  onChange={(e) => alCambiarFiltros({ ...filtros, estado: e.target.value } as ValoresFormulario)}
+                >
+                  <option value="">Todos</option>
+                  {ESTADOS_ACTIVO.map((e) => (
+                    <option key={e} value={e}>{etiquetaEstado(e)}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Tipo" htmlFor="f-tipo">
+                <Select
+                  id="f-tipo"
+                  value={filtros.tipo ?? ""}
+                  onChange={(e) => alCambiarFiltros({ ...filtros, tipo: e.target.value } as ValoresFormulario)}
+                >
+                  <option value="">Todos</option>
+                  {(tipos.datos ?? []).map((o) => (
+                    <option key={o.valor} value={o.valor}>{o.etiqueta}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Ubicación" htmlFor="f-ubicacion">
+                <Select
+                  id="f-ubicacion"
+                  value={filtros.ubicacionId ?? ""}
+                  onChange={(e) => alCambiarFiltros({ ...filtros, ubicacionId: e.target.value } as ValoresFormulario)}
+                >
+                  <option value="">Todas</option>
+                  {(ubicaciones.datos ?? []).map((o) => (
+                    <option key={o.valor} value={o.valor}>{o.etiqueta}</option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+
+            {/* Más filtros: colapsable con los campos secundarios. */}
+            <div style={{ marginTop: "var(--do-sp-3)" }}>
+              <Button
+                variant="fantasma"
+                size="sm"
+                onClick={() => setMasFiltros((v) => !v)}
+                aria-expanded={masFiltros}
+              >
+                <SlidersHorizontal size={16} aria-hidden="true" /> {masFiltros ? "Menos filtros" : "Más filtros"}
+              </Button>
+              {masFiltros && (
+                <div style={{ marginTop: "var(--do-sp-3)" }}>
+                  <FormularioDinamico
+                    definicion={defFiltros}
+                    valores={filtros as ValoresFormulario}
+                    onCambio={alCambiarFiltros}
+                  />
+                </div>
+              )}
+            </div>
+
             {q.trim().length >= 2 && busquedaServidor === false && (
               <p style={{ marginTop: "var(--do-sp-2)", fontSize: "var(--do-text-xs)", color: "var(--do-texto-suave)" }}>
                 Búsqueda del servidor no disponible; filtrando en cliente sobre el listado.
@@ -191,11 +310,15 @@ function Listado() {
         ) : (
           <>
             <div className="do-solo-desktop">
-              {vista === "tabla" ? <TablaActivos filas={visibles} onAbrir={(id) => navegar(`/activos/${id}`)} /> : <TarjetasActivos filas={visibles} onAbrir={(id) => navegar(`/activos/${id}`)} />}
+              {vista === "tabla" ? (
+                <TablaActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} />
+              ) : (
+                <TarjetasActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} />
+              )}
             </div>
             {/* En móvil siempre tarjetas */}
             <div className="do-solo-movil">
-              <TarjetasActivos filas={visibles} onAbrir={(id) => navegar(`/activos/${id}`)} />
+              <TarjetasActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} />
             </div>
             {totalPaginas > 1 && (
               <div style={{ marginTop: "var(--do-sp-4)" }}>
@@ -209,18 +332,19 @@ function Listado() {
   );
 }
 
-function TablaActivos({ filas, onAbrir }: { filas: ActivoRow[]; onAbrir: (id: string) => void }) {
+function TablaActivos({ filas, etiquetasCentro, onAbrir }: { filas: ActivoRow[]; etiquetasCentro: Map<string, string>; onAbrir: (id: string) => void }) {
   return (
     <Card>
       <CardContent>
-        <DoTable caption="Listado de activos" hover>
+        <DoTable caption="Listado de equipos" hover>
           <thead>
             <tr>
               <th>Código</th>
               <th>Nombre</th>
               <th>Tipo</th>
+              <th>Centro de costos</th>
+              <th>Ubicación</th>
               <th>Estado</th>
-              <th>Criticidad</th>
               <th></th>
             </tr>
           </thead>
@@ -230,9 +354,10 @@ function TablaActivos({ filas, onAbrir }: { filas: ActivoRow[]; onAbrir: (id: st
                 <td><code style={{ fontSize: "var(--do-text-xs)" }}>{a.codigoEmpresarial}</code></td>
                 <td>{a.nombre}</td>
                 <td>{a.tipo}</td>
+                <td>{centroDeActivo(a, etiquetasCentro)}</td>
+                <td>{ubicacionDeActivo(a)}</td>
                 <td><Badge variant={variantEstado(a.estado)}>{etiquetaEstado(a.estado)}</Badge></td>
-                <td>{a.criticidad ?? "—"}</td>
-                <td><Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver</Button></td>
+                <td><Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver equipo</Button></td>
               </tr>
             ))}
           </tbody>
@@ -242,7 +367,7 @@ function TablaActivos({ filas, onAbrir }: { filas: ActivoRow[]; onAbrir: (id: st
   );
 }
 
-function TarjetasActivos({ filas, onAbrir }: { filas: ActivoRow[]; onAbrir: (id: string) => void }) {
+function TarjetasActivos({ filas, etiquetasCentro, onAbrir }: { filas: ActivoRow[]; etiquetasCentro: Map<string, string>; onAbrir: (id: string) => void }) {
   return (
     <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))" }}>
       {filas.map((a) => (
@@ -254,8 +379,14 @@ function TarjetasActivos({ filas, onAbrir }: { filas: ActivoRow[]; onAbrir: (id:
                 <Badge variant={variantEstado(a.estado)}>{etiquetaEstado(a.estado)}</Badge>
               </div>
               <strong>{a.nombre}</strong>
-              <span style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>{a.tipo}{a.criticidad ? ` · ${a.criticidad}` : ""}</span>
-              <Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver ficha</Button>
+              <span style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>{a.tipo}</span>
+              <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px var(--do-sp-2)", fontSize: "var(--do-text-sm)" }}>
+                <dt style={{ color: "var(--do-texto-suave)" }}>Centro</dt>
+                <dd style={{ margin: 0 }}>{centroDeActivo(a, etiquetasCentro)}</dd>
+                <dt style={{ color: "var(--do-texto-suave)" }}>Ubicación</dt>
+                <dd style={{ margin: 0 }}>{ubicacionDeActivo(a)}</dd>
+              </dl>
+              <Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver equipo</Button>
             </div>
           </CardContent>
         </Card>

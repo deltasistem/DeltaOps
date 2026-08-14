@@ -19,6 +19,7 @@ import {
   ErrorState,
   Alert,
   Modal,
+  Select,
   useToast,
 } from "@workspace/design-system";
 import { useDependencias } from "../../lib/ordenes/hooks";
@@ -168,9 +169,9 @@ function ModalDependencia({ orden, onCerrar, onGuardado }: { orden: OrdenRow; on
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)" }}>
           <span style={{ fontSize: "var(--do-text-sm)" }}>Tipo de dependencia</span>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ padding: "var(--do-sp-2)", borderRadius: "var(--do-radius-sm)", border: "1px solid var(--do-borde)", minHeight: "var(--do-sp-10)" }}>
+          <Select value={tipo} onChange={(e) => setTipo(e.target.value)} aria-label="Tipo de dependencia">
             {TIPOS_DEPENDENCIA.map((t) => <option key={t.valor} value={t.valor}>{t.etiqueta}</option>)}
-          </select>
+          </Select>
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)" }}>
           <span style={{ fontSize: "var(--do-text-sm)" }}>Orden destino (identificador)</span>

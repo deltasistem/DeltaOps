@@ -61,17 +61,31 @@ export function useTimelineActivo(activoId: string | null): EstadoAsync<EventoTi
   );
 }
 
-/** Listado global de órdenes con filtro opcional (Centro Global). */
-export function useOrdenesGlobal(filtro: { estado?: string; limit?: number } = {}): EstadoAsync<OrdenRow[]> {
+/**
+ * Listado global de órdenes con filtro opcional (Centro Global · Home empresa).
+ *
+ * `toleraNoAutorizado`: cuando esta consulta es el CONTENIDO que se dispara al
+ * MONTAR una superficie (p. ej. la Home tras login/logout→login), un 401
+ * transitorio (cookie recién emitida aún no propagada a la petición inmediata)
+ * NO debe redirigir el navegador a /login: aborta la carga y deja al usuario
+ * varado en /login. Con el flag, ese 401 se degrada a error normal (lista vacía)
+ * y la ÚNICA autoridad de redirección sigue siendo `useSesion`. Ver LITE-03 ·
+ * fix de carrera post-login.
+ */
+export function useOrdenesGlobal(
+  filtro: { estado?: string; limit?: number } = {},
+  opts: { toleraNoAutorizado?: boolean } = {},
+): EstadoAsync<OrdenRow[]> {
   const query = new URLSearchParams();
   if (filtro.estado) query.set("estado", filtro.estado);
   query.set("limit", String(filtro.limit ?? 200));
   const qs = query.toString();
+  const toleraNoAutorizado = opts.toleraNoAutorizado ?? false;
   return useConsulta<OrdenRow[]>(
     async (signal) => {
-      const r = await ordenesFetch<{ ordenes: OrdenRow[] }>(`?${qs}`, { signal });
+      const r = await ordenesFetch<{ ordenes: OrdenRow[] }>(`?${qs}`, { signal, toleraNoAutorizado });
       return r?.ordenes ?? [];
     },
-    [qs],
+    [qs, toleraNoAutorizado],
   );
 }

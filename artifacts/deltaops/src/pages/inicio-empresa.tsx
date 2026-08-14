@@ -46,7 +46,6 @@ import { AppShellIdentidad } from "@/lib/identidad/AppShell";
 import { useSesionActiva, useSesion } from "@/lib/identidad/sesion";
 import {
   landingOperacional,
-  modulosVisibles,
   nombreRol,
   moduloHabilitado,
   esAdminEmpresa,
@@ -101,6 +100,60 @@ function Saludo({ sesion }: { sesion: Sesion }) {
         {" · "}
         <Badge variant="info">{nombreRol(sesion.rol)}</Badge>
       </p>
+    </Section>
+  );
+}
+
+/* --------------------- ¿Qué necesita tu atención? ---------------------- */
+
+/**
+ * DELTAOPS LITE-03 §2 · Encabezado ACCIONABLE del inicio. Responde "¿qué
+ * necesita tu atención?" con las señales reales del resumen (SLA vencido/en
+ * riesgo, sin asignar, críticas) traducidas a tarjetas con acción directa a la
+ * superficie que resuelve cada una. Es composición pura sobre `alertasOperacionales`
+ * (sin sistema de alertas nuevo). Si no hay nada urgente, muestra un estado
+ * positivo honesto en lugar de vacío frío. Los destinos son deep links a las
+ * bandejas de Órdenes ya existentes: no se crean rutas.
+ */
+function AtencionAhora({ resumen }: { resumen: ResumenOperacional | null }) {
+  const alertas = resumen ? alertasOperacionales(resumen) : [];
+  // Destino accionable por señal, SIEMPRE a una bandeja REAL existente del
+  // Centro de Operaciones (BANDEJAS de ordenes/constantes). No se inventan
+  // bandejas: "sin asignar" no tiene bandeja propia → se dirige a la lista
+  // general de Órdenes, donde el filtro de responsable ya está disponible.
+  const rutaPorClave: Record<string, string> = {
+    "sla-vencido": urlBandejaOrdenes("vencer"),
+    "sla-riesgo": urlBandejaOrdenes("vencer"),
+    "sin-asignar": "/ordenes",
+    criticas: urlBandejaOrdenes("criticas"),
+  };
+  return (
+    <Section titulo="¿Qué necesita tu atención?">
+      {alertas.length === 0 ? (
+        <Alert variant="info" titulo="Todo bajo control">
+          No hay órdenes vencidas, en riesgo, sin asignar ni críticas en este momento.
+        </Alert>
+      ) : (
+        <div style={gridAuto(240)}>
+          {alertas.map((a) => (
+            <Card key={a.clave} style={{ borderColor: a.tono === "error" ? "var(--do-error)" : undefined }}>
+              <CardContent>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)" }}>
+                  <Badge variant={a.tono}>{a.cantidad}</Badge>
+                  <strong style={{ fontSize: "var(--do-text-base)" }}>{a.titulo}</strong>
+                </div>
+                <div style={{ marginTop: "var(--do-sp-3)" }}>
+                  <Link href={rutaPorClave[a.clave] ?? "/ordenes"}>
+                    <Button variant="secundario" size="md" style={botonTactil}>
+                      Revisar <ArrowRight size={16} aria-hidden="true" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </Section>
   );
 }
@@ -406,42 +459,6 @@ function PuntoDePartida({ sesion }: { sesion: Sesion }) {
   );
 }
 
-/* ---------------------------- Módulos grid ----------------------------- */
-
-function ModulosSeccion({ sesion }: { sesion: Sesion }) {
-  const modulos = modulosVisibles(sesion);
-  return (
-    <Section titulo="Módulos disponibles">
-      {modulos.length === 0 ? (
-        <EmptyState
-          titulo="Sin módulos habilitados"
-          descripcion="Tu empresa aún no tiene módulos operativos habilitados. Contacta a tu administrador."
-        />
-      ) : (
-        <div style={gridAuto(240)}>
-          {modulos.map((m) => (
-            <Card key={m.modulo}>
-              <CardContent>
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
-                  <h3 style={{ margin: 0, fontSize: "var(--do-text-lg)" }}>{m.nombre}</h3>
-                  <p style={{ margin: 0, color: "var(--do-texto-suave)" }}>Ir a {m.nombre}.</p>
-                  <div>
-                    <Link href={m.ruta}>
-                      <Button variant="secundario" size="md" style={botonTactil}>
-                        Abrir <ArrowRight size={16} aria-hidden="true" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </Section>
-  );
-}
-
 /* -------------------------- Administración ----------------------------- */
 
 function AdministracionSeccion() {
@@ -669,8 +686,15 @@ function ContenidoInicio() {
   const sesion = useSesionActiva();
   const tieneOrdenes = moduloHabilitado(sesion, "ordenes");
 
-  // Read model REAL de órdenes (sólo si el módulo está habilitado).
-  const { datos, cargando, error, recargar } = useOrdenesGlobal(tieneOrdenes ? { limit: 200 } : { limit: 0 });
+  // Read model REAL de órdenes (sólo si el módulo está habilitado). Es el
+  // CONTENIDO que se dispara al montar la Home tras login: `toleraNoAutorizado`
+  // evita que un 401 transitorio (cookie recién emitida aún no propagada) haga
+  // una redirección DURA a /login y deje al usuario varado allí; la autoridad de
+  // sesión (useSesion) es la única que redirige. Ver LITE-03 · fix carrera.
+  const { datos, cargando, error, recargar } = useOrdenesGlobal(
+    tieneOrdenes ? { limit: 200 } : { limit: 0 },
+    { toleraNoAutorizado: true },
+  );
   const ahora = Date.now();
   const ordenes = datos ?? [];
   const resumen = useMemo(
@@ -706,6 +730,13 @@ function ContenidoInicio() {
         <FocoTecnico sesion={sesion} ordenesPropias={ordenesPropias} ahora={ahora} />
       )}
 
+      {/*
+        LITE-03 §2 · PRIMER PLANO ACCIONABLE. Lo urgente ("¿qué necesita tu
+        atención?") encabeza la experiencia de todos los roles con Órdenes; el
+        punto de partida operacional lo sigue para roles no-técnicos.
+      */}
+      {tieneOrdenes && !cargando && !error && <AtencionAhora resumen={resumen} />}
+
       {!esTecnico && <PuntoDePartida sesion={sesion} />}
 
       {tieneOrdenes && (
@@ -737,9 +768,13 @@ function ContenidoInicio() {
 
       <AccesosRapidos sesion={sesion} />
 
+      {/*
+        SEGUNDO PLANO · exploración. LITE-03 §1 retira la parrilla "Módulos
+        disponibles" del primer plano (la navegación por proceso ya cubre el
+        descubrimiento de módulos). Se conserva "Explorar por módulo" como
+        acceso secundario a integraciones profundas, más abajo en el flujo.
+      */}
       <IntegracionesSeccion sesion={sesion} />
-
-      <ModulosSeccion sesion={sesion} />
 
       {esAdminEmpresa(sesion.rol) && <AdministracionSeccion />}
     </div>

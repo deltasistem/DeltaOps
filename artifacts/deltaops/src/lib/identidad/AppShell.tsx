@@ -24,12 +24,14 @@ import {
   AppShell,
   type DropdownItem,
 } from "@workspace/design-system";
-import { Building2, UserCircle, Palette } from "lucide-react";
+import { Building2, UserCircle, Palette, MapPin } from "lucide-react";
 import { useSesion } from "./sesion";
 import { OpcionesApariencia } from "./SelectorApariencia";
 import { BrandingProvider, useBranding } from "./branding";
-import { esAdminEmpresa, esSuperAdmin, modulosVisibles, nombreRol } from "./rbac";
+import { esAdminEmpresa, esSuperAdmin, gruposNavegacion, nombreRol } from "./rbac";
 import { utilizacionVisible } from "../utilizacion/capacidades";
+import { useCatalogo } from "../activos/hooks";
+import { CentroCostosProvider, useCentroCostos, CENTRO_TODOS, type OpcionCentro } from "../centro/contexto";
 import type { Sesion } from "./tipos";
 
 /* --------------------------------- Marca -------------------------------- */
@@ -201,48 +203,86 @@ function MenuPerfil({ sesion }: { sesion: Sesion }) {
   );
 }
 
+/* --------------------------- Selector de centro ------------------------- */
+
+/**
+ * DELTAOPS LITE-03 §3 · Contexto de CENTRO DE COSTOS en la barra. Valores REALES
+ * del catálogo `centros-costo`; si está vacío no se muestra (estado vacío
+ * honesto). Sólo cambia el contexto de navegación (estado cliente): jamás
+ * duplica activos ni datos. Reutiliza el `Select` del DS (tokenizado, legible en
+ * claro/oscuro) para no introducir un control nuevo.
+ */
+function SelectorCentro() {
+  const { centro, setCentro, opciones } = useCentroCostos();
+  if (opciones.length === 0) return null;
+  return (
+    <label
+      style={{ display: "inline-flex", alignItems: "center", gap: "var(--do-sp-2)", color: "var(--do-shell-texto)" }}
+    >
+      <MapPin size={16} aria-hidden="true" />
+      <span className="do-solo-desktop" style={{ fontSize: "var(--do-text-xs)" }}>
+        Centro de costos
+      </span>
+      <span style={{ minWidth: 180, display: "inline-block" }}>
+        <Select
+          size="sm"
+          value={centro}
+          onChange={(e) => setCentro(e.target.value)}
+          aria-label="Centro de costos activo"
+        >
+          <option value={CENTRO_TODOS}>Todos los centros</option>
+          {opciones.map((o) => (
+            <option key={o.valor} value={o.valor}>
+              {o.etiqueta}
+            </option>
+          ))}
+        </Select>
+      </span>
+    </label>
+  );
+}
+
 /* ------------------------------ Navegación ------------------------------ */
 
 function esActiva(location: string, ruta: string): boolean {
   return location === ruta || location.startsWith(ruta + "/");
 }
 
+/**
+ * DELTAOPS LITE-03 §1 · Navegación agrupada por PROCESO. Cada grupo muestra su
+ * título y sus ítems (rutas existentes) como enlaces visibles. En escritorio se
+ * despliega como clústeres horizontales; en móvil, el AppShell del DS la
+ * convierte en un cajón vertical. No se crean rutas ni se elimina ninguna: sólo
+ * se reagrupa la presentación por entitlement/capacidad reales.
+ */
 function Navegacion({ sesion }: { sesion: Sesion }) {
   const [location] = useLocation();
-  const modulos = modulosVisibles(sesion);
+  const grupos = gruposNavegacion(sesion, { utilizacionVisible: utilizacionVisible(sesion) });
   return (
     <>
       <Link href="/">
         <Button variant={location === "/" ? "primario" : "fantasma"} size="sm" aria-current={location === "/" ? "page" : undefined}>
-          Consola
+          Inicio
         </Button>
       </Link>
-      {modulos.map((m) => (
-        <Link key={m.modulo} href={m.ruta}>
-          <Button
-            variant={esActiva(location, m.ruta) ? "primario" : "fantasma"}
-            size="sm"
-            aria-current={esActiva(location, m.ruta) ? "page" : undefined}
-          >
-            {m.nombre}
-          </Button>
-        </Link>
+      {grupos.map((g) => (
+        <div key={g.clave} className="do-nav-grupo" role="group" aria-label={g.titulo}>
+          <span className="do-nav-grupo__titulo">{g.titulo}</span>
+          <div className="do-nav-grupo__items">
+            {g.items.map((it) => (
+              <Link key={it.clave} href={it.ruta}>
+                <Button
+                  variant={esActiva(location, it.ruta) ? "primario" : "fantasma"}
+                  size="sm"
+                  aria-current={esActiva(location, it.ruta) ? "page" : undefined}
+                >
+                  {it.nombre}
+                </Button>
+              </Link>
+            ))}
+          </div>
+        </div>
       ))}
-      {/* DGP-019.1 · Módulo emergente Utilización: se muestra sólo con el
-          entitlement "utilizacion" del tenant Y capacidad de lectura del rol.
-          El tipo `Modulo` del contrato de identidad aún no lo enumera, por eso
-          se gobierna con un guard de presentación dedicado. */}
-      {utilizacionVisible(sesion) && (
-        <Link href="/utilizacion/lecturas">
-          <Button
-            variant={esActiva(location, "/utilizacion") ? "primario" : "fantasma"}
-            size="sm"
-            aria-current={esActiva(location, "/utilizacion") ? "page" : undefined}
-          >
-            Utilización
-          </Button>
-        </Link>
-      )}
     </>
   );
 }
@@ -254,26 +294,43 @@ export interface AppShellIdentidadProps {
 }
 
 function ShellInterno({ sesion, children }: { sesion: Sesion; children: React.ReactNode }) {
+  // Catálogo REAL de centros de costos (módulo Activos). Degradación elegante:
+  // sin datos o sin módulo → sin opciones → el selector no se muestra.
+  const puedeCentro = sesion.modulos.includes("activos");
+  // `toleraNoAutorizado`: este catálogo es SÓLO de presentación (selector de
+  // centro) y se dispara al montar el shell, justo tras login/logout→login. Un
+  // 401 transitorio (cookie de sesión aún no propagada a esta petición inmediata)
+  // NO debe arrastrar el navegador a /login: eso reventaba la navegación a la
+  // Home de forma intermitente. La AUTORIDAD de sesión es `useSesion`; aquí el
+  // 401 se degrada a "sin opciones" y el selector simplemente no se muestra.
+  const catCentros = useCatalogo(puedeCentro ? "centros-costo" : "", { toleraNoAutorizado: true });
+  const opcionesCentro: OpcionCentro[] = (catCentros.datos ?? []).map((o) => ({
+    valor: o.valor,
+    etiqueta: o.etiqueta,
+  }));
   return (
     <BrandingProvider tenant={sesion.tenant}>
-      <div className="do-root">
-        <AppShell
-          logo={<Marca />}
-          nav={<Navegacion sesion={sesion} />}
-          labelNav="Módulos habilitados"
-          acciones={
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-3)" }}>
-              {sesion.tenant.estado && sesion.tenant.estado.toUpperCase() !== "ACTIVO" && (
-                <Badge variant="advertencia">Empresa {sesion.tenant.estado}</Badge>
-              )}
-              <SelectorEmpresa sesion={sesion} />
-              <MenuPerfil sesion={sesion} />
-            </div>
-          }
-        >
-          {children}
-        </AppShell>
-      </div>
+      <CentroCostosProvider tenantId={sesion.tenant.id} opciones={opcionesCentro}>
+        <div className="do-root">
+          <AppShell
+            logo={<Marca />}
+            nav={<Navegacion sesion={sesion} />}
+            labelNav="Navegación por proceso"
+            acciones={
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-3)" }}>
+                {sesion.tenant.estado && sesion.tenant.estado.toUpperCase() !== "ACTIVO" && (
+                  <Badge variant="advertencia">Empresa {sesion.tenant.estado}</Badge>
+                )}
+                <SelectorCentro />
+                <SelectorEmpresa sesion={sesion} />
+                <MenuPerfil sesion={sesion} />
+              </div>
+            }
+          >
+            {children}
+          </AppShell>
+        </div>
+      </CentroCostosProvider>
     </BrandingProvider>
   );
 }

@@ -12,7 +12,7 @@ import React, { useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
   PageHeader, Section, Card, CardContent, CardHeader, Tabs, Table, Badge,
-  Button, Spinner, EmptyState, ErrorState, Modal, Alert, Timeline,
+  Button, Spinner, EmptyState, ErrorState, Modal, Alert, Timeline, Select,
 } from "@workspace/design-system";
 import type { TimelineTono } from "@workspace/design-system";
 import { ShellCorrectivo } from "../lib/correctivo/Shell";
@@ -141,10 +141,10 @@ export function AccionesWorkflow({ solicitud, onCambio }: { solicitud: Solicitud
             <label style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)" }}>
               <span>Motivo (obligatorio)</span>
               {opcionesMotivo.length > 0 && (
-                <select value={motivo} onChange={(e) => setMotivo(e.target.value)} style={{ padding: "var(--do-sp-2)" }}>
+                <Select value={motivo} onChange={(e) => setMotivo(e.target.value)} aria-label="Motivo">
                   <option value="">— Selecciona un motivo —</option>
                   {opcionesMotivo.map((m) => <option key={m.clave} value={m.etiqueta}>{m.etiqueta}</option>)}
-                </select>
+                </Select>
               )}
               <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} placeholder="Describe el motivo" style={{ padding: "var(--do-sp-2)" }} />
             </label>

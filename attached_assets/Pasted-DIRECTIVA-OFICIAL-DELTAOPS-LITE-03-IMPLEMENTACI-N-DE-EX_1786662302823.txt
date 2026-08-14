@@ -1,0 +1,720 @@
+DIRECTIVA OFICIAL — DELTAOPS LITE-03
+«IMPLEMENTACIÓN DE EXPERIENCIA OPERACIONAL, NAVEGACIÓN Y UX/UI»
+
+CONTEXTO
+
+Dirección aprueba iniciar la implementación de DeltaOps Lite sobre el producto DeltaOps existente.
+
+IMPORTANTE:
+NO se debe reconstruir la aplicación.
+NO se deben crear módulos paralelos.
+NO se deben eliminar capacidades existentes.
+NO se deben crear tablas, contratos, servicios o dominios nuevos salvo que el código real demuestre que son estrictamente necesarios.
+
+El objetivo de esta fase es transformar la experiencia actual de DeltaOps para que sea mucho más sencilla, operacional, agradable y adecuada para una empresa de mantenimiento de equipos y maquinaria.
+
+La plataforma seguirá siendo técnicamente robusta, pero la experiencia del usuario debe ser simple.
+
+DOCUMENTOS BASE OBLIGATORIOS
+
+Antes de modificar código, leer y utilizar como fuente:
+
+- docs/dgp/DELTAOPS-LITE-01-DISCOVERY.md
+- docs/dgp/DELTAOPS-LITE-02-DISEÑO-FUNCIONAL-UX.md
+- documentos anteriores de DGP relacionados con arquitectura, RBAC, RLS, activos, órdenes, costos, utilización, inventario y analytics.
+
+No inventar funcionalidades que no estén sustentadas por el código existente o por esta directiva.
+
+DECISIONES DE DIRECCIÓN
+
+1. MULTICENTRO
+
+DeltaOps es utilizado por una misma empresa/tenant que puede tener múltiples centros de costos.
+
+Los centros de costos pueden tener:
+
+- diferentes equipos de mantenimiento;
+- diferentes responsables;
+- diferentes ubicaciones;
+- diferentes formas de asignar, ejecutar, revisar o aprobar trabajos.
+
+Un activo pertenece a un contexto de centro de costos, pero CENTRO DE COSTOS, UBICACIÓN, RESPONSABLE y EQUIPO/GRUPO DE MANTENIMIENTO son dimensiones independientes.
+
+No asumir que centro de costos = ubicación.
+
+No asumir que centro de costos = equipo de mantenimiento.
+
+No asumir que existe un coordinador de mantenimiento en todos los centros.
+
+2. SEGREGACIÓN DE FUNCIONES
+
+En algunos centros puede existir una estructura donde una persona asigna, supervisa y aprueba.
+
+En otros puede existir segregación entre:
+
+- quien solicita;
+- quien asigna;
+- quien ejecuta;
+- quien revisa;
+- quien aprueba/cierra.
+
+NO implementar una jerarquía rígida.
+
+Utilizar las capacidades existentes de RBAC, permisos, aprobaciones y grupos.
+
+La experiencia debe adaptarse al rol/capacidad disponible del usuario y al contexto del centro.
+
+No crear un rol OPERADOR en esta fase.
+
+3. APTO CON OBSERVACIONES
+
+La decisión de negocio queda establecida para DeltaOps Lite:
+
+- APTO: puede continuar operación normal.
+- APTO CON OBSERVACIONES: puede continuar operación, pero quedan observaciones registradas para seguimiento.
+- NO APTO: existe una condición que impide continuar operación y debe generarse/derivarse un hallazgo para mantenimiento.
+
+Los ítems críticos del checklist serán tratados posteriormente en la fase específica del PREOPERACIONAL.
+
+NO implementar todavía la lógica completa de checklist/preoperacional en LITE-03.
+
+OBJETIVO DE LITE-03
+
+Rediseñar la experiencia existente sin cambiar el dominio.
+
+La aplicación debe sentirse como:
+
+«Centro de control de mantenimiento de Delta»
+
+y no como:
+
+«ERP con muchos módulos independientes».
+
+==================================================
+1. NUEVA ARQUITECTURA DE NAVEGACIÓN
+==================================================
+
+Reducir la navegación visual actual.
+
+La navegación debe organizarse alrededor del proceso operacional y no alrededor de la arquitectura técnica interna.
+
+Propuesta base:
+
+INICIO
+
+MANTENIMIENTO
+- Órdenes
+- Preventivo
+- Correctivo
+
+EQUIPOS
+- Activos
+- Utilización
+
+INVENTARIO
+- Inventario
+- Abastecimiento
+
+INDICADORES
+- Analytics
+- Costos
+
+ADMINISTRACIÓN
+- Configuración
+- Usuarios/permisos
+- Catálogos
+(según permisos reales)
+
+No mostrar todos estos elementos necesariamente como botones independientes en la barra superior.
+
+Utilizar navegación agrupada, menú lateral o menú contextual según el patrón existente y el resultado del Discovery.
+
+La navegación debe ser por PERFIL/CAPACIDAD, no simplemente mostrar todo y esconder funciones después.
+
+Un técnico no debe sentirse frente a una aplicación administrativa.
+
+Un administrador debe tener acceso a las capacidades administrativas que realmente necesita.
+
+CONSULTA debe permanecer como experiencia de lectura.
+
+SUPER_ADMIN debe conservar su consola independiente.
+
+No romper ninguna ruta existente.
+
+==================================================
+2. NUEVA HOME / INICIO
+==================================================
+
+Transformar la pantalla actual.
+
+La pregunta principal de la Home debe ser:
+
+«¿Qué necesita mi atención?»
+
+y no:
+
+«¿Qué módulo quiero abrir?»
+
+La Home debe priorizar:
+
+1. Trabajos pendientes.
+2. Órdenes en ejecución.
+3. Equipos con problemas.
+4. Preoperacionales pendientes.
+5. Alertas.
+6. Acciones rápidas.
+
+Mantener indicadores útiles, pero reducir el protagonismo de tarjetas puramente administrativas.
+
+Ejemplo conceptual:
+
+BUENOS DÍAS, CARLOS
+
+Centro de costos:
+[Todos ▼]
+
+--------------------------------
+
+QUÉ NECESITA TU ATENCIÓN
+
+🔴 2 equipos con novedad
+🟡 4 órdenes pendientes
+🟢 8 equipos disponibles
+
+--------------------------------
+
+ACCIONES RÁPIDAS
+
+[Iniciar preoperacional]
+[Ver mis órdenes]
+[Buscar equipo]
+[Crear solicitud]
+
+--------------------------------
+
+ACTIVIDAD
+
+Últimas órdenes
+Últimos hallazgos
+Últimos mantenimientos
+
+Los botones deben llevar directamente a la acción correspondiente.
+
+No crear datos ficticios para llenar la interfaz.
+
+Si no existen datos, mostrar estados vacíos honestos.
+
+==================================================
+3. CONTEXTO DE CENTRO DE COSTOS
+==================================================
+
+El usuario debe poder trabajar con el contexto:
+
+«Todos los centros»
+
+o con un centro específico.
+
+Ejemplo:
+
+CENTRO DE COSTOS
+[ Todos los centros ▼ ]
+
+[ Barranquilla ]
+[ Cartagena ]
+[ Santa Marta ]
+[ Otro ]
+
+Los valores deben provenir de los datos reales existentes.
+
+No crear centros ficticios.
+
+El selector de centro debe actuar como filtro/contexto de navegación cuando técnicamente sea posible.
+
+IMPORTANTE:
+
+Cambiar el centro no debe duplicar activos.
+
+Un activo continúa siendo un único registro.
+
+El centro es contexto operativo.
+
+No modificar todavía el modelo de datos salvo que el código real demuestre que el contexto no puede implementarse reutilizando el dominio existente.
+
+==================================================
+4. ACTIVOS
+==================================================
+
+Simplificar considerablemente la pantalla de Activos.
+
+La pantalla actual contiene demasiados filtros visibles.
+
+No mostrar inicialmente nueve filtros.
+
+Priorizar:
+
+[ Buscar equipo, placa, código o nombre ]
+
+Filtros secundarios:
+
+- Centro de costos
+- Estado
+- Tipo
+- Ubicación
+
+Los filtros avanzados pueden permanecer disponibles mediante:
+
+[ Más filtros ]
+
+La tarjeta/fila de un activo debe priorizar:
+
+Código
+Nombre
+Tipo
+Centro de costos
+Ubicación
+Estado
+
+y una acción clara:
+
+[ Ver equipo ]
+
+No mostrar información técnica que no sea necesaria para la operación cotidiana.
+
+==================================================
+5. FICHA DEL EQUIPO
+==================================================
+
+La ficha de activo debe convertirse en una verdadera ficha operacional.
+
+Jerarquía recomendada:
+
+EQUIPO
+
+CAM-001
+Camión Kenworth T880
+
+🟢 OPERATIVO
+
+Centro de costos:
+Transporte
+
+Ubicación:
+Barranquilla
+
+Responsable:
+...
+
+Equipo de mantenimiento:
+...
+
+--------------------------------
+
+ACCIONES
+
+[ Preoperacional ]
+[ Crear OT ]
+[ Ver historial ]
+[ Registrar novedad ]
+
+--------------------------------
+
+ESTADO DEL EQUIPO
+
+Último mantenimiento
+Próximo mantenimiento
+Horómetro
+Kilometraje
+
+--------------------------------
+
+HISTORIAL
+
+Mantenimientos
+Órdenes
+Hallazgos
+Utilización
+Costos
+
+Reutilizar las fuentes existentes.
+
+No inventar información.
+
+==================================================
+6. EXPERIENCIA VISUAL
+==================================================
+
+Esta parte es PRIORITARIA.
+
+La aplicación debe verse profesional, moderna y coherente con Delta.
+
+Utilizar el Design System existente y sus tokens --do-*.
+
+No crear un segundo sistema visual.
+
+Mantener la identidad de Delta, pero mejorar:
+
+- jerarquía visual;
+- espaciado;
+- tipografía;
+- botones;
+- tarjetas;
+- tablas;
+- formularios;
+- navegación;
+- estados;
+- mensajes;
+- iconografía;
+- responsive.
+
+Evitar:
+
+- apariencia de ERP genérico;
+- exceso de bordes;
+- exceso de tarjetas;
+- pantallas llenas de filtros;
+- botones pequeños;
+- textos técnicos innecesarios;
+- interfaces visualmente densas.
+
+La aplicación debe sentirse como software operacional moderno.
+
+==================================================
+7. TEMA CLARO Y OSCURO
+==================================================
+
+CORREGIR la experiencia visual del tema oscuro.
+
+El usuario reportó problemas reales:
+
+- logo que pierde contraste;
+- textos poco visibles;
+- opciones/selects difíciles de leer;
+- controles nativos inconsistentes.
+
+No basta con cambiar colores del fondo.
+
+Auditar:
+
+- logo;
+- textos;
+- textos secundarios;
+- labels;
+- inputs;
+- selects;
+- dropdowns;
+- tablas;
+- badges;
+- estados;
+- botones;
+- focus;
+- hover;
+- disabled;
+- mensajes;
+- modales.
+
+Los elementos deben mantener contraste suficiente.
+
+Reutilizar la autoridad de tema existente.
+
+NO crear un segundo sistema de temas.
+
+Para selects nativos, aplicar la solución más compatible con el Design System existente.
+
+Si los selects nativos no permiten una experiencia consistente entre navegadores, reemplazarlos por el componente de selección existente del Design System cuando corresponda.
+
+==================================================
+8. RESPONSIVE / MOBILE FIRST
+==================================================
+
+La aplicación será utilizada desde teléfonos durante la operación.
+
+Prioridad:
+
+390px
+768px
+1280px
+
+La experiencia móvil debe ser operacional.
+
+Evitar:
+
+- tablas imposibles de leer;
+- botones diminutos;
+- navegación horizontal excesiva;
+- formularios interminables;
+- filtros ocupando toda la pantalla.
+
+En móvil:
+
+- acciones principales visibles;
+- información secundaria colapsable;
+- tarjetas simplificadas;
+- navegación accesible;
+- botones táctiles.
+
+No realizar una versión móvil independiente.
+
+==================================================
+9. LENGUAJE DE LA INTERFAZ
+==================================================
+
+Usar lenguaje operacional sencillo.
+
+Preferir:
+
+«Equipo»
+«Orden de trabajo»
+«Novedad»
+«Mantenimiento»
+«Pendiente»
+«En ejecución»
+«Finalizada»
+
+Evitar exponer al usuario términos internos como:
+
+- DGP
+- CQRS
+- RLS
+- tenant
+- contrato
+- snapshot
+- outbox
+- kernel
+- principal
+
+Estos términos pueden existir internamente pero jamás deben dominar la interfaz.
+
+==================================================
+10. REGLA DE ORO DE ESTA FASE
+==================================================
+
+NO crear una nueva aplicación.
+
+Transformar la aplicación existente.
+
+Antes de implementar cualquier componente:
+
+1. buscar si ya existe;
+2. reutilizarlo;
+3. adaptarlo;
+4. solamente crear uno nuevo si realmente no existe.
+
+No duplicar componentes ni lógica.
+
+==================================================
+11. ALCANCE ESTRICTO
+==================================================
+
+LITE-03 SOLO incluye:
+
+- navegación;
+- Home;
+- contexto de centro de costos;
+- experiencia de activos;
+- experiencia de ficha de activo;
+- sistema visual;
+- tema claro/oscuro;
+- responsive;
+- lenguaje operacional;
+- componentes de interacción.
+
+LITE-03 NO incluye todavía:
+
+- implementación del preoperacional;
+- creación automática de OT;
+- checklist;
+- lógica APTO/NO APTO;
+- nuevos indicadores;
+- rediseño del motor de costos;
+- rediseño del inventario;
+- nuevos roles;
+- migraciones de base de datos innecesarias;
+- hardening de infraestructura;
+- cambios de RLS/RBAC.
+
+==================================================
+12. SEGURIDAD
+==================================================
+
+No relajar ninguna protección existente.
+
+No eliminar guards.
+
+No saltarse RBAC/RLS.
+
+No introducir acceso basado solamente en frontend.
+
+Toda autorización debe continuar dependiendo del backend existente.
+
+==================================================
+13. PRUEBAS
+==================================================
+
+Antes del cierre ejecutar:
+
+- tests existentes relevantes;
+- typecheck;
+- build;
+- pruebas de navegación;
+- pruebas de roles;
+- pruebas de centro de costos;
+- responsive 390/768/1280;
+- tema claro;
+- tema oscuro;
+- login/logout;
+- refresh;
+- navegación entre módulos.
+
+Validar al menos:
+
+SUPER_ADMIN
+TENANT_ADMIN
+SUPERVISOR
+PLANIFICADOR
+TECNICO
+CONSULTA
+
+No crear OPERADOR.
+
+==================================================
+14. E2E VISUAL
+==================================================
+
+Realizar recorrido real en navegador.
+
+Como mínimo:
+
+Login
+→ Home
+→ cambiar centro
+→ Activos
+→ buscar equipo
+→ abrir ficha
+→ volver Home
+→ Órdenes
+→ cambiar tema
+→ logout
+→ login nuevamente.
+
+Capturar evidencia de:
+
+- escritorio;
+- móvil 390px;
+- tema claro;
+- tema oscuro.
+
+==================================================
+15. CONTROL DE COSTOS / TOKENS
+==================================================
+
+Esta directiva es deliberadamente limitada.
+
+NO realizar refactorizaciones masivas sin necesidad.
+
+NO modificar archivos que no estén relacionados con el alcance.
+
+NO actualizar dependencias salvo necesidad técnica demostrada.
+
+NO crear nuevas tablas ni migraciones.
+
+NO tocar infraestructura.
+
+NO implementar funcionalidades de LITE-04/LITE-05/LITE-06.
+
+Si se encuentra un problema fuera del alcance:
+
+DOCUMENTARLO Y DETENERSE respecto de ese punto.
+
+No solucionarlo por iniciativa propia.
+
+==================================================
+16. CRITERIO DE ÉXITO
+==================================================
+
+LITE-03 será PASS si:
+
+- La navegación es más simple.
+- La Home es accionable.
+- El contexto de centro de costos es claro.
+- Activos tiene una experiencia mucho más limpia.
+- La ficha del equipo prioriza operación.
+- El tema claro funciona.
+- El tema oscuro funciona correctamente.
+- Logo y textos tienen contraste.
+- Los controles son legibles.
+- La experiencia móvil es usable.
+- Los 6 roles existentes conservan sus permisos.
+- No se rompe ninguna funcionalidad existente.
+- No se crean módulos paralelos.
+- No se crean datos ficticios.
+- Tests/typecheck/build pasan.
+- E2E real pasa.
+- El cambio visual se mantiene dentro del Design System Delta.
+
+==================================================
+17. REVISIÓN ARQUITECTÓNICA OBLIGATORIA
+==================================================
+
+Antes del cierre realizar una revisión independiente.
+
+El revisor debe comprobar:
+
+- alcance;
+- ausencia de cambios de dominio;
+- ausencia de migraciones innecesarias;
+- RBAC/RLS intactos;
+- navegación;
+- centro de costos;
+- responsive;
+- tema oscuro;
+- accesibilidad;
+- regresiones.
+
+Si encuentra un cambio fuera de alcance:
+
+corregirlo antes del PASS o documentarlo como GAP.
+
+==================================================
+18. CIERRE
+
+Al finalizar entregar:
+
+# Informe Oficial de Cierre — DELTAOPS LITE-03
+
+Debe incluir:
+
+1. qué se modificó;
+2. archivos modificados;
+3. funcionalidades afectadas;
+4. componentes reutilizados;
+5. centro de costos;
+6. navegación por perfil;
+7. cambios visuales;
+8. tema claro/oscuro;
+9. responsive;
+10. pruebas;
+11. E2E;
+12. revisión independiente;
+13. GAPs;
+14. commits;
+15. estado final.
+
+NO iniciar LITE-04 automáticamente.
+
+DETENERSE Y ESPERAR APROBACIÓN EXPLÍCITA DE DIRECCIÓN.
+
+La prioridad de este trabajo es:
+
+SIMPLICIDAD OPERACIONAL
+>
+EXPERIENCIA DE USUARIO
+>
+REUTILIZACIÓN DEL CÓDIGO EXISTENTE
+>
+ESTÉTICA
+>
+NUEVAS FUNCIONALIDADES
+
+No convertir DeltaOps Lite en un producto más grande.
+
+Convertir DeltaOps en un producto que la gente de mantenimiento realmente quiera usar.

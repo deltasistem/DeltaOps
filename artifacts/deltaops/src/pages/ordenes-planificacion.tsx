@@ -21,6 +21,7 @@ import {
   EmptyState,
   Alert,
   Modal,
+  Select,
   useToast,
 } from "@workspace/design-system";
 import { ShellOrdenes } from "../lib/ordenes/Shell";
@@ -207,15 +208,17 @@ function FiltroSelect({ etiqueta, valor, opciones, onCambio }: {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)", fontSize: "var(--do-text-sm)" }}>
       <span>{etiqueta}</span>
-      <select
-        value={valor}
-        onChange={(e) => onCambio(e.target.value)}
-        aria-label={`Filtrar por ${etiqueta.toLowerCase()}`}
-        style={{ padding: "var(--do-sp-2)", borderRadius: "var(--do-radius-sm)", border: "1px solid var(--do-borde)", minHeight: "var(--do-sp-10)", minWidth: 160 }}
-      >
-        <option value="">Todos</option>
-        {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <span style={{ minWidth: 160, display: "inline-block" }}>
+        <Select
+          size="sm"
+          value={valor}
+          onChange={(e) => onCambio(e.target.value)}
+          aria-label={`Filtrar por ${etiqueta.toLowerCase()}`}
+        >
+          <option value="">Todos</option>
+          {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+        </Select>
+      </span>
     </label>
   );
 }

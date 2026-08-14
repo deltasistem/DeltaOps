@@ -397,12 +397,28 @@
   width: 100%;
   border: none;
   outline: none;
-  background: transparent;
+  /* G-H · Popup nativo legible en tema oscuro: el <select> nativo hereda del
+     control tanto `color-scheme` como el par fondo/texto que el navegador usa
+     para pintar la lista desplegable de <option>. Con `transparent` + sin
+     `color-scheme`, en modo oscuro el popup salía con texto claro sobre fondo
+     claro (ilegible). Se fijan superficie/texto tokenizados y se hereda el
+     `color-scheme` efectivo del tema (definido en tokens.css sobre :root/.dark),
+     de modo que la lista use los colores nativos correctos del sistema. */
+  color-scheme: inherit;
+  background: var(--do-surface);
   color: var(--do-texto);
   font-family: var(--do-font-secundaria);
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+}
+/* Cada opción del popup nativo con superficie/texto explícitos del tema, para
+   navegadores que respetan el estilado de <option> (Chromium). En los que no
+   (Safari/Firefox), `color-scheme` heredado garantiza igualmente el contraste. */
+.do-select__control option,
+.do-select__control optgroup {
+  background: var(--do-surface);
+  color: var(--do-texto);
 }
 .do-select--md .do-select__control { height: var(--do-control-md); padding: 0 var(--do-sp-8) 0 var(--do-sp-3); font-size: var(--do-text-sm); }
 .do-select--sm .do-select__control { height: var(--do-control-sm); padding: 0 var(--do-sp-8) 0 var(--do-sp-2); font-size: var(--do-text-xs); }
