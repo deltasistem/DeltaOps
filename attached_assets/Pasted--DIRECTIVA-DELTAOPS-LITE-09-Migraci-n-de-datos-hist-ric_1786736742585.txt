@@ -1,0 +1,798 @@
+# DIRECTIVA DELTAOPS LITE-09
+## Migración de datos históricos reales — Delta → DeltaOps Lite
+
+CONTEXTO
+
+DeltaOps Lite ya tiene implementadas las capacidades operacionales principales:
+
+- Activos
+- Horómetro / lecturas
+- Preoperacional y checklist
+- Hallazgos
+- Órdenes de mantenimiento
+- Ejecución y cierre
+- Combustible
+- Mano de obra
+- Consumo ligero de repuestos/insumos
+- Hoja de vida del activo
+- Rutinas por horómetro/kilometraje
+- Centros de costos
+- Navegación operacional
+- RBAC/RLS
+- Multitenancy
+
+Ahora necesitamos pasar de datos demo a DATOS REALES DE DELTA.
+
+Esta fase NO debe inventar información, NO debe borrar datos existentes y NO debe crear una arquitectura paralela.
+
+OBJETIVO
+
+Construir la capacidad de preparar e importar históricos reales provenientes de los archivos Excel operacionales de Delta, preservando:
+
+1. identidad del activo;
+2. continuidad histórica;
+3. fechas;
+4. horómetros;
+5. preoperacionales;
+6. mantenimientos;
+7. combustible;
+8. horas hombre;
+9. responsables;
+10. observaciones;
+11. procedencia del dato;
+12. trazabilidad de la importación.
+
+Los datos históricos deben terminar representados dentro de los modelos existentes de DeltaOps Lite y ser visibles en la hoja de vida del activo.
+
+NO queremos una pantalla que simplemente diga "Excel importado".
+
+Queremos que DeltaOps pueda comportarse como si esos registros hubieran sido cargados operacionalmente durante el tiempo, respetando las limitaciones propias de los datos históricos.
+
+==================================================
+1. ARCHIVOS FUENTE
+==================================================
+
+Los archivos fuente reales son:
+
+- CHECKLIST PRE OPERACIONAL DE CARGADOR (4).xlsx
+- CHECKLIST PRE OPERACIONAL DE MONTACARGAS (5).xlsx
+- CONTROL DE _COMBUSTIBLE RIVERPORT (2).xlsx
+- Formulario para el cargue de Horas Hombre (1).xlsx
+- PLAN DE MANTENIMIENTO PREVENTIVO CARGADORES V3.xlsx
+- PLAN DE MANTENIMIENTO PREVENTIVO MONTACARGAS V2.xlsx
+
+Si estos archivos existen dentro del proyecto, localízalos y analízalos directamente.
+
+NO inventes columnas.
+NO inventes registros.
+NO inventes equipos.
+NO inventes usuarios.
+NO inventes fechas.
+NO inventes mantenimientos.
+
+Antes de implementar cualquier importación, genera un análisis de estructura real de cada archivo.
+
+==================================================
+2. REGLA ABSOLUTA: LOS EXCEL SON FUENTE HISTÓRICA
+==================================================
+
+Los Excel contienen información operacional histórica real.
+
+Por tanto:
+
+- no convertir datos históricos en datos demo;
+- no generar registros aleatorios;
+- no alterar silenciosamente valores;
+- no reemplazar información por valores ficticios;
+- no eliminar información porque no tenga equivalencia inmediata.
+
+Cuando un campo no tenga correspondencia en DeltaOps:
+
+marcarlo como:
+
+NO MAPEADO / REQUIERE DECISIÓN
+
+y continuar con los campos que sí tengan correspondencia.
+
+==================================================
+3. IDENTIDAD DEL ACTIVO
+==================================================
+
+Esta regla es OBLIGATORIA.
+
+C11 y C11 SIGAR corresponden al MISMO activo.
+
+No crear dos activos.
+
+La evolución es:
+
+C11
+→ posteriormente C11 SIGAR
+
+La razón del cambio es operacional:
+
+- C11 era la identificación anterior;
+- posteriormente pasó a identificarse como C11 SIGAR;
+- es un equipo alquilado;
+- el mantenimiento no es responsabilidad de Delta;
+- Delta mantiene control operacional principalmente sobre combustible y la información que corresponda.
+
+Por tanto:
+
+ACTIVO CANÓNICO:
+C11
+
+NOMBRE ACTUAL:
+C11 SIGAR
+
+ALIAS HISTÓRICO:
+C11
+
+TENENCIA:
+ALQUILADO
+
+RESPONSABILIDAD DE MANTENIMIENTO:
+TERCERO
+
+NO crear un activo adicional.
+
+La búsqueda por "C11" y "C11 SIGAR" debe encontrar el mismo activo.
+
+La hoja de vida debe conservar la continuidad histórica.
+
+==================================================
+4. REGLA DE TENENCIA Y RESPONSABILIDAD
+==================================================
+
+No todos los activos tienen el mismo alcance operacional.
+
+Debe respetarse:
+
+ACTIVO PROPIO:
+
+- mantenimiento Delta;
+- preoperacional;
+- combustible si aplica;
+- horómetro;
+- rutinas;
+- OT;
+- hoja de vida completa.
+
+ACTIVO ALQUILADO CON MANTENIMIENTO DE TERCERO:
+
+- información del activo;
+- horómetro;
+- combustible si Delta lo controla;
+- operación/histórico que corresponda;
+- hoja de vida operacional;
+- NO generar automáticamente rutinas internas de mantenimiento Delta;
+- NO crear OT de mantenimiento propia por el simple hecho de importar históricos.
+
+La configuración debe depender del activo y no de código hardcodeado para C11.
+
+No crear una excepción específica "si código = C11".
+
+Debe utilizarse la dimensión existente o una composición mínima coherente con el dominio actual para representar responsabilidad/tenencia.
+
+Si el modelo actual no soporta completamente esta dimensión, documentar el GAP y utilizar únicamente lo que ya existe sin crear una estructura paralela innecesaria.
+
+==================================================
+5. ACTIVOS
+==================================================
+
+Construir el catálogo inicial de activos a partir de los archivos.
+
+Antes de crear registros:
+
+- consolidar nombres;
+- detectar duplicados;
+- normalizar identificadores;
+- identificar alias;
+- identificar activos propios/alquilados cuando la fuente lo permita;
+- determinar la última lectura conocida;
+- identificar ubicación/centro de costos cuando exista.
+
+No duplicar activos por diferencias de:
+
+- mayúsculas/minúsculas;
+- espacios;
+- nombres históricos;
+- sufijos;
+- denominaciones operacionales.
+
+Si existe una duda real de identidad:
+
+NO fusionar automáticamente.
+
+Registrar la duda para revisión.
+
+==================================================
+6. HORÓMETROS
+==================================================
+
+Importar el histórico de lecturas cuando exista.
+
+NO importar únicamente el último horómetro.
+
+Debe conservarse:
+
+- activo;
+- fecha;
+- hora si existe;
+- lectura;
+- fuente;
+- responsable si existe;
+- procedencia del archivo.
+
+Respetar los invariantes existentes:
+
+- lecturas append-only;
+- lecturas decrecientes no deben aceptarse como válidas;
+- no alterar lecturas históricas silenciosamente.
+
+Si existen lecturas inconsistentes:
+
+NO borrarlas.
+
+Marcar el registro como inconsistente o utilizar el mecanismo de regularización existente.
+
+La última lectura válida debe alimentar el estado actual del activo.
+
+==================================================
+7. PREOPERACIONALES
+==================================================
+
+Los archivos:
+
+- CHECKLIST PRE OPERACIONAL DE CARGADOR (4).xlsx
+- CHECKLIST PRE OPERACIONAL DE MONTACARGAS (5).xlsx
+
+contienen históricos reales de checklist.
+
+Analizar todas sus columnas.
+
+Mapear:
+
+- activo;
+- fecha;
+- hora;
+- persona;
+- horómetro;
+- respuestas;
+- observaciones;
+- resultado;
+- demás campos operacionales.
+
+No crear una estructura paralela de checklist.
+
+Utilizar el motor de Dynamic Forms / Preoperacional existente.
+
+IMPORTANTE:
+
+Los históricos deben quedar claramente identificados como históricos/importados cuando la identidad de usuario, evidencia o sellado de servidor no exista.
+
+NO falsificar:
+
+- usuario canónico;
+- firma;
+- timestamp de servidor;
+- fotografía;
+- evidencia.
+
+Si el Excel contiene el nombre de quien realizó el checklist, conservarlo como dato histórico de origen, aunque no sea posible convertirlo en identidad autenticada.
+
+==================================================
+8. MANTENIMIENTOS PREVENTIVOS
+==================================================
+
+Analizar:
+
+- PLAN DE MANTENIMIENTO PREVENTIVO CARGADORES V3.xlsx
+- PLAN DE MANTENIMIENTO PREVENTIVO MONTACARGAS V2.xlsx
+
+Separar claramente:
+
+A. Rutina/programación
+
+de
+
+B. Mantenimiento realmente ejecutado.
+
+Si el archivo demuestra que una rutina fue ejecutada:
+
+representarla como histórico de mantenimiento/preventivo utilizando las capacidades existentes.
+
+No convertir una planificación en una OT cerrada si la fuente no demuestra que la intervención ocurrió.
+
+No inventar:
+
+- órdenes;
+- técnicos;
+- costos;
+- repuestos;
+- tiempos.
+
+Cuando el Excel demuestre ejecución, importar lo que realmente exista.
+
+==================================================
+9. COMBUSTIBLE
+==================================================
+
+Archivo:
+
+CONTROL DE _COMBUSTIBLE RIVERPORT (2).xlsx
+
+Importar:
+
+- activo;
+- fecha;
+- hora;
+- cantidad;
+- unidad;
+- horómetro;
+- responsable;
+- proveedor;
+- identificación del proveedor si existe;
+- observaciones;
+- número/ticket/evidencia si existe.
+
+REGLA DE PROVEEDORES:
+
+NO crear un maestro obligatorio de proveedores.
+
+El proveedor debe conservarse como snapshot transaccional de texto, tal como fue registrado en la fuente.
+
+La misma máquina puede comprar/cargar combustible con proveedores diferentes.
+
+No forzar un catálogo de proveedores para esta importación.
+
+==================================================
+10. HORAS HOMBRE
+==================================================
+
+Archivo:
+
+Formulario para el cargue de Horas Hombre (1).xlsx
+
+Importar cuando exista correspondencia:
+
+- fecha;
+- activo;
+- operación;
+- material;
+- proveedor;
+- área;
+- horómetro inicial;
+- horómetro final;
+- turno;
+- responsable;
+- propio/tercerizado;
+- demás campos relevantes.
+
+Cuando exista horómetro inicial y final:
+
+permitir que DeltaOps derive la diferencia.
+
+NO reemplazar el dato original.
+
+Si existe una diferencia entre horas registradas y diferencia de horómetro:
+
+conservar ambos y no asumir cuál es correcto.
+
+==================================================
+11. HOJA DE VIDA
+==================================================
+
+La importación debe culminar en una hoja de vida realmente útil.
+
+Para cada activo debe ser posible visualizar, cuando existan datos:
+
+- identificación;
+- nombre;
+- estado;
+- tenencia;
+- ubicación;
+- centro de costos;
+- horómetro actual;
+- histórico de horómetro;
+- preoperacionales;
+- hallazgos;
+- mantenimientos;
+- órdenes;
+- combustible;
+- horas hombre;
+- consumos;
+- rutinas;
+- eventos relevantes.
+
+La hoja de vida debe ordenar cronológicamente los eventos.
+
+No crear una pantalla adicional de "históricos Excel".
+
+==================================================
+12. PROCEDENCIA
+==================================================
+
+Cada registro importado debe conservar procedencia.
+
+Como mínimo:
+
+- archivo origen;
+- tipo de información;
+- fila o identificador de origen cuando sea posible;
+- fecha de importación;
+- lote/importación.
+
+No necesitamos almacenar el archivo completo dentro de cada registro.
+
+Debe existir trazabilidad suficiente para responder:
+
+"¿De qué Excel salió este dato?"
+
+==================================================
+13. IDEMPOTENCIA
+==================================================
+
+La importación NO puede duplicar históricos al ejecutarse dos veces.
+
+Debe existir una clave determinista basada en la naturaleza del registro.
+
+Ejemplos:
+
+Activo:
+identificador canónico.
+
+Horómetro:
+activo + fecha/hora + lectura + origen.
+
+Combustible:
+activo + fecha/hora + cantidad + horómetro + origen.
+
+Checklist:
+activo + fecha/hora + identificador/origen.
+
+Horas hombre:
+identificador de origen o combinación determinista.
+
+Mantenimiento:
+activo + fecha + rutina + origen cuando aplique.
+
+NO utilizar timestamps actuales como parte de una clave que provoque duplicación.
+
+==================================================
+14. VALIDACIÓN ANTES DE IMPORTAR
+==================================================
+
+No permitir una importación masiva sin vista previa.
+
+Debe existir una etapa de:
+
+VALIDACIÓN
+
+con categorías:
+
+✓ Válido
+⚠ Requiere revisión
+✕ Rechazado
+
+Mostrar:
+
+- cantidad total;
+- registros válidos;
+- registros con advertencias;
+- registros rechazados;
+- activos nuevos;
+- activos existentes;
+- posibles duplicados;
+- inconsistencias de horómetro;
+- campos no mapeados.
+
+La importación definitiva debe requerir confirmación explícita.
+
+==================================================
+15. IMPORTACIÓN POR LOTES
+==================================================
+
+La carga debe realizarse por tipo de información y de forma controlada.
+
+No ejecutar una transacción gigante de miles de registros si el modelo actual no lo soporta.
+
+Preferir lotes controlados.
+
+Debe poder identificarse el lote de importación.
+
+Si una parte falla:
+
+- no dejar registros corruptos;
+- registrar el error;
+- permitir reintento seguro;
+- no duplicar lo que ya fue importado correctamente.
+
+==================================================
+16. SEGURIDAD
+==================================================
+
+No modificar:
+
+- RLS;
+- RBAC;
+- roles PostgreSQL;
+- arquitectura multitenant.
+
+La importación debe respetar el tenant.
+
+No aceptar tenantId arbitrario desde el archivo.
+
+El tenant debe venir del contexto autenticado.
+
+Solo perfiles autorizados podrán ejecutar importaciones.
+
+CONSULTA nunca puede importar.
+
+El backend siempre es autoridad.
+
+==================================================
+17. DATOS DEMO
+==================================================
+
+NO borrar datos demo automáticamente.
+
+Primero implementar la carga y validación.
+
+Si el proyecto ya tiene datos demo:
+
+mantenerlos durante la fase de desarrollo salvo que exista una instrucción explícita posterior de Dirección para sustituirlos.
+
+Debe existir una forma clara de diferenciar:
+
+- DEMO
+- HISTÓRICO REAL IMPORTADO
+
+No mezclar silenciosamente ambos.
+
+==================================================
+18. NO CREAR SOBREINGENIERÍA
+==================================================
+
+Esta fase NO debe convertirse en un ERP de importaciones.
+
+No crear:
+
+- ETL complejo externo;
+- nuevo sistema de proveedores;
+- nuevo sistema de activos;
+- nuevo sistema de mantenimiento;
+- nuevo motor de checklist;
+- nueva cola offline;
+- nueva base de datos;
+- nuevo módulo paralelo de hoja de vida.
+
+Componer sobre lo que ya existe.
+
+==================================================
+19. UX
+==================================================
+
+La pantalla de importación debe ser sencilla.
+
+Preferencia:
+
+Administración
+→ Datos históricos
+→ Importar
+
+Flujo:
+
+1. Seleccionar tipo
+2. Cargar Excel
+3. Analizar
+4. Vista previa
+5. Validar
+6. Confirmar
+7. Importar
+8. Resultado
+
+Debe funcionar correctamente en desktop.
+
+No es necesario convertir la administración de importaciones en una aplicación compleja.
+
+==================================================
+20. ARCHIVOS NO SOPORTADOS / CAMPOS DESCONOCIDOS
+==================================================
+
+Si una columna no tiene destino claro:
+
+NO descartarla silenciosamente.
+
+Mostrar:
+
+"Campo no mapeado"
+
+y registrar:
+
+- nombre del archivo;
+- columna;
+- cantidad de valores;
+- posible destino si puede inferirse con seguridad.
+
+==================================================
+21. REGLA DE HONESTIDAD
+==================================================
+
+Diferenciar siempre:
+
+VERIFICADO
+IMPORTADO
+DERIVADO
+NO DISPONIBLE
+NO MAPEADO
+NO VERIFICADO
+
+No afirmar que un mantenimiento fue ejecutado si el Excel únicamente demuestra que estaba programado.
+
+No afirmar que una persona autenticada realizó una acción histórica si solo tenemos su nombre escrito.
+
+No inventar fotografías.
+
+No inventar costos.
+
+No inventar OT.
+
+==================================================
+22. CRITERIO DE ÉXITO
+==================================================
+
+La fase será PASS únicamente si:
+
+1. Los seis Excel fueron analizados.
+2. Las columnas fueron clasificadas.
+3. Los activos fueron normalizados.
+4. C11/C11 SIGAR quedó como un solo activo.
+5. La diferencia de tenencia/responsabilidad quedó representada sin hardcode.
+6. Los históricos de horómetro se conservan.
+7. Los históricos de checklist se conservan.
+8. Los históricos de mantenimiento se conservan sin inventar ejecución.
+9. Los históricos de combustible se conservan.
+10. Las horas hombre se conservan.
+11. Los datos aparecen en la hoja de vida.
+12. Existe procedencia de cada registro importado.
+13. La importación es idempotente.
+14. Existen validaciones antes de confirmar.
+15. RLS/RBAC permanecen intactos.
+16. No se crean estructuras paralelas innecesarias.
+17. Typecheck pasa.
+18. Build pasa.
+19. Tests existentes pasan.
+20. Se ejecutan pruebas reales de importación.
+21. Se demuestra que una segunda importación no duplica.
+22. Se verifica al menos un activo real de cada tipo de fuente.
+23. Se documentan claramente los campos no mapeados.
+
+==================================================
+23. PRUEBA REAL OBLIGATORIA
+==================================================
+
+Antes del cierre, realizar una prueba con datos reales del proyecto.
+
+Como mínimo demostrar:
+
+ACTIVO:
+C11 / C11 SIGAR
+
+y otros activos reales presentes en los archivos.
+
+Demostrar:
+
+Activo
+→ Horómetro
+→ Preoperacional
+→ Combustible
+→ Horas hombre
+→ Mantenimiento
+→ Hoja de vida
+
+cuando exista información disponible para ese activo.
+
+Para C11/C11 SIGAR demostrar específicamente:
+
+- un único activo;
+- continuidad histórica;
+- cambio de denominación;
+- tenencia alquilada;
+- mantenimiento Delta no aplicable;
+- combustible conservado.
+
+==================================================
+24. DISCOVERY VS IMPLEMENTACIÓN
+==================================================
+
+Antes de modificar código:
+
+A. Analizar los seis archivos.
+B. Generar una matriz de mapeo interna/documental.
+C. Identificar GAPs reales.
+D. Verificar qué modelos existentes reciben cada dato.
+E. Solo después implementar.
+
+NO comenzar modificando código basándose en suposiciones.
+
+==================================================
+25. DOCUMENTACIÓN
+==================================================
+
+Crear:
+
+docs/dgp/DELTAOPS-LITE-09-DISCOVERY-MIGRACION.md
+
+antes de la implementación.
+
+Después crear:
+
+docs/dgp/DELTAOPS-LITE-09-CIERRE-MIGRACION.md
+
+El documento final debe incluir:
+
+- archivos analizados;
+- columnas;
+- mapeos;
+- reglas de normalización;
+- reglas de identidad;
+- C11/C11 SIGAR;
+- reglas de tenencia;
+- cantidad de registros procesados;
+- cantidad importada;
+- advertencias;
+- rechazados;
+- no mapeados;
+- pruebas;
+- idempotencia;
+- evidencia de hoja de vida;
+- limitaciones.
+
+==================================================
+26. RESTRICCIONES ABSOLUTAS
+==================================================
+
+NO:
+
+- borrar datos;
+- borrar tablas;
+- DROP;
+- modificar RLS;
+- modificar RBAC;
+- modificar roles PostgreSQL;
+- modificar OpenAPI existente salvo necesidad estrictamente justificada;
+- crear un sistema paralelo;
+- inventar datos;
+- convertir planificación en mantenimiento ejecutado;
+- crear proveedores maestros obligatorios;
+- crear OT ficticias;
+- crear fotografías ficticias.
+
+Si una decisión requiere negocio:
+
+DETENERSE Y PREGUNTAR.
+
+==================================================
+27. CIERRE
+==================================================
+
+Cuando termines:
+
+1. Ejecuta tests.
+2. Ejecuta typecheck.
+3. Ejecuta build.
+4. Realiza pruebas de importación.
+5. Ejecuta una segunda importación para probar idempotencia.
+6. Verifica hoja de vida.
+7. Ejecuta revisión independiente.
+8. Genera el informe oficial de cierre.
+9. NO inicies LITE-10 automáticamente.
+
+El informe debe decir exactamente qué quedó implementado y qué quedó pendiente.
+
+IMPORTANTE:
+
+Este prompt NO autoriza borrar los datos demo ni reemplazar producción.
+
+El objetivo de LITE-09 es conseguir una primera carga histórica REAL y segura sobre la arquitectura actual de DeltaOps Lite.
