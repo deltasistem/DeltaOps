@@ -1,0 +1,1293 @@
+# DIRECTIVA OFICIAL — DELTAOPS LITE-07
+# "Aterrizaje Operacional Delta: Equipo, Horómetro, Rutinas, Combustible, Mano de Obra y Hoja de Vida"
+
+## CONTEXTO DE DIRECCIÓN
+
+DeltaOps ya cuenta con las fases DGP-023.x y DELTAOPS LITE-01 a LITE-06 cerradas.
+
+NO estamos construyendo nuevamente la plataforma.
+
+NO debemos eliminar las capacidades robustas que ya existen.
+
+El objetivo de esta fase es aterrizar DeltaOps Lite a la operación REAL de Delta Logística.
+
+La plataforma actual está técnicamente avanzada, pero su experiencia todavía refleja demasiado un CMMS/EAM genérico.
+
+La Dirección considera que la operación real debe girar principalmente alrededor de:
+
+EQUIPO
+→ HORÓMETRO / KILOMETRAJE
+→ PREOPERACIONAL
+→ OPERACIÓN
+→ RUTINA DE MANTENIMIENTO
+→ HALLAZGO / OT
+→ EJECUCIÓN
+→ HORAS HOMBRE
+→ REPUESTOS / CONSUMOS
+→ COMBUSTIBLE
+→ CIERRE
+→ HOJA DE VIDA
+→ INDICADORES
+
+La aplicación debe ser sencilla para el usuario operativo y conservar las capacidades administrativas/avanzadas detrás de una experiencia por perfil.
+
+Esta fase debe analizar el proyecto real, la documentación existente y el material de negocio disponible antes de modificar cualquier código.
+
+---
+
+# 1. REGLA ABSOLUTA DE ESTA FASE
+
+ESTA FASE ES DISCOVERY + DISEÑO DE ATERRIZAJE OPERACIONAL.
+
+NO IMPLEMENTAR TODAVÍA.
+
+NO modificar:
+
+- código de frontend;
+- código backend;
+- base de datos;
+- migraciones;
+- API;
+- OpenAPI;
+- RBAC;
+- RLS;
+- roles;
+- permisos;
+- workflows;
+- infraestructura;
+- configuración;
+- navegación;
+- componentes visuales.
+
+NO eliminar funcionalidades.
+
+NO crear módulos paralelos.
+
+NO duplicar entidades existentes.
+
+NO crear tablas nuevas durante esta fase.
+
+El entregable único debe ser:
+
+docs/dgp/DELTAOPS-LITE-07-ATERRIZAJE-OPERACIONAL.md
+
+La fase debe terminar con informe de cierre y DETENERSE.
+
+---
+
+# 2. FUENTES DE VERDAD
+
+Antes de diseñar cualquier cosa, estudiar:
+
+1. Código actual completo.
+2. docs/dgp/* relacionados con DGP-023 y DELTAOPS LITE.
+3. DELTAOPS-LITE-06.
+4. DELTAOPS-LITE-05.
+5. DELTAOPS-LITE-04.
+6. DELTAOPS-LITE-03.
+7. Documentación empresarial existente.
+8. Diccionario de negocio.
+9. Modelo de datos.
+10. Data ownership.
+11. Dashboards.
+12. Presentaciones de DeltaOps.
+13. Archivos/documentos empresariales disponibles en attached_assets/.
+14. Excel, Forms, Power BI y demás evidencias disponibles en el proyecto.
+
+No asumir que la documentación antigua representa necesariamente la operación actual.
+
+Cuando exista contradicción:
+
+CÓDIGO ACTUAL + EVIDENCIA REAL DE NEGOCIO > DOCUMENTACIÓN ANTIGUA.
+
+Si tampoco existe evidencia suficiente:
+
+marcar como NO VERIFICADO y detenerse antes de inventar.
+
+---
+
+# 3. OBJETIVO REAL DE DELTAOPS LITE
+
+El sistema debe dejar de sentirse como:
+
+"un ERP con muchos módulos de mantenimiento"
+
+y comenzar a sentirse como:
+
+"la herramienta diaria para controlar los equipos y su mantenimiento".
+
+El usuario debe poder pensar:
+
+"Esta es mi máquina."
+
+"Voy a revisar mi máquina."
+
+"Mi máquina tiene una novedad."
+
+"Esta máquina necesita mantenimiento."
+
+"Voy a ejecutar el mantenimiento."
+
+"Voy a registrar lo que hice."
+
+"Voy a cerrar el trabajo."
+
+Y el sistema debe encargarse de alimentar:
+
+- hoja de vida;
+- costos;
+- horas hombre;
+- combustible;
+- utilización;
+- mantenimiento preventivo;
+- indicadores.
+
+---
+
+# 4. EQUIPO COMO CENTRO DE LA EXPERIENCIA
+
+Analizar la ficha actual de Activos y diseñar cómo debe convertirse en el centro operacional.
+
+La ficha de un equipo debe permitir conceptual y funcionalmente consultar:
+
+## Identificación
+
+- código;
+- nombre;
+- tipo;
+- marca;
+- modelo;
+- serial;
+- estado.
+
+## Ubicación
+
+- centro de costos;
+- centro de trabajo/operación;
+- ubicación;
+- responsable;
+- equipo/grupo de mantenimiento cuando aplique.
+
+No asumir que estos conceptos son equivalentes.
+
+Deben permanecer conceptualmente separados:
+
+CENTRO DE COSTOS
+CENTRO DE TRABAJO / OPERACIÓN
+UBICACIÓN
+RESPONSABLE
+EQUIPO DE MANTENIMIENTO
+
+Un activo puede cambiar de ubicación, operación o centro durante su vida útil sin duplicarse.
+
+---
+
+# 5. HORÓMETRO Y KILOMETRAJE
+
+Este punto es CRÍTICO.
+
+Analizar las capacidades actuales de:
+
+- lecturas;
+- horómetro;
+- kilometraje;
+- mantenimiento preventivo por uso;
+- historial del activo.
+
+El sistema debe considerar que el horómetro es una lectura acumulativa y monotónica.
+
+No permitir silenciosamente:
+
+1000 h → 900 h
+
+Si existe corrección:
+
+debe existir mecanismo de corrección/compensación auditada.
+
+No inventar lecturas.
+
+## Experiencia objetivo
+
+Ejemplo:
+
+EQUIPO: CARGADOR C5
+
+Horómetro actual:
+1.185 h
+
+Próxima rutina:
+1.200 h
+
+Faltan:
+15 h
+
+Cuando se alcance la condición:
+
+🔧 MANTENIMIENTO DE 1.200 h
+
+[Iniciar mantenimiento]
+
+La experiencia debe priorizar el disparador por uso cuando el equipo utilice horómetro.
+
+Para vehículos:
+
+usar kilometraje cuando corresponda.
+
+Para otros activos:
+
+usar el medidor configurado.
+
+No asumir que todos los activos utilizan horómetro.
+
+---
+
+# 6. RUTINAS VS PLANES
+
+La Dirección establece una diferencia importante:
+
+Los centros de trabajo no necesariamente tienen un "líder de mantenimiento" o "planeador de mantenimiento".
+
+Por lo tanto:
+
+NO diseñar la experiencia alrededor de que una persona deba entrar periódicamente a:
+
+"crear plan"
+"programar plan"
+"asignar plan"
+
+para que el mantenimiento ocurra.
+
+Las RUTINAS deben ser la fuente operacional.
+
+El sistema debe respetar:
+
+- frecuencia por horas;
+- frecuencia por kilometraje;
+- frecuencia por tiempo cuando aplique;
+- tolerancias;
+- última ejecución;
+- próxima ejecución;
+- vencimiento.
+
+La rutina debe disparar la necesidad de mantenimiento.
+
+La asignación y ejecución deben depender de las capacidades disponibles en el centro/operación.
+
+El sistema NO debe exigir un coordinador de mantenimiento universal.
+
+---
+
+# 7. MODELO DE ROLES REAL
+
+La organización tiene diferentes realidades.
+
+## Centro grande
+
+Puede existir:
+
+Asignador
+↓
+Técnico
+↓
+Supervisor
+↓
+Validador
+
+## Centro pequeño
+
+Puede existir:
+
+Responsable
+↓
+Ejecuta
+↓
+Supervisa
+↓
+Cierra
+
+La aplicación debe soportar ambos escenarios.
+
+NO crear una jerarquía universal.
+
+NO obligar a que todos los centros tengan coordinador.
+
+NO asumir que quien asigna debe ser diferente de quien ejecuta.
+
+NO asumir que quien ejecuta siempre debe ser diferente del aprobador.
+
+Utilizar las capacidades/RBAC existentes.
+
+Mantener trazabilidad completa de cada acción.
+
+---
+
+# 8. PREOPERACIONAL
+
+Mantener LITE-04 como base.
+
+El flujo debe continuar siendo:
+
+EQUIPO
+↓
+PREOPERACIONAL
+↓
+CHECKLIST
+↓
+RESULTADO
+↓
+HALLAZGO
+↓
+OT cuando corresponda
+
+El preoperacional debe permanecer como una experiencia mobile-first.
+
+Debe poder iniciarse desde:
+
+- QR;
+- equipo;
+- Home;
+- tarea pendiente;
+- mis equipos.
+
+---
+
+# 9. HALLAZGO → OT
+
+Mantener LITE-05.
+
+No crear otro sistema.
+
+Cuando el preoperacional detecte una condición que requiere mantenimiento:
+
+HALLAZGO
+↓
+GENERAR MANTENIMIENTO
+↓
+OT
+↓
+ASIGNACIÓN
+↓
+EJECUCIÓN
+↓
+VALIDACIÓN
+↓
+CIERRE
+
+Conservar la procedencia:
+
+- equipo;
+- checklist;
+- ítem;
+- hallazgo;
+- criticidad;
+- evidencia;
+- usuario;
+- fecha;
+- hora.
+
+---
+
+# 10. COMBUSTIBLE
+
+Analizar la funcionalidad actual y los documentos empresariales relacionados con combustible.
+
+El combustible debe convertirse en una experiencia asociada al activo, NO simplemente en un módulo aislado.
+
+Registrar como mínimo según disponibilidad real:
+
+- fecha;
+- hora;
+- equipo;
+- tipo de combustible/energía;
+- cantidad;
+- unidad;
+- horómetro o kilometraje;
+- centro de trabajo;
+- responsable;
+- proveedor, si aplica;
+- número de ticket/evidencia, si aplica.
+
+IMPORTANTE:
+
+NO asumir ACPM como único combustible.
+
+La arquitectura existente contempla múltiples fuentes de energía.
+
+El sistema debe permitir el combustible correspondiente al activo.
+
+---
+
+# 11. PROVEEDOR DE COMBUSTIBLE
+
+La Dirección hace la siguiente observación de negocio:
+
+Un mismo repuesto o combustible puede comprarse a diferentes proveedores en diferentes momentos.
+
+Por lo tanto, NO convertir el registro de una operación sencilla en un proceso administrativo pesado.
+
+Analizar si para DeltaOps Lite resulta más adecuado:
+
+- proveedor opcional;
+- nombre del proveedor;
+- identificación/NIT;
+- datos mínimos de la transacción;
+
+sin obligar al usuario a crear previamente un maestro completo de proveedores.
+
+Si el dominio actual exige proveedor maestro, NO modificarlo en esta fase.
+
+Documentar una recomendación de UX:
+
+"Proveedor como dato de transacción / snapshot"
+
+y dejar la administración completa de proveedores como capacidad administrativa.
+
+NO eliminar el módulo existente.
+
+---
+
+# 12. RENDIMIENTO DE COMBUSTIBLE
+
+NO permitir que el usuario digite manualmente:
+
+"rendimiento = 5 gal/h"
+
+El rendimiento debe derivarse de:
+
+consumo
++
+lecturas del activo
++
+intervalo de uso.
+
+Ejemplos:
+
+gal/h
+km/gal
+kWh/km
+
+según tipo de activo/energía.
+
+Si no existen datos suficientes:
+
+mostrar:
+
+"Sin datos suficientes para calcular rendimiento"
+
+NO inventar indicadores.
+
+---
+
+# 13. COMBUSTIBLE → HOJA DE VIDA
+
+Cada registro de combustible debe terminar asociado al activo.
+
+La hoja de vida debe poder mostrar:
+
+ABASTECIMIENTO
+
+Fecha
+Tipo
+Cantidad
+Horómetro/Km
+Responsable
+Costo
+Proveedor
+Evidencia
+
+Esto debe poder alimentar posteriormente:
+
+- consumo;
+- costo energético;
+- rendimiento;
+- análisis por equipo;
+- análisis por centro;
+- anomalías.
+
+---
+
+# 14. HORAS HOMBRE
+
+Analizar la implementación existente.
+
+Las horas hombre deben estar relacionadas con:
+
+- técnico/persona;
+- activo;
+- OT;
+- fecha;
+- hora inicial;
+- hora final;
+- duración;
+- centro de costos cuando corresponda;
+- observación.
+
+No crear otro módulo de mano de obra si ya existe.
+
+El objetivo es que el técnico pueda registrar su trabajo sin atravesar un proceso administrativo complejo.
+
+Ejemplo:
+
+OT-000123
+Equipo: Cargador C5
+
+Trabajo:
+Cambio de aceite y filtros
+
+Inicio:
+08:10
+
+Fin:
+11:20
+
+Horas:
+3,17 h
+
+Técnico:
+Juan Pérez
+
+Guardar y asociar a la OT y al activo.
+
+---
+
+# 15. REPUESTOS EN DELTAOPS LITE
+
+La Dirección informa que actualmente el proceso de inventario NO se está llevando operativamente.
+
+Por lo tanto:
+
+NO convertir Inventario en requisito para poder cerrar una OT.
+
+NO obligar al técnico a seleccionar:
+
+bodega
+almacén
+ubicación de stock
+movimiento
+transferencia
+
+si el proceso real de Delta no lo requiere actualmente.
+
+Mantener la capacidad existente.
+
+Permitir registrar en una OT:
+
+- repuesto/insumo utilizado;
+- cantidad;
+- unidad;
+- costo si está disponible;
+- proveedor opcional;
+- observación/evidencia.
+
+El módulo de inventario completo puede permanecer como capacidad futura/administrativa.
+
+NO eliminarlo.
+
+---
+
+# 16. HOJA DE VIDA DEL ACTIVO
+
+Este debe convertirse en uno de los puntos centrales de DeltaOps Lite.
+
+Diseñar una hoja de vida operacional consolidada.
+
+Ejemplo:
+
+## CARGADOR C5
+
+### Estado actual
+
+Operativo
+
+### Horómetro
+
+1.185 h
+
+### Ubicación
+
+Patio Barranquilla
+
+### Centro de costos
+
+[valor real]
+
+### Responsable
+
+[valor real]
+
+---
+
+### PREOPERACIONALES
+
+Último:
+14/08/2026
+
+Resultado:
+APTO
+
+---
+
+### MANTENIMIENTO
+
+Último mantenimiento:
+1.000 h
+
+Próximo:
+1.200 h
+
+OT abiertas:
+1
+
+---
+
+### COMBUSTIBLE
+
+Últimos tanques
+
+Consumo
+
+Rendimiento
+
+---
+
+### HORAS HOMBRE
+
+Horas acumuladas
+
+Horas por mantenimiento
+
+---
+
+### REPUESTOS
+
+Últimos repuestos utilizados
+
+---
+
+### HISTORIAL
+
+Timeline:
+
+Preoperacional
+↓
+Combustible
+↓
+Lectura
+↓
+OT
+↓
+Horas hombre
+↓
+Repuesto
+↓
+Cierre
+
+No duplicar hechos.
+
+Utilizar las fuentes existentes.
+
+---
+
+# 17. INDICADORES
+
+Analizar qué indicadores pueden calcularse REALMENTE con los datos existentes.
+
+Como mínimo estudiar:
+
+- horas de operación;
+- horas hombre;
+- combustible;
+- consumo;
+- rendimiento;
+- costo de mantenimiento;
+- costo de combustible;
+- OTs;
+- preventivos ejecutados;
+- preventivos vencidos;
+- correctivos;
+- equipos fuera de servicio.
+
+No inventar:
+
+MTBF
+MTTR
+Disponibilidad
+OEE
+
+si la fuente real no es suficiente.
+
+Clasificar cada indicador:
+
+A = fuente real completa
+B = fuente real parcial
+C = requiere captura adicional
+D = no disponible
+
+---
+
+# 18. CENTROS DE COSTOS Y MULTICENTRO
+
+Delta tiene máquinas distribuidas en diferentes lugares y operaciones.
+
+Diseñar la experiencia para:
+
+Empresa/Tenant
+↓
+Centro de costos
+↓
+Centro de trabajo/operación
+↓
+Ubicación
+↓
+Activo
+
+Pero NO duplicar activos.
+
+Un usuario autorizado puede tener acceso a uno o varios centros.
+
+Debe poder cambiar de contexto sin perder la identidad del activo.
+
+Los datos deben continuar protegidos por RLS y backend.
+
+Nunca aceptar tenantId o centro de costos sensible desde el frontend como autoridad.
+
+---
+
+# 19. EXPERIENCIA POR PERFIL
+
+Diseñar la experiencia de:
+
+## ADMINISTRADOR
+
+Configuración
+Usuarios
+Permisos
+Centros
+Equipos
+Catálogos
+Indicadores
+Auditoría
+
+Pero sin mostrar todo al mismo nivel.
+
+## RESPONSABLE / SUPERVISOR
+
+Equipos
+Preoperacionales
+Hallazgos
+OT
+Asignación
+Seguimiento
+Mantenimiento
+Indicadores
+
+## TÉCNICO
+
+Mis órdenes
+Mis equipos
+Mantenimiento
+Horas
+Repuestos
+Evidencias
+Cierre
+
+## OPERADOR
+
+El rol OPERADOR todavía NO debe crearse.
+
+Diseñar solamente la experiencia conceptual:
+
+Mi equipo
+↓
+Preoperacional
+↓
+Tanqueo
+↓
+Lectura
+↓
+Reportar novedad
+
+## CONSULTA
+
+Solo lectura.
+
+---
+
+# 20. CONFIGURACIÓN DE MÓDULOS POR ROL
+
+La Dirección pregunta explícitamente:
+
+"¿En Configuración puedo parametrizar qué módulos ve cada rol?"
+
+Analizar la implementación actual de:
+
+- roles;
+- capacidades;
+- entitlements;
+- permisos;
+- navegación.
+
+Determinar qué puede configurarse actualmente y qué no.
+
+NO implementar cambios todavía.
+
+La recomendación objetivo debe ser:
+
+VISIBILIDAD ≠ SEGURIDAD
+
+El frontend puede ocultar módulos.
+
+El backend continúa siendo la autoridad.
+
+La configuración debe permitir administrar la experiencia por perfil sin crear permisos inseguros.
+
+Documentar claramente:
+
+EXISTE
+PARCIAL
+NO EXISTE
+REQUIERE IMPLEMENTACIÓN
+
+---
+
+# 21. REDISEÑO VISUAL Y RESPONSIVE
+
+La Dirección considera que la UI actual todavía presenta problemas importantes:
+
+- contenido demasiado comprimido;
+- exceso de espacio lateral;
+- navegación superior demasiado cargada;
+- problemas de responsive;
+- elementos que no encajan correctamente;
+- mala adaptación móvil;
+- logo incorrecto/invisible en determinados temas;
+- problemas de contraste;
+- textos pequeños;
+- pantallas diseñadas para escritorio que simplemente se reducen;
+- falta de aprovechamiento del ancho disponible.
+
+Esto debe tratarse como un problema de experiencia, no como una simple corrección CSS.
+
+Diseñar:
+
+## Desktop
+
+Uso eficiente del ancho.
+
+Contenido centrado pero con max-width razonable.
+
+No dejar grandes espacios vacíos innecesarios.
+
+## Tablet
+
+Reorganización de navegación y contenido.
+
+## Móvil
+
+Experiencia diseñada específicamente para operación.
+
+No simplemente reducir columnas.
+
+Acciones táctiles grandes.
+
+Prioridad:
+
+1. Acción principal.
+2. Estado.
+3. Información crítica.
+4. Evidencia.
+5. Información secundaria.
+
+---
+
+# 22. TEMA CLARO Y OSCURO
+
+Debe existir una única autoridad de tema.
+
+Verificar:
+
+- logo;
+- fondos;
+- textos;
+- iconos;
+- botones;
+- selects;
+- tablas;
+- badges;
+- menús;
+- dropdowns;
+- formularios.
+
+El logo debe ser visible correctamente en ambos temas.
+
+NO aceptar:
+
+logo negro sobre fondo negro.
+
+NO aceptar:
+
+texto gris oscuro sobre fondo oscuro.
+
+NO aceptar:
+
+select nativo ilegible.
+
+No crear un segundo sistema visual.
+
+Reutilizar el Design System existente.
+
+---
+
+# 23. NAVEGACIÓN
+
+La navegación principal NO debe mostrar toda la plataforma como si todos fueran administradores.
+
+El objetivo conceptual debe aproximarse a:
+
+## Técnico
+
+Inicio
+Mis equipos
+Mantenimiento
+Preoperacional
+
+## Operación
+
+Inicio
+Mis equipos
+Preoperacional
+Combustible
+Lecturas
+
+## Supervisor
+
+Inicio
+Equipos
+Mantenimiento
+Preoperacionales
+Indicadores
+
+## Administrador
+
+Inicio
+Mantenimiento
+Equipos
+Indicadores
+Administración
+
+Las capacidades avanzadas deben permanecer disponibles para quienes las necesiten.
+
+NO eliminar módulos.
+
+Cambiar la experiencia de exposición.
+
+---
+
+# 24. PLANES
+
+Analizar específicamente el módulo actual "Planes".
+
+La Dirección NO quiere depender de un planeador/coordinador en cada centro.
+
+Determinar:
+
+- qué parte del motor es reutilizable;
+- qué parte es necesaria;
+- qué parte debe dejar de aparecer como navegación principal;
+- cómo representar las rutinas;
+- cómo calcular próximas intervenciones;
+- cómo usar horómetro/kilometraje;
+- cómo notificar vencimientos.
+
+La recomendación debe priorizar:
+
+RUTINAS AUTOMÁTICAS POR USO
+
+sobre:
+
+PLANIFICACIÓN MANUAL COMO ACTIVIDAD DIARIA.
+
+No eliminar el motor preventivo.
+
+Cambiar su experiencia.
+
+---
+
+# 25. NO SOBREINGENIERÍA
+
+Esta fase debe identificar explícitamente qué NO necesitamos para DeltaOps Lite.
+
+Evaluar como NO PRIORITARIO para operación inicial:
+
+- administración avanzada de proveedores;
+- órdenes de compra;
+- bodegas complejas;
+- transferencias de inventario;
+- planificación manual sofisticada;
+- calendarios complejos;
+- predictivo;
+- IA;
+- multimoneda;
+- multiidioma;
+- funcionalidades SaaS avanzadas.
+
+No eliminarlas.
+
+Clasificarlas como:
+
+OCULTO
+ADMINISTRATIVO
+FUTURO
+CORE OPERACIONAL
+
+---
+
+# 26. RESULTADO ESPERADO
+
+El documento debe producir una propuesta concreta de:
+
+## "DeltaOps Lite — Operación Delta"
+
+con este flujo:
+
+EQUIPO
+↓
+LECTURA
+↓
+PREOPERACIONAL
+↓
+OPERACIÓN
+↓
+RUTINA
+↓
+MANTENIMIENTO
+↓
+OT
+↓
+EJECUCIÓN
+↓
+HORAS HOMBRE
+↓
+REPUESTOS
+↓
+COMBUSTIBLE
+↓
+CIERRE
+↓
+HOJA DE VIDA
+↓
+INDICADORES
+
+No significa que todos los pasos ocurran siempre.
+
+Debe quedar claro cuándo cada uno aplica.
+
+---
+
+# 27. ENTREGABLE
+
+Crear únicamente:
+
+docs/dgp/DELTAOPS-LITE-07-ATERRIZAJE-OPERACIONAL.md
+
+El documento debe contener como mínimo:
+
+1. Resumen ejecutivo.
+2. Operación real identificada.
+3. Diferencias entre DeltaOps actual y DeltaOps Lite.
+4. Equipo como centro de la experiencia.
+5. Horómetro/kilometraje.
+6. Rutinas.
+7. Preventivo por uso.
+8. Preoperacional.
+9. Hallazgo.
+10. OT.
+11. Ejecución.
+12. Horas hombre.
+13. Repuestos.
+14. Combustible.
+15. Proveedores como dato transaccional.
+16. Hoja de vida.
+17. Centros de costos.
+18. Centros de trabajo.
+19. Ubicación.
+20. Responsables.
+21. Equipos/grupos de mantenimiento.
+22. Roles y capacidades.
+23. Configuración por rol.
+24. Navegación por perfil.
+25. Responsive.
+26. Tema claro/oscuro.
+27. Indicadores.
+28. Inventario como capacidad secundaria.
+29. Módulos CORE.
+30. Módulos secundarios.
+31. Módulos administrativos.
+32. Módulos futuros.
+33. Datos existentes que ya pueden alimentar BI.
+34. Datos que todavía requieren captura.
+35. Dependencias.
+36. Riesgos.
+37. GAPs.
+38. Roadmap de implementación.
+
+---
+
+# 28. MATRIZ OBLIGATORIA
+
+Crear una matriz:
+
+| Capacidad | Existe | Reutilizable | Requiere cambio | Prioridad | Motivo |
+|---|---|---|---|---|---|
+| Activos | | | | | |
+| Horómetro | | | | | |
+| Kilometraje | | | | | |
+| Preoperacional | | | | | |
+| Checklist | | | | | |
+| Hallazgo | | | | | |
+| OT | | | | | |
+| Rutinas | | | | | |
+| Combustible | | | | | |
+| Horas hombre | | | | | |
+| Repuestos | | | | | |
+| Inventario | | | | | |
+| Hoja de vida | | | | | |
+| Indicadores | | | | | |
+| Centros de costos | | | | | |
+| Centros de trabajo | | | | | |
+| Roles | | | | | |
+| Configuración | | | | | |
+
+No marcar "Existe" solamente porque existe un módulo.
+
+Debe verificarse que realmente soporte el comportamiento descrito.
+
+---
+
+# 29. MATRIZ DE DATOS
+
+Para cada dato relevante indicar:
+
+- fuente;
+- dónde se almacena actualmente;
+- quién lo registra;
+- cuándo se registra;
+- qué consume ese dato;
+- si alimenta hoja de vida;
+- si alimenta BI;
+- si alimenta mantenimiento preventivo.
+
+Especialmente:
+
+Horómetro
+Kilometraje
+Combustible
+Horas hombre
+Repuestos
+OT
+Preoperacional
+Hallazgo
+Centro de costos
+Centro de trabajo
+Ubicación
+
+---
+
+# 30. CRITERIO DE HONESTIDAD
+
+No afirmar:
+
+"esto ya existe"
+
+solo porque existe una tabla o componente.
+
+Diferenciar:
+
+VERIFICADO FUNCIONALMENTE
+
+EXISTE PARCIALMENTE
+
+EXISTE PERO NO ESTÁ EXPUESTO
+
+REQUIERE COMPOSICIÓN
+
+REQUIERE DESARROLLO
+
+NO VERIFICADO
+
+NO APLICA A DELTA LITE
+
+---
+
+# 31. REVISIÓN INDEPENDIENTE
+
+Antes de cerrar:
+
+1. Revisar el documento contra el código real.
+2. Revisar contra DELTAOPS-LITE-06.
+3. Revisar contra LITE-04 y LITE-05.
+4. Verificar horómetro.
+5. Verificar rutinas.
+6. Verificar combustible.
+7. Verificar horas hombre.
+8. Verificar hoja de vida.
+9. Verificar centros de costos.
+10. Verificar roles.
+11. Verificar responsive.
+12. Verificar tema claro/oscuro.
+13. Verificar navegación.
+14. Verificar que no se haya inventado funcionalidad.
+15. Verificar que no se haya propuesto eliminar capacidad existente.
+16. Verificar que no se haya creado dependencia obligatoria del coordinador.
+17. Verificar que inventario no sea requisito operativo.
+18. Verificar que proveedores no se conviertan innecesariamente en una barrera operativa.
+19. Verificar que combustible y lecturas alimenten correctamente los conceptos de hoja de vida/indicadores.
+20. Verificar que los datos sensibles continúen protegidos por backend/RLS.
+21. Ejecutar git status.
+22. Confirmar cero cambios de implementación.
+
+---
+
+# 32. REGLA FINAL
+
+NO IMPLEMENTAR.
+
+NO CREAR MIGRACIONES.
+
+NO MODIFICAR LA BASE DE DATOS.
+
+NO MODIFICAR RBAC/RLS.
+
+NO MODIFICAR API.
+
+NO MODIFICAR UI.
+
+NO ELIMINAR MÓDULOS.
+
+NO CREAR MÓDULOS PARALELOS.
+
+Solo analizar, diseñar y documentar.
+
+Si una decisión depende del negocio y no puede determinarse mediante el código o los documentos disponibles:
+
+DETENERSE Y PREGUNTAR A DIRECCIÓN.
+
+Al finalizar entregar:
+
+# INFORME OFICIAL DE CIERRE — DELTAOPS LITE-07
+
+con:
+
+- veredicto;
+- hallazgos;
+- decisiones;
+- GAPs;
+- matriz de capacidades;
+- matriz de datos;
+- propuesta operacional;
+- roadmap de implementación;
+- revisión independiente.
+
+Y DETENERSE.
+
+NO iniciar LITE-08 automáticamente.
