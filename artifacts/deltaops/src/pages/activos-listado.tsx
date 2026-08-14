@@ -22,6 +22,7 @@ import {
   ErrorState,
   Spinner,
   KpiCard,
+  Alert,
 } from "@workspace/design-system";
 import { SlidersHorizontal } from "lucide-react";
 import { ShellActivos } from "../lib/activos/Shell";
@@ -31,6 +32,9 @@ import { FormularioDinamico } from "../lib/forms/FormularioDinamico";
 import { plantillaFiltrosAvanzados } from "../lib/forms/plantillas";
 import { useCentroCostos, CENTRO_TODOS, centroDeRegistro } from "../lib/centro/contexto";
 import type { ValoresFormulario } from "../lib/forms/tipos";
+import { useSesion } from "../lib/identidad/sesion";
+import { moduloHabilitado } from "../lib/identidad/rbac";
+import { ShieldQuestion } from "lucide-react";
 
 /** Etiqueta legible del centro de costos de una fila (o "—"). */
 function centroDeActivo(a: ActivoRow, etiquetas: Map<string, string>): string {
@@ -68,6 +72,11 @@ function Listado() {
 
   const [filtros, setFiltros] = useState<Record<string, string | undefined>>({});
   const { datos, cargando, error, recargar } = useListado(filtros);
+
+  // DGP-LITE-04 §3 · Acción contextual «Preoperacional» por equipo. Anclada a
+  // activos (mismo entitlement); sólo con módulo activos y rol con escritura.
+  const { sesion } = useSesion();
+  const puedePreoperacional = !!sesion && moduloHabilitado(sesion, "activos") && sesion.rol !== "CONSULTA";
 
   const tipos = useCatalogo("tipos");
   const categorias = useCatalogo("categorias");
@@ -177,9 +186,19 @@ function Listado() {
     />
   );
 
+  // DGP-LITE-04 §3 · Cuando se llega desde «Iniciar preoperacional» de la Home,
+  // se guía a seleccionar el equipo (la acción por fila abre el flujo).
+  const modoPreop = puedePreoperacional &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("accion") === "preoperacional";
+
   return (
     <>
       {cabecera}
+
+      {modoPreop && (
+        <Alert variant="info" titulo="Selecciona un equipo para iniciar su preoperacional." />
+      )}
 
       <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))" }}>
         <KpiCard titulo="Total de activos" valor={String(resumen.total)} />
@@ -311,14 +330,14 @@ function Listado() {
           <>
             <div className="do-solo-desktop">
               {vista === "tabla" ? (
-                <TablaActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} />
+                <TablaActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} onPreop={puedePreoperacional ? (id) => navegar(`/activos/${id}/preoperacional`) : undefined} />
               ) : (
-                <TarjetasActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} />
+                <TarjetasActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} onPreop={puedePreoperacional ? (id) => navegar(`/activos/${id}/preoperacional`) : undefined} />
               )}
             </div>
             {/* En móvil siempre tarjetas */}
             <div className="do-solo-movil">
-              <TarjetasActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} />
+              <TarjetasActivos filas={visibles} etiquetasCentro={etiquetasCentro} onAbrir={(id) => navegar(`/activos/${id}`)} onPreop={puedePreoperacional ? (id) => navegar(`/activos/${id}/preoperacional`) : undefined} />
             </div>
             {totalPaginas > 1 && (
               <div style={{ marginTop: "var(--do-sp-4)" }}>
@@ -332,7 +351,7 @@ function Listado() {
   );
 }
 
-function TablaActivos({ filas, etiquetasCentro, onAbrir }: { filas: ActivoRow[]; etiquetasCentro: Map<string, string>; onAbrir: (id: string) => void }) {
+function TablaActivos({ filas, etiquetasCentro, onAbrir, onPreop }: { filas: ActivoRow[]; etiquetasCentro: Map<string, string>; onAbrir: (id: string) => void; onPreop?: (id: string) => void }) {
   return (
     <Card>
       <CardContent>
@@ -357,7 +376,16 @@ function TablaActivos({ filas, etiquetasCentro, onAbrir }: { filas: ActivoRow[];
                 <td>{centroDeActivo(a, etiquetasCentro)}</td>
                 <td>{ubicacionDeActivo(a)}</td>
                 <td><Badge variant={variantEstado(a.estado)}>{etiquetaEstado(a.estado)}</Badge></td>
-                <td><Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver equipo</Button></td>
+                <td>
+                  <div style={{ display: "flex", gap: "var(--do-sp-1)", justifyContent: "flex-end" }}>
+                    {onPreop && (
+                      <Button variant="fantasma" size="sm" onClick={() => onPreop(a.id)} title="Iniciar preoperacional">
+                        <ShieldQuestion size={14} aria-hidden="true" /> Preoperacional
+                      </Button>
+                    )}
+                    <Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver equipo</Button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -367,7 +395,7 @@ function TablaActivos({ filas, etiquetasCentro, onAbrir }: { filas: ActivoRow[];
   );
 }
 
-function TarjetasActivos({ filas, etiquetasCentro, onAbrir }: { filas: ActivoRow[]; etiquetasCentro: Map<string, string>; onAbrir: (id: string) => void }) {
+function TarjetasActivos({ filas, etiquetasCentro, onAbrir, onPreop }: { filas: ActivoRow[]; etiquetasCentro: Map<string, string>; onAbrir: (id: string) => void; onPreop?: (id: string) => void }) {
   return (
     <div style={{ display: "grid", gap: "var(--do-sp-4)", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))" }}>
       {filas.map((a) => (
@@ -386,7 +414,14 @@ function TarjetasActivos({ filas, etiquetasCentro, onAbrir }: { filas: ActivoRow
                 <dt style={{ color: "var(--do-texto-suave)" }}>Ubicación</dt>
                 <dd style={{ margin: 0 }}>{ubicacionDeActivo(a)}</dd>
               </dl>
-              <Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver equipo</Button>
+              <div style={{ display: "flex", gap: "var(--do-sp-1)", flexWrap: "wrap" }}>
+                <Button variant="secundario" size="sm" onClick={() => onAbrir(a.id)}>Ver equipo</Button>
+                {onPreop && (
+                  <Button variant="fantasma" size="sm" onClick={() => onPreop(a.id)}>
+                    <ShieldQuestion size={14} aria-hidden="true" /> Preoperacional
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

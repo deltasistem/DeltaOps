@@ -45,6 +45,7 @@ import { TabOrdenes } from "./ficha/tab-ordenes";
 import { TabPlanes } from "./ficha/tab-planes";
 import { TabPreventivo } from "./ficha/tab-preventivo";
 import { TabCorrectivo } from "./ficha/tab-correctivo";
+import { TabPreoperacional } from "./ficha/tab-preoperacional";
 import { leerParam } from "../lib/ecosistema/deep-links";
 import { PanelOperacional } from "../lib/utilizacion/PanelOperacional";
 import { utilizacionVisible } from "../lib/utilizacion/capacidades";
@@ -112,6 +113,9 @@ function Ficha({ id }: { id: string }) {
   // como flujo en esta app (fuera de alcance): se muestran deshabilitados con
   // texto honesto, nunca ocultos silenciosamente ni simulados.
   const puedeCrearOrden = !!sesion && moduloHabilitado(sesion, "ordenes") && sesion.rol !== "CONSULTA";
+  // DGP-LITE-04 · El preoperacional se ancla a activos (mismo entitlement). Sólo
+  // habilitado para roles con escritura (CONSULTA nunca ejecuta).
+  const puedePreoperacional = !!sesion && moduloHabilitado(sesion, "activos") && sesion.rol !== "CONSULTA";
 
   return (
     <>
@@ -146,11 +150,20 @@ function Ficha({ id }: { id: string }) {
 
       <CabeceraOperacional a={a} />
 
-      {/* Acciones no disponibles en esta app (honestas, deshabilitadas). §5 */}
+      {/* DGP-LITE-04 · Preoperacional (habilitado). "Registrar novedad" sigue
+          honestamente deshabilitado (fuera del alcance de LITE-04). §5 */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-2)" }}>
-        <Button variant="fantasma" size="sm" disabled title="Preoperacional no está disponible en esta versión.">
-          <ShieldQuestion size={16} aria-hidden="true" /> Preoperacional (no disponible)
-        </Button>
+        {puedePreoperacional ? (
+          <Link href={`/activos/${encodeURIComponent(a.id)}/preoperacional`}>
+            <Button variant="secundario" size="sm">
+              <ShieldQuestion size={16} aria-hidden="true" /> Iniciar preoperacional
+            </Button>
+          </Link>
+        ) : (
+          <Button variant="fantasma" size="sm" disabled title="Tu rol no permite ejecutar el preoperacional.">
+            <ShieldQuestion size={16} aria-hidden="true" /> Preoperacional
+          </Button>
+        )}
         <Button variant="fantasma" size="sm" disabled title="El registro de novedades no está disponible en esta versión.">
           <FilePlus2 size={16} aria-hidden="true" /> Registrar novedad (no disponible)
         </Button>
@@ -175,6 +188,7 @@ function Ficha({ id }: { id: string }) {
           { id: "planes", etiqueta: "Planes", contenido: <TabPlanes activoId={id} activoNombre={a.nombre} /> },
           { id: "preventivo", etiqueta: "Preventivo", contenido: <TabPreventivo activoId={id} activoNombre={a.nombre} /> },
           { id: "correctivo", etiqueta: "Correctivo", contenido: <TabCorrectivo activoId={id} activoNombre={a.nombre} /> },
+          { id: "preoperacional", etiqueta: "Preoperacional", contenido: <TabPreoperacional activoId={id} activoNombre={a.nombre} /> },
           { id: "manodeobra", etiqueta: "Mano de obra", contenido: <ManoDeObraActivo activoId={id} /> },
           { id: "costos", etiqueta: "Costos", contenido: <CostosActivo activoId={id} /> },
           { id: "timeline", etiqueta: "Timeline", contenido: <TabTimeline id={id} /> },

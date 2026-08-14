@@ -17,6 +17,7 @@ import ActivosArboles from '@/pages/activos-arboles';
 import ActivosSincronizacion from '@/pages/activos-sincronizacion';
 import ActivosEscanear from '@/pages/activos-escanear';
 import ActivosFicha from '@/pages/activos-ficha';
+import ActivosPreoperacional from '@/pages/activos-preoperacional';
 import OrdenesOperaciones from '@/pages/ordenes-operaciones';
 import OrdenesNueva from '@/pages/ordenes-nueva';
 import OrdenesSupervisor from '@/pages/ordenes-supervisor';
@@ -141,6 +142,7 @@ function Router() {
       <Route path="/activos/arboles" component={ActivosArboles} />
       <Route path="/activos/sincronizacion" component={ActivosSincronizacion} />
       <Route path="/activos/escanear" component={ActivosEscanear} />
+      <Route path="/activos/:id/preoperacional" component={ActivosPreoperacional} />
       <Route path="/activos/:id" component={ActivosFicha} />
       <Route path="/ordenes" component={OrdenesOperaciones} />
       <Route path="/ordenes/nueva" component={OrdenesNueva} />

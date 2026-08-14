@@ -8,6 +8,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { ThemeProvider, ToastProvider } from "@workspace/design-system";
 import { OfflineProvider } from "../lib/offline/contexto";
+
+// DGP-LITE-04 · El menú del QR ahora ofrece «Iniciar preoperacional» para roles
+// con escritura; la sesión se mockea igual que en el resto de pruebas de UI.
+vi.mock("../lib/identidad/sesion", () => ({
+  useSesion: () => ({ sesion: { rol: "TENANT_ADMIN", tenant: { id: "deltaops" }, modulos: ["activos"], permisos: [], capacidades: [] } }),
+}));
+vi.mock("../lib/identidad/rbac", () => ({ moduloHabilitado: () => true }));
+
 import { MenuAccionesEscaneo } from "../lib/ecosistema/flujo-escaneo";
 
 function mockFetch(): void {
@@ -45,6 +53,8 @@ describe("MenuAccionesEscaneo (flujo QR unificado)", () => {
     expect(screen.getByRole("button", { name: /Crear orden/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Registrar lectura/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Registrar evidencia/i })).toBeInTheDocument();
+    // DGP-LITE-04 §3c · Acceso al preoperacional desde el QR (rol con escritura).
+    expect(screen.getByRole("button", { name: /Iniciar preoperacional/i })).toBeInTheDocument();
   });
 
   it("abre el diálogo de lectura de medidor con horómetro/odómetro", async () => {

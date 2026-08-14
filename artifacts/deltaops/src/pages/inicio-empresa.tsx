@@ -41,6 +41,7 @@ import {
   RefreshCw,
   Wrench,
   AlertTriangle,
+  ShieldQuestion,
 } from "lucide-react";
 import { AppShellIdentidad } from "@/lib/identidad/AppShell";
 import { useSesionActiva, useSesion } from "@/lib/identidad/sesion";
@@ -358,6 +359,8 @@ function AccesosRapidos({ sesion }: { sesion: Sesion }) {
   const todos: AccesoRapido[] = [
     { clave: "nueva-ot", etiqueta: "Nueva orden", ruta: urlNuevaOrden(), icono: ClipboardList, escritura: true, modulo: "ordenes" },
     { clave: "nuevo-activo", etiqueta: "Nuevo activo", ruta: "/activos/nuevo", icono: PackagePlus, escritura: true, modulo: "activos" },
+    // DGP-LITE-04 §3 · Iniciar preoperacional (sólo módulo activos + escritura).
+    { clave: "iniciar-preoperacional", etiqueta: "Iniciar preoperacional", ruta: "/activos?accion=preoperacional", icono: ShieldQuestion, escritura: true, modulo: "activos" },
     { clave: "registrar-lectura", etiqueta: "Registrar lectura", ruta: "/activos", icono: Gauge, escritura: true, modulo: "activos" },
     { clave: "inventario", etiqueta: "Inventario", ruta: "/inventario", icono: Boxes, modulo: "inventario" },
     { clave: "escanear-qr", etiqueta: "Escanear QR", ruta: "/activos?accion=qr", icono: QrCode, modulo: "activos" },

@@ -20,6 +20,17 @@ export interface ItemChecklist {
   readonly firmaRequerida?: boolean;
   /** Puntaje que aporta el ítem cuando se marca como conforme. */
   readonly puntaje?: number;
+  /**
+   * Criticidad DECLARADA por quien diseña la plantilla (motor neutro; jamás
+   * inferida por nombre/texto/categoría). Un ítem `critico:true` con estado
+   * `false` (no conforme) fuerza el veredicto NO APTO en las capas de negocio
+   * que consuman este checklist. Ausente/`false` ⇒ NO crítico. La criticidad
+   * queda anclada a la VERSIÓN de la plantilla (inmutabilidad N/N-1), de modo
+   * que un cambio posterior jamás altera el resultado de ejecuciones históricas.
+   */
+  readonly critico?: boolean;
+  /** Agrupación de presentación del ítem (mobile-first, no afecta la validación). */
+  readonly categoria?: string;
 }
 
 /** Definición de un checklist reutilizable versionado. */
@@ -41,6 +52,8 @@ export const itemChecklistSchema: z.ZodType<ItemChecklist> = z
     evidenciasRequeridas: z.array(z.string()).optional(),
     firmaRequerida: z.boolean().optional(),
     puntaje: z.number().optional(),
+    critico: z.boolean().optional(),
+    categoria: z.string().optional(),
   })
   .strict();
 
@@ -128,6 +141,97 @@ export function calcularPuntaje(
     itemsConformes: conformes,
     itemsNoConformes: noConformes,
     itemsNoAplica: noAplica,
+  };
+}
+
+/* ------------------------------- Veredicto -------------------------------- */
+
+/**
+ * Veredicto de instancia de un checklist (regla de negocio de Dirección):
+ *   - APTO: todos los obligatorios cumplen y no hay incumplimientos.
+ *   - APTO_CON_OBSERVACIONES: sin incumplimientos CRÍTICOS, pero hay
+ *     observaciones o incumplimientos NO críticos que requieren seguimiento.
+ *   - NO_APTO: al menos un ítem CRÍTICO con estado NO CUMPLE (false).
+ * NO_APLICA nunca cuenta como incumplimiento ni cambia el estado por sí solo.
+ */
+export type Veredicto = "APTO" | "APTO_CON_OBSERVACIONES" | "NO_APTO";
+
+/** Ítem incumplido con su criticidad (procedencia para el hallazgo). */
+export interface IncumplimientoItem {
+  readonly clave: string;
+  readonly etiqueta: string;
+  readonly critico: boolean;
+  readonly comentario?: string;
+  readonly evidencias?: readonly string[];
+}
+
+/** Resultado completo del cálculo del veredicto. */
+export interface ResultadoVeredicto {
+  readonly veredicto: Veredicto;
+  /** Ítems con estado `false` (no cumple), críticos primero. */
+  readonly incumplimientos: readonly IncumplimientoItem[];
+  /** Ítems con observación (comentario) que no son incumplimientos. */
+  readonly observaciones: readonly IncumplimientoItem[];
+  readonly hayCriticoIncumplido: boolean;
+  readonly puntaje: PuntajeChecklist;
+}
+
+/**
+ * Calcula el VEREDICTO de un checklist a partir de su definición (que declara la
+ * criticidad por ítem) y las respuestas. Función PURA y DETERMINISTA; la capa de
+ * negocio la ejecuta en el servidor y SELLA el resultado contra la versión de la
+ * plantilla usada (no se recalcula retroactivamente). La criticidad proviene
+ * EXCLUSIVAMENTE de `item.critico` (declarada en la plantilla); jamás se infiere.
+ */
+export function calcularVeredicto(
+  def: DefinicionChecklist,
+  respuestas: readonly RespuestaItem[],
+): ResultadoVeredicto {
+  const porClave = new Map(respuestas.map((r) => [r.clave, r]));
+  const incumplimientos: IncumplimientoItem[] = [];
+  const observaciones: IncumplimientoItem[] = [];
+  let hayCriticoIncumplido = false;
+
+  for (const item of def.items) {
+    const r = porClave.get(item.clave);
+    if (!r) continue; // sin respuesta: no es incumplimiento (obligatoriedad la valida itemsPendientes)
+    if (r.estado === "na") continue; // NO APLICA nunca cuenta como incumplimiento
+
+    const critico = item.critico === true;
+    if (r.estado === false) {
+      const inc: IncumplimientoItem = {
+        clave: item.clave,
+        etiqueta: item.etiqueta,
+        critico,
+        ...(r.comentario ? { comentario: r.comentario } : {}),
+        ...(r.evidencias && r.evidencias.length > 0 ? { evidencias: r.evidencias } : {}),
+      };
+      incumplimientos.push(inc);
+      if (critico) hayCriticoIncumplido = true;
+    } else if (r.estado === true && r.comentario && r.comentario.trim().length > 0) {
+      // Cumple pero con observación → requiere seguimiento (no incumplimiento).
+      observaciones.push({ clave: item.clave, etiqueta: item.etiqueta, critico, comentario: r.comentario });
+    }
+  }
+
+  // Críticos primero en la lista de incumplimientos (procedencia priorizada).
+  incumplimientos.sort((a, b) => Number(b.critico) - Number(a.critico));
+
+  let veredicto: Veredicto;
+  if (hayCriticoIncumplido) {
+    veredicto = "NO_APTO";
+  } else if (incumplimientos.length > 0 || observaciones.length > 0) {
+    veredicto = "APTO_CON_OBSERVACIONES";
+  } else {
+    veredicto = "APTO";
+  }
+
+  return {
+    veredicto,
+    incumplimientos,
+    observaciones,
+    hayCriticoIncumplido,
+    puntaje: calcularPuntaje(def, respuestas),
   };
 }
 

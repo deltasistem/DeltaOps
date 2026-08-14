@@ -28,6 +28,8 @@ import {
 } from "@workspace/design-system";
 import { useActivoResumen } from "./hooks";
 import { urlActivo, urlActivoTab, urlOrdenesDeActivo, urlNuevaOrden } from "./deep-links";
+import { useSesion } from "../identidad/sesion";
+import { moduloHabilitado } from "../identidad/rbac";
 import { useOffline } from "../offline/contexto";
 import { registrarMedidor, adjuntar } from "../activos/mutaciones";
 import { CapturaFoto, CapturaGeolocalizacion, useGeolocalizacion, type ArchivoCampo } from "./campo";
@@ -35,8 +37,13 @@ import { sha256Hex } from "../activos/hash";
 
 export function MenuAccionesEscaneo({ activoId }: { activoId: string }) {
   const { datos: activo, cargando } = useActivoResumen(activoId);
+  const { sesion } = useSesion();
   const [modal, setModal] = useState<null | "medidor" | "evidencia">(null);
   const etiqueta = activo?.nombre ?? activoId;
+  // DGP-LITE-04 §3c · Iniciar preoperacional desde el QR. El `activoId` proviene
+  // de `platform.qr.resolve` (backend) y la página lo RE-VALIDA vía
+  // `modulo.activos.detalle`; jamás se confía en el id del frontend sin validar.
+  const puedePreoperacional = !!sesion && moduloHabilitado(sesion, "activos") && sesion.rol !== "CONSULTA";
 
   return (
     <Card>
@@ -55,6 +62,9 @@ export function MenuAccionesEscaneo({ activoId }: { activoId: string }) {
           <Link href={urlActivoTab(activoId, "historial")}><Button variant="secundario" size="lg" style={{ width: "100%", minHeight: "var(--do-sp-12)" }}>Ver historial</Button></Link>
           <Link href={urlOrdenesDeActivo(activoId)}><Button variant="secundario" size="lg" style={{ width: "100%", minHeight: "var(--do-sp-12)" }}>Ver órdenes</Button></Link>
           <Link href={urlNuevaOrden({ activo: activoId, activoEtiqueta: etiqueta })}><Button variant="primario" size="lg" style={{ width: "100%", minHeight: "var(--do-sp-12)" }}>Crear orden</Button></Link>
+          {puedePreoperacional && (
+            <Link href={`/activos/${encodeURIComponent(activoId)}/preoperacional`}><Button variant="secundario" size="lg" style={{ width: "100%", minHeight: "var(--do-sp-12)" }}>Iniciar preoperacional</Button></Link>
+          )}
           <Button variant="secundario" size="lg" style={{ minHeight: "var(--do-sp-12)" }} onClick={() => setModal("medidor")}>Registrar lectura</Button>
           <Button variant="secundario" size="lg" style={{ minHeight: "var(--do-sp-12)" }} onClick={() => setModal("evidencia")}>Registrar evidencia</Button>
         </div>

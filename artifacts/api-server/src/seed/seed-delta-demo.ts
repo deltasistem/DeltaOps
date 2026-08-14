@@ -2318,6 +2318,84 @@ async function seedCostosMantenimiento(activoIds: Map<string, string>): Promise<
   );
 }
 
+/** Clave/versión de la plantilla de preoperacional (Dynamic Forms). */
+const PREOP_PLANTILLA_CLAVE = "preop-movil";
+
+/**
+ * DGP-LITE-04 · Siembra IDEMPOTENTE de una plantilla de PREOPERACIONAL para
+ * equipos móviles (tenant DEMO). Es un checklist REAL de Dynamic Forms con
+ * criticidad DECLARADA por ítem (`critico`) — fuente de verdad del veredicto — y
+ * metadatos de aplicabilidad (§5: tipo de equipo, vigencia). Datos claramente de
+ * DEMO; sin fabricar ejecuciones (las crea el operador). Se ACTIVA para que el
+ * orquestador la resuelva por `plantilla.obtenerActiva`.
+ */
+async function seedPreoperacional(): Promise<void> {
+  const fr = formulariosRuntime();
+  const ctxF = contextForFormularios("seed-demo", DEMO_TENANT);
+  const fcmd = (n: string, i: unknown) => fr.platform.kernel.commands.execute(ctxF, n, i);
+  const fq = (n: string, i: unknown) => fr.platform.kernel.queries.execute(ctxF, n, i);
+  const fdrain = () => drenarCompleto(fr.platform.kernel);
+
+  // Ítems del checklist (categoría para agrupación mobile-first; criticidad
+  // explícita — jamás inferida). Los "críticos" fuerzan NO APTO si NO CUMPLE.
+  const items = [
+    { clave: "frenos", etiqueta: "Sistema de frenos operativo", categoria: "Seguridad", obligatorio: true, critico: true },
+    { clave: "luces", etiqueta: "Luces y señalización", categoria: "Seguridad", obligatorio: true, critico: true },
+    { clave: "extintor", etiqueta: "Extintor presente y vigente", categoria: "Seguridad", obligatorio: true, critico: true },
+    { clave: "aceite", etiqueta: "Nivel de aceite", categoria: "Fluidos", obligatorio: true, critico: false },
+    { clave: "refrigerante", etiqueta: "Nivel de refrigerante", categoria: "Fluidos", obligatorio: true, critico: false },
+    { clave: "neumaticos", etiqueta: "Estado de neumáticos", categoria: "Rodaje", obligatorio: true, critico: false },
+    { clave: "limpieza", etiqueta: "Limpieza general de cabina", categoria: "General", obligatorio: false, critico: false },
+  ];
+
+  // Título/etiquetas NEUTROS (el motor rechaza vocabulario de negocio como
+  // "equipo"/"activo"; el encuadre "preoperacional/equipo" vive en la UI/API).
+  const definicion = {
+    clave: PREOP_PLANTILLA_CLAVE,
+    titulo: "Verificación operacional móvil",
+    nodos: items.map((it) => ({
+      clase: "campo" as const,
+      clave: it.clave,
+      tipo: "checklist" as const,
+      etiqueta: it.etiqueta,
+      obligatorio: it.obligatorio,
+    })),
+  };
+  const checklist = {
+    clave: PREOP_PLANTILLA_CLAVE,
+    titulo: "Verificación operacional móvil",
+    version: 1,
+    items: items.map((it) => ({
+      clave: it.clave,
+      etiqueta: it.etiqueta,
+      obligatorio: it.obligatorio,
+      critico: it.critico,
+      categoria: it.categoria,
+    })),
+  };
+
+  const plantillaId = idDet("plantilla:preop-movil");
+  const yaActiva = await fq("modulo.formularios.plantilla.obtenerActiva", { clave: PREOP_PLANTILLA_CLAVE });
+  if (!yaActiva.ok || !yaActiva.value) {
+    const yaPub = await fq("modulo.formularios.plantilla.obtener", { clave: PREOP_PLANTILLA_CLAVE, version: 1 });
+    if (!yaPub.ok || !yaPub.value) {
+      unwrap(await fcmd("modulo.formularios.plantilla.crear", {
+        id: plantillaId, opId: "seed:preop:crear", clave: PREOP_PLANTILLA_CLAVE,
+        contenido: {
+          definicion,
+          checklist,
+          aplicabilidad: { tiposEquipo: ["movil"], vigenciaDias: 1 },
+        },
+      }), "preop.plantilla.crear");
+      await fdrain();
+      // `publicar` congela la versión 1 y la deja ACTIVA (no requiere activar aparte).
+      unwrap(await fcmd("modulo.formularios.plantilla.publicar", { id: plantillaId, opId: "seed:preop:publicar" }), "preop.plantilla.publicar");
+      await fdrain();
+    }
+  }
+  log(`Plantilla de preoperacional publicada y activa (${PREOP_PLANTILLA_CLAVE} v1)`);
+}
+
 export async function seedDeltaDemo(): Promise<void> {
   console.log(`\nSeed DEMO oficial DGP-011.3 — tenant "${DEMO_TENANT}" (${DEMO_EMPRESA})`);
   await wipeDeltaDemo();
@@ -2325,6 +2403,7 @@ export async function seedDeltaDemo(): Promise<void> {
   await seedEnterpriseIdentity();
   await seedCatalogos();
   const activoIds = await seedActivos();
+  await seedPreoperacional();
   await seedOrdenes();
   const invIds = await seedInventario();
   await seedPlanes(activoIds);

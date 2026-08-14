@@ -7,6 +7,7 @@ import platformConsoleRouter from "./routes/deltaops/platform-console";
 import attachmentServeRouter from "./routes/deltaops/attachment-serve";
 import referenceModuleRouter from "./routes/deltaops/reference-module";
 import activosModuleRouter from "./routes/deltaops/activos-module";
+import preoperacionalModuleRouter from "./routes/deltaops/preoperacional-module";
 import ordenesModuleRouter from "./routes/deltaops/ordenes-module";
 import inventarioModuleRouter from "./routes/deltaops/inventario-module";
 import planesModuleRouter from "./routes/deltaops/planes-module";
@@ -89,6 +90,11 @@ app.use("/api", platformConsoleRouter);
 app.use("/api", requireIdentityForModules);
 app.use("/api", enforceEntitlements);
 app.use("/api", referenceModuleRouter);
+// DGP-LITE-04 · Preoperacional/Checklist Operacional: se monta ANTES del router
+// de activos porque comparte el prefijo `/deltaops/activos` y activos tiene un
+// catch-all `/:id`. El entitlement que lo gobierna es `activos` (mismo segmento);
+// no introduce módulo ni entitlement nuevo.
+app.use("/api", preoperacionalModuleRouter);
 app.use("/api", activosModuleRouter);
 app.use("/api", ordenesModuleRouter);
 app.use("/api", inventarioModuleRouter);

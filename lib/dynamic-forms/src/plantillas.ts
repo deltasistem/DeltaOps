@@ -38,6 +38,7 @@ import {
 } from "./definicion";
 import type { ContratoValidacion } from "./validacion";
 import type { LayoutFormulario } from "./layout";
+import { definicionChecklistSchema, type DefinicionChecklist } from "./checklist";
 import { detectarVocabularioProhibido } from "./vocabulario";
 
 export const SERVICIO = "modulo.formularios";
@@ -45,11 +46,32 @@ export const RECORD_PLANTILLA = "plantilla-formulario";
 
 export type EstadoPlantilla = "BORRADOR" | "PUBLICADA" | "ACTIVA" | "INACTIVA" | "INDICE";
 
+/**
+ * Metadatos declarativos de aplicabilidad de una plantilla (neutros respecto al
+ * negocio; los consume la capa de aplicación para RESOLVER qué plantilla aplica
+ * a un objeto). Todo opcional y aditivo: no altera el motor ni la validación.
+ */
+export interface AplicabilidadPlantilla {
+  /** Claves de tipo/categoría de objeto a los que aplica la plantilla. */
+  readonly tiposEquipo?: readonly string[];
+  /** Vigencia en días de una ejecución (0/ausente = sin vencimiento). */
+  readonly vigenciaDias?: number;
+}
+
 /** Contenido autocontenido de una plantilla (exportable/importable). */
 export interface ContenidoPlantilla {
   readonly definicion: DefinicionFormulario;
   readonly contrato?: ContratoValidacion;
   readonly layout?: LayoutFormulario;
+  /**
+   * Checklist de dominio embebido (versionado con la plantilla). Cuando está
+   * presente, es la FUENTE DE VERDAD de la criticidad por ítem (`item.critico`)
+   * que gobierna el veredicto de instancia. Aditivo: si ausente, la plantilla se
+   * comporta como antes (formulario puro).
+   */
+  readonly checklist?: DefinicionChecklist;
+  /** Metadatos de aplicabilidad (tipo de equipo, vigencia). */
+  readonly aplicabilidad?: AplicabilidadPlantilla;
 }
 
 /** Documento JSON de exportación autocontenido. */
@@ -58,6 +80,8 @@ export interface ExportacionPlantilla extends ContenidoPlantilla {
   readonly version: number;
   readonly estado: EstadoPlantilla;
   readonly formatoExport: "deltaops.dynamic-forms.plantilla.v1";
+  readonly checklist?: DefinicionChecklist;
+  readonly aplicabilidad?: AplicabilidadPlantilla;
 }
 
 export const PERMISOS_PLANTILLA = {
@@ -108,10 +132,17 @@ interface DatosIndice {
 
 /* ------------------------------- Esquemas --------------------------------- */
 
+const aplicabilidadSchema = z.object({
+  tiposEquipo: z.array(z.string().min(1)).optional(),
+  vigenciaDias: z.number().int().nonnegative().optional(),
+}).optional();
+
 const contenidoSchema = z.object({
   definicion: definicionFormularioSchema,
   contrato: z.unknown().optional(),
   layout: z.unknown().optional(),
+  checklist: definicionChecklistSchema.optional(),
+  aplicabilidad: aplicabilidadSchema,
 });
 
 const importacionSchema = z.object({
@@ -122,6 +153,8 @@ const importacionSchema = z.object({
   definicion: definicionFormularioSchema,
   contrato: z.unknown().optional(),
   layout: z.unknown().optional(),
+  checklist: definicionChecklistSchema.optional(),
+  aplicabilidad: aplicabilidadSchema,
 });
 
 /* ----------------------------- Repositorio -------------------------------- */
@@ -363,6 +396,8 @@ export function comandosPlantilla(): readonly ((deps: ServiceDeps) => CommandDef
           definicion: parsed.data.definicion,
           contrato: parsed.data.contrato as ContratoValidacion | undefined,
           layout: parsed.data.layout as LayoutFormulario | undefined,
+          ...(parsed.data.checklist ? { checklist: parsed.data.checklist } : {}),
+          ...(parsed.data.aplicabilidad ? { aplicabilidad: parsed.data.aplicabilidad } : {}),
         };
         const indice = await leerIndice(deps, tenant.value, clave);
         const activar = indice == null || version > indice.datos.ultimaVersion;
@@ -498,6 +533,8 @@ export function queriesPlantilla(): readonly ((deps: ServiceDeps) => QueryDefini
           definicion: contenido.definicion,
           contrato: contenido.contrato,
           layout: contenido.layout,
+          ...(contenido.checklist ? { checklist: contenido.checklist } : {}),
+          ...(contenido.aplicabilidad ? { aplicabilidad: contenido.aplicabilidad } : {}),
         };
         return ok(doc);
       },
@@ -541,5 +578,7 @@ export function construirExportacion(
     definicion: contenido.definicion,
     contrato: contenido.contrato,
     layout: contenido.layout,
+    ...(contenido.checklist ? { checklist: contenido.checklist } : {}),
+    ...(contenido.aplicabilidad ? { aplicabilidad: contenido.aplicabilidad } : {}),
   };
 }
