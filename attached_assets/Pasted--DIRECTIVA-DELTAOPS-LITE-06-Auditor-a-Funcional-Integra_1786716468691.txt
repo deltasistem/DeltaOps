@@ -1,0 +1,954 @@
+# DIRECTIVA DELTAOPS LITE-06
+## Auditoría Funcional Integral, Mapa Operacional y Base del Manual de Usuario
+
+CONTEXTO DE DIRECCIÓN
+
+DELTAOPS LITE ya completó las fases:
+
+- LITE-01 — Discovery de producto, simplificación operacional y UX/UI.
+- LITE-02 — Diseño funcional operacional, roles, centros de costos y experiencia objetivo.
+- LITE-03 — Implementación de navegación, Home operacional y UX/UI.
+- LITE-04 — Preoperacional y Checklist Operacional.
+- LITE-05 — Hallazgo → OT → Ejecución → Cierre.
+
+Adicionalmente, el programa DGP cerró:
+
+- DGP-022.1 — Platform Console ACL.
+- DGP-023.2 — Retiro definitivo de SGMA.
+- DGP-023.5 — RLS efectiva y separación de roles PostgreSQL.
+- DGP-023.6 — Discovery de infraestructura, secrets y configuración.
+
+DIRECCIÓN YA HA INSPECCIONADO LA APLICACIÓN Y TIENE UNA OBSERVACIÓN IMPORTANTE:
+
+El producto técnicamente funciona y tiene un núcleo robusto, pero existe una preocupación de producto:
+
+> DELTAOPS puede estar exponiendo al usuario demasiada complejidad funcional para las necesidades reales de la organización.
+
+Por tanto, antes de continuar implementando nuevas funcionalidades, Dirección necesita conocer EXACTAMENTE qué existe hoy, qué funciona realmente, quién lo utiliza, qué datos produce, qué módulos dependen entre sí y qué debería ser visible u oculto para cada perfil.
+
+IMPORTANTE:
+
+NO quiero que implementes cambios en esta fase.
+
+NO quiero que refactorices.
+
+NO quiero que borres archivos.
+
+NO quiero que cambies DB.
+
+NO quiero que cambies RBAC/RLS.
+
+NO quiero que cambies OpenAPI.
+
+NO quiero que cambies UI.
+
+NO quiero que cambies rutas.
+
+NO quiero que "mejores" código.
+
+NO quiero que inventes funcionalidades.
+
+Esta fase es EXCLUSIVAMENTE DE AUDITORÍA Y DOCUMENTACIÓN.
+
+============================================================
+1. OBJETIVO PRINCIPAL
+============================================================
+
+Construir un mapa funcional REAL de DeltaOps a partir del código actualmente existente.
+
+La fuente de verdad debe ser:
+
+1. Código actual.
+2. Rutas reales.
+3. Componentes reales.
+4. APIs reales.
+5. Contratos reales.
+6. Esquema de base de datos real.
+7. Guards/RBAC/RLS reales.
+8. Tests existentes.
+9. E2E existentes.
+10. DGP/LITE ya cerrados, únicamente como contexto histórico.
+
+NO asumir que algo funciona porque aparece mencionado en un informe.
+
+Si un informe afirma que algo existe, verificarlo contra código real.
+
+Si algo existe en código pero no tiene uso real, clasificarlo correctamente.
+
+Si algo aparece en navegación pero no tiene datos funcionales suficientes, indicarlo.
+
+Si algo está parcialmente implementado, indicarlo.
+
+Si algo es únicamente infraestructura interna y no debe ser considerado funcionalidad de usuario, indicarlo.
+
+============================================================
+2. ENTREGABLE
+============================================================
+
+Crear únicamente:
+
+docs/dgp/DELTAOPS-LITE-06-AUDITORIA-FUNCIONAL-MAPA.md
+
+Debe ser un documento exhaustivo, pero orientado a Dirección y a la futura construcción del manual.
+
+No debe convertirse en documentación técnica innecesariamente extensa.
+
+Debe responder claramente:
+
+> ¿Qué es DeltaOps hoy?
+> ¿Qué puede hacer?
+> ¿Quién puede hacerlo?
+> ¿Cómo comienza un proceso de mantenimiento?
+> ¿Qué datos genera?
+> ¿Dónde terminan esos datos?
+> ¿Qué módulos intervienen?
+> ¿Qué debería ver cada usuario?
+> ¿Qué funcionalidades están realmente listas?
+> ¿Qué funcionalidades existen pero no son prioritarias para Delta?
+> ¿Qué debemos mantener oculto o secundario?
+> ¿Qué información puede alimentar indicadores/BI?
+
+============================================================
+3. INVENTARIO COMPLETO DE PANTALLAS
+============================================================
+
+Inventariar todas las páginas/rutas actuales de:
+
+artifacts/deltaops/src
+
+Clasificarlas en:
+
+A. OPERACIÓN PRINCIPAL
+B. CONSULTA / INFORMACIÓN
+C. ADMINISTRACIÓN
+D. CONFIGURACIÓN
+E. SOPORTE / TÉCNICA
+F. INFRAESTRUCTURA / PLATAFORMA
+G. LEGADO O FUNCIONALIDAD NO PRIORITARIA
+H. AUXILIAR / INTERNA
+
+Para cada pantalla indicar:
+
+- Ruta.
+- Nombre visible.
+- Archivo.
+- Módulo.
+- Rol/capacidad requerida.
+- Propósito.
+- Acciones principales.
+- APIs consumidas.
+- Datos que consulta.
+- Datos que modifica.
+- Si tiene impacto directo en el proceso de mantenimiento.
+- Estado:
+  - COMPLETA
+  - FUNCIONAL PARCIAL
+  - SOLO CONSULTA
+  - INFRAESTRUCTURA
+  - NO PRIORITARIA
+  - GAP
+
+NO deducir el estado únicamente por el nombre del archivo.
+
+============================================================
+4. MAPA DE MÓDULOS
+============================================================
+
+Construir una tabla con TODOS los módulos funcionales existentes.
+
+Como mínimo investigar:
+
+- Inicio
+- Activos
+- Preoperacional
+- Órdenes
+- Preventivo
+- Correctivo
+- Inventario
+- Abastecimiento
+- Analytics
+- Utilización
+- Costos
+- Mano de obra
+- Planes
+- Referencia
+- Administración
+- cualquier otro módulo real encontrado
+
+Para cada módulo:
+
+- Qué problema resuelve.
+- Quién lo usa.
+- Qué información necesita.
+- Qué información genera.
+- Qué módulos alimenta.
+- Qué módulos lo alimentan.
+- Qué tan importante es para el proceso principal.
+- Estado real.
+
+Clasificar importancia:
+
+CORE
+IMPORTANTE
+SECUNDARIO
+ADMINISTRATIVO
+TÉCNICO
+NO PRIORITARIO PARA DELTAOPS LITE
+
+============================================================
+5. PROCESO COMPLETO DE MANTENIMIENTO
+============================================================
+
+Reconstruir desde el código el proceso real:
+
+EQUIPO
+↓
+PREOPERACIONAL
+↓
+CHECKLIST
+↓
+APTO / APTO CON OBSERVACIONES / NO APTO
+↓
+HALLAZGO
+↓
+DECISIÓN
+↓
+OT
+↓
+ASIGNACIÓN
+↓
+EJECUCIÓN
+↓
+VALIDACIÓN
+↓
+CIERRE
+↓
+HISTORIAL
+↓
+INDICADORES
+
+Determinar exactamente:
+
+- qué pantalla inicia cada etapa;
+- qué usuario puede realizarla;
+- qué datos se generan;
+- qué API interviene;
+- qué entidad/registro se crea o modifica;
+- qué condición permite avanzar;
+- qué condición bloquea;
+- qué evidencia queda;
+- qué información pasa a la siguiente etapa.
+
+Indicar también dónde el flujo real difiere de este modelo.
+
+NO corregir las diferencias en esta fase.
+
+============================================================
+6. ACTIVO COMO CENTRO DEL SISTEMA
+============================================================
+
+Documentar qué información tiene actualmente un activo.
+
+Investigar específicamente:
+
+- código;
+- nombre;
+- tipo;
+- categoría;
+- familia;
+- criticidad;
+- estado;
+- centro de costos;
+- ubicación;
+- responsable;
+- equipo/grupo de mantenimiento;
+- relaciones;
+- historial;
+- preoperacionales;
+- órdenes;
+- preventivos;
+- correctivos;
+- evidencias;
+- documentos;
+- utilización;
+- costos;
+- mano de obra;
+- cualquier otro dato real.
+
+Determinar qué información es:
+
+FUENTE DE VERDAD
+
+y qué información solamente es:
+
+DATO DERIVADO / HISTÓRICO / CONSULTA.
+
+============================================================
+7. MULTICENTRO DE COSTOS
+============================================================
+
+Esta es una condición importante de Dirección.
+
+DeltaOps será utilizado para equipos distribuidos físicamente.
+
+Puede haber:
+
+- diferentes centros de costos;
+- diferentes ubicaciones;
+- diferentes equipos de mantenimiento;
+- diferentes responsables;
+- diferentes personas realizando mantenimiento.
+
+En algunos centros, especialmente Barranquilla, puede NO existir un coordinador de mantenimiento independiente.
+
+Por tanto:
+
+NO asumir una jerarquía universal:
+
+Coordinador → Supervisor → Técnico.
+
+La segregación debe depender de roles/capacidades/configuración.
+
+Auditar cómo está soportado actualmente:
+
+- tenant;
+- centro de costos;
+- ubicación;
+- responsable;
+- equipo/grupo de mantenimiento;
+- asignación;
+- aprobación;
+- ejecución;
+- validación;
+- cierre.
+
+Explicar qué ya existe y qué todavía es GAP.
+
+============================================================
+8. MATRIZ DE ROLES
+============================================================
+
+Construir una matriz real de los 6 roles actuales.
+
+Para cada rol:
+
+- qué puede consultar;
+- qué puede crear;
+- qué puede modificar;
+- qué puede ejecutar;
+- qué puede asignar;
+- qué puede validar;
+- qué puede cerrar;
+- qué puede administrar.
+
+Separar:
+
+AUTORIZACIÓN BACKEND
+
+de:
+
+VISIBILIDAD FRONTEND.
+
+No considerar que ocultar un botón equivale a seguridad.
+
+También identificar qué rol sería conceptualmente equivalente a:
+
+- Operador.
+- Técnico.
+- Supervisor.
+- Responsable de mantenimiento.
+- Administrador de empresa.
+
+SIN crear ningún rol nuevo.
+
+============================================================
+9. MAPA DE BOTONES Y ACCIONES
+============================================================
+
+Para las pantallas CORE, documentar las acciones reales.
+
+Especialmente:
+
+ACTIVOS
+- Nuevo activo
+- Ver
+- Editar
+- Preoperacional
+- Escanear
+- Historial
+- etc.
+
+PREOPERACIONAL
+- Iniciar
+- Responder
+- Evidencia
+- Finalizar
+- Ver resultado
+- Ver hallazgo
+
+HALLAZGO
+- Generar mantenimiento
+- No requiere mantenimiento
+- Reabrir
+- Ver OT
+
+ÓRDENES
+- Crear
+- Asignar
+- Ejecutar
+- Registrar trabajo
+- Registrar tiempo
+- Registrar evidencia
+- Validar
+- Cerrar
+
+INVENTARIO
+- Consultar
+- Movimiento
+- Salida
+- Entrada
+- Transferencia
+- etc.
+
+Para cada acción:
+
+- Qué hace.
+- Qué endpoint llama.
+- Qué registro crea/modifica.
+- Qué permisos necesita.
+- Qué ocurre si falla.
+- Qué resultado obtiene el usuario.
+
+============================================================
+10. DATOS GENERADOS POR LA OPERACIÓN
+============================================================
+
+Crear un mapa de datos.
+
+Ejemplo:
+
+PREOPERACIONAL
+→ respuestas
+→ resultado
+→ hallazgos
+→ evidencias
+→ usuario
+→ fecha/hora
+→ activo
+→ ubicación
+→ centro de costos
+
+HALLAZGO
+→ estado
+→ criticidad
+→ procedencia
+→ OT
+→ descarte
+→ usuario
+→ fechas
+
+OT
+→ activo
+→ solicitante
+→ asignación
+→ ejecución
+→ mano de obra
+→ repuestos
+→ costos
+→ evidencias
+→ tiempos
+→ cierre
+
+etc.
+
+Para cada dato identificar dónde queda almacenado.
+
+============================================================
+11. INFORMACIÓN PARA BI / ANALYTICS
+============================================================
+
+Dirección quiere saber qué información puede terminar alimentando indicadores.
+
+Auditar las fuentes reales.
+
+NO afirmar que un indicador existe simplemente porque existe una pantalla llamada Analytics.
+
+Separar:
+
+A. DATOS QUE YA EXISTEN
+B. DATOS QUE SE PUEDEN AGREGAR DIRECTAMENTE
+C. DATOS QUE REQUIEREN TRANSFORMACIÓN
+D. DATOS QUE TODAVÍA NO EXISTEN
+
+Investigar como mínimo:
+
+- horas hombre;
+- tiempo de ejecución;
+- tiempo de parada;
+- utilización de equipos;
+- kilometraje;
+- horómetro;
+- consumo;
+- repuestos;
+- costos;
+- órdenes;
+- preventivos;
+- correctivos;
+- frecuencia de fallas;
+- preoperacionales;
+- hallazgos;
+- equipos fuera de servicio;
+- centros de costos;
+- disponibilidad;
+- cualquier otro indicador real.
+
+MUY IMPORTANTE:
+
+No inventar MTTR, MTBF, disponibilidad, consumo u otros KPI si el sistema no tiene una fuente real suficiente.
+
+Indicar exactamente qué datos existen para calcularlos y cuáles faltan.
+
+============================================================
+12. RELACIÓN CON EXCEL / FORMS / POWER BI
+============================================================
+
+Buscar dentro del repositorio cualquier evidencia de:
+
+- Excel;
+- Forms;
+- Power BI;
+- importaciones;
+- migraciones;
+- endpoints;
+- estructuras equivalentes;
+- nombres de campos relacionados.
+
+Determinar:
+
+- qué procesos anteriores de la organización están representados en DeltaOps;
+- qué información todavía no está representada;
+- qué información podría migrarse;
+- qué información no debe migrarse.
+
+NO inventar correspondencias.
+
+Si no existe evidencia suficiente, indicarlo como:
+
+NO VERIFICADO.
+
+============================================================
+13. OFFLINE / MÓVIL
+============================================================
+
+Auditar qué procesos funcionan realmente offline.
+
+Especialmente:
+
+- preoperacional;
+- checklist;
+- hallazgos;
+- OT;
+- ejecución;
+- inventario.
+
+Determinar:
+
+- qué se guarda localmente;
+- qué se sincroniza;
+- qué ocurre con conflictos;
+- qué ocurre si el usuario pierde conexión;
+- qué acciones requieren conexión;
+- qué acciones son realmente mobile-first.
+
+============================================================
+14. EXPERIENCIA POR PERFIL
+============================================================
+
+Diseñar DOCUMENTALMENTE el recorrido ideal de cada perfil usando solamente capacidades existentes.
+
+Por ejemplo:
+
+TÉCNICO:
+
+Login
+→ Inicio
+→ Mis equipos / Mis trabajos
+→ Preoperacional
+→ Hallazgo
+→ OT
+→ Ejecutar
+→ Cerrar
+
+CONSULTA:
+
+Login
+→ Inicio
+→ Consulta
+→ Equipos
+→ Historial
+→ Indicadores
+
+SUPER_ADMIN:
+
+Login
+→ Consola SaaS
+→ Empresas
+→ Plataforma
+
+Y así para los 6 roles.
+
+No implementar estos recorridos.
+
+Solo documentarlos.
+
+============================================================
+15. QUÉ DEBERÍA VER DELTA
+============================================================
+
+Crear una clasificación de la navegación actual:
+
+MOSTRAR SIEMPRE
+MOSTRAR SEGÚN ROL
+MOSTRAR COMO "MÁS"
+SOLO ADMINISTRACIÓN
+SOLO SOPORTE/TÉCNICO
+OCULTAR DEL USUARIO OPERATIVO
+NO PRIORITARIO
+
+Esto NO significa eliminar funcionalidad.
+
+La directiva es:
+
+> "Ocultar complejidad no es eliminar capacidad."
+
+============================================================
+16. COMPLEJIDAD VS VALOR
+============================================================
+
+Clasificar cada funcionalidad según:
+
+VALOR OPERACIONAL
+COMPLEJIDAD PARA EL USUARIO
+DEPENDENCIAS
+FRECUENCIA DE USO
+
+Usar una matriz:
+
+ALTO VALOR / BAJA COMPLEJIDAD
+ALTO VALOR / ALTA COMPLEJIDAD
+BAJO VALOR / BAJA COMPLEJIDAD
+BAJO VALOR / ALTA COMPLEJIDAD
+
+Las funcionalidades de bajo valor/alta complejidad deben ser candidatas a quedar ocultas o secundarias.
+
+NO eliminarlas.
+
+============================================================
+17. MANUAL FUTURO
+============================================================
+
+Crear una estructura propuesta para el futuro:
+
+"MANUAL DE USUARIO DELTAOPS"
+
+con capítulos:
+
+1. ¿Qué es DeltaOps?
+2. Inicio de sesión.
+3. Mi inicio.
+4. Equipos.
+5. Preoperacional.
+6. Checklist.
+7. Hallazgos.
+8. Órdenes de mantenimiento.
+9. Ejecución del mantenimiento.
+10. Cierre.
+11. Inventario.
+12. Indicadores.
+13. Administración.
+14. Trabajo desde celular.
+15. Trabajo sin conexión.
+16. Preguntas frecuentes.
+
+Para cada capítulo indicar qué pantallas actuales deberían documentarse.
+
+NO crear todavía el manual definitivo.
+
+Solo su estructura y mapa de contenidos.
+
+============================================================
+18. AUDITORÍA VISUAL
+============================================================
+
+Realizar una revisión del frontend actual enfocada en:
+
+- consistencia visual;
+- jerarquía;
+- botones;
+- formularios;
+- tablas;
+- tarjetas;
+- mensajes;
+- estados;
+- tema claro;
+- tema oscuro;
+- móvil;
+- textos;
+- iconografía;
+- densidad de información.
+
+NO modificar nada.
+
+Clasificar:
+
+CORRECTO
+MEJORABLE
+PROBLEMÁTICO
+CRÍTICO PARA USABILIDAD.
+
+El objetivo es preparar una futura fase visual, no implementarla ahora.
+
+============================================================
+19. FUNCIONALIDAD REAL VS APARENTE
+============================================================
+
+Esta sección es MUY IMPORTANTE.
+
+Detectar cualquier caso donde:
+
+- exista un botón pero la funcionalidad sea parcial;
+- exista una pantalla pero no haya datos;
+- exista un indicador pero la fuente sea limitada;
+- exista un módulo pero dependa de configuración inexistente;
+- exista un campo pero no tenga impacto funcional;
+- exista una API sin consumidor real;
+- exista una función solamente preparada para una fase futura.
+
+Clasificar cada caso.
+
+No ocultar problemas.
+
+No intentar solucionarlos.
+
+============================================================
+20. MAPA DE DEPENDENCIAS
+============================================================
+
+Crear un diagrama textual:
+
+ACTIVO
+↓
+PREOPERACIONAL
+↓
+HALLAZGO
+↓
+CORRECTIVO
+↓
+ORDEN
+↓
+EJECUCIÓN
+↓
+MANO DE OBRA / REPUESTOS / COSTOS
+↓
+CIERRE
+↓
+HISTORIAL
+↓
+ANALYTICS
+
+Agregar las dependencias reales de:
+
+- Inventario;
+- Abastecimiento;
+- Preventivo;
+- Utilización;
+- Centros de costos;
+- Usuarios;
+- Evidencias.
+
+============================================================
+21. LISTA DE "NO TOCAR"
+============================================================
+
+Identificar componentes que NO deberían modificarse durante una futura simplificación superficial porque son infraestructura/core:
+
+- autenticación;
+- sesiones;
+- RBAC;
+- RLS;
+- tenant isolation;
+- motor de workflow;
+- Dynamic Forms;
+- store genérico;
+- offline/sync;
+- auditoría;
+- idempotencia;
+- contratos de seguridad;
+- etc.
+
+El objetivo es proteger el trabajo ya realizado.
+
+============================================================
+22. LISTA DE POSIBLES SIMPLIFICACIONES
+============================================================
+
+Sin implementar nada, proponer:
+
+- qué menús podrían ocultarse;
+- qué páginas podrían convertirse en accesos secundarios;
+- qué información podría resumirse;
+- qué filtros podrían quedar en "Más filtros";
+- qué acciones podrían convertirse en flujo guiado;
+- qué pantallas deberían ser móviles;
+- qué funcionalidades deberían quedar solo para administración.
+
+Cada propuesta debe incluir:
+
+BENEFICIO
+RIESGO
+DEPENDENCIAS
+IMPACTO EN USUARIO
+IMPACTO TÉCNICO
+
+============================================================
+23. CRITERIO DE HONESTIDAD
+============================================================
+
+Está expresamente prohibido:
+
+- inventar funcionalidades;
+- afirmar que un módulo funciona si no fue comprobado;
+- afirmar que un dato alimenta BI si no existe fuente;
+- asumir que un botón funciona por su nombre;
+- asumir que una pantalla representa una capacidad completa;
+- convertir una deuda en funcionalidad;
+- minimizar GAPs;
+- ocultar funcionalidades incompletas.
+
+Cuando no sea posible verificar algo:
+
+> NO VERIFICADO
+
+Cuando algo exista pero esté incompleto:
+
+> FUNCIONALIDAD PARCIAL
+
+Cuando algo exista y esté operativo:
+
+> VERIFICADO
+
+============================================================
+24. REVISIÓN INDEPENDIENTE
+============================================================
+
+Antes de cerrar:
+
+Un segundo proceso/revisor debe comprobar:
+
+- inventario;
+- rutas;
+- módulos;
+- roles;
+- flujo de mantenimiento;
+- fuentes de datos;
+- APIs;
+- indicadores;
+- dependencias;
+- funcionalidades parciales;
+- recomendaciones.
+
+Debe existir PASS/FAIL.
+
+============================================================
+25. RESTRICCIÓN ABSOLUTA
+============================================================
+
+Esta fase es DISCOVERY.
+
+NO:
+
+- código;
+- migraciones;
+- DB;
+- RBAC;
+- RLS;
+- OpenAPI;
+- dependencias;
+- infraestructura;
+- configuración;
+- eliminación;
+- renombrado;
+- UI;
+- workflows.
+
+Únicamente:
+
+- inspección;
+- análisis;
+- documentación;
+- consultas de solo lectura;
+- pruebas no mutantes si son necesarias para confirmar una afirmación.
+
+Si durante la auditoría encuentras un problema que requiere modificación:
+
+DOCUMENTARLO.
+
+NO CORREGIRLO.
+
+============================================================
+26. CRITERIO DE CIERRE
+============================================================
+
+LITE-06 solo puede cerrarse si:
+
+✓ Todas las rutas actuales fueron inventariadas.
+✓ Todos los módulos fueron clasificados.
+✓ Los 6 roles fueron auditados.
+✓ El flujo completo de mantenimiento fue reconstruido.
+✓ Activos fue documentado como fuente de verdad.
+✓ Centros de costos fueron auditados.
+✓ Preoperacional fue auditado.
+✓ Hallazgo fue auditado.
+✓ OT fue auditada.
+✓ Ejecución y cierre fueron auditados.
+✓ Inventario fue auditado.
+✓ Datos generados fueron identificados.
+✓ Fuentes potenciales para BI fueron identificadas.
+✓ Excel/Forms/Power BI fueron buscados en el proyecto.
+✓ Offline fue auditado.
+✓ Mobile fue auditado.
+✓ UX/UI fue auditada sin modificarla.
+✓ Funcionalidad real vs aparente fue revisada.
+✓ Dependencias fueron documentadas.
+✓ Simplificaciones posibles fueron identificadas.
+✓ El manual futuro tiene estructura definida.
+✓ No se modificó el sistema.
+✓ No se eliminaron funcionalidades.
+✓ No se inventaron datos.
+✓ Revisión independiente PASS.
+
+============================================================
+27. RESULTADO ESPERADO DE DIRECCIÓN
+============================================================
+
+El informe debe permitir que Dirección responda:
+
+1. ¿Qué tenemos realmente construido?
+2. ¿Qué funciona realmente?
+3. ¿Cuál es el flujo completo de mantenimiento?
+4. ¿Qué debe usar cada perfil?
+5. ¿Qué datos estamos generando?
+6. ¿Qué datos pueden alimentar BI?
+7. ¿Qué funcionalidades sobran visualmente pero NO deben eliminarse?
+8. ¿Qué debería simplificarse?
+9. ¿Qué debe quedar visible para el técnico?
+10. ¿Qué debe quedar visible para supervisión/administración?
+11. ¿Qué está listo para producción?
+12. ¿Qué debemos mejorar antes de producción?
+13. ¿Cómo debe estructurarse el manual de usuario?
+
+IMPORTANTE:
+
+No iniciar ninguna fase LITE-07 automáticamente.
+
+DETENERSE después de generar el informe y solicitar aprobación explícita de Dirección.
