@@ -1,0 +1,641 @@
+DIRECTIVA DE DIRECCIÓN — DELTAOPS LITE-05
+«Hallazgo → OT → Ejecución → Cierre del mantenimiento»
+
+CONTEXTO
+
+LITE-04 está oficialmente cerrado PASS.
+
+El flujo actualmente funcional es:
+
+EQUIPO → PREOPERACIONAL → CHECKLIST → RESULTADO → HALLAZGO
+
+El preoperacional ya:
+- se inicia desde equipo, listado, Home y QR;
+- funciona en móvil;
+- utiliza plantillas versionadas;
+- registra CUMPLE / NO CUMPLE / OBSERVACIÓN / NO APLICA;
+- calcula APTO / APTO CON OBSERVACIONES / NO APTO en backend;
+- utiliza criticidad declarada explícitamente por la plantilla;
+- conserva procedencia e identidad;
+- es idempotente;
+- no genera todavía una OT automáticamente.
+
+El objetivo de LITE-05 es cerrar el ciclo operacional:
+
+HALLAZGO → SOLICITUD/OT → ASIGNACIÓN → EJECUCIÓN → REVISIÓN → CIERRE
+
+REGLA PRINCIPAL
+
+NO crear un nuevo módulo paralelo de mantenimiento.
+
+NO duplicar Activos.
+
+NO duplicar Órdenes.
+
+NO crear una segunda implementación de OT.
+
+NO crear otra cola offline.
+
+NO crear otro sistema de estados.
+
+Se debe reutilizar el dominio, APIs, permisos, motor de órdenes, Correctivo, Dynamic Forms, auditoría, RLS, RBAC, Design System y componentes existentes.
+
+==================================================
+1. OBJETIVO FUNCIONAL
+==================================================
+
+Cuando un preoperacional genere un incumplimiento que requiera mantenimiento, el usuario debe poder convertir el hallazgo en una solicitud/OT utilizando la información ya capturada.
+
+El sistema debe conservar la procedencia:
+
+ACTIVO
+→ PREOPERACIONAL
+→ PLANTILLA/VERSIÓN
+→ ÍTEM
+→ RESPUESTA
+→ HALLAZGO
+→ SOLICITUD/OT
+→ EJECUCIÓN
+→ CIERRE
+
+No debe obligarse al usuario a volver a escribir información que ya existe.
+
+La OT debe recibir como mínimo, cuando exista:
+
+- activo;
+- código/nombre del activo;
+- centro de costos;
+- ubicación;
+- responsable;
+- preoperacional de origen;
+- ítem que generó el hallazgo;
+- descripción del hallazgo;
+- respuesta original;
+- criticidad;
+- observación;
+- evidencia disponible;
+- usuario que realizó el preoperacional;
+- fecha/hora del hallazgo;
+- origen = PREOPERACIONAL.
+
+==================================================
+2. REGLA DE GENERACIÓN
+==================================================
+
+IMPORTANTE:
+
+NO generar automáticamente una OT simplemente porque existe un NO CUMPLE.
+
+Debe existir una acción explícita de negocio:
+
+«Generar mantenimiento»
+
+o equivalente en lenguaje operacional.
+
+La razón es que no todos los incumplimientos necesariamente requieren una OT.
+
+La UI debe diferenciar claramente:
+
+- Hallazgo pendiente de gestionar.
+- Hallazgo ya convertido en solicitud/OT.
+- Hallazgo que no requiere OT.
+
+Nunca permitir duplicar accidentalmente una OT para el mismo hallazgo.
+
+La conversión debe ser idempotente.
+
+Si el hallazgo ya tiene una OT asociada, mostrar:
+
+«Mantenimiento ya generado»
+
+y permitir navegar a la OT existente.
+
+==================================================
+3. REUTILIZACIÓN DEL MÓDULO CORRECTIVO
+==================================================
+
+Antes de implementar:
+
+AUDITAR el módulo Correctivo y Órdenes existente.
+
+Identificar exactamente:
+
+- entidades;
+- estados;
+- endpoints;
+- permisos;
+- asignación;
+- ejecución;
+- cierre;
+- aprobaciones;
+- evidencias;
+- costos;
+- mano de obra;
+- repuestos;
+- auditoría;
+- offline;
+- relaciones con activos.
+
+La implementación debe utilizar esas estructuras existentes.
+
+Si alguna capacidad ya existe, NO volver a implementarla.
+
+Si existe un GAP, documentarlo antes de crear una nueva estructura.
+
+==================================================
+4. FLUJO PROPUESTO
+==================================================
+
+Flujo principal:
+
+1. Técnico/operador ejecuta preoperacional.
+2. Ítem crítico/no crítico resulta NO CUMPLE.
+3. Se genera un hallazgo sellado.
+4. Usuario visualiza el detalle.
+5. Usuario selecciona «Generar mantenimiento».
+6. Sistema muestra una vista de confirmación.
+7. La solicitud/OT se crea utilizando los datos existentes.
+8. La OT queda relacionada con el hallazgo.
+9. Responsable autorizado asigna el trabajo.
+10. Técnico ejecuta la OT.
+11. Técnico registra:
+    - trabajo realizado;
+    - observaciones;
+    - evidencias;
+    - tiempo;
+    - repuestos/materiales si aplica.
+12. La OT pasa al flujo de revisión/cierre existente.
+13. Al cerrar la OT, el hallazgo queda trazado como gestionado.
+
+==================================================
+5. ROLES Y CENTROS DE COSTOS
+==================================================
+
+Esta organización es MULTICENTRO.
+
+Existen equipos ubicados en diferentes lugares y centros de costos.
+
+También existen diferentes equipos/personas de mantenimiento.
+
+NO asumir que existe un «Coordinador de Mantenimiento» en cada centro.
+
+En algunos centros, particularmente Barranquilla, una misma persona puede tener varias responsabilidades:
+
+- asignar;
+- ejecutar;
+- revisar;
+- cerrar.
+
+En otros centros puede existir segregación:
+
+- supervisor asigna;
+- técnico ejecuta;
+- supervisor revisa/cierra.
+
+Por tanto:
+
+NO codificar una jerarquía universal.
+
+NO crear un flujo obligatorio de aprobación que siempre requiera un coordinador.
+
+Utilizar las capacidades/permisos existentes y el motor de aprobaciones existente.
+
+La separación de funciones debe poder configurarse según el centro/organización y las capacidades disponibles.
+
+Cuando una misma persona legítimamente tenga capacidad para ejecutar varias etapas, debe poder hacerlo sin bloquear el proceso, pero dejando auditoría completa de:
+
+- quién;
+- cuándo;
+- qué acción realizó;
+- con qué rol/capacidad;
+- estado anterior;
+- estado nuevo.
+
+==================================================
+6. CENTRO DE COSTOS
+==================================================
+
+La OT debe respetar el contexto del centro de costos del activo.
+
+NO duplicar activos por centro.
+
+NO copiar manualmente el centro si ya existe una relación confiable.
+
+Utilizar la fuente de verdad existente.
+
+Si el activo no tiene centro configurado:
+
+mostrar «Sin centro de costos configurado»
+
+y NO inventar uno.
+
+==================================================
+7. EXPERIENCIA DEL USUARIO
+==================================================
+
+La interfaz debe ser operacional y sencilla.
+
+No presentar al técnico una pantalla tipo ERP.
+
+Para el técnico móvil:
+
+«¿Qué necesitas hacer?»
+
+→ Mis mantenimientos
+→ Mis equipos
+→ Hallazgos pendientes
+→ Preoperacionales
+→ Escanear QR
+
+Cuando entre desde un hallazgo:
+
+«Hallazgo detectado»
+
+Mostrar:
+
+- Equipo
+- Ubicación
+- Hallazgo
+- Criticidad
+- Evidencia
+- Fecha
+- Preoperacional de origen
+
+Acción principal:
+
+[ GENERAR MANTENIMIENTO ]
+
+Después:
+
+«Mantenimiento generado»
+
+[ VER ORDEN ]
+
+==================================================
+8. ESTADOS
+==================================================
+
+NO inventar estados nuevos si ya existe un catálogo de estados de Órdenes.
+
+Reutilizar exactamente los estados existentes.
+
+Si el dominio actual no permite representar alguna transición necesaria:
+
+DETENERSE y documentar el GAP.
+
+No modificar el modelo de estados sin autorización.
+
+==================================================
+9. EVIDENCIAS
+==================================================
+
+Reutilizar el sistema existente de evidencias.
+
+No duplicar archivos.
+
+Si el hallazgo ya tiene evidencia, la OT debe poder referenciarla.
+
+La OT puede agregar nuevas evidencias durante la ejecución.
+
+Mantener referencia y procedencia.
+
+==================================================
+10. COSTOS Y MANO DE OBRA
+==================================================
+
+No implementar todavía nuevos cálculos económicos.
+
+Reutilizar las capacidades existentes de:
+
+- mano de obra;
+- repuestos;
+- costos;
+- utilización;
+
+cuando ya formen parte del flujo de OT.
+
+No introducir conversiones monetarias.
+
+No utilizar float para nuevos cálculos económicos.
+
+No modificar DGP-021.x.
+
+==================================================
+11. OFFLINE / MÓVIL
+==================================================
+
+El técnico debe poder trabajar correctamente en móvil.
+
+Reutilizar la única cola offline existente.
+
+No crear una segunda cola.
+
+Las acciones críticas deben ser idempotentes.
+
+Un doble toque, refresh o reintento no debe crear dos solicitudes/OT.
+
+==================================================
+12. SEGURIDAD
+==================================================
+
+Backend como autoridad.
+
+Nunca confiar en:
+
+- tenantId enviado por frontend;
+- identityId enviado por frontend;
+- centro de costos enviado por frontend;
+- rol enviado por frontend;
+- activo enviado sin validación.
+
+El backend debe validar:
+
+- tenant;
+- activo;
+- permisos;
+- procedencia;
+- hallazgo;
+- relación con OT.
+
+CONSULTA no puede crear ni modificar mantenimiento.
+
+Un técnico solo debe poder actuar sobre aquello que sus permisos/capacidades permitan.
+
+RLS debe permanecer intacta.
+
+No crear bypass.
+
+==================================================
+13. PREVENCIÓN DE DUPLICADOS
+==================================================
+
+Debe existir una garantía fuerte de:
+
+UN HALLAZGO → COMO MÁXIMO UNA OT DERIVADA.
+
+Debe funcionar correctamente ante:
+
+- doble click;
+- refresh;
+- mala conexión;
+- reintento;
+- sincronización offline.
+
+Preferir una restricción/idempotencia basada en el identificador del hallazgo/origen.
+
+==================================================
+14. EXPERIENCIA VISUAL
+==================================================
+
+Mantener el trabajo visual de LITE-03/LITE-04.
+
+La interfaz debe:
+
+- funcionar en claro y oscuro;
+- tener contraste correcto;
+- utilizar Design System;
+- no utilizar selects nativos problemáticos;
+- ser mobile-first;
+- evitar pantallas excesivamente densas;
+- utilizar lenguaje operacional.
+
+Prioridad visual:
+
+1. acción principal;
+2. estado;
+3. información crítica;
+4. evidencia;
+5. información secundaria.
+
+No realizar una remodelación visual completa en esta fase.
+
+==================================================
+15. DASHBOARD / HOME
+==================================================
+
+Agregar únicamente indicadores accionables derivados de datos reales:
+
+- Hallazgos pendientes de gestionar;
+- Mantenimientos derivados de preoperacionales;
+- Órdenes pendientes de asignación;
+- Órdenes en ejecución.
+
+No inventar indicadores.
+
+No crear gráficos si no existe fuente real.
+
+==================================================
+16. MULTICENTRO
+==================================================
+
+El sistema debe permitir trabajar con:
+
+Centro A
+  ├─ Equipos
+  ├─ Personal
+  └─ Mantenimientos
+
+Centro B
+  ├─ Equipos
+  ├─ Personal
+  └─ Mantenimientos
+
+sin duplicar datos.
+
+El usuario debe ver únicamente aquello permitido por su contexto/capacidades.
+
+El administrador podrá tener una vista consolidada cuando sus permisos lo permitan.
+
+==================================================
+17. DISCOVERY OBLIGATORIO
+==================================================
+
+Antes de modificar código:
+
+crear:
+
+docs/dgp/DELTAOPS-LITE-05-DISCOVERY.md
+
+El discovery debe identificar:
+
+- modelo actual de OT;
+- estados;
+- APIs;
+- permisos;
+- asignación;
+- ejecución;
+- cierre;
+- Correctivo;
+- relación con Activos;
+- evidencias;
+- offline;
+- costos;
+- mano de obra;
+- aprobaciones;
+- centros de costos;
+- capacidades por rol.
+
+Clasificar cada requisito como:
+
+EXISTE
+REUTILIZABLE
+GAP
+NO APLICA
+
+Si existe un conflicto entre esta directiva y el código real:
+
+NO asumir.
+
+Documentar el conflicto y detenerse para consulta de Dirección cuando afecte una decisión de negocio.
+
+==================================================
+18. CRITERIO DE NO SOBREDISEÑO
+==================================================
+
+Esta fase es DELTAOPS LITE.
+
+No convertir la aplicación en un ERP.
+
+No implementar:
+
+- planificación avanzada;
+- mantenimiento predictivo;
+- IA;
+- MTBF/MTTR si no existe fuente;
+- nuevos módulos;
+- nuevas jerarquías organizacionales;
+- nuevos motores de workflow;
+- nuevos sistemas de aprobación;
+- nuevos sistemas de archivos.
+
+El objetivo es cerrar el flujo operacional básico de mantenimiento.
+
+==================================================
+19. TESTS
+==================================================
+
+Agregar pruebas para:
+
+- conversión hallazgo→OT;
+- procedencia completa;
+- idempotencia;
+- doble click;
+- tenant isolation;
+- RBAC;
+- CONSULTA sin escritura;
+- técnico;
+- supervisor/planificador;
+- administrador;
+- centros de costos;
+- evidencia;
+- cierre;
+- refresh;
+- offline/sync si aplica.
+
+Ejecutar:
+
+- tests relevantes;
+- typecheck;
+- build;
+- E2E real.
+
+No declarar PASS con mocks únicamente.
+
+==================================================
+20. REVISIÓN INDEPENDIENTE
+==================================================
+
+Antes del cierre:
+
+hacer revisión independiente del alcance.
+
+Debe verificar:
+
+- no se creó módulo paralelo;
+- no se duplicó OT;
+- no se duplicó activo;
+- no se rompió RBAC/RLS;
+- no se introdujo nueva cola offline;
+- no se inventaron estados;
+- no se inventaron datos;
+- procedencia completa;
+- idempotencia;
+- experiencia móvil;
+- claro/oscuro;
+- multicentro.
+
+==================================================
+21. REGLA DE DETENCIÓN
+==================================================
+
+Si para implementar LITE-05 necesitas:
+
+- crear una nueva entidad de OT;
+- modificar estructuralmente RBAC;
+- modificar RLS;
+- crear un nuevo módulo;
+- crear un nuevo workflow engine;
+- cambiar estados fundamentales;
+- duplicar datos;
+
+DETENTE y presenta el GAP a Dirección.
+
+No tomes esa decisión unilateralmente.
+
+==================================================
+22. CIERRE
+==================================================
+
+Al finalizar entregar:
+
+# Informe Oficial de Cierre — DELTAOPS LITE-05
+
+Debe contener:
+
+1. Discovery.
+2. Qué se reutilizó.
+3. Qué se implementó.
+4. Archivos modificados.
+5. APIs afectadas.
+6. Migraciones.
+7. Flujo funcional.
+8. Roles/capacidades.
+9. Multicentro.
+10. UX/UI.
+11. Seguridad.
+12. Idempotencia.
+13. Tests.
+14. E2E.
+15. Revisión independiente.
+16. GAPs.
+17. Deuda técnica.
+18. Commits.
+19. Estado final.
+
+Si todo cumple:
+
+DELTAOPS LITE-05 CERRADO — PASS
+
+Después DETENERSE.
+
+NO iniciar LITE-06 sin aprobación explícita de Dirección.
+
+==================================================
+
+DIRECTIVA FINAL DE DIRECCIÓN
+
+El objetivo no es agregar más funcionalidades por agregar.
+
+El objetivo es que un trabajador pueda comenzar en:
+
+PREOPERACIONAL
+
+y terminar en:
+
+MANTENIMIENTO CERRADO
+
+con la menor cantidad de pasos posible, manteniendo trazabilidad, seguridad, multicentro y la arquitectura existente.
+
+La aplicación debe sentirse como una herramienta de mantenimiento operacional, no como un ERP genérico.
+
+DETENERSE ante cualquier decisión de negocio no especificada.
