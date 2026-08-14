@@ -1,0 +1,998 @@
+DIRECTIVA OFICIAL — DELTAOPS LITE-04
+«IMPLEMENTACIÓN DEL PREOPERACIONAL Y CHECKLIST OPERACIONAL»
+
+ESTADO DEL PROGRAMA
+
+DeltaOps Lite-03 está cerrado con PASS.
+
+LITE-03 transformó la experiencia visual y operacional de la plataforma:
+
+- navegación por proceso;
+- Home accionable;
+- contexto de centro de costos;
+- Activos simplificados;
+- ficha operacional del equipo;
+- Design System;
+- tema claro/oscuro;
+- responsive mobile-first;
+- seis roles existentes conservados.
+
+AHORA comienza DELTAOPS LITE-04.
+
+OBJETIVO PRINCIPAL
+
+Implementar el flujo operacional:
+
+EQUIPO
+→ PREOPERACIONAL
+→ CHECKLIST
+→ RESULTADO
+→ HALLAZGO
+
+El objetivo es que DeltaOps pueda representar digitalmente el proceso que actualmente se realiza mediante formatos, Excel, Forms y otros mecanismos operativos.
+
+IMPORTANTE:
+
+Esta fase NO debe convertirse en una reconstrucción completa de mantenimiento.
+
+No implementar todavía:
+
+- ciclo completo de OT;
+- asignación avanzada;
+- ejecución de OT;
+- aprobación/cierre de OT;
+- indicadores nuevos;
+- costos nuevos;
+- combustible;
+- inventario nuevo;
+- nuevos roles;
+- hardening de infraestructura;
+- cambios de RLS;
+- cambios de RBAC estructural.
+
+Esos procesos serán fases posteriores.
+
+==================================================
+1. REGLA PRINCIPAL: DESCUBRIR ANTES DE MODIFICAR
+==================================================
+
+ANTES de escribir código:
+
+Auditar el código real y localizar:
+
+- Dynamic Forms;
+- plantillas;
+- formularios;
+- checklists;
+- respuestas;
+- hallazgos;
+- evidencias;
+- adjuntos;
+- firmas;
+- activos;
+- órdenes;
+- correctivo;
+- permisos;
+- estados;
+- catálogos;
+- APIs;
+- repositorios;
+- read models;
+- componentes UI existentes.
+
+Utilizar como fuentes obligatorias:
+
+- docs/dgp/DELTAOPS-LITE-01-DISCOVERY.md
+- docs/dgp/DELTAOPS-LITE-02-DISEÑO-FUNCIONAL-UX.md
+- documentación/código generado durante LITE-03
+- DGP relacionados con Dynamic Forms
+- DGP relacionados con activos
+- DGP relacionados con órdenes
+- DGP relacionados con correctivo
+- DGP relacionados con identidad/RBAC/RLS
+
+La auditoría debe responder:
+
+1. ¿Qué piezas del checklist ya existen?
+2. ¿Qué piezas del preoperacional ya existen?
+3. ¿Qué piezas pueden reutilizarse directamente?
+4. ¿Qué piezas necesitan composición?
+5. ¿Qué GAP real existe?
+6. ¿Es necesario crear alguna entidad nueva?
+7. ¿Es necesario crear alguna API nueva?
+8. ¿Es necesario modificar el modelo de datos?
+
+NO implementar algo nuevo si el dominio existente ya puede resolverlo.
+
+==================================================
+2. PRINCIPIO ARQUITECTÓNICO
+==================================================
+
+El preoperacional NO será un módulo paralelo.
+
+Debe componerse sobre las capacidades existentes.
+
+La arquitectura objetivo es:
+
+ACTIVO
+↓
+PLANTILLA DE PREOPERACIONAL
+↓
+CHECKLIST
+↓
+RESPUESTAS
+↓
+EVIDENCIA / OBSERVACIÓN
+↓
+RESULTADO
+↓
+HALLAZGO SI CORRESPONDE
+
+El activo sigue siendo la fuente de identidad del equipo.
+
+La plantilla define QUÉ se debe revisar.
+
+La ejecución define QUÉ ocurrió.
+
+El hallazgo define QUÉ problema fue encontrado.
+
+No duplicar activos.
+
+No duplicar órdenes.
+
+No crear una segunda tabla paralela de equipos.
+
+==================================================
+3. ACCESO AL PREOPERACIONAL
+==================================================
+
+El usuario debe poder iniciar un preoperacional desde:
+
+A. Ficha del equipo
+
+[ INICIAR PREOPERACIONAL ]
+
+B. Lista de equipos
+
+acción contextual:
+
+[ Preoperacional ]
+
+C. QR del equipo, si la capacidad QR existente lo permite.
+
+D. Home, mediante:
+
+[ Iniciar preoperacional ]
+
+Si el usuario llega por QR:
+
+QR
+→ identificar activo
+→ validar acceso
+→ mostrar equipo
+→ iniciar preoperacional.
+
+No aceptar un activo arbitrario enviado desde frontend para saltarse autorización.
+
+El backend debe validar el activo y el tenant mediante los mecanismos existentes.
+
+==================================================
+4. EXPERIENCIA MOBILE-FIRST
+==================================================
+
+El preoperacional está diseñado principalmente para teléfono.
+
+Objetivo principal:
+
+que una persona pueda realizarlo con una sola mano y mínima navegación.
+
+Pantalla:
+
+--------------------------------
+PREOPERACIONAL
+
+CAM-001
+Camión Kenworth T880
+
+🟢 Estado actual
+
+Centro:
+Transporte
+
+Ubicación:
+Barranquilla
+--------------------------------
+
+PROGRESO
+
+12 de 18 revisados
+
+████████████░░░░░░
+
+--------------------------------
+
+CHECKLIST
+
+✓ Motor
+✓ Niveles
+⚠ Sistema eléctrico
+○ Neumáticos
+○ Seguridad
+
+--------------------------------
+
+[ CONTINUAR ]
+
+--------------------------------
+
+No mostrar una pantalla gigantesca con 50 campos simultáneamente.
+
+Agrupar los ítems por categorías.
+
+==================================================
+5. PLANTILLAS
+==================================================
+
+Reutilizar Dynamic Forms si técnicamente corresponde.
+
+Una plantilla de preoperacional debe permitir definir:
+
+- nombre;
+- descripción;
+- tipo de equipo;
+- categoría;
+- versión;
+- vigencia;
+- ítems;
+- orden;
+- obligatoriedad;
+- tipo de respuesta;
+- severidad;
+- evidencia requerida;
+- observación requerida;
+- comportamiento ante incumplimiento.
+
+NO crear un constructor de formularios nuevo.
+
+Si Dynamic Forms ya soporta estas capacidades, extenderlo mínimamente.
+
+Si una capacidad no existe, documentar el GAP antes de inventar una arquitectura nueva.
+
+==================================================
+6. TIPOS DE RESPUESTA
+==================================================
+
+El checklist debe soportar, según las capacidades reales existentes:
+
+✓ CUMPLE
+
+✕ NO CUMPLE
+
+⚠ OBSERVACIÓN
+
+○ NO APLICA
+
+Cuando el código existente utilice otra nomenclatura, mantener el contrato existente y mapearlo a esta experiencia visual.
+
+No romper contratos existentes por razones exclusivamente visuales.
+
+==================================================
+7. REGLA DE EVIDENCIA
+==================================================
+
+NO obligar a tomar fotografías para absolutamente todo.
+
+La evidencia debe solicitarse cuando:
+
+- el ítem lo requiere;
+- existe incumplimiento;
+- existe una observación relevante;
+- la plantilla lo establece.
+
+Ejemplo:
+
+✕ NIVEL DE ACEITE
+
+Motivo:
+[ Nivel bajo ]
+
+Observación:
+[________________]
+
+Evidencia:
+[ Tomar foto ]
+
+[ Continuar ]
+
+No bloquear innecesariamente al usuario cuando la evidencia no sea requerida.
+
+==================================================
+8. RESULTADO DEL PREOPERACIONAL
+==================================================
+
+Al finalizar debe existir un resultado operacional claro.
+
+Estados:
+
+🟢 APTO
+
+🟡 APTO CON OBSERVACIONES
+
+🔴 NO APTO
+
+NO depender exclusivamente del color.
+
+Siempre mostrar texto.
+
+Ejemplo:
+
+RESULTADO
+
+🟡 APTO CON OBSERVACIONES
+
+El equipo puede continuar operando.
+
+2 observaciones requieren seguimiento.
+
+[ VER OBSERVACIONES ]
+
+o:
+
+🔴 NO APTO
+
+Se detectaron condiciones que impiden la operación.
+
+1 hallazgo crítico.
+
+[ VER HALLAZGOS ]
+
+==================================================
+9. REGLAS DE APTO / NO APTO
+==================================================
+
+Aplicar las decisiones de Dirección establecidas en LITE-02:
+
+APTO:
+Todos los requisitos obligatorios cumplen.
+
+APTO CON OBSERVACIONES:
+Existen observaciones que no impiden continuar operación.
+
+NO APTO:
+Existe una condición que impide continuar operación.
+
+IMPORTANTE:
+
+No inventar automáticamente qué ítems son críticos.
+
+La criticidad debe provenir de:
+
+- configuración existente;
+- plantilla;
+- catálogo;
+- regla de negocio existente.
+
+Si el código no tiene actualmente una fuente de verdad para determinar criticidad:
+
+DETENER la implementación de esa parte y documentar GAP.
+
+NO inventar reglas de seguridad.
+
+==================================================
+10. HALLAZGOS
+==================================================
+
+Cuando un ítem produzca un incumplimiento:
+
+generar un hallazgo dentro del modelo existente si éste ya soporta la relación.
+
+El hallazgo debe conservar procedencia:
+
+PREOPERACIONAL
+→ ACTIVO
+→ ÍTEM
+→ RESPUESTA
+→ OBSERVACIÓN
+→ EVIDENCIA
+
+Debe ser posible saber:
+
+- qué equipo;
+- cuándo;
+- quién realizó el preoperacional;
+- qué ítem falló;
+- qué respuesta dio;
+- qué evidencia existe;
+- qué severidad tiene.
+
+NO generar todavía una OT automáticamente si eso pertenece a LITE-05.
+
+Pero dejar preparada la procedencia para que LITE-05 pueda conectar:
+
+HALLAZGO → OT
+
+sin reconstruir la información.
+
+==================================================
+11. NO DUPLICAR HALLAZGOS
+==================================================
+
+Un usuario puede reintentar o refrescar una operación.
+
+Debe respetarse la idempotencia existente.
+
+No crear duplicados por:
+
+- doble click;
+- refresh;
+- retry;
+- pérdida temporal de conexión;
+- reenvío del formulario.
+
+Utilizar los mecanismos de idempotencia existentes.
+
+Si el dominio actual no tiene una capacidad suficiente:
+
+documentar el GAP antes de introducir una nueva solución.
+
+==================================================
+12. ESTADO DEL PREOPERACIONAL
+==================================================
+
+El proceso debe manejar estados apropiados según lo soportado actualmente:
+
+- NO INICIADO
+- EN PROGRESO
+- COMPLETADO
+
+Si existe capacidad de borrador/offline en Dynamic Forms, reutilizarla.
+
+NO implementar una segunda cola offline.
+
+IMPORTANTE:
+
+El preoperacional puede necesitar ser realizado desde campo.
+
+Si el sistema existente permite guardar progreso localmente de forma segura:
+
+reutilizarlo.
+
+Si no existe capacidad segura:
+
+NO inventar sincronización offline en esta fase.
+
+Documentar GAP.
+
+Nunca marcar como completado algo que no haya sido sincronizado/persistido correctamente.
+
+==================================================
+13. FECHA Y HORA
+==================================================
+
+La ejecución debe conservar:
+
+- fecha/hora de inicio;
+- fecha/hora de finalización;
+- usuario;
+- activo;
+- plantilla/versión utilizada.
+
+No usar la hora enviada por el frontend como fuente de verdad cuando exista infraestructura server-side.
+
+Usar las convenciones de tiempo existentes de DeltaOps.
+
+==================================================
+14. IDENTIDAD
+==================================================
+
+La ejecución debe registrar la identidad canónica.
+
+Nunca confiar en:
+
+- nombre enviado por frontend;
+- identityId arbitrario;
+- tenantId enviado por frontend.
+
+Usar la sesión autenticada.
+
+Respetar:
+
+RBAC
+RLS
+tenant isolation
+capacidades.
+
+==================================================
+15. CENTRO DE COSTOS
+==================================================
+
+El preoperacional debe mostrar el contexto del activo:
+
+Centro de costos
+Ubicación
+Responsable
+Equipo de mantenimiento
+
+pero estas dimensiones siguen siendo independientes.
+
+NO asumir:
+
+Centro = ubicación.
+
+Centro = responsable.
+
+Centro = grupo.
+
+Si alguna dimensión no está configurada:
+
+mostrar:
+
+—
+
+o:
+
+No configurado
+
+Nunca inventar información.
+
+==================================================
+16. EQUIPOS DE MANTENIMIENTO
+==================================================
+
+La dirección estableció que los centros pueden tener estructuras diferentes.
+
+Por tanto:
+
+NO exigir un coordinador.
+
+NO exigir un supervisor.
+
+NO exigir separación universal entre:
+
+asignar
+ejecutar
+revisar
+aprobar.
+
+En esta fase únicamente mostrar el contexto existente.
+
+La segregación de funciones será utilizada en fases posteriores.
+
+==================================================
+17. EXPERIENCIA DE USUARIO
+==================================================
+
+Aplicar el Design System existente.
+
+Utilizar:
+
+--do-*
+Select
+Button
+Input
+Toast
+Modal
+Card
+Badge
+Logo
+etc.
+
+NO crear un sistema visual paralelo.
+
+Tema claro y oscuro deben funcionar.
+
+El preoperacional debe ser completamente legible en ambos temas.
+
+Requisitos:
+
+- contraste;
+- botones táctiles;
+- estados claramente diferenciados;
+- focus;
+- feedback;
+- loading;
+- errores;
+- éxito;
+- estados vacíos.
+
+No depender únicamente de color.
+
+==================================================
+18. EXPERIENCIA DE ERROR
+==================================================
+
+Nunca mostrar errores técnicos como:
+
+500
+SQLSTATE
+RLS
+tenant_id
+foreign key
+UUID
+stack trace
+
+al usuario final.
+
+Ejemplos:
+
+En lugar de:
+
+"401 Unauthorized"
+
+usar:
+
+"No pudimos validar tu sesión. Intenta nuevamente."
+
+En lugar de:
+
+"500 INTERNAL"
+
+usar:
+
+"No pudimos guardar el preoperacional. Tus respuestas no se han marcado como completadas."
+
+==================================================
+19. NO INVENTAR DATOS
+==================================================
+
+Esta regla es ABSOLUTA.
+
+Si el tenant demo no tiene:
+
+- plantillas;
+- equipos;
+- centros;
+- responsables;
+- checklists;
+
+mostrar estado vacío.
+
+Ejemplo:
+
+"No hay plantillas de preoperacional configuradas."
+
+NO crear datos ficticios automáticamente para mejorar una captura.
+
+Si se requiere seed para pruebas:
+
+debe estar claramente identificado como seed de pruebas y no alterar datos reales.
+
+==================================================
+20. SEGURIDAD
+==================================================
+
+No modificar RLS/RBAC.
+
+No eliminar guards.
+
+No aceptar tenantId del frontend.
+
+No aceptar identityId del frontend.
+
+No permitir ejecutar un preoperacional sobre un activo de otro tenant.
+
+No permitir que un usuario consulte ejecuciones que no tiene autorización para consultar.
+
+Backend = autoridad.
+
+Frontend = experiencia.
+
+==================================================
+21. ALCANCE ESTRICTO
+==================================================
+
+LITE-04 SÍ incluye:
+
+- acceso al preoperacional;
+- experiencia mobile-first;
+- checklist;
+- plantillas existentes;
+- respuestas;
+- evidencia;
+- observaciones;
+- resultado APTO/APTO CON OBSERVACIONES/NO APTO;
+- historial de ejecución;
+- hallazgos derivados;
+- procedencia;
+- estados;
+- UX/UI;
+- tema claro/oscuro;
+- responsive.
+
+LITE-04 NO incluye:
+
+- generación automática de OT;
+- asignación de OT;
+- ejecución de OT;
+- aprobación/cierre de OT;
+- costos;
+- inventario;
+- combustible;
+- nuevos indicadores;
+- nuevos roles;
+- hardening;
+- cambios de RLS;
+- cambios de RBAC estructural.
+
+==================================================
+22. CAMBIOS DE BASE DE DATOS
+==================================================
+
+REGLA:
+
+No crear migraciones si el modelo existente ya permite implementar el flujo.
+
+Si se necesita persistencia nueva y el código existente no puede representar una ejecución de checklist/preoperacional:
+
+antes de crear migración:
+
+1. documentar por qué;
+2. identificar tabla existente insuficiente;
+3. explicar qué entidad mínima falta;
+4. evitar duplicar entidades;
+5. mantener RLS;
+6. mantener tenant isolation;
+7. mantener auditoría.
+
+Si la nueva persistencia es realmente necesaria:
+
+hacerla mínima y aditiva.
+
+==================================================
+23. CONTROL DE COSTOS Y TOKENS
+==================================================
+
+No hacer:
+
+- refactorizaciones masivas;
+- actualización general de dependencias;
+- reescritura de Dynamic Forms;
+- reescritura del motor de OT;
+- nuevo sistema de formularios;
+- nuevo sistema de archivos;
+- nuevo sistema de autenticación;
+- nuevo sistema offline.
+
+Reutilizar.
+
+Modificar únicamente lo necesario.
+
+==================================================
+24. PRUEBAS
+==================================================
+
+Crear pruebas suficientes para demostrar:
+
+1. plantilla válida;
+2. inicio de preoperacional;
+3. respuesta CUMPLE;
+4. respuesta NO CUMPLE;
+5. observación;
+6. evidencia;
+7. APTO;
+8. APTO CON OBSERVACIONES;
+9. NO APTO;
+10. hallazgo;
+11. procedencia;
+12. identidad;
+13. tenant isolation;
+14. RBAC;
+15. idempotencia;
+16. refresh/reintento;
+17. tema claro;
+18. tema oscuro;
+19. responsive;
+20. estados de error.
+
+Ejecutar:
+
+- tests relevantes;
+- typecheck;
+- build;
+- E2E real.
+
+==================================================
+25. E2E OBLIGATORIO
+==================================================
+
+Probar en navegador real.
+
+Escenario mínimo:
+
+LOGIN
+↓
+HOME
+↓
+EQUIPOS
+↓
+CAM-001
+↓
+INICIAR PREOPERACIONAL
+↓
+SELECCIONAR PLANTILLA
+↓
+RESPONDER CHECKLIST
+↓
+GENERAR INCUMPLIMIENTO
+↓
+AGREGAR OBSERVACIÓN
+↓
+EVIDENCIA SI CORRESPONDE
+↓
+FINALIZAR
+↓
+VER RESULTADO
+↓
+VER HALLAZGO
+↓
+VOLVER AL EQUIPO
+
+Repetir:
+
+- tema claro;
+- tema oscuro;
+- 390 px;
+- 1280 px.
+
+También probar:
+
+- refresh;
+- doble click;
+- reintento;
+- logout/login;
+- rol TECNICO;
+- rol CONSULTA;
+- TENANT_ADMIN.
+
+CONSULTA no debe recibir acciones de escritura si el backend no las permite.
+
+==================================================
+26. REVISIÓN ARQUITECTÓNICA
+==================================================
+
+Antes del cierre ejecutar revisión independiente.
+
+El revisor debe verificar:
+
+- reutilización de Dynamic Forms;
+- ausencia de módulo paralelo;
+- ausencia de duplicación de activos;
+- ausencia de bypass RBAC/RLS;
+- procedencia del hallazgo;
+- tenant isolation;
+- identidad canónica;
+- idempotencia;
+- estados;
+- evidencia;
+- tema claro/oscuro;
+- mobile;
+- alcance.
+
+Si encuentra un cambio fuera del alcance:
+
+corregirlo o documentarlo.
+
+==================================================
+27. CRITERIO DE ÉXITO
+==================================================
+
+LITE-04 PASS solamente si:
+
+✓ El usuario puede iniciar un preoperacional desde un equipo.
+
+✓ Puede completar el checklist desde móvil.
+
+✓ Las respuestas quedan persistidas.
+
+✓ Los incumplimientos quedan claramente identificados.
+
+✓ Se pueden registrar observaciones.
+
+✓ La evidencia se solicita únicamente cuando corresponde.
+
+✓ El resultado es APTO / APTO CON OBSERVACIONES / NO APTO.
+
+✓ Los hallazgos conservan procedencia.
+
+✓ No se inventan reglas de criticidad.
+
+✓ No se generan OT automáticamente todavía.
+
+✓ No se duplican activos ni órdenes.
+
+✓ RBAC/RLS permanecen intactos.
+
+✓ Tema claro/oscuro funciona.
+
+✓ 390px funciona.
+
+✓ Los seis roles existentes continúan funcionando.
+
+✓ Tests, typecheck y build pasan.
+
+✓ E2E real pasa.
+
+✓ Revisión arquitectónica independiente PASS.
+
+==================================================
+28. INFORME DE CIERRE
+==================================================
+
+Al finalizar entregar:
+
+# Informe Oficial de Cierre — DELTAOPS LITE-04
+«Preoperacional y Checklist Operacional»
+
+Debe incluir:
+
+1. Discovery realizado.
+2. Qué componentes existentes fueron reutilizados.
+3. Qué se implementó.
+4. Archivos modificados.
+5. APIs modificadas/creadas, si existieran.
+6. Migraciones, si existieran.
+7. Flujo operacional.
+8. Plantillas.
+9. Checklist.
+10. Respuestas.
+11. Evidencias.
+12. Resultado.
+13. Hallazgos.
+14. Seguridad.
+15. RBAC/RLS.
+16. Idempotencia.
+17. Tests.
+18. E2E.
+19. Revisión independiente.
+20. GAPs.
+21. Deuda técnica.
+22. Commits.
+23. Estado final.
+
+NO iniciar LITE-05 automáticamente.
+
+DETENERSE.
+
+ESPERAR APROBACIÓN EXPLÍCITA DE DIRECCIÓN.
+
+==================================================
+DIRECTIVA FINAL
+==================================================
+
+El objetivo no es crear el checklist más sofisticado posible.
+
+El objetivo es crear el checklist que los técnicos realmente puedan utilizar durante una jornada de mantenimiento.
+
+La prioridad es:
+
+OPERACIÓN REAL
+>
+SIMPLICIDAD
+>
+TRAZABILIDAD
+>
+SEGURIDAD
+>
+REUTILIZACIÓN
+>
+ESTÉTICA
+>
+NUEVAS FUNCIONES
+
+Si una decisión técnica no es necesaria para conseguir el flujo anterior:
+
+NO HACERLA.
+
+Si existe una capacidad existente:
+
+REUTILIZARLA.
+
+Si existe una dependencia no resuelta:
+
+DOCUMENTARLA.
+
+Si una regla de negocio no está definida:
+
+DETENERSE Y PREGUNTAR.
+
+NO INVENTAR.
