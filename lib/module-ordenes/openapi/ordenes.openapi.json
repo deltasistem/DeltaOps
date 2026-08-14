@@ -492,7 +492,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Transicionar"
+                "$ref": "#/components/schemas/AprobarCierre"
               }
             }
           }
@@ -4036,6 +4036,34 @@
         "required": [
           "id",
           "comando"
+        ],
+        "additionalProperties": false
+      },
+      "AprobarCierre": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "transicion": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "aprobar",
+              "rechazar"
+            ]
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "opId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision"
         ],
         "additionalProperties": false
       },

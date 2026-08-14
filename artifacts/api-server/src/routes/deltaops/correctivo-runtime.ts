@@ -82,15 +82,47 @@ function ordenIdDeGeneracion(generacionId: string): string {
 }
 
 /**
+ * Resuelve el centro de costos / ubicación / responsable del activo desde la
+ * FUENTE DE VERDAD (`modulo.activos.detalle`, autoridad backend §6). FAIL-SAFE:
+ * si el activo no se puede leer, devuelve nulos (la OT se crea igualmente; el
+ * frontend mostrará «Sin centro de costos configurado» — jamás se inventa).
+ * DELTAOPS LITE-05 (L5-2): enriquece la materialización SIN cambiar el contrato
+ * público de `modulo.ordenes.crear` (los campos ya existen en su schema).
+ */
+async function procedenciaActivo(
+  tenantId: string,
+  activoId: string,
+): Promise<{ centroCosto: string | null; ubicacion: { ubicacionId: string } | null; responsable: string | null }> {
+  const ctxA = contextForActivos("system", "lector", tenantId);
+  const r = await activosRuntime().platform.kernel.queries.execute(ctxA, "modulo.activos.detalle", { id: activoId });
+  if (!r.ok) return { centroCosto: null, ubicacion: null, responsable: null };
+  const v = r.value as { datos?: Record<string, unknown> };
+  const datos = v.datos ?? {};
+  const ubic = datos["ubicacion"] as { ubicacionId?: string } | null | undefined;
+  return {
+    centroCosto: datos["centroCosto"] == null ? null : String(datos["centroCosto"]),
+    ubicacion: ubic?.ubicacionId ? { ubicacionId: String(ubic.ubicacionId) } : null,
+    responsable: datos["responsable"] == null ? null : String(datos["responsable"]),
+  };
+}
+
+/**
  * MATERIALIZADOR OFICIAL de Órdenes de Trabajo. `entrada.opId` es la `claveDedup`
  * (idempotencia end-to-end); el `id` de la OT se deriva de la generación para que
  * reintentos produzcan la MISMA orden. Tipo CANÓNICO "correctiva". Drena el outbox
  * de Órdenes tras crear.
+ *
+ * DELTAOPS LITE-05 (L5-2): la OT hereda `centroCosto`/`ubicacion`/`responsable`
+ * del activo (fuente de verdad Activos) y la `prioridad` de la solicitud. La
+ * PROCEDENCIA extensa del hallazgo (§1) la aporta la solicitud correctiva y viaja
+ * en `observaciones` como resumen legible; el detalle completo se consulta por la
+ * cadena hallazgo↔solicitud↔OT (nunca se duplica el preoperacional).
  */
 const materializadorOrdenes: MaterializadorOrdenes = {
   async crearOrden(tenantId, actorId, entrada: EntradaMaterializacionOrden): Promise<Result<ResultadoMaterializacionOrden, KernelError>> {
     const ctxO = contextForOrdenes(actorId, "admin", tenantId);
     const ordenId = ordenIdDeGeneracion(entrada.generacionId);
+    const proc = await procedenciaActivo(tenantId, entrada.activoPrincipal.activoId);
     const creado = await ordenesRuntime().platform.kernel.commands.execute(ctxO, "modulo.ordenes.crear", {
       id: ordenId,
       opId: entrada.opId,
@@ -98,6 +130,15 @@ const materializadorOrdenes: MaterializadorOrdenes = {
       // Tipo CANÓNICO del módulo de Órdenes (DGP-009): "correctiva".
       tipo: "correctiva",
       activoPrincipal: entrada.activoPrincipal,
+      // L5-2 · centro/ubicación/responsable desde la fuente de verdad (Activos).
+      // `ubicacion`/`responsable` son campos de forma libre en Órdenes; el
+      // `centroCosto` se valida contra el catálogo `centros-costo` del tenant y,
+      // si está vacío (forma libre), no restringe (§6: respeta el del activo, no
+      // inventa). NO se propaga la `prioridad` del catálogo correctivo (distinto
+      // dominio de valores): vive en la solicitud/procedencia, no en la OT.
+      ...(proc.centroCosto ? { centroCosto: proc.centroCosto } : {}),
+      ...(proc.ubicacion ? { ubicacion: proc.ubicacion } : {}),
+      ...(proc.responsable ? { responsable: proc.responsable } : {}),
       observaciones: `Solicitud correctiva ${entrada.solicitudId}`,
     });
     if (!creado.ok) return creado;

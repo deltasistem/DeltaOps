@@ -67,20 +67,66 @@ export async function transicionar(
   });
 }
 
-/** Aprueba (o rechaza) el cierre de una orden en validación. */
+/**
+ * Aprueba (o rechaza) el cierre de una orden en validación.
+ *
+ * El contrato CONGELADO de Órdenes (`modulo.ordenes.aprobarCierre`) exige
+ * `decision: "aprobar" | "rechazar"` (no un booleano): aquí se traduce la
+ * intención de la UI al shape EXACTO que valida el backend, tanto en el POST
+ * directo como en el replay de la cola offline (mismo `input`). Enviar `aprobado`
+ * hacía fallar la validación con «Entrada inválida» (HTTP 400).
+ */
 export async function aprobarCierre(
   cola: ColaSync,
   id: string,
   aprobado: boolean,
+  motivo?: string,
 ): Promise<ResultadoMutacion> {
   const opId = nuevoOpId();
-  const cuerpo = { id, aprobado, opId };
+  const decision = aprobado ? "aprobar" : "rechazar";
+  const cuerpo = {
+    id,
+    decision,
+    opId,
+    ...(!aprobado && motivo ? { motivo } : {}),
+  };
   return mutarConOffline(cola, {
     comando: `${MODULO}.aprobarCierre`,
     input: cuerpo,
     descripcion: `${aprobado ? "Aprobar" : "Rechazar"} cierre de ${id}`,
     directo: () => ordenesFetch(`/${id}/aprobar-cierre`, { method: "POST", body: cuerpo }),
   });
+}
+
+/**
+ * Resuelve el cierre gobernado de una OT en EN_VALIDACION en los DOS pasos que
+ * exige el contrato CONGELADO de Órdenes:
+ *   1) `transicionar("cerrar")` — ABRE el gate de aprobación `validacionCierre`
+ *      (la OT permanece en EN_VALIDACION; el motor es IDEMPOTENTE si el gate ya
+ *      está pendiente, por lo que reintentos/reclics son seguros).
+ *   2) `aprobarCierre(decision)` — DECIDE ese gate (aprobar⇒CERRADA, rechazar⇒
+ *      vuelve a EN_EJECUCION).
+ *
+ * La ficha (y el panel de supervisor) mapeaban el botón «Aprobar y cerrar»
+ * DIRECTAMENTE a `aprobarCierre`, SALTÁNDOSE el paso 1. Como el gate nunca se
+ * abría, el backend respondía «No hay aprobación pendiente para "cerrar"»
+ * (KRN-CFL) —o, según el estado del agregado, «No encontrado: orden-trabajo»—,
+ * bloqueando el cierre por HTTP. Esta función encadena ambos pasos con el mismo
+ * soporte offline que el resto de mutaciones (cada paso se encola por separado y
+ * es idempotente por su propio opId).
+ */
+export async function resolverCierre(
+  cola: ColaSync,
+  id: string,
+  aprobado: boolean,
+  motivo?: string,
+): Promise<ResultadoMutacion> {
+  // Paso 1: abrir el gate. Si queda ENCOLADO (offline) o falla, no seguimos: el
+  // paso 2 sin gate abierto sería un conflicto garantizado.
+  const abrir = await transicionar(cola, id, "cerrar");
+  if (abrir.error || abrir.encolada) return abrir;
+  // Paso 2: decidir el gate ya pendiente.
+  return aprobarCierre(cola, id, aprobado, motivo);
 }
 
 /** Asigna responsable/supervisor. */

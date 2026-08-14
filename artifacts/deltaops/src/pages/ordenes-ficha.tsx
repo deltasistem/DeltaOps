@@ -31,7 +31,7 @@ import {
   useBitacora,
 } from "../lib/ordenes/hooks";
 import { useOffline } from "../lib/offline/contexto";
-import { transicionar, aprobarCierre } from "../lib/ordenes/mutaciones";
+import { transicionar, resolverCierre } from "../lib/ordenes/mutaciones";
 import { fusionarEcosistema } from "../lib/ecosistema/timeline";
 import { useTimelineActivo } from "../lib/ecosistema/hooks";
 import { TRANSICIONES, ETIQUETA_ESTADO, TONO_ESTADO } from "../lib/ordenes/constantes";
@@ -102,11 +102,14 @@ function AccionesCiclo({ orden, onCambio }: { orden: OrdenRow; onCambio: () => v
   async function ejecutar(comando: string, etiqueta: string, requiereValidacion?: boolean) {
     setOcupado(true);
     try {
-      // El cierre en validación pasa por la aprobación inline `validacionCierre`.
+      // El cierre en validación pasa por la aprobación inline `validacionCierre`,
+      // que el contrato de Órdenes exige en DOS pasos (abrir gate `cerrar` +
+      // decidir). `resolverCierre` encadena ambos; llamar sólo a `aprobarCierre`
+      // fallaba porque el gate nunca se abría.
       const r = requiereValidacion && comando === "cerrar"
-        ? await aprobarCierre(cola, orden.id, true)
+        ? await resolverCierre(cola, orden.id, true)
         : requiereValidacion && comando === "devolver"
-          ? await aprobarCierre(cola, orden.id, false)
+          ? await resolverCierre(cola, orden.id, false)
           : await transicionar(cola, orden.id, comando);
       if (r.error) toast.mostrar({ variant: "error", titulo: "Error", mensaje: r.error.message });
       else if (r.encolada) toast.mostrar({ variant: "info", titulo: "Sin conexión", mensaje: `«${etiqueta}» quedó en cola.` });

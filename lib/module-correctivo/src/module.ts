@@ -1305,6 +1305,29 @@ export function correctivoModule(adapters: ModuleAdapters): PlatformServiceDefin
           return ok(r.value as unknown as Record<string, unknown>);
         },
       }),
+      /**
+       * DELTAOPS LITE-05 · Estado de la GENERACIÓN de OT por solicitud (read-only).
+       * Compone el adaptador `generaciones.buscarPorClave` con la clave de dedup
+       * DETERMINISTA de la solicitud. Sirve para que el bucle hallazgo→OT resuelva
+       * «ya convertido» y el enlace a la OT SIN reejecutar la generación (§2/§13).
+       * No expone tablas ni escribe: sólo lee el vínculo existente.
+       */
+      (deps) => ({
+        name: `${MODULO}.generacion-por-solicitud`,
+        inputSchema: z.object({ solicitudId: z.string().min(1) }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          void deps;
+          const clave = claveDedupOrden(input.solicitudId);
+          const r = await adapters.generaciones.buscarPorClave(tenant.value, clave);
+          if (!r.ok) return r;
+          if (!r.value) return ok(null as unknown as Record<string, unknown>);
+          const g = r.value;
+          return ok({ id: g.id, solicitudId: g.solicitudId, ordenTrabajoId: g.ordenTrabajoId, estado: g.estado } as unknown as Record<string, unknown>);
+        },
+      }),
       (deps) => ({
         name: `${MODULO}.solicitudes`,
         inputSchema: z.object({ estado: z.string().optional(), origen: z.string().optional(), activoId: z.string().optional(), limit: z.number().int().positive().optional() }),

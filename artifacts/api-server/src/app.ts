@@ -8,6 +8,7 @@ import attachmentServeRouter from "./routes/deltaops/attachment-serve";
 import referenceModuleRouter from "./routes/deltaops/reference-module";
 import activosModuleRouter from "./routes/deltaops/activos-module";
 import preoperacionalModuleRouter from "./routes/deltaops/preoperacional-module";
+import hallazgoModuleRouter from "./routes/deltaops/hallazgo-module";
 import ordenesModuleRouter from "./routes/deltaops/ordenes-module";
 import inventarioModuleRouter from "./routes/deltaops/inventario-module";
 import planesModuleRouter from "./routes/deltaops/planes-module";
@@ -95,6 +96,11 @@ app.use("/api", referenceModuleRouter);
 // catch-all `/:id`. El entitlement que lo gobierna es `activos` (mismo segmento);
 // no introduce módulo ni entitlement nuevo.
 app.use("/api", preoperacionalModuleRouter);
+// DELTAOPS LITE-05 · Bucle Hallazgo→OT→Cierre: comparte el prefijo
+// `/deltaops/activos/hallazgo`; se monta ANTES de activos (catch-all `/:id`). El
+// entitlement que lo gobierna es `activos` (mismo segmento que el preoperacional
+// que origina los hallazgos); no introduce módulo ni entitlement nuevo.
+app.use("/api", hallazgoModuleRouter);
 app.use("/api", activosModuleRouter);
 app.use("/api", ordenesModuleRouter);
 app.use("/api", inventarioModuleRouter);

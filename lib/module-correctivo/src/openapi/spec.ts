@@ -235,6 +235,12 @@ export function construirOpenApi(): Record<string, unknown> {
     requestBody: jsonBody(ref("GenerarOrdenCorrectiva")),
     responses: { "200": jsonOk(obj({}, [])), ...errores("400", "401", "403", "404", "409") },
   });
+  add(`${BASE}/generaciones/{solicitudId}`, "get", {
+    tags: ["Generación"], operationId: "correctivo.generacion-por-solicitud",
+    summary: "Estado de la generación de OT por solicitud (read-only; enlace a la OT por claveDedup determinista, sin reejecutar la generación)",
+    parameters: [{ name: "solicitudId", in: "path", required: true, schema: str() }],
+    responses: { "200": jsonOk(obj({}, [])), ...errores("401", "403", "404") },
+  });
 
   // ---- Intervenciones ----
   add(`${BASE}/intervenciones`, "post", {

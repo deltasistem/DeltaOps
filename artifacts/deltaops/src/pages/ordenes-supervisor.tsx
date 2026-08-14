@@ -26,7 +26,7 @@ import {
 import { ShellOrdenes } from "../lib/ordenes/Shell";
 import { useListado, useIdentidadesElegibles } from "../lib/ordenes/hooks";
 import { useOffline } from "../lib/offline/contexto";
-import { asignar, asignarRecursoHumano, aprobarCierre } from "../lib/ordenes/mutaciones";
+import { asignar, asignarRecursoHumano, resolverCierre } from "../lib/ordenes/mutaciones";
 import { FormularioDinamico, useFormularioDinamico } from "../lib/forms/FormularioDinamico";
 import { plantillaAsignacion } from "../lib/forms/plantillas-ordenes";
 import { BadgeEstado, esCritica, proximaAVencer } from "../lib/ordenes/componentes";
@@ -156,7 +156,9 @@ function TarjetaValidacion({ orden, onCambio, onAbrir }: { orden: OrdenRow; onCa
 
   async function resolver(aprobado: boolean) {
     setOcupado(true);
-    const r = await aprobarCierre(cola, orden.id, aprobado);
+    // Cierre gobernado en DOS pasos (abrir gate `cerrar` + decidir): sólo llamar
+    // a aprobarCierre fallaba con «No hay aprobación pendiente». Ver mutaciones.ts.
+    const r = await resolverCierre(cola, orden.id, aprobado);
     setOcupado(false);
     if (r.error) toast.mostrar({ variant: "error", titulo: "Error", mensaje: r.error.message });
     else { toast.mostrar({ variant: r.encolada ? "info" : "exito", titulo: aprobado ? "Cierre aprobado" : "Orden devuelta" }); onCambio(); }

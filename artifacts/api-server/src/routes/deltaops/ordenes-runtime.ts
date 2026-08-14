@@ -126,10 +126,23 @@ export function principalOrdenes(userId: string, rol: string): Principal {
   const RESP_SEND = "modulo.formularios.respuesta.enviar";
   const canonico = aRolCanonico(rol);
 
+  // GATE DE CIERRE GOBERNADO (contrato CONGELADO de Órdenes): la máquina de
+  // estados declara `aprobadores: ["validador"]` para la transición `cerrar`, y
+  // el motor de workflow decide por `principal.rol` (o `principal.id`). DeltaOps
+  // NO tiene un rol canónico «validador»; su equivalente son los roles ELEVADOS
+  // con capacidad `validar-ordenes` (TENANT_ADMIN/SUPER_ADMIN/SUPERVISOR). Este
+  // adaptador de autorización —cuya función es TRADUCIR la identidad al vocabulario
+  // del módulo— presenta a esos principales con `rol: "validador"` ANTE EL MOTOR,
+  // sin tocar la máquina de estados, el motor ni el modelo de identidad. Es seguro:
+  // dentro del módulo, `principal.rol` SÓLO lo consume este gate de aprobación; el
+  // resto de la lógica (incl. la excepción §6 al abrir sesión) decide por
+  // capacidades/permisos (`esSupervisorOAdmin`), nunca por `rol`.
+  const ROL_APROBADOR_CIERRE = "validador";
+
   if (canonico === "TENANT_ADMIN" || canonico === "SUPER_ADMIN") {
     return {
       id: userId,
-      rol,
+      rol: ROL_APROBADOR_CIERRE,
       permisos: [...PLATFORM_PERMISSIONS, ...MODULE_PERMISSIONS, FORMS_READ, RESP_READ, RESP_WRITE, RESP_SEND],
       capacidades: ["gestionar-ordenes", "ejecutar-ordenes", "validar-ordenes", "administrar-ordenes"],
     };
@@ -137,11 +150,12 @@ export function principalOrdenes(userId: string, rol: string): Principal {
 
   // SUPERVISOR: gestión operativa completa CON la excepción §6 (validar/cerrar
   // gobernado). Mantiene `modulo.ordenes.validar` y la capacidad `validar-ordenes`
-  // que habilita el bypass legítimo de asignación al abrir sesión.
+  // que habilita el bypass legítimo de asignación al abrir sesión, y actúa como
+  // aprobador del gate de cierre (rol `validador` ante el motor, ver nota arriba).
   if (canonico === "SUPERVISOR") {
     return {
       id: userId,
-      rol,
+      rol: ROL_APROBADOR_CIERRE,
       permisos: [
         ...MODULE_PERMISSIONS.filter((p) => p !== "modulo.ordenes.admin"),
         "platform.attachment.read", "platform.attachment.write",

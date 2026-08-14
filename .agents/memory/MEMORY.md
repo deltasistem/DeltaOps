@@ -48,4 +48,5 @@
 - [Diseño Lite LITE-02](deltaops-lite-diseno-02.md) — capacidades como capa sobre RBAC (jamás jerarquía rígida); 4 dimensiones independientes del activo; DP-2 y DP-5 requieren decisión de Dirección.
 - [Experiencia LITE-03](deltaops-lite-experiencia-03.md) — 401 de contenido degrada sin redirigir (autoridad única useSesion); setQueryData+navegar mismo tick exige lectura síncrona (useSyncExternalStore); UI honesta con catálogos vacíos; E2E con teclado real.
 - [Preoperacional LITE-04](deltaops-preoperacional-lite04.md) — criticidad declarada en plantilla y veredicto anclado a versión; composición embebida exige principal con los permisos de la cadena real + guarda HTTP fail-closed; veredicto solo con sello de servidor.
+- [Hallazgo→OT LITE-05](deltaops-hallazgo-ot-lite05.md) — unicidad vía ids deterministas (uuidv5) sobre dedup existente; gates congelados exigen abrir+decidir; suites PG borran el tenant demo (re-seed antes de E2E).
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.

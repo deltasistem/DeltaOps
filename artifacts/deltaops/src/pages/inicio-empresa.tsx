@@ -52,6 +52,8 @@ import {
   esAdminEmpresa,
 } from "@/lib/identidad/rbac";
 import { useOrdenesGlobal } from "@/lib/ecosistema/hooks";
+import { useResumenHallazgos } from "@/lib/hallazgo/hooks";
+import type { ResumenHallazgos } from "@/lib/hallazgo/tipos";
 import { OfflineProvider, useOffline } from "@/lib/offline/contexto";
 import { BadgeEstado, BadgePrioridad } from "@/lib/ordenes/componentes";
 import { estadoSla, tonoRiesgo } from "@/lib/ecosistema/sla";
@@ -220,6 +222,72 @@ function AlertasSeccion({ resumen }: { resumen: ResumenOperacional | null }) {
           </Alert>
         ))}
       </div>
+    </Section>
+  );
+}
+
+/* -------------------- Hallazgos de preoperacional (§15) ---------------- */
+
+/**
+ * §15 · Indicadores ACCIONABLES del bucle Hallazgo→OT sobre datos REALES del
+ * backend (composición de lectura). Deep links a las bandejas ya existentes:
+ *   - «Pendientes de gestionar» → /activos (donde se abre el preoperacional del
+ *     equipo para generar o descartar el mantenimiento). No se crean rutas.
+ *   - «Mantenimientos derivados» → /ordenes (las OT ya materializadas fluyen a la
+ *     bandeja de Órdenes existente). Estado vacío honesto cuando no hay hallazgos.
+ */
+export function HallazgosPreopSeccion({
+  resumen,
+  cargando,
+  error,
+  onReintentar,
+}: {
+  resumen: ResumenHallazgos | null;
+  cargando: boolean;
+  error: unknown;
+  onReintentar: () => void;
+}) {
+  return (
+    <Section titulo="Hallazgos de preoperacional">
+      {cargando ? (
+        <div style={{ padding: "var(--do-sp-4)" }}>
+          <Spinner label="Cargando hallazgos de preoperacional" />
+        </div>
+      ) : error ? (
+        <ErrorState
+          descripcion="No fue posible cargar los hallazgos de preoperacional."
+          onReintentar={onReintentar}
+        />
+      ) : !resumen || resumen.totalHallazgos === 0 ? (
+        <EmptyState
+          titulo="Sin hallazgos registrados"
+          descripcion="Las inspecciones preoperacionales selladas no reportan hallazgos por gestionar."
+        />
+      ) : (
+        <div style={gapCol}>
+          <div style={gridAuto(240)}>
+            <Link href="/activos" aria-label="Ver activos para gestionar hallazgos pendientes">
+              <KpiCard
+                titulo="Hallazgos pendientes de gestionar"
+                valor={resumen.hallazgosPendientes}
+                icono={ShieldQuestion}
+              />
+            </Link>
+            <Link href="/ordenes" aria-label="Ver órdenes derivadas de preoperacionales">
+              <KpiCard
+                titulo="Mantenimientos derivados"
+                valor={resumen.mantenimientosDerivados}
+                icono={Wrench}
+              />
+            </Link>
+          </div>
+          {resumen.acotado && (
+            <Alert variant="info" titulo="Vista acotada">
+              Se muestran las inspecciones más recientes; el total puede ser mayor.
+            </Alert>
+          )}
+        </div>
+      )}
     </Section>
   );
 }
@@ -688,6 +756,7 @@ function trabajoPorRol(
 function ContenidoInicio() {
   const sesion = useSesionActiva();
   const tieneOrdenes = moduloHabilitado(sesion, "ordenes");
+  const tieneActivos = moduloHabilitado(sesion, "activos");
 
   // Read model REAL de órdenes (sólo si el módulo está habilitado). Es el
   // CONTENIDO que se dispara al montar la Home tras login: `toleraNoAutorizado`
@@ -706,6 +775,11 @@ function ContenidoInicio() {
   );
 
   const trabajo = resumen ? trabajoPorRol(sesion, resumen, ordenes, ahora) : null;
+
+  // §15 · Resumen accionable de hallazgos de preoperacional (datos reales del
+  // backend). Sólo si el módulo de activos —bajo el que vive el preoperacional
+  // que origina los hallazgos— está habilitado. CONSULTA puede leerlo.
+  const hallazgos = useResumenHallazgos({ habilitado: tieneActivos });
 
   const esTecnico = sesion.rol === "TECNICO";
   // OTs asignadas ESTRICTAMENTE a la identidad de la sesión (G-1): base del foco
@@ -752,6 +826,15 @@ function ContenidoInicio() {
       )}
 
       {tieneOrdenes && !cargando && !error && <AlertasSeccion resumen={resumen} />}
+
+      {tieneActivos && (
+        <HallazgosPreopSeccion
+          resumen={hallazgos.datos}
+          cargando={hallazgos.cargando}
+          error={hallazgos.error}
+          onReintentar={hallazgos.recargar}
+        />
+      )}
 
       {tieneOrdenes && !cargando && !error && trabajo && (
         <TrabajoDeHoy

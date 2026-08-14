@@ -75,6 +75,10 @@ export function construirOpenApi(): Record<string, unknown> {
     ),
     EditarOrden: obj({ id: str(), expectedVersion: int({ minimum: 1 }), titulo: str(), descripcion: str(), prioridad: str(), severidad: str() }, ["id", "expectedVersion"]),
     Transicionar: obj({ id: str(), comando: str(), aprobado: bool(), opId: str() }, ["id", "comando"]),
+    AprobarCierre: obj(
+      { id: str(), transicion: str(), decision: str({ enum: ["aprobar", "rechazar"] }), motivo: str(), opId: str() },
+      ["decision"],
+    ),
     Asignar: obj({ id: str(), expectedVersion: int({ minimum: 1 }), responsable: str({ nullable: true }), supervisor: str({ nullable: true }), opId: str() }, ["id", "expectedVersion"]),
     RegistrarEjecucion: obj({ id: str(), expectedVersion: int({ minimum: 1 }), diagnostico: obj({}, []), opId: str() }, ["id", "expectedVersion"]),
     PlantillaRef: obj(
@@ -259,7 +263,7 @@ export function construirOpenApi(): Record<string, unknown> {
   });
   add(`${BASE}/{id}/aprobar-cierre`, "post", {
     tags: ["Ciclo de vida"], operationId: "ordenes.aprobarCierre", summary: "Aprobar (o rechazar) el cierre gobernado",
-    parameters: [idParam], requestBody: jsonBody(ref("Transicionar")),
+    parameters: [idParam], requestBody: jsonBody(ref("AprobarCierre")),
     responses: { "200": jsonOk(ref("ResultadoComando")), ...errores("400", "401", "403", "404", "409") },
   });
   add(`${BASE}/{id}/asignar`, "post", {
