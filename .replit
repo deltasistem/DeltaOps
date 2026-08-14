@@ -27,3 +27,15 @@ packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libimagequant
 
 [userenv.shared]
 NOTIFICATION_PROVIDER = "m365-graph"
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 80
+
+[[ports]]
+localPort = 18151
+externalPort = 3000
