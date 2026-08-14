@@ -53,7 +53,9 @@ import {
 } from "@/lib/identidad/rbac";
 import { useOrdenesGlobal } from "@/lib/ecosistema/hooks";
 import { useResumenHallazgos } from "@/lib/hallazgo/hooks";
+import { useListado } from "@/lib/activos/hooks";
 import type { ResumenHallazgos } from "@/lib/hallazgo/tipos";
+import { atencionHome, type SenalAtencion } from "@/lib/centro/atencion";
 import { OfflineProvider, useOffline } from "@/lib/offline/contexto";
 import { BadgeEstado, BadgePrioridad } from "@/lib/ordenes/componentes";
 import { estadoSla, tonoRiesgo } from "@/lib/ecosistema/sla";
@@ -61,7 +63,6 @@ import { urlOrden, urlActivo, urlOrdenesDeActivo, urlNuevaOrden } from "@/lib/ec
 import {
   resumenOperacional,
   activosConOrdenes,
-  alertasOperacionales,
   ordenesDeHoy,
   type ResumenOperacional,
 } from "@/lib/centro/resumen";
@@ -110,43 +111,33 @@ function Saludo({ sesion }: { sesion: Sesion }) {
 /* --------------------- ¿Qué necesita tu atención? ---------------------- */
 
 /**
- * DELTAOPS LITE-03 §2 · Encabezado ACCIONABLE del inicio. Responde "¿qué
- * necesita tu atención?" con las señales reales del resumen (SLA vencido/en
- * riesgo, sin asignar, críticas) traducidas a tarjetas con acción directa a la
- * superficie que resuelve cada una. Es composición pura sobre `alertasOperacionales`
- * (sin sistema de alertas nuevo). Si no hay nada urgente, muestra un estado
- * positivo honesto en lugar de vacío frío. Los destinos son deep links a las
- * bandejas de Órdenes ya existentes: no se crean rutas.
+ * DELTAOPS LITE-08 §23 · Encabezado ACCIONABLE y de MÁXIMA prioridad del inicio.
+ * Responde "¿qué necesita tu atención?" con la lista PRIORIZADA compuesta por
+ * `atencionHome` sobre read models reales (Órdenes + hallazgos de preoperacional
+ * + equipos fuera de servicio). Prioridad estricta: mantenimiento vencido →
+ * preoperacionales/hallazgos pendientes → OT pendientes → sin asignar/críticas →
+ * equipos fuera de servicio. No es un dashboard de KPIs: son señales con acción
+ * directa a la bandeja/superficie REAL que las resuelve (sin rutas nuevas). Si no
+ * hay nada urgente, muestra un estado positivo honesto en lugar de vacío frío.
  */
-function AtencionAhora({ resumen }: { resumen: ResumenOperacional | null }) {
-  const alertas = resumen ? alertasOperacionales(resumen) : [];
-  // Destino accionable por señal, SIEMPRE a una bandeja REAL existente del
-  // Centro de Operaciones (BANDEJAS de ordenes/constantes). No se inventan
-  // bandejas: "sin asignar" no tiene bandeja propia → se dirige a la lista
-  // general de Órdenes, donde el filtro de responsable ya está disponible.
-  const rutaPorClave: Record<string, string> = {
-    "sla-vencido": urlBandejaOrdenes("vencer"),
-    "sla-riesgo": urlBandejaOrdenes("vencer"),
-    "sin-asignar": "/ordenes",
-    criticas: urlBandejaOrdenes("criticas"),
-  };
+function AtencionAhora({ senales }: { senales: SenalAtencion[] }) {
   return (
     <Section titulo="¿Qué necesita tu atención?">
-      {alertas.length === 0 ? (
+      {senales.length === 0 ? (
         <Alert variant="info" titulo="Todo bajo control">
-          No hay órdenes vencidas, en riesgo, sin asignar ni críticas en este momento.
+          No hay mantenimientos vencidos, hallazgos ni órdenes pendientes, ni equipos fuera de servicio en este momento.
         </Alert>
       ) : (
         <div style={gridAuto(240)}>
-          {alertas.map((a) => (
+          {senales.map((a) => (
             <Card key={a.clave} style={{ borderColor: a.tono === "error" ? "var(--do-error)" : undefined }}>
               <CardContent>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)", flexWrap: "wrap", minWidth: 0 }}>
                   <Badge variant={a.tono}>{a.cantidad}</Badge>
-                  <strong style={{ fontSize: "var(--do-text-base)" }}>{a.titulo}</strong>
+                  <strong style={{ fontSize: "var(--do-text-base)", minWidth: 0, overflowWrap: "anywhere" }}>{a.titulo}</strong>
                 </div>
                 <div style={{ marginTop: "var(--do-sp-3)" }}>
-                  <Link href={rutaPorClave[a.clave] ?? "/ordenes"}>
+                  <Link href={a.ruta}>
                     <Button variant="secundario" size="md" style={botonTactil}>
                       Revisar <ArrowRight size={16} aria-hidden="true" />
                     </Button>
@@ -175,7 +166,7 @@ function ResumenOperacionalSeccion({
   onReintentar: () => void;
 }) {
   return (
-    <Section titulo="Resumen operacional">
+    <Section titulo="Indicadores">
       {cargando ? (
         <div style={{ padding: "var(--do-sp-4)" }}>
           <Spinner label="Cargando resumen operacional" />
@@ -200,28 +191,6 @@ function ResumenOperacionalSeccion({
           <KpiCard titulo="Sin asignar" valor={resumen.sinAsignar.length} />
         </div>
       )}
-    </Section>
-  );
-}
-
-/* ------------------------ Alertas operacionales ------------------------ */
-
-function AlertasSeccion({ resumen }: { resumen: ResumenOperacional | null }) {
-  const alertas = resumen ? alertasOperacionales(resumen) : [];
-  if (alertas.length === 0) return null;
-  return (
-    <Section titulo="Alertas operacionales">
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)", marginTop: "var(--do-sp-3)" }}>
-        {alertas.map((a) => (
-          <Alert key={a.clave} variant={a.tono} titulo={`${a.cantidad} · ${a.titulo}`}>
-            <Link href="/centro">
-              <Button variant="fantasma" size="md" style={botonTactil}>
-                Ver en el centro de mantenimiento <ArrowRight size={16} aria-hidden="true" />
-              </Button>
-            </Link>
-          </Alert>
-        ))}
-      </div>
     </Section>
   );
 }
@@ -378,33 +347,81 @@ function TrabajoDeHoy({
   );
 }
 
-/* --------------------- Activos que requieren atención ------------------ */
+/* ------------------------------- Equipos ------------------------------- */
 
-function ActivosAtencion({ ordenes, ahora }: { ordenes: OrdenRow[]; ahora: number }) {
-  const grupos = useMemo(() => activosConOrdenes(ordenes, ahora).filter((g) => g.requiereAtencion).slice(0, 6), [ordenes, ahora]);
-  if (grupos.length === 0) return null;
+/**
+ * DELTAOPS LITE-08 §23 · Sección «Equipos» (tercera prioridad del inicio, tras
+ * atención y «mi trabajo de hoy»). Muestra los activos que requieren atención
+ * (derivados de sus OT) y accesos directos al listado de equipos y a la
+ * planificación de rutinas. GAP-HOME-RUTINAS: «rutinas próximas» a nivel de
+ * todos los equipos se ofrece como acceso a la superficie de Planes/calendario
+ * en lugar de un agregado read-only nuevo N×M (documentado en el CIERRE).
+ */
+function SeccionEquipos({
+  ordenes,
+  ahora,
+  tieneActivos,
+  tienePlanes,
+}: {
+  ordenes: OrdenRow[];
+  ahora: number;
+  tieneActivos: boolean;
+  tienePlanes: boolean;
+}) {
+  const grupos = useMemo(
+    () => activosConOrdenes(ordenes, ahora).filter((g) => g.requiereAtencion).slice(0, 6),
+    [ordenes, ahora],
+  );
+  if (!tieneActivos && grupos.length === 0) return null;
   return (
-    <Section titulo="Activos que requieren atención">
-      <div style={gridAuto(260)}>
-        {grupos.map((g) => (
-          <Card key={g.activoId}>
-            <CardContent>
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)" }}>
-                <strong>{g.etiqueta}</strong>
-                <Badge variant="advertencia">{g.ordenes.length} OT</Badge>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-2)", marginTop: "var(--do-sp-3)" }}>
-                <Link href={urlActivo(g.activoId)}>
-                  <Button variant="secundario" size="md" style={botonTactil}>Vista 360°</Button>
-                </Link>
-                <Link href={urlOrdenesDeActivo(g.activoId)}>
-                  <Button variant="fantasma" size="md" style={botonTactil}>Sus órdenes</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <Section
+      titulo="Equipos"
+      acciones={
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-2)" }}>
+          {tieneActivos && (
+            <Link href="/activos">
+              <Button variant="fantasma" size="md" style={botonTactil}>
+                Ver equipos <ArrowRight size={16} aria-hidden="true" />
+              </Button>
+            </Link>
+          )}
+          {tienePlanes && (
+            <Link href="/planes/calendario">
+              <Button variant="fantasma" size="md" style={botonTactil}>
+                <CalendarDays size={16} aria-hidden="true" /> Rutinas próximas
+              </Button>
+            </Link>
+          )}
+        </div>
+      }
+    >
+      {grupos.length === 0 ? (
+        <EmptyState
+          titulo="Sin equipos que requieran atención"
+          descripcion="Ningún equipo tiene órdenes críticas, vencidas ni en riesgo ahora mismo."
+        />
+      ) : (
+        <div style={gridAuto(260)}>
+          {grupos.map((g) => (
+            <Card key={g.activoId}>
+              <CardContent>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)", flexWrap: "wrap", minWidth: 0 }}>
+                  <strong style={{ minWidth: 0, overflowWrap: "anywhere" }}>{g.etiqueta}</strong>
+                  <Badge variant="advertencia">{g.ordenes.length} OT</Badge>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-2)", marginTop: "var(--do-sp-3)" }}>
+                  <Link href={urlActivo(g.activoId)}>
+                    <Button variant="secundario" size="md" style={botonTactil}>Vista 360°</Button>
+                  </Link>
+                  <Link href={urlOrdenesDeActivo(g.activoId)}>
+                    <Button variant="fantasma" size="md" style={botonTactil}>Sus órdenes</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </Section>
   );
 }
@@ -781,6 +798,34 @@ function ContenidoInicio() {
   // que origina los hallazgos— está habilitado. CONSULTA puede leerlo.
   const hallazgos = useResumenHallazgos({ habilitado: tieneActivos });
 
+  const tienePlanes = moduloHabilitado(sesion, "planes");
+
+  // §23 · Equipos «fuera de servicio»: read model REAL de Activos filtrado por
+  // estado. Degradación elegante: sin módulo/datos → 0 (la señal no aparece). El
+  // filtro `estado` lo aplica el listado ya existente (RLS por tenant en backend).
+  const activosFuera = useListado(tieneActivos ? { estado: "FUERA_SERVICIO" } : {}, { toleraNoAutorizado: true });
+  const equiposFueraServicio = tieneActivos ? (activosFuera.datos?.length ?? 0) : 0;
+
+  // §23 · Composición PRIORIZADA de «¿qué necesita tu atención?» sobre read
+  // models reales. Deep links a bandejas/superficies existentes (sin rutas nuevas).
+  const senalesAtencion = useMemo(
+    () =>
+      atencionHome({
+        resumen,
+        hallazgos: hallazgos.datos,
+        equiposFueraServicio,
+        rutas: {
+          slaVencido: urlBandejaOrdenes("vencer"),
+          pendientes: urlBandejaOrdenes("pendientes"),
+          sinAsignar: "/ordenes",
+          criticas: urlBandejaOrdenes("criticas"),
+          hallazgosPendientes: "/activos",
+          equiposFuera: "/activos?estado=FUERA_SERVICIO",
+        },
+      }),
+    [resumen, hallazgos.datos, equiposFueraServicio],
+  );
+
   const esTecnico = sesion.rol === "TECNICO";
   // OTs asignadas ESTRICTAMENTE a la identidad de la sesión (G-1): base del foco
   // del técnico. Sin match estricto → lista vacía → estado vacío conservador.
@@ -808,34 +853,23 @@ function ContenidoInicio() {
       )}
 
       {/*
-        LITE-03 §2 · PRIMER PLANO ACCIONABLE. Lo urgente ("¿qué necesita tu
-        atención?") encabeza la experiencia de todos los roles con Órdenes; el
-        punto de partida operacional lo sigue para roles no-técnicos.
+        DELTAOPS LITE-08 §23 · ORDEN ESTRICTO DEL INICIO:
+          1) ¿Qué necesita tu atención?  (máxima prioridad, accionable)
+          2) Mi trabajo de hoy
+          3) Equipos
+          4) Indicadores
+        No es un dashboard de 30 KPIs: la atención encabeza; los indicadores se
+        relegan al final y de forma compacta.
       */}
-      {tieneOrdenes && !cargando && !error && <AtencionAhora resumen={resumen} />}
+
+      {/* 1 · Atención (todos los roles con datos operacionales). */}
+      {(tieneOrdenes || tieneActivos) && !cargando && !error && (
+        <AtencionAhora senales={senalesAtencion} />
+      )}
 
       {!esTecnico && <PuntoDePartida sesion={sesion} />}
 
-      {tieneOrdenes && (
-        <ResumenOperacionalSeccion
-          resumen={resumen}
-          cargando={cargando}
-          error={error}
-          onReintentar={recargar}
-        />
-      )}
-
-      {tieneOrdenes && !cargando && !error && <AlertasSeccion resumen={resumen} />}
-
-      {tieneActivos && (
-        <HallazgosPreopSeccion
-          resumen={hallazgos.datos}
-          cargando={hallazgos.cargando}
-          error={hallazgos.error}
-          onReintentar={hallazgos.recargar}
-        />
-      )}
-
+      {/* 2 · Mi trabajo de hoy. */}
       {tieneOrdenes && !cargando && !error && trabajo && (
         <TrabajoDeHoy
           titulo={trabajo.titulo}
@@ -848,11 +882,32 @@ function ContenidoInicio() {
         />
       )}
 
+      {/* Hallazgos de preoperacional (detalle §15) — bajo «mi trabajo». */}
+      {tieneActivos && (
+        <HallazgosPreopSeccion
+          resumen={hallazgos.datos}
+          cargando={hallazgos.cargando}
+          error={hallazgos.error}
+          onReintentar={hallazgos.recargar}
+        />
+      )}
+
+      {/* 3 · Equipos. */}
       {tieneOrdenes && !cargando && !error && !esTecnico && (
-        <ActivosAtencion ordenes={ordenes} ahora={ahora} />
+        <SeccionEquipos ordenes={ordenes} ahora={ahora} tieneActivos={tieneActivos} tienePlanes={tienePlanes} />
       )}
 
       <AccesosRapidos sesion={sesion} />
+
+      {/* 4 · Indicadores (compactos, al final; NO un dashboard de 30 KPIs). */}
+      {tieneOrdenes && (
+        <ResumenOperacionalSeccion
+          resumen={resumen}
+          cargando={cargando}
+          error={error}
+          onReintentar={recargar}
+        />
+      )}
 
       {/*
         SEGUNDO PLANO · exploración. LITE-03 §1 retira la parrilla "Módulos

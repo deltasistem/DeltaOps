@@ -303,16 +303,23 @@ describe("DGP-008.2 · historial y línea de tiempo", () => {
     const tl = await query(rt, ctx, `${MODULO}.timeline`, { id: A });
     expect(tl.ok).toBe(true);
     if (!tl.ok) return;
-    const items = tl.value as Array<{ data: { eventType: string; estado: string | null; actorId: string } }>;
+    // Shape PLANO normalizado (DGP-010 fix): la UI recibe `eventType`/`tipo`,
+    // `ocurridoAt`/`occurredAt` y `resumen` legibles, nunca objetos anidados que
+    // pintaban «Evento» / «Sin datos».
+    const items = tl.value as Array<{ eventType: string; tipo: string; estado: string | null; actorId: string; resumen: string; ocurridoAt: string | null }>;
     expect(items.length).toBeGreaterThanOrEqual(2);
+    expect(items.every((i) => typeof i.eventType === "string" && i.eventType.length > 0)).toBe(true);
+    expect(items.every((i) => i.tipo === i.eventType)).toBe(true);
+    expect(items.every((i) => typeof i.resumen === "string" && i.resumen.length > 0)).toBe(true);
+    expect(items.every((i) => typeof i.ocurridoAt === "string" && i.ocurridoAt!.length > 0)).toBe(true);
 
     // Filtro por estado: sólo entradas cuyo estado proyectado coincide.
     const porEstado = await query(rt, ctx, `${MODULO}.timeline`, { id: A, estado: "REGISTRADO" });
     expect(porEstado.ok).toBe(true);
     if (porEstado.ok) {
-      const filtrados = porEstado.value as Array<{ data: { estado: string | null } }>;
+      const filtrados = porEstado.value as Array<{ estado: string | null }>;
       expect(filtrados.length).toBeGreaterThanOrEqual(1);
-      expect(filtrados.every((i) => i.data.estado === "REGISTRADO")).toBe(true);
+      expect(filtrados.every((i) => i.estado === "REGISTRADO")).toBe(true);
     }
 
     // Filtro por actor inexistente ⇒ vacío.

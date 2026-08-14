@@ -16,6 +16,7 @@ import {
   plantillaAsignacion,
   PASOS_CREACION,
   CATEGORIAS_EVIDENCIA,
+  CLASES_RECURSO_OPCIONES,
 } from "../lib/forms/plantillas-ordenes";
 import { ACCIONES_BITACORA, ETIQUETA_BITACORA } from "../lib/ordenes/constantes";
 import type { ValoresFormulario } from "../lib/forms/tipos";
@@ -37,6 +38,25 @@ describe("plantillas de órdenes (definiciones válidas)", () => {
     const wiz = def.nodos[0] as unknown as { pasos?: { clave: string }[] };
     const claves = (wiz.pasos ?? []).map((p) => p.clave);
     expect(claves).toEqual(PASOS_CREACION.map((p) => p.clave));
+  });
+});
+
+describe("§15 · consumo ligero en OT (repuesto/insumo)", () => {
+  function campos(def: ReturnType<typeof plantillaRecurso>): string[] {
+    const g = def.nodos[0] as unknown as { hijos?: { clave: string }[] };
+    return (g.hijos ?? []).map((c) => c.clave);
+  }
+  it("incluye repuesto e insumo como tipos de consumo ligero", () => {
+    const valores = CLASES_RECURSO_OPCIONES.map((o) => o.valor);
+    expect(valores).toContain("repuesto");
+    expect(valores).toContain("insumo");
+    // Conserva las clases físicas existentes (aditivo, no rompe).
+    expect(valores).toContain("herramienta");
+    expect(valores).toContain("material");
+  });
+  it("captura costo/proveedor/observación opcionales (§15)", () => {
+    const cs = campos(plantillaRecurso());
+    expect(cs).toEqual(expect.arrayContaining(["clase", "referenciaId", "cantidad", "unidad", "costo", "proveedorId", "observacion"]));
   });
 });
 

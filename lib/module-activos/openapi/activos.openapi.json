@@ -3459,49 +3459,47 @@
           "id": {
             "type": "string"
           },
-          "tenantId": {
+          "eventType": {
             "type": "string"
           },
-          "service": {
+          "tipo": {
             "type": "string"
           },
-          "recordType": {
+          "resumen": {
             "type": "string"
           },
-          "status": {
+          "descripcion": {
             "type": "string"
           },
-          "data": {
-            "type": "object",
-            "properties": {
-              "eventType": {
-                "type": "string"
-              },
-              "entityRef": {
-                "type": "string"
-              },
-              "actorId": {
-                "type": "string"
-              },
-              "resumen": {
-                "type": "string"
-              },
-              "estado": {
-                "type": "string",
-                "nullable": true
-              },
-              "entidadRelacionada": {
-                "type": "string",
-                "nullable": true
-              },
-              "occurredAt": {
-                "type": "string",
-                "format": "date-time"
-              }
-            },
-            "additionalProperties": false
+          "estado": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "entidadRelacionada": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ocurridoAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
+        "required": [
+          "eventType",
+          "tipo"
+        ],
         "additionalProperties": false
       },
       "EntradaHistorial": {

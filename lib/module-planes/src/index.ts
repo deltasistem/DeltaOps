@@ -13,6 +13,7 @@ export * from "./domain/events";
 export * from "./domain/workflow";
 export * from "./domain/value-objects";
 export * from "./domain/frecuencia-engine";
+export * from "./domain/estado-rutina";
 export * from "./domain/calendario";
 export * from "./domain/rutina";
 export * from "./domain/generacion";

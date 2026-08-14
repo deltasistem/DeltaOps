@@ -56,7 +56,7 @@ import {
 } from "./domain/plan";
 import { crearCalendarioOperacional, proximaFechaHabil } from "./domain/calendario";
 import { crearRutina, type Rutina } from "./domain/rutina";
-import { crearFrecuencia, crearAlcanceActivos, type AlcanceActivos, type Frecuencia } from "./domain/value-objects";
+import { crearFrecuencia, crearAlcanceActivos, alcanceIncluye, type AlcanceActivos, type Frecuencia } from "./domain/value-objects";
 import {
   ACCIONES_SUSPENSION,
   crearHistorialPlan,
@@ -68,7 +68,8 @@ import {
   decidirGeneracion,
   type OrigenGeneracion,
 } from "./domain/generacion";
-import type { AnclajeFrecuencia, ContextoEvaluacion } from "./domain/frecuencia-engine";
+import { evaluarFrecuencia, type AnclajeFrecuencia, type ContextoEvaluacion } from "./domain/frecuencia-engine";
+import { estadoRutina } from "./domain/estado-rutina";
 import {
   policiesDelModulo,
   POLICY_PUEDE_ARCHIVAR_PLAN,
@@ -1207,6 +1208,118 @@ export function planesModule(adapters: ModuleAdapters): PlatformServiceDefinitio
           const r = await adapters.generaciones.listPorPlan(tenant.value, input.planId);
           if (!r.ok) return r;
           return ok(r.value as unknown as Record<string, unknown>[]);
+        },
+      }),
+      /* ---------------------- estado-rutinas (LITE-08) ------------------- */
+      // DELTAOPS LITE-08 §3-5: expone, por ACTIVO, el ESTADO OPERACIONAL de las
+      // rutinas por USO/TIEMPO que ya calcula el MOTOR de FRECUENCIAS. Es una
+      // CONSULTA PURA (no crea generaciones ni OT): compone el read model de
+      // planes (snapshot `datos` con alcance/programa) + el motor determinista.
+      // Los `medidores` del activo llegan como INPUT desde el runtime (que los
+      // lee del módulo de Activos con `medidoresDeActivo`): el frontend NO es
+      // autoridad de esos valores. `ahora` se inyecta (jamás reloj interno).
+      // El anclaje `medidoresBase` es {} (primer cumplimiento) ⇒ la meta de uso
+      // es el intervalo absoluto del plan; para temporales, `desde` = última
+      // ocurrencia generada (rutina cíclica) o `vigenteDesde`. GAP documentado:
+      // sin "medidor al último cumplimiento" persistido, la meta de uso no se
+      // re-ancla tras cada servicio (ver LITE-08 CIERRE).
+      (deps) => ({
+        name: `${MODULO}.estado-rutinas`,
+        inputSchema: z.object({
+          activoId: z.string().min(1),
+          ahora: z.string().min(1),
+          medidores: z.record(z.string(), z.number()).optional(),
+          eventos: z.record(z.string(), z.number()).optional(),
+          candidato: z
+            .object({
+              categoria: z.string().nullable().optional(),
+              familia: z.string().nullable().optional(),
+              subfamilia: z.string().nullable().optional(),
+              empresa: z.string().nullable().optional(),
+              proyecto: z.string().nullable().optional(),
+              ubicacion: z.string().nullable().optional(),
+              clase: z.string().nullable().optional(),
+            })
+            .optional(),
+          umbralProximidad: z.number().min(0).max(1).optional(),
+        }),
+        authorization: { permissions: [`${MODULO}.read`] },
+        async handle(ctx, input) {
+          const tenant = tenantOf(ctx);
+          if (!tenant.ok) return tenant;
+          void deps;
+          if (!adapters.readModel) {
+            return fail(KernelErrors.conflict("El runtime no está configurado con read models de planes"));
+          }
+          const medidores = input.medidores ?? {};
+          const eventos = input.eventos ?? {};
+          // Sólo planes VIGENTES (publicados y en curso): son los que operan.
+          const lista = await adapters.readModel.planList(tenant.value, { estado: "vigente" });
+          if (!lista.ok) return lista;
+
+          const rutinas: Record<string, unknown>[] = [];
+          for (const fila of lista.value) {
+            const detalle = await adapters.readModel.planGet(tenant.value, fila.id);
+            if (!detalle.ok) return detalle;
+            if (!detalle.value) continue;
+            const plan = detalle.value.datos as unknown as PlanMantenimiento;
+            const activa = versionActiva(plan);
+            if (!activa) continue;
+            // Alcance declarativo: ¿este activo cae en el plan?
+            const enAlcance = alcanceIncluye(activa.alcance, {
+              activoId: input.activoId,
+              categoria: input.candidato?.categoria ?? null,
+              familia: input.candidato?.familia ?? null,
+              subfamilia: input.candidato?.subfamilia ?? null,
+              empresa: input.candidato?.empresa ?? null,
+              proyecto: input.candidato?.proyecto ?? null,
+              ubicacion: input.candidato?.ubicacion ?? null,
+              clase: input.candidato?.clase ?? null,
+            });
+            if (!enAlcance) continue;
+
+            // Anclaje: última ocurrencia generada para este activo (rutina
+            // cíclica) o el inicio de vigencia del programa. `medidoresBase` no
+            // se persiste al generar ⇒ {} (primer tramo). Documentado como GAP.
+            let desde = activa.programa.vigenteDesde;
+            const gens = await adapters.readModel.generacionesPorPlan(tenant.value, plan.id);
+            if (gens.ok) {
+              const delActivo = gens.value
+                .filter((g) => g.activoId === input.activoId)
+                .sort((a, b) => b.registradoAt.getTime() - a.registradoAt.getTime());
+              if (delActivo[0]) desde = delActivo[0].fechaObjetivo.toISOString();
+            }
+            const anclaje: AnclajeFrecuencia = { desde, medidoresBase: {}, eventosBase: {} };
+            const ctxEval: ContextoEvaluacion = { ahora: input.ahora, medidores, eventos };
+            const evaluacion = evaluarFrecuencia(activa.programa.frecuencia, anclaje, ctxEval);
+            const estado = estadoRutina(evaluacion, { fraccion: input.umbralProximidad });
+
+            rutinas.push({
+              planId: plan.id,
+              codigo: plan.codigo,
+              nombre: plan.nombre,
+              tipoPlan: plan.tipoPlan,
+              prioridad: plan.prioridad,
+              version: activa.numero,
+              vencida: estado.vencida,
+              semaforo: estado.semaforo,
+              etiqueta: estado.etiqueta,
+              faltante: estado.faltante,
+              excedente: estado.excedente,
+              meta: estado.meta,
+              unidad: estado.unidad,
+              dominio: estado.dominio,
+              progreso: estado.progreso,
+            });
+          }
+          // Orden: vencidas primero, luego por mayor progreso (más cercanas).
+          rutinas.sort((a, b) => {
+            const va = a.vencida ? 1 : 0;
+            const vb = b.vencida ? 1 : 0;
+            if (va !== vb) return vb - va;
+            return Number(b.progreso ?? 0) - Number(a.progreso ?? 0);
+          });
+          return ok({ activoId: input.activoId, ahora: input.ahora, rutinas });
         },
       }),
       (deps) => ({

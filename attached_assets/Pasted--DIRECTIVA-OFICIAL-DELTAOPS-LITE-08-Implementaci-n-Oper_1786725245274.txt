@@ -1,0 +1,1239 @@
+# DIRECTIVA OFICIAL — DELTAOPS LITE-08
+# "Implementación Operacional Delta: Rutinas, Lecturas, Hoja de Vida, Combustible, Consumos, Multicentro y Datos Operacionales"
+
+## 0. AUTORIZACIÓN
+
+La Dirección revisó y aprobó el resultado de:
+
+- DGP-023.1
+- DGP-023.2
+- DGP-023.3
+- DGP-023.4
+- DGP-023.5
+- DGP-023.6
+- DELTAOPS LITE-01
+- DELTAOPS LITE-02
+- DELTAOPS LITE-03
+- DELTAOPS LITE-04
+- DELTAOPS LITE-05
+- DELTAOPS LITE-06
+- DELTAOPS LITE-07
+
+LITE-07 confirmó que gran parte del dominio necesario ya existe.
+
+A partir de esta directiva SÍ se autoriza implementación.
+
+IMPORTANTE:
+
+No reconstruir la plataforma.
+
+No crear un CMMS paralelo.
+
+No crear entidades duplicadas.
+
+No reemplazar módulos existentes.
+
+La implementación debe COMPOSICIONAR sobre el dominio actual.
+
+---
+
+# 1. OBJETIVO
+
+Convertir DeltaOps en una herramienta realmente orientada a la operación diaria de Delta Logística.
+
+El flujo objetivo es:
+
+EQUIPO
+↓
+LECTURA
+↓
+PREOPERACIONAL
+↓
+OPERACIÓN
+↓
+RUTINA
+↓
+NECESIDAD DE MANTENIMIENTO
+↓
+HALLAZGO / OT
+↓
+EJECUCIÓN
+↓
+HORAS HOMBRE
+↓
+CONSUMOS
+↓
+COMBUSTIBLE
+↓
+CIERRE
+↓
+HOJA DE VIDA
+↓
+INDICADORES
+
+No todos los pasos ocurren siempre.
+
+Cada dato debe registrarse una sola vez y reutilizarse donde corresponda.
+
+---
+
+# 2. PRINCIPIO FUNDAMENTAL
+
+La fuente de verdad debe continuar siendo el dominio existente.
+
+No crear:
+
+- segunda entidad de activo;
+- segunda entidad de OT;
+- segunda entidad de checklist;
+- segunda entidad de lectura;
+- segunda entidad de combustible;
+- segunda entidad de mano de obra;
+- segunda hoja de vida;
+- segunda cola offline.
+
+Reutilizar:
+
+- Activos;
+- Lecturas;
+- Planes/Rutinas;
+- Dynamic Forms;
+- Preoperacionales;
+- Correctivo;
+- Órdenes;
+- Mano de obra;
+- Combustible;
+- Costos;
+- platform_records;
+- auditoría;
+- RLS;
+- RBAC;
+- offline existente;
+- Design System.
+
+---
+
+# 3. FASE 1 — RUTINAS POR USO
+
+LITE-07 confirmó que el motor ya calcula:
+
+- horómetro;
+- kilometraje;
+- ciclos;
+- próxima meta;
+- vencimiento.
+
+La implementación debe exponer esta capacidad.
+
+En la ficha del activo mostrar:
+
+## Próximo mantenimiento
+
+Ejemplo:
+
+Mantenimiento 1.200 h
+
+Horómetro actual:
+1.185 h
+
+Faltan:
+15 h
+
+Estado:
+🟢 Próximo
+
+Cuando corresponda:
+
+🟡 Próximo mantenimiento
+
+🔴 Mantenimiento vencido
+
+Siempre utilizar texto además del color.
+
+---
+
+# 4. NO CREAR PLANIFICACIÓN MANUAL OBLIGATORIA
+
+La rutina debe ser el mecanismo operacional.
+
+El sistema NO debe depender de:
+
+"un coordinador entra y crea el mantenimiento".
+
+La rutina debe determinar automáticamente:
+
+- cuándo corresponde;
+- por qué corresponde;
+- cuánto falta;
+- cuánto se ha excedido.
+
+La persona responsable decide la ejecución según las capacidades existentes.
+
+---
+
+# 5. NOTIFICACIÓN VS OT AUTOMÁTICA
+
+Decisión de Dirección:
+
+Una rutina vencida por horómetro/kilometraje inicialmente NO debe crear una OT automáticamente.
+
+Debe:
+
+1. detectar;
+2. notificar;
+3. mostrar como pendiente;
+4. permitir generar mantenimiento/OT desde la experiencia operacional.
+
+No crear OTs masivamente sin intervención humana.
+
+La generación de OT debe continuar utilizando el flujo LITE-05.
+
+---
+
+# 6. LECTURAS
+
+Exponer una experiencia sencilla para registrar:
+
+- horómetro;
+- kilometraje;
+- ciclos cuando aplique.
+
+La lectura debe quedar asociada al activo.
+
+Debe conservar:
+
+- fecha;
+- hora;
+- valor;
+- usuario;
+- origen;
+- auditoría.
+
+Mantener el comportamiento append-only.
+
+No aceptar silenciosamente lecturas inferiores.
+
+Si existe corrección:
+
+mantener la regularización auditada existente.
+
+---
+
+# 7. CAPTURA RÁPIDA DE LECTURA
+
+Crear/componer una experiencia operacional sencilla:
+
+## Registrar lectura
+
+Equipo:
+CARGADOR CAT 320
+
+Última lectura:
+1.185 h
+
+Nueva lectura:
+[________]
+
+[Guardar lectura]
+
+Después de guardar:
+
+Nueva lectura:
+1.190 h
+
+Próximo mantenimiento:
+1.200 h
+
+Faltan:
+10 h
+
+No obligar al usuario a entrar al módulo administrativo de Planes.
+
+---
+
+# 8. HOJA DE VIDA
+
+La ficha del activo debe convertirse en el expediente operacional principal.
+
+Crear/componer una vista de hoja de vida usando datos existentes.
+
+Debe consolidar:
+
+## Identificación
+
+- código;
+- nombre;
+- tipo;
+- marca;
+- modelo;
+- serial.
+
+## Ubicación
+
+- centro de costos;
+- centro de trabajo;
+- ubicación;
+- responsable.
+
+## Estado
+
+- operativo;
+- mantenimiento;
+- fuera de servicio.
+
+## Lecturas
+
+- última lectura;
+- histórico;
+- evolución.
+
+## Preoperacionales
+
+- último;
+- resultado;
+- hallazgos;
+- historial.
+
+## Mantenimiento
+
+- última OT;
+- OT abiertas;
+- OT cerradas;
+- preventivos;
+- correctivos;
+- próximos mantenimientos.
+
+## Mano de obra
+
+- horas hombre;
+- horas por OT;
+- acumulado.
+
+## Combustible
+
+- cantidad;
+- costo;
+- rendimiento;
+- histórico.
+
+## Consumos
+
+- repuestos;
+- insumos;
+- cantidad;
+- costo.
+
+## Timeline
+
+Mostrar los hechos cronológicamente.
+
+NO duplicar datos.
+
+La hoja de vida debe consultar las fuentes existentes.
+
+---
+
+# 9. COMBUSTIBLE
+
+Implementar la experiencia operacional de combustible.
+
+El registro debe estar asociado directamente al activo.
+
+Campos mínimos:
+
+- activo;
+- fecha;
+- cantidad;
+- unidad;
+- tipo de energía;
+- lectura del activo;
+- centro de costos;
+- centro de trabajo;
+- responsable;
+- costo;
+- proveedor opcional;
+- identificación del proveedor opcional;
+- número de soporte/ticket cuando aplique;
+- observación.
+
+---
+
+# 10. UNIDADES DE ENERGÍA
+
+No asumir que todo es combustible líquido.
+
+El modelo debe respetar el catálogo existente de energía.
+
+Ejemplos posibles:
+
+- litros;
+- galones;
+- kWh;
+- otras unidades configuradas por el dominio.
+
+Si el dominio actual no soporta una unidad necesaria:
+
+documentarlo claramente antes de crear una modificación estructural.
+
+No convertir silenciosamente todo a litros.
+
+---
+
+# 11. PROVEEDOR
+
+Mantener la decisión de negocio de Delta:
+
+NO obligar a crear un proveedor maestro antes de registrar una compra/abastecimiento.
+
+El proveedor puede ser un dato transaccional:
+
+Nombre:
+________
+
+Identificación/NIT:
+________
+
+El registro debe conservar el snapshot del proveedor utilizado en esa operación.
+
+No convertir proveedores en una barrera operativa.
+
+El módulo administrativo de proveedores puede permanecer como capacidad futura/administrativa.
+
+---
+
+# 12. RENDIMIENTO
+
+Nunca permitir que el usuario introduzca manualmente un rendimiento calculable.
+
+Derivar:
+
+consumo + lectura inicial + lectura final.
+
+Ejemplos:
+
+litros/h
+
+galones/h
+
+km/l
+
+kWh/h
+
+etc.
+
+La unidad depende del activo/energía.
+
+Si no hay suficientes datos:
+
+"Sin datos suficientes para calcular rendimiento."
+
+---
+
+# 13. COMBUSTIBLE Y COSTOS
+
+Un abastecimiento debe poder alimentar:
+
+- costo del activo;
+- costo energético;
+- análisis de consumo;
+- rendimiento;
+- indicadores.
+
+Si el abastecimiento está relacionado con una OT:
+
+debe poder reflejarse también en el costo de la intervención.
+
+No duplicar el costo.
+
+La fuente de verdad debe ser la transacción original.
+
+---
+
+# 14. HORAS HOMBRE
+
+Utilizar el módulo existente.
+
+Simplificar la experiencia de registro.
+
+Desde una OT:
+
+## Registrar trabajo
+
+Técnico:
+[usuario]
+
+Inicio:
+[hora]
+
+Fin:
+[hora]
+
+Trabajo realizado:
+[texto]
+
+[Guardar]
+
+Calcular duración automáticamente.
+
+Mantener:
+
+- usuario;
+- OT;
+- activo;
+- centro;
+- fecha;
+- duración;
+- auditoría.
+
+---
+
+# 15. REPUESTOS E INSUMOS
+
+Delta Logística actualmente NO opera un inventario formal para este proceso.
+
+Por lo tanto:
+
+NO hacer que Inventario sea requisito para cerrar una OT.
+
+Implementar una captura ligera de consumo en la OT.
+
+Ejemplo:
+
+## Registrar consumo
+
+Tipo:
+Repuesto / Insumo
+
+Descripción:
+Filtro de aceite
+
+Cantidad:
+1
+
+Unidad:
+unidad
+
+Costo:
+opcional
+
+Proveedor:
+opcional
+
+Observación:
+opcional
+
+[Agregar]
+
+El registro debe quedar asociado a:
+
+OT
+↓
+Activo
+↓
+Hoja de vida
+↓
+Costos
+
+No eliminar el Inventario existente.
+
+Clasificarlo como capacidad secundaria/administrativa hasta que Delta decida implementarlo operacionalmente.
+
+---
+
+# 16. CENTRO DE COSTOS
+
+Implementar el centro de costos como dimensión operacional.
+
+Debe poder asociarse al activo.
+
+No permitir que el usuario cambie arbitrariamente el centro de costos de un activo desde una OT.
+
+La fuente de verdad debe ser el activo/catálogo autorizado.
+
+Si el activo no tiene centro:
+
+mostrar:
+
+"Sin centro de costos configurado"
+
+No inventar.
+
+---
+
+# 17. CENTRO DE TRABAJO
+
+LITE-07 confirmó que actualmente NO existe como dimensión completa.
+
+Implementar solamente si el modelo actual permite hacerlo de manera consistente.
+
+Conceptualmente:
+
+CENTRO DE COSTOS
+≠
+CENTRO DE TRABAJO
+≠
+UBICACIÓN
+
+El centro de trabajo representa la operación/sitio donde trabaja el equipo.
+
+No duplicar activos para representar centros diferentes.
+
+Un activo puede cambiar de centro de trabajo durante su vida útil.
+
+Debe existir trazabilidad del cambio si se implementa persistencia.
+
+---
+
+# 18. MULTICENTRO
+
+Un usuario puede trabajar en uno o varios centros.
+
+El acceso debe depender de las autorizaciones reales del usuario.
+
+No asumir que todos los usuarios pueden ver todos los centros.
+
+El backend continúa siendo la autoridad.
+
+Nunca aceptar:
+
+tenantId
+centerId
+identityId
+
+desde el frontend como autoridad de seguridad.
+
+El frontend solo solicita.
+
+El backend determina.
+
+RLS permanece activa.
+
+---
+
+# 19. EQUIPO/GRUPO DE MANTENIMIENTO
+
+LITE-07 confirmó que esta dimensión completa no existe actualmente.
+
+Implementarla solamente si resulta necesaria para la asignación operacional.
+
+Debe ser opcional.
+
+No crear una estructura jerárquica rígida.
+
+Ejemplo:
+
+Equipo de mantenimiento:
+"Mecánica Barranquilla"
+
+Puede existir.
+
+Pero un centro pequeño puede operar sin grupo formal.
+
+No obligar.
+
+---
+
+# 20. ROLES
+
+No crear el rol OPERADOR todavía.
+
+Mantener los roles existentes.
+
+La experiencia debe adaptarse a las capacidades existentes.
+
+Un centro puede funcionar con:
+
+Administrador
+Responsable
+Técnico
+
+sin exigir coordinador.
+
+Otro centro puede tener:
+
+Asignador
+Técnico
+Validador
+
+El sistema debe permitir ambas realidades mediante capacidades.
+
+Nunca codificar:
+
+"siempre debe existir coordinador".
+
+---
+
+# 21. CONFIGURACIÓN POR ROL
+
+LITE-07 confirmó que actualmente NO existe una configuración completa de módulos por rol.
+
+Implementar una primera versión administrativa únicamente si puede componerse sobre el sistema de capacidades/entitlements existente.
+
+Objetivo:
+
+permitir configurar qué módulos aparecen para determinados perfiles/usuarios autorizados.
+
+IMPORTANTE:
+
+VISIBILIDAD ≠ SEGURIDAD.
+
+Ocultar un módulo no concede ni revoca seguridad.
+
+El backend/RBAC continúa siendo la autoridad.
+
+No crear permisos paralelos.
+
+No crear un segundo RBAC.
+
+---
+
+# 22. NAVEGACIÓN
+
+La navegación debe reflejar el trabajo del usuario.
+
+Para un técnico:
+
+Inicio
+Mis equipos
+Mantenimiento
+Preoperacional
+
+Para un responsable:
+
+Inicio
+Equipos
+Mantenimiento
+Preoperacionales
+Indicadores
+
+Para administración:
+
+Inicio
+Mantenimiento
+Equipos
+Indicadores
+Administración
+
+Los módulos secundarios no deben ocupar el mismo peso visual que los módulos CORE.
+
+No eliminar módulos.
+
+Solo reorganizar exposición.
+
+---
+
+# 23. HOME OPERACIONAL
+
+La Home debe priorizar:
+
+## ¿Qué necesita tu atención?
+
+- equipos con mantenimiento vencido;
+- preoperacionales pendientes;
+- hallazgos pendientes;
+- OTs pendientes;
+- rutinas próximas;
+- equipos fuera de servicio.
+
+Después:
+
+## Mi trabajo de hoy
+
+Después:
+
+## Equipos
+
+Después:
+
+## Indicadores
+
+No convertir la Home en un dashboard de 30 KPIs.
+
+---
+
+# 24. INDICADORES
+
+Implementar únicamente indicadores con fuente real.
+
+Prioridad:
+
+### CORE
+
+- equipos;
+- OTs;
+- mantenimiento vencido;
+- mantenimiento próximo;
+- preoperacionales;
+- hallazgos;
+- horas hombre;
+- combustible;
+- consumo;
+- costos.
+
+### DERIVADOS
+
+- rendimiento;
+- costo por hora;
+- costo por km;
+- combustible por hora;
+- combustible por km.
+
+### NO INVENTAR
+
+MTBF
+MTTR
+Disponibilidad
+OEE
+
+si los datos todavía no son suficientes.
+
+Cuando no exista fuente:
+
+"Sin datos suficientes".
+
+---
+
+# 25. HOJA DE VIDA COMO FUENTE DE CONSULTA
+
+Desde cualquier lugar donde aparezca un equipo:
+
+[Ver equipo]
+
+debe llevar a la ficha.
+
+La ficha debe permitir acceder a:
+
+[Preoperacional]
+
+[Registrar lectura]
+
+[Registrar combustible]
+
+[Ver mantenimiento]
+
+[Registrar trabajo]
+
+[Ver historial]
+
+Las acciones disponibles deben depender del perfil.
+
+---
+
+# 26. QR
+
+Mantener el QR existente.
+
+El flujo:
+
+ESCANEAR QR
+↓
+EQUIPO
+↓
+ESTADO
+↓
+PREOPERACIONAL
+↓
+LECTURA
+↓
+REPORTAR NOVEDAD
+
+debe ser una de las experiencias principales de operación móvil.
+
+---
+
+# 27. OFFLINE
+
+Utilizar únicamente la cola offline existente.
+
+No crear una segunda cola.
+
+Las operaciones que puedan ejecutarse offline deben utilizar el patrón existente.
+
+Mantener:
+
+- idempotencia;
+- sincronización;
+- identidad;
+- tenant;
+- auditoría.
+
+No permitir duplicados por mala conexión.
+
+---
+
+# 28. MOBILE FIRST
+
+La experiencia operativa debe funcionar correctamente en:
+
+390 px
+768 px
+1280 px+
+
+No simplemente reducir el escritorio.
+
+Diseñar específicamente las pantallas operativas para móvil.
+
+Priorizar:
+
+botones grandes
+campos simples
+pocos pasos
+acciones claras
+lectura rápida
+uso con una mano.
+
+---
+
+# 29. RESPONSIVE REAL
+
+Corregir estructuralmente:
+
+- exceso de espacio lateral;
+- contenido comprimido;
+- navegación desbordada;
+- tablas imposibles en móvil;
+- cards demasiado pequeñas;
+- formularios con demasiadas columnas;
+- botones fuera de pantalla;
+- texto recortado.
+
+Utilizar el ancho disponible correctamente.
+
+No establecer un max-width artificial que genere grandes espacios vacíos.
+
+---
+
+# 30. TEMA CLARO/OSCURO
+
+Corregir definitivamente:
+
+- logo;
+- navegación;
+- textos;
+- iconos;
+- botones;
+- selects;
+- dropdowns;
+- tablas;
+- cards;
+- badges;
+- formularios.
+
+El logo debe ser visible en:
+
+CLARO
+OSCURO
+
+No utilizar un logo negro sobre fondo negro.
+
+Reutilizar exclusivamente Design System.
+
+---
+
+# 31. NO HACER
+
+No implementar en esta fase:
+
+- IA;
+- mantenimiento predictivo;
+- compras;
+- órdenes de compra;
+- inventario avanzado;
+- bodegas complejas;
+- transferencias;
+- multi-moneda;
+- multi-idioma;
+- planificación manual compleja;
+- nuevos roles innecesarios;
+- segundo sistema de permisos;
+- segundo sistema de offline;
+- nuevo motor de OT;
+- nuevo motor de checklists;
+- nueva entidad de activos.
+
+---
+
+# 32. CRITERIO DE IMPLEMENTACIÓN
+
+Antes de tocar código para cada funcionalidad:
+
+1. localizar componente existente;
+2. localizar API existente;
+3. localizar entidad existente;
+4. localizar tests;
+5. reutilizar;
+6. modificar solamente lo necesario.
+
+Si se descubre que una capacidad no existe:
+
+documentar el GAP antes de crear una estructura nueva.
+
+Preferir:
+
+COMPOSICIÓN > EXTENSIÓN > NUEVA ESTRUCTURA
+
+---
+
+# 33. MIGRACIONES
+
+Antes de crear cualquier migración:
+
+demostrar que la funcionalidad no puede resolverse con las estructuras actuales.
+
+Si una migración es inevitable:
+
+documentarla.
+
+Mantener:
+
+RLS
+tenant_id
+auditoría
+timestamps
+idempotencia
+
+No modificar el modelo multitenant de forma innecesaria.
+
+---
+
+# 34. PRUEBAS
+
+Agregar pruebas para:
+
+- lectura válida;
+- lectura menor;
+- regularización;
+- cálculo de próxima rutina;
+- rutina vencida;
+- notificación;
+- generación manual de OT;
+- combustible;
+- rendimiento;
+- horas hombre;
+- consumo;
+- centro de costos;
+- aislamiento multicentro;
+- RBAC;
+- RLS;
+- offline;
+- idempotencia;
+- hoja de vida.
+
+No considerar una funcionalidad terminada solo porque la pantalla funciona.
+
+---
+
+# 35. E2E OBLIGATORIO
+
+Construir un flujo E2E real:
+
+LOGIN
+↓
+HOME
+↓
+EQUIPO
+↓
+REGISTRAR LECTURA
+↓
+VER PRÓXIMA RUTINA
+↓
+PREOPERACIONAL
+↓
+NO APTO
+↓
+HALLAZGO
+↓
+GENERAR OT
+↓
+ASIGNAR
+↓
+EJECUTAR
+↓
+REGISTRAR HORAS HOMBRE
+↓
+REGISTRAR CONSUMO
+↓
+REGISTRAR COMBUSTIBLE
+↓
+CERRAR OT
+↓
+VOLVER AL EQUIPO
+↓
+VER HOJA DE VIDA
+
+Debe verificarse que los hechos realmente quedaron asociados.
+
+---
+
+# 36. SEGURIDAD
+
+No reducir:
+
+- RLS;
+- RBAC;
+- autenticación;
+- autorización;
+- auditoría.
+
+El backend continúa siendo autoridad.
+
+Todas las mutaciones deben validar:
+
+tenant
+identidad
+activo
+permisos
+relaciones
+
+No confiar en IDs enviados desde frontend.
+
+---
+
+# 37. REVISIÓN INDEPENDIENTE
+
+Antes del cierre:
+
+revisar desde cero:
+
+- código;
+- migraciones;
+- API;
+- RBAC;
+- RLS;
+- tests;
+- E2E;
+- UX;
+- responsive;
+- tema;
+- hoja de vida;
+- combustible;
+- lecturas;
+- rutinas;
+- OT;
+- horas hombre;
+- consumos;
+- multicentro.
+
+Verificar que no se haya creado:
+
+- módulo duplicado;
+- entidad duplicada;
+- RBAC paralelo;
+- cola offline paralela;
+- dato duplicado.
+
+---
+
+# 38. ENTREGABLE
+
+Crear:
+
+docs/dgp/DELTAOPS-LITE-08-CIERRE-IMPLEMENTACION-OPERACIONAL.md
+
+Debe incluir:
+
+1. Qué se implementó.
+2. Qué se reutilizó.
+3. Archivos modificados.
+4. APIs modificadas/creadas.
+5. Migraciones.
+6. Rutinas.
+7. Lecturas.
+8. Combustible.
+9. Horas hombre.
+10. Consumos.
+11. Hoja de vida.
+12. Centros.
+13. Roles.
+14. Navegación.
+15. Home.
+16. Indicadores.
+17. Responsive.
+18. Tema.
+19. Offline.
+20. Seguridad.
+21. Tests.
+22. E2E.
+23. Revisión independiente.
+24. GAPs.
+25. Deuda técnica.
+26. Rollback.
+27. Estado final.
+
+---
+
+# 39. CRITERIO DE CIERRE
+
+LITE-08 solo puede declararse PASS si:
+
+- typecheck PASS;
+- build PASS;
+- tests PASS;
+- RLS PASS;
+- RBAC PASS;
+- E2E PASS;
+- móvil PASS;
+- desktop PASS;
+- tema claro PASS;
+- tema oscuro PASS;
+- lectura PASS;
+- rutina PASS;
+- combustible PASS;
+- horas hombre PASS;
+- consumo PASS;
+- hoja de vida PASS;
+- aislamiento multicentro PASS;
+- no existen duplicaciones de dominio;
+- no existen regresiones conocidas introducidas por esta fase.
+
+Si algo no puede verificarse:
+
+NO marcarlo como PASS.
+
+Clasificarlo honestamente.
+
+---
+
+# 40. REGLA FINAL
+
+Esta es una fase de IMPLEMENTACIÓN.
+
+Sí se permite modificar código.
+
+Sí se permiten migraciones si son estrictamente necesarias.
+
+Sí se permiten cambios de API si son necesarios.
+
+Sí se permiten cambios de UI.
+
+Sí se permiten cambios de navegación.
+
+NO se permite cambiar la arquitectura de seguridad establecida por DGP-023.
+
+NO se permite crear un sistema paralelo.
+
+NO se permite eliminar capacidades existentes.
+
+NO se permite convertir DeltaOps Lite en un CMMS más complejo.
+
+El objetivo es:
+
+MENOS PASOS
++
+MÁS CLARIDAD
++
+MÁS UTILIDAD OPERACIONAL
++
+MISMO DOMINIO ROBUSTO
+
+Al terminar:
+
+crear el informe oficial.
+
+ejecutar revisión independiente.
+
+dejar git limpio salvo attached_assets/ según la convención existente.
+
+DETENERSE.
+
+NO iniciar LITE-09 automáticamente.

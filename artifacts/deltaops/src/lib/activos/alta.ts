@@ -32,6 +32,9 @@ export function construirInput(v: ValoresFormulario): Record<string, unknown> {
     vidaUtil: n("vidaUtil"),
     responsable: s("responsable"),
     supervisor: s("supervisor"),
+    // §16 · Centro de costos: capturado en el alta (LITE-06 lo omitía). Fuente
+    // de verdad = activo; el módulo lo persiste y valida contra `centros-costo`.
+    centroCosto: s("centroCosto"),
     fechaCompra: s("fechaCompra"),
     fechaPuestaServicio: s("fechaPuestaServicio"),
     proveedor: s("proveedor"),

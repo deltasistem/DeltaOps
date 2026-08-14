@@ -6,8 +6,13 @@
  * proviene de las sesiones de DGP-020.2 y el backend deriva costo/tarifa.
  */
 
-/** Estado de valoración de una sesión cerrada. */
-export type EstadoValoracion = "VALORADA" | "SIN_TARIFA" | "SIN_RECURSO";
+/**
+ * Estado de valoración de una sesión. `PENDIENTE` = sesión CERRADA con horas
+ * efectivas pero AÚN sin snapshot de valoración. `EN_CURSO` = sesión ABIERTA/
+ * PAUSADA con horas acumuladas (trabajo activo). Ambos aparecen sólo en la hoja
+ * de vida por activo: horas sin costo ≠ sin datos (DGP-020.3 fix).
+ */
+export type EstadoValoracion = "VALORADA" | "SIN_TARIFA" | "SIN_RECURSO" | "PENDIENTE" | "EN_CURSO";
 
 /** Estado operacional de un recurso humano. */
 export type EstadoRecurso = "ACTIVO" | "INACTIVO";

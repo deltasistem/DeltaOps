@@ -145,6 +145,56 @@ describe("DGP-020.3 · aplicación (fakes)", () => {
     expect(res["costoPorMoneda"]).toEqual([{ moneda: "CLP", costo: "100000.000000" }]);
   });
 
+  it("valoraciones por ACTIVO (hoja de vida) muestra HORAS de sesiones cerradas SIN valorar (PENDIENTE)", async () => {
+    // Sesión cerrada del activo pero NUNCA procesada ⇒ sin snapshot de
+    // valoración. Antes del fix DGP-020.3 la hoja de vida quedaba VACÍA aunque
+    // hubiera horas efectivas. Ahora se compone como PENDIENTE con sus horas.
+    sesionCerrada("s1", "o1", "u1", 9_000_000); // 2h30, jamás procesar-sesion
+    const porActivo = must(await query(ctx(), `${MODULO}.valoraciones`, { activoId: "act1" })) as {
+      valoraciones: { sesionId: string; estado: string; efectivoMs: number; costo: string | null; ordenId: string }[];
+    };
+    expect(porActivo.valoraciones.length).toBe(1);
+    const fila = porActivo.valoraciones[0]!;
+    expect(fila.estado).toBe("PENDIENTE");
+    expect(fila.efectivoMs).toBe(9_000_000); // horas reales visibles (autoridad = sesión)
+    expect(fila.costo).toBeNull(); // costo NULL, nunca 0 (§15)
+    expect(fila.ordenId).toBe("o1");
+  });
+
+  it("valoraciones por ACTIVO mezcla VALORADA (con snapshot) y PENDIENTE (cerrada sin snapshot), sin duplicar", async () => {
+    await definirRecursoYTarifa();
+    sesionCerrada("s1", "o1", "u1", 9_000_000); // se valora
+    sesionCerrada("s2", "o1", "u1", 4_800_000); // cerrada, NO procesada ⇒ PENDIENTE
+    must(await exec(ctx(), `${MODULO}.valoracion.procesar-sesion`, { sesionId: "s1" }));
+    const porActivo = must(await query(ctx(), `${MODULO}.valoraciones`, { activoId: "act1" })) as {
+      valoraciones: { sesionId: string; estado: string }[];
+    };
+    expect(porActivo.valoraciones.length).toBe(2);
+    const porEstado = Object.fromEntries(porActivo.valoraciones.map((v) => [v.sesionId, v.estado]));
+    expect(porEstado["s1"]).toBe("VALORADA");
+    expect(porEstado["s2"]).toBe("PENDIENTE");
+  });
+
+  it("valoraciones por ACTIVO sin sesiones ni valoraciones ⇒ vacío honesto (0 filas)", async () => {
+    const porActivo = must(await query(ctx(), `${MODULO}.valoraciones`, { activoId: "act-vacio" })) as { valoraciones: unknown[] };
+    expect(porActivo.valoraciones.length).toBe(0);
+  });
+
+  it("valoraciones por ACTIVO surte la sesión ABIERTA como EN_CURSO con horas (causa raíz en vivo)", async () => {
+    // Causa raíz verificada en vivo: CAM-001/OT-000022 dejó su sesión ABIERTA
+    // (nunca cerrada). Componer sólo CERRADAs dejaba la ficha «Sin mano de obra»
+    // pese a haber trabajo real. La abierta debe salir como EN_CURSO con horas.
+    ordenes.set(TENANT, { sesionId: "s-viva", ordenId: "o1", activoId: "act1", identityId: "u1", estado: "ABIERTA", efectivoMs: 81, abierta: true, iniciadoAt: D("2024-03-01T00:00:00Z"), cerradoAt: null });
+    const porActivo = must(await query(ctx(), `${MODULO}.valoraciones`, { activoId: "act1" })) as {
+      valoraciones: { sesionId: string; estado: string; efectivoMs: number; costo: unknown }[];
+    };
+    const fila = porActivo.valoraciones.find((v) => v.sesionId === "s-viva")!;
+    expect(fila).toBeDefined();
+    expect(fila.estado).toBe("EN_CURSO");
+    expect(fila.efectivoMs).toBe(81); // horas reales, jamás 0
+    expect(fila.costo).toBeNull(); // sin costo falso (§15)
+  });
+
   it("costo-estimado de sesión ABIERTA usa duraciones actuales × tarifa vigente", async () => {
     await definirRecursoYTarifa("35000");
     ordenes.set(TENANT, { sesionId: "sa", ordenId: "o1", activoId: "act1", identityId: "u1", estado: "ABIERTA", efectivoMs: 4_800_000, abierta: true, iniciadoAt: D("2024-03-01T00:00:00Z"), cerradoAt: null });

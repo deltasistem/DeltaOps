@@ -317,3 +317,78 @@ describe("CQRS calendarios e historial", () => {
     expect(hitos).toContain("publicado");
   });
 });
+
+describe("DELTAOPS LITE-08 · estado-rutinas (consulta pura por activo)", () => {
+  beforeEach(() => { rt = nuevoRt(); });
+
+  const ACTIVO = "act-uso-1";
+  async function planPublicadoPorUso() {
+    const p = await crearPlan({
+      nombre: "Cambio de aceite",
+      estrategia: "basado-uso",
+      alcance: { activos: [ACTIVO] },
+      programa: {
+        frecuencia: { reglas: [{ tipo: "horometro", cada: 1200, unidad: "horometro" }] },
+        vigenteDesde: "2024-01-01T00:00:00.000Z",
+      },
+    });
+    const pub = await exec(`${MODULO}.publicar-plan`, { id: p.id, expectedVersion: p.version });
+    if (!pub.ok) throw new Error("no publicó");
+    return p;
+  }
+
+  it("evalúa la rutina por uso del activo y calcula el faltante (§3-5)", async () => {
+    const p = await planPublicadoPorUso();
+    const q = await query(`${MODULO}.estado-rutinas`, {
+      activoId: ACTIVO,
+      ahora: "2024-06-01T00:00:00.000Z",
+      medidores: { horometro: 1185 },
+    });
+    expect(q.ok).toBe(true);
+    if (!q.ok) return;
+    const res = q.value as { rutinas: Array<{ planId: string; vencida: boolean; faltante: number; semaforo: string; meta: string }> };
+    const fila = res.rutinas.find((r) => r.planId === p.id);
+    expect(fila).toBeDefined();
+    expect(fila!.vencida).toBe(false);
+    expect(fila!.faltante).toBe(15);
+    expect(fila!.meta).toBe("1200");
+    expect(fila!.semaforo).toBe("amarillo");
+  });
+
+  it("marca la rutina VENCIDA cuando el medidor supera la meta (§5)", async () => {
+    const p = await planPublicadoPorUso();
+    const q = await query(`${MODULO}.estado-rutinas`, {
+      activoId: ACTIVO,
+      ahora: "2024-06-01T00:00:00.000Z",
+      medidores: { horometro: 1300 },
+    });
+    expect(q.ok).toBe(true);
+    if (!q.ok) return;
+    const res = q.value as { rutinas: Array<{ planId: string; vencida: boolean; semaforo: string }> };
+    const fila = res.rutinas.find((r) => r.planId === p.id);
+    expect(fila?.vencida).toBe(true);
+    expect(fila?.semaforo).toBe("rojo");
+  });
+
+  it("no evalúa planes fuera del alcance del activo (compone alcance declarativo)", async () => {
+    await planPublicadoPorUso();
+    const q = await query(`${MODULO}.estado-rutinas`, {
+      activoId: "otro-activo-sin-plan",
+      ahora: "2024-06-01T00:00:00.000Z",
+      medidores: { horometro: 1300 },
+    });
+    expect(q.ok).toBe(true);
+    if (!q.ok) return;
+    const res = q.value as { rutinas: unknown[] };
+    expect(res.rutinas).toHaveLength(0);
+  });
+
+  it("es una consulta PURA: no genera OT ni muta el read model de generaciones", async () => {
+    const p = await planPublicadoPorUso();
+    await query(`${MODULO}.estado-rutinas`, { activoId: ACTIVO, ahora: "2024-06-01T00:00:00.000Z", medidores: { horometro: 1300 } });
+    const gens = await query(`${MODULO}.generaciones`, { planId: p.id });
+    expect(gens.ok).toBe(true);
+    if (!gens.ok) return;
+    expect((gens.value as unknown[]).length).toBe(0);
+  });
+});

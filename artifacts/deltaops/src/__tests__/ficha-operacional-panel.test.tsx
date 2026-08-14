@@ -27,6 +27,7 @@ let TANQUEOS: any[] = [];
 let LECTURAS: any[] = [];
 let ORDENES: any[] = [];
 let PLANES: any[] = [];
+let RUTINAS: any = { activoId: "act-1", rutinas: [] };
 let TIMELINE: any[] = [];
 let PENDIENTES = 0;
 let EN_LINEA = true;
@@ -54,6 +55,7 @@ vi.mock("../lib/ecosistema/hooks", () => ({
 }));
 vi.mock("../lib/planes/hooks", () => ({
   usePlanesDeActivo: () => ({ datos: PLANES, cargando: false, error: null, recargar: () => {} }),
+  useEstadoRutinas: () => ({ datos: RUTINAS, cargando: false, error: null, recargar: () => {} }),
 }));
 vi.mock("../lib/identidad/sesion", () => ({
   useSesion: () => ({ sesion: { rol: ROL, modulos: ["utilizacion"], permisos: PERMISOS, capacidades: CAPS } }),
@@ -116,6 +118,16 @@ beforeEach(() => {
   PLANES = [
     { id: "p1", nombre: "Plan 250h", tipoPlan: "PREVENTIVO", estado: "VIGENTE", proximaOcurrencia: "2026-01-15T00:00:00.000Z" },
   ];
+  RUTINAS = {
+    activoId: "act-1",
+    rutinas: [
+      {
+        planId: "p1", nombre: "Plan 250h", tipoPlan: "PREVENTIVO", vencida: false,
+        semaforo: "amarillo", etiqueta: "Próximo mantenimiento",
+        faltante: 15, excedente: -15, meta: "2400", unidad: "horometro", dominio: "uso", progreso: 0.94,
+      },
+    ],
+  };
   TIMELINE = [
     { tipo: "utilizacion.tanqueo", descripcion: "Tanqueo registrado", ocurridoAt: "2025-12-28T09:00:00.000Z", actor: "admin" },
   ];
@@ -198,11 +210,18 @@ describe("Ficha Operacional 360° · órdenes", () => {
 });
 
 describe("Ficha Operacional 360° · mantenimiento e historial", () => {
-  it("muestra próximo mantenimiento y enlaza al plan", () => {
-    const { container } = wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
+  it("muestra el estado de la rutina por uso (semáforo + texto + faltante)", () => {
+    wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
     expect(screen.getByText("Plan 250h")).toBeInTheDocument();
+    // §3: estado con COLOR + TEXTO y el faltante en unidades de la regla.
+    expect(screen.getAllByText(/Próximo mantenimiento/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Faltan\s*15\s*h/)).toBeInTheDocument();
+  });
+
+  it("ofrece 'Generar mantenimiento' hacia el flujo LITE-05 (nueva OT)", () => {
+    const { container } = wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
     const enlaces = Array.from(container.querySelectorAll("a[href]")).map((a) => a.getAttribute("href"));
-    expect(enlaces.some((h) => h?.includes("p1"))).toBe(true);
+    expect(enlaces.some((h) => h?.includes("/ordenes/nueva") && h?.includes("plan=p1"))).toBe(true);
   });
 
   it("expone 'Ver historial completo' hacia la timeline compartida", () => {
@@ -214,22 +233,25 @@ describe("Ficha Operacional 360° · mantenimiento e historial", () => {
 });
 
 describe("Ficha Operacional 360° · permisos (ocultar, no deshabilitar)", () => {
-  it("CONSULTA no ve acciones de escritura de medidor/tanqueo", () => {
+  it("CONSULTA no ve acciones de escritura de lectura/combustible", () => {
     ROL = "CONSULTA";
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
-    expect(screen.queryByRole("button", { name: /Registrar medidor/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Registrar tanqueo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Registrar lectura/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Registrar combustible/ })).not.toBeInTheDocument();
     // pero sí puede CONSULTAR (navegación de solo lectura: ver órdenes, ver QR)
     expect(screen.getByRole("button", { name: /Ver QR/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ver órdenes/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ver todas las órdenes/ })).toBeInTheDocument();
+    // El expediente ofrece navegación por perfil (composición, no escritura).
+    expect(screen.getByRole("button", { name: /Ver mantenimiento/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Ver historial/ }).length).toBeGreaterThan(0);
   });
 
   it("TENANT_ADMIN sí ve las acciones de escritura", () => {
     ROL = "TENANT_ADMIN";
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
-    expect(screen.getByRole("button", { name: /Registrar medidor/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Registrar tanqueo/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Registrar lectura/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Registrar combustible/ })).toBeInTheDocument();
   });
 });
 
@@ -237,7 +259,7 @@ describe("Ficha Operacional 360° · RBAC de creación de Órdenes (ocultar CTAs
   // Matriz contra la señal CANÓNICA (aRolLegacy→principalOrdenes):
   //   admin(TENANT_ADMIN/SUPER_ADMIN) y operador(SUPERVISOR/PLANIFICADOR/TECNICO)
   //   pueden crear OT; lector(CONSULTA) NO.
-  const CTAS_CREAR = [/Crear orden/, /Nueva orden/];
+  const CTAS_CREAR = [/Registrar trabajo/, /Nueva orden/];
 
   function verCrear(rol: string): boolean {
     ROL = rol;
@@ -260,10 +282,10 @@ describe("Ficha Operacional 360° · RBAC de creación de Órdenes (ocultar CTAs
   it("CONSULTA NO ve los CTAs de crear orden (ocultos, no deshabilitados)", () => {
     ROL = "CONSULTA";
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
-    expect(screen.queryByRole("button", { name: /Crear orden/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Registrar trabajo/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Nueva orden/ })).not.toBeInTheDocument();
-    // Nunca se deshabilita: no debe existir ningún botón "Crear/Nueva orden" disabled.
-    const posibles = screen.queryAllByRole("button", { name: /(Crear|Nueva) orden/ });
+    // Nunca se deshabilita: no debe existir ningún botón de creación disabled.
+    const posibles = screen.queryAllByRole("button", { name: /(Registrar trabajo|Nueva orden)/ });
     expect(posibles).toHaveLength(0);
   });
 
@@ -280,7 +302,7 @@ describe("Ficha Operacional 360° · RBAC de creación de Órdenes (ocultar CTAs
     ROL = "CONSULTA";
     PERMISOS = ["modulo.ordenes.read", "modulo.ordenes.write"];
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
-    expect(screen.getByRole("button", { name: /Crear orden/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Registrar trabajo/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Nueva orden/ })).toBeInTheDocument();
   });
 
@@ -288,7 +310,7 @@ describe("Ficha Operacional 360° · RBAC de creación de Órdenes (ocultar CTAs
     ROL = "SUPERVISOR";
     PERMISOS = ["modulo.ordenes.read"];
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
-    expect(screen.queryByRole("button", { name: /Crear orden/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Registrar trabajo/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Nueva orden/ })).not.toBeInTheDocument();
   });
 
@@ -296,7 +318,7 @@ describe("Ficha Operacional 360° · RBAC de creación de Órdenes (ocultar CTAs
     ROL = "CONSULTA";
     CAPS = ["gestionar-ordenes"];
     wrap(<PanelOperacional activo={activo()} ahoraIso={AHORA} />);
-    expect(screen.getByRole("button", { name: /Crear orden/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Registrar trabajo/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Nueva orden/ })).toBeInTheDocument();
   });
 });

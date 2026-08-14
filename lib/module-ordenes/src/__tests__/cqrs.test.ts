@@ -163,6 +163,42 @@ describe("Asignaciones / recursos / SLA / relaciones", () => {
     expect(deps.ok && (deps.value as { dependencias: unknown[] }).dependencias.length).toBe(1);
   });
 
+  // DELTAOPS LITE-08 §15 · Consumo ligero (repuesto/insumo) sobre el recurso
+  // existente: costo dinero-string, proveedor y observación en `datos`; NO
+  // exige inventario; idempotente por opId.
+  it("§15 · registra consumo ligero (repuesto) con costo string, proveedor y observación", async () => {
+    const ctx = ctxOf("t-consumo");
+    const a = await crear(ctx);
+    await drenar();
+    const r = await exec(ctx, `${MODULO}.registrar-recurso`, {
+      ordenId: a.id, clase: "repuesto", referenciaId: "SKU-9", descripcion: "Filtro de aceite",
+      cantidad: 2, unidad: "und", costo: "1200.50", proveedorId: "Prov S.A. · F-001", observacion: "urgente",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { clase: string }).clase).toBe("repuesto");
+  });
+
+  it("§15 · el costo no decimal-string se rechaza (sin float, frontera estricta)", async () => {
+    const ctx = ctxOf("t-consumo2");
+    const a = await crear(ctx);
+    await drenar();
+    const bad = await exec(ctx, `${MODULO}.registrar-recurso`, {
+      ordenId: a.id, clase: "insumo", referenciaId: "INS-1", costo: "1,200",
+    });
+    expect(bad.ok).toBe(false);
+  });
+
+  it("§15 · consumo ligero es idempotente por opId", async () => {
+    const ctx = ctxOf("t-consumo3");
+    const a = await crear(ctx);
+    await drenar();
+    const input = { ordenId: a.id, clase: "repuesto", referenciaId: "SKU-1", opId: "op-consumo-1" };
+    const r1 = await exec(ctx, `${MODULO}.registrar-recurso`, input);
+    const r2 = await exec(ctx, `${MODULO}.registrar-recurso`, input);
+    expect(r1.ok && (r1.value as { idempotente: boolean }).idempotente).toBe(false);
+    expect(r2.ok && (r2.value as { idempotente: boolean }).idempotente).toBe(true);
+  });
+
   it("relación duplicada es idempotente; auto-relación se rechaza", async () => {
     const ctx = ctxOf("t-rel");
     const a = await crear(ctx);

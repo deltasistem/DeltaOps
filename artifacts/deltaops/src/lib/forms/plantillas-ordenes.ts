@@ -203,6 +203,9 @@ export function plantillaHoras(): DefinicionFormulario {
  * backend es la autoridad (rechaza clases no válidas).
  */
 export const CLASES_RECURSO_OPCIONES: OpcionSeleccion[] = [
+  // §15 · Consumo ligero primero (repuesto/insumo) por ser el caso frecuente.
+  { valor: "repuesto", etiqueta: "Repuesto" },
+  { valor: "insumo", etiqueta: "Insumo" },
   { valor: "herramienta", etiqueta: "Herramienta" },
   { valor: "material", etiqueta: "Material" },
   { valor: "epp", etiqueta: "EPP" },
@@ -223,11 +226,16 @@ export function plantillaRecurso(): DefinicionFormulario {
       {
         clase: "contenedor", clave: "g", tipo: "grupo", etiqueta: "Campos",
         hijos: [
-          campo({ clave: "clase", tipo: "select", etiqueta: "Clase de recurso", obligatorio: true, opciones: CLASES_RECURSO_OPCIONES }),
-          campo({ clave: "referenciaId", tipo: "texto", etiqueta: "Referencia (SKU/código)", obligatorio: true, ayuda: "Identificador del material/herramienta/vehículo en el catálogo o inventario.", restricciones: { longitudMin: 1, longitudMax: 120 } }),
+          campo({ clave: "clase", tipo: "select", etiqueta: "Tipo", obligatorio: true, opciones: CLASES_RECURSO_OPCIONES }),
+          campo({ clave: "referenciaId", tipo: "texto", etiqueta: "Referencia (SKU/código)", obligatorio: true, ayuda: "Identificador del repuesto/insumo/material en el catálogo o inventario. Para consumo ligero puede ser un código libre; NO exige inventario.", restricciones: { longitudMin: 1, longitudMax: 120 } }),
           campo({ clave: "descripcion", tipo: "texto", etiqueta: "Descripción", restricciones: { longitudMax: 200 } }),
           campo({ clave: "cantidad", tipo: "decimal", etiqueta: "Cantidad", restricciones: { minimo: 0 } }),
           campo({ clave: "unidad", tipo: "texto", etiqueta: "Unidad" }),
+          // §15 · Consumo ligero: costo/proveedor/observación opcionales. El
+          // costo es dinero string (frontera estricta en el backend, sin float).
+          campo({ clave: "costo", tipo: "texto", etiqueta: "Costo (opcional)", ayuda: "Importe total del consumo, p.ej. 1200.50. No exige inventario.", restricciones: { longitudMax: 20 } }),
+          campo({ clave: "proveedorId", tipo: "texto", etiqueta: "Proveedor (opcional)", restricciones: { longitudMax: 160 } }),
+          campo({ clave: "observacion", tipo: "texto", etiqueta: "Observación (opcional)", restricciones: { longitudMax: 500 } }),
         ],
       },
     ],

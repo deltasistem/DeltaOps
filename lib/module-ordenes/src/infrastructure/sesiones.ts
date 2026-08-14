@@ -148,6 +148,12 @@ export interface SesionStore {
   tramosRead(tenantId: string, sesionId: string): Promise<Result<TramoReadRow[], KernelError>>;
   duracionesDeSesion(tenantId: string, sesionId: string): Promise<Result<DuracionesReadRow | null, KernelError>>;
   duracionesPorOrden(tenantId: string, ordenId: string): Promise<Result<DuracionesReadRow[], KernelError>>;
+  /**
+   * DGP-020.3 fix · Duraciones de TODAS las sesiones del ACTIVO (para la hoja de
+   * vida). Permite componer horas por activo aunque aún no exista valoración
+   * monetaria (horas sin costo ≠ sin datos).
+   */
+  duracionesPorActivo(tenantId: string, activoId: string): Promise<Result<DuracionesReadRow[], KernelError>>;
 
   /* --------------------------- Replay / pruebas --------------------------- */
   clear(uow: UnitOfWork, tenantId: string): Promise<Result<void, KernelError>>;
@@ -239,6 +245,10 @@ export class FakeSesionStore implements SesionStore {
   }
   async duracionesPorOrden(t: string, ordenId: string) {
     const rows = [...this.durRead.values()].filter((r) => r.tenantId === t && r.ordenId === ordenId);
+    return ok(rows.map((r) => clone(this.stripDur(r))));
+  }
+  async duracionesPorActivo(t: string, activoId: string) {
+    const rows = [...this.durRead.values()].filter((r) => r.tenantId === t && r.activoId === activoId);
     return ok(rows.map((r) => clone(this.stripDur(r))));
   }
   async clear(_u: UnitOfWork, t: string) {
@@ -534,6 +544,14 @@ export class PgSesionStore implements SesionStore {
       );
       return ok(res.rows.map(toDuracionesRead));
     } catch (err) { return fail(KernelErrors.infrastructure("duracionesPorOrden falló", err)); }
+  }
+  async duracionesPorActivo(tenantId: string, activoId: string) {
+    try {
+      const res = await withTenantRead(this.pool, tenantId, (c) =>
+        c.query(`SELECT * FROM deltaops.ord_sesion_duraciones_read WHERE tenant_id=$1 AND activo_id=$2 ORDER BY iniciado_at DESC`, [tenantId, activoId]),
+      );
+      return ok(res.rows.map(toDuracionesRead));
+    } catch (err) { return fail(KernelErrors.infrastructure("duracionesPorActivo falló", err)); }
   }
   async clear(uow: UnitOfWork, tenantId: string) {
     try {

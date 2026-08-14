@@ -416,6 +416,77 @@ async function resumenPorOrden(
   });
 }
 
+/**
+ * DGP-020.3 fix · Listado de mano de obra POR ACTIVO para la hoja de vida.
+ *
+ * Compone las VALORACIONES persistidas del activo con las SESIONES CERRADAS del
+ * activo que AÚN NO tienen valoración (estado PENDIENTE). Así la pestaña muestra
+ * las horas efectivas del activo aunque la valoración monetaria no exista o no
+ * haya materializado todavía (horas sin costo ≠ sin datos). El estado honesto
+ * «sin datos» sólo aparece cuando NO hay ni valoraciones ni sesiones cerradas.
+ * Respeta el alcance de lectura (técnico P_MIAS ⇒ sólo sus filas).
+ */
+async function listadoPorActivo(
+  adapters: ModuleAdapters,
+  tenant: string,
+  activoId: string,
+  alcance: { restringido: false } | { restringido: true; identityId: string },
+  yo: string | null,
+): Promise<Result<Record<string, unknown>, KernelError>> {
+  const vals = await adapters.valoraciones.listarPorActivo(tenant, activoId);
+  if (!vals.ok) return vals;
+  const dur = await adapters.ordenes.duracionesPorActivo(tenant, activoId);
+  if (!dur.ok) return dur;
+
+  const restringirA = alcance.restringido ? alcance.identityId : null;
+  const valoradas = restringirA ? vals.value.filter((v) => v.identityId === restringirA) : vals.value;
+  const porSesion = new Map(valoradas.map((v) => [v.sesionId, v] as const));
+  // Sesiones del activo AÚN sin snapshot de valoración. Se surtieron dos hechos
+  // reales (autoridad de tiempo = Órdenes, DGP-020.2), NUNCA se recalcula tramo:
+  //  - CERRADA (no abierta): trabajo terminado, valoración pendiente ⇒ PENDIENTE.
+  //  - ABIERTA/PAUSADA (abierta=true): trabajo EN CURSO ⇒ EN_CURSO con horas
+  //    acumuladas hasta ahora. Sin esto, un activo con una sesión abierta leía
+  //    «Sin mano de obra» (mentira: SÍ hay trabajo). Causa raíz verificada en el
+  //    entorno vivo: OT-000022/CAM-001 dejó su sesión ABIERTA, nunca cerrada.
+  const sinValorarRaw = dur.value.filter((s) => !porSesion.has(s.sesionId));
+  const sinValorar = restringirA ? sinValorarRaw.filter((s) => s.identityId === restringirA) : sinValorarRaw;
+
+  const ids = [...new Set(valoradas.map((v) => v.identityId).concat(sinValorar.map((p) => p.identityId)))];
+  const nombres = await adapters.identidad.resolverVarios(tenant, ids);
+  if (!nombres.ok) return nombres;
+
+  const filasValoradas = valoradas.map((v) => ({
+    ...valoracionAResultado(v, tenant),
+    nombre: nombres.value[v.identityId] ?? null,
+    esPropia: yo !== null && v.identityId === yo,
+  }));
+  // Filas sin valoración monetaria: horas reales y costo NULL (nunca 0, §15). El
+  // shape es compatible con la fila de valoración que consume la UI.
+  const filasSinValorar = sinValorar.map((p) => ({
+    sesionId: p.sesionId,
+    ordenId: p.ordenId,
+    activoId: p.activoId,
+    identityId: p.identityId,
+    nombre: nombres.value[p.identityId] ?? null,
+    categoriaClave: null,
+    tarifaId: null,
+    tarifaValor: null,
+    moneda: null,
+    unidad: null,
+    efectivoMs: p.efectivoMs,
+    costo: null,
+    estado: p.abierta ? ("EN_CURSO" as const) : ("PENDIENTE" as const),
+    vigenciaDesde: null,
+    vigenciaHasta: null,
+    cruzaPeriodos: false,
+    iniciadoAt: p.iniciadoAt.toISOString(),
+    cerradoAt: p.cerradoAt ? p.cerradoAt.toISOString() : null,
+    esPropia: yo !== null && p.identityId === yo,
+  }));
+
+  return ok({ valoraciones: [...filasValoradas, ...filasSinValorar] });
+}
+
 /* ------------------------------ El servicio ------------------------------ */
 
 /**
@@ -867,15 +938,24 @@ export function manodeobraModule(adapters: ModuleAdapters): PlatformServiceDefin
           if (alcance.restringido && input.identityId && input.identityId !== alcance.identityId) {
             return fail(KernelErrors.forbidden("mano de obra: sólo puede consultar sus propias valoraciones"));
           }
+          // DGP-020.3 fix (hoja de vida) · la consulta POR ACTIVO compone las
+          // valoraciones con TODAS las sesiones del activo aún NO valoradas:
+          // CERRADA ⇒ PENDIENTE, ABIERTA/PAUSADA ⇒ EN_CURSO. Horas sin costo ≠
+          // sin datos. Sin este merge, un activo con trabajo real (sesión abierta
+          // o cerrada cuya valoración no materializó) leía «Sin mano de obra».
+          // Causa raíz verificada en vivo: la sesión de CAM-001/OT-000022 quedó
+          // ABIERTA (nunca se cerró), así que sólo componer CERRADAs no bastaba.
+          if (input.activoId) {
+            const yoAct = alcance.restringido ? alcance.identityId : identidadDeSesionSuave(ctx);
+            return listadoPorActivo(adapters, tenant.value, input.activoId, alcance, yoAct);
+          }
           const r = input.ordenId
             ? await adapters.valoraciones.listarPorOrden(tenant.value, input.ordenId)
-            : input.activoId
-              ? await adapters.valoraciones.listarPorActivo(tenant.value, input.activoId)
-              : input.identityId
-                ? await adapters.valoraciones.listarPorIdentidad(tenant.value, input.identityId)
-                : alcance.restringido
-                  ? await adapters.valoraciones.listarPorIdentidad(tenant.value, alcance.identityId)
-                  : fail(KernelErrors.validation("Especifique ordenId, activoId o identityId"));
+            : input.identityId
+              ? await adapters.valoraciones.listarPorIdentidad(tenant.value, input.identityId)
+              : alcance.restringido
+                ? await adapters.valoraciones.listarPorIdentidad(tenant.value, alcance.identityId)
+                : fail(KernelErrors.validation("Especifique ordenId, activoId o identityId"));
           if (!r.ok) return r;
           const yo = alcance.restringido ? alcance.identityId : identidadDeSesionSuave(ctx);
           const filas = alcance.restringido ? r.value.filter((v) => v.identityId === alcance.identityId) : r.value;

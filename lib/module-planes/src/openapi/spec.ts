@@ -172,6 +172,19 @@ export function construirOpenApi(): Record<string, unknown> {
       claveDedup: str(), origen: str(), ordenTrabajoId: str({ nullable: true }),
       estado: str({ enum: ["pendiente", "materializada"] }), fechaObjetivo: str(),
     }),
+    EstadoRutina: obj({
+      planId: str(), codigo: str(), nombre: str(), tipoPlan: str(), prioridad: str(), version: int(),
+      vencida: bool(),
+      semaforo: str({ enum: ["verde", "amarillo", "rojo", "sin-datos"] }),
+      etiqueta: str(),
+      faltante: num({ nullable: true }), excedente: num({ nullable: true }),
+      meta: str({ nullable: true }), unidad: str({ nullable: true }),
+      dominio: str({ enum: ["uso", "temporal", "eventos", "desconocido"] }),
+      progreso: num(),
+    }, ["planId", "nombre", "vencida", "semaforo", "etiqueta"]),
+    EstadoRutinasActivo: obj({
+      activoId: str(), ahora: str(), rutinas: arr(ref("EstadoRutina")),
+    }, ["activoId", "rutinas"]),
     Consola: obj({
       statsPlanes: obj({}, []), eventLog: obj({}, []), proyecciones: obj({}, []),
       outbox: obj({}, []), receipts: arr(obj({}, [])), tablasRLS: arr(str()),
@@ -267,6 +280,17 @@ export function construirOpenApi(): Record<string, unknown> {
   add(`${BASE}/{id}/generaciones`, "get", {
     tags: ["Generación"], operationId: "planes.generaciones", summary: "Listar generaciones de OT del plan (read model)",
     parameters: [idParam], responses: { "200": jsonOk(arr(ref("Generacion"))), ...errores("401", "403") },
+  });
+  // DELTAOPS LITE-08 §3-5: estado operacional de rutinas por uso/tiempo de un activo (consulta pura).
+  add(`${BASE}/activos/{activoId}/estado-rutinas`, "get", {
+    tags: ["Generación"], operationId: "planes.estado-rutinas",
+    summary: "Estado operacional (semáforo + faltante) de las rutinas por uso/tiempo de un activo; medidores leídos server-side",
+    parameters: [
+      pathParam("activoId", "Identificador del activo"),
+      queryParam("ahora", "Instante ISO de evaluación (por defecto, ahora)"),
+      queryParam("umbral", "Umbral de proximidad 0..1 (por defecto 0.9)"),
+    ],
+    responses: { "200": jsonOk(ref("EstadoRutinasActivo")), ...errores("401", "403") },
   });
 
   // ---- Catálogos ----

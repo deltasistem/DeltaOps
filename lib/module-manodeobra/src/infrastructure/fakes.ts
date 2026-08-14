@@ -155,4 +155,7 @@ export class FakeOrdenesSesionPort implements OrdenesSesionPort {
   async duracionesPorOrden(tenantId: string, ordenId: string) {
     return ok([...this.data.values()].filter((e) => e.tenantId === tenantId && e.sesion.ordenId === ordenId).map((e) => e.sesion));
   }
+  async duracionesPorActivo(tenantId: string, activoId: string) {
+    return ok([...this.data.values()].filter((e) => e.tenantId === tenantId && e.sesion.activoId === activoId).map((e) => e.sesion));
+  }
 }

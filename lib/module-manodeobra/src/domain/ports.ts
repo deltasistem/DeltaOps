@@ -54,6 +54,11 @@ export interface OrdenesSesionPort {
   duracionesDeSesion(tenantId: TenantId, sesionId: string): Promise<Result<DuracionSesion | null, KernelError>>;
   /** Duraciones de TODAS las sesiones de una OT. */
   duracionesPorOrden(tenantId: TenantId, ordenId: string): Promise<Result<DuracionSesion[], KernelError>>;
+  /**
+   * DGP-020.3 fix · Duraciones de TODAS las sesiones del ACTIVO (hoja de vida).
+   * Habilita mostrar horas por activo aunque no haya valoración monetaria.
+   */
+  duracionesPorActivo(tenantId: TenantId, activoId: string): Promise<Result<DuracionSesion[], KernelError>>;
 }
 
 /* ------------------------------- Repositorios ---------------------------- */

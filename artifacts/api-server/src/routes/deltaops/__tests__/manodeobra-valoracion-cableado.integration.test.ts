@@ -49,6 +49,16 @@ const TARIFA_DESDE = new Date("2024-01-01T00:00:00.000Z"); // vigente en iniciad
 
 const SESION_ID = randomUUID();
 
+// --- Hoja de vida por ACTIVO (DGP-020.3 · causa raíz verificada en vivo) ---
+// La ficha de CAM-001 leía «Sin mano de obra» aunque OT-000022 tenía trabajo:
+// su sesión quedó ABIERTA (nunca se cerró). Sólo componer sesiones CERRADAS no
+// bastaba; la composición debe surtir también las ABIERTAS/PAUSADAS (EN_CURSO).
+const ACTIVO_ID = randomUUID();
+const SESION_ABIERTA = randomUUID(); // trabajo EN CURSO ⇒ EN_CURSO
+const SESION_CERRADA_SV = randomUUID(); // cerrada sin valoración ⇒ PENDIENTE
+const EFECTIVO_ABIERTA = 81; // mismo orden de magnitud que la sesión real del reporte
+const EFECTIVO_CERRADA = 3600000;
+
 /** Inserta filas respetando RLS (set_config app.tenant_id en la misma tx). */
 async function conTenant<T>(fn: (c: { query: (q: string, p?: unknown[]) => Promise<{ rows: any[] }> }) => Promise<T>): Promise<T> {
   const client = await pool.connect();
@@ -77,6 +87,27 @@ beforeAll(async () => {
        VALUES ($1,$2,$3,NULL,$4,'CERRADA',$5,0,$5,0,false,$6,$7,$8,now())
        ON CONFLICT (tenant_id, sesion_id) DO NOTHING`,
       [TENANT, SESION_ID, ORDEN, IDENTITY, EFECTIVO_MS, INICIADO_AT.toISOString(), CERRADO_AT.toISOString(), randomUUID()],
+    );
+    // Sesión ABIERTA del ACTIVO (trabajo EN CURSO): abierta=true, sin cerrado_at.
+    // ESTA es la forma exacta que dejaba la ficha «vacía» en vivo.
+    await c.query(
+      `INSERT INTO deltaops.ord_sesion_duraciones_read
+         (tenant_id, sesion_id, orden_id, activo_id, identity_id, estado,
+          efectivo_ms, pausado_ms, transcurrido_ms, pausas, abierta,
+          iniciado_at, cerrado_at, last_event_id, actualizado_at)
+       VALUES ($1,$2,$3,$4,$5,'ABIERTA',$6,0,$6,0,true,$7,NULL,$8,now())
+       ON CONFLICT (tenant_id, sesion_id) DO NOTHING`,
+      [TENANT, SESION_ABIERTA, ORDEN, ACTIVO_ID, IDENTITY, EFECTIVO_ABIERTA, INICIADO_AT.toISOString(), randomUUID()],
+    );
+    // Sesión CERRADA del ACTIVO sin valoración materializada ⇒ PENDIENTE.
+    await c.query(
+      `INSERT INTO deltaops.ord_sesion_duraciones_read
+         (tenant_id, sesion_id, orden_id, activo_id, identity_id, estado,
+          efectivo_ms, pausado_ms, transcurrido_ms, pausas, abierta,
+          iniciado_at, cerrado_at, last_event_id, actualizado_at)
+       VALUES ($1,$2,$3,$4,$5,'CERRADA',$6,0,$6,0,false,$7,$8,$9,now())
+       ON CONFLICT (tenant_id, sesion_id) DO NOTHING`,
+      [TENANT, SESION_CERRADA_SV, ORDEN, ACTIVO_ID, IDENTITY, EFECTIVO_CERRADA, INICIADO_AT.toISOString(), CERRADO_AT.toISOString(), randomUUID()],
     );
     // Recurso ACTIVO del técnico (categoría con tarifa vigente).
     await c.query(
@@ -153,6 +184,61 @@ describe("DGP-020.3 · cableado REAL de la valoración (regresión §41)", () =>
       const v = res.value as Record<string, unknown>;
       expect(v["yaExistia"]).toBe(true); // no duplica: reprocesar es no-op ok
       expect(v["estado"]).toBe("VALORADA");
+    }
+  });
+});
+
+/**
+ * DGP-020.3 (causa raíz VERIFICADA EN VIVO) · hoja de vida POR ACTIVO.
+ *
+ * La ficha de CAM-001 mostraba «Sin mano de obra» aunque OT-000022 sí tenía
+ * trabajo registrado: la SQL de solo-lectura reveló que su única sesión en
+ * `ord_sesion_duraciones_read` estaba ABIERTA (nunca se cerró). La primera
+ * versión del fix sólo componía sesiones CERRADAS, así que en vivo seguía vacía.
+ *
+ * DIVERGENCIA test/producción que ocultó el bug: las suites del módulo usan
+ * `FakeOrdenesSesionPort`, cuyo `duracionesPorActivo` SIEMPRE trae la fila. El
+ * camino real (PG `SELECT ... WHERE activo_id=$2` + `listadoPorActivo`) nunca se
+ * ejercitaba. Este bloque cierra el gap contra la BD real.
+ */
+describe("DGP-020.3 · hoja de vida por ACTIVO (cableado REAL, causa raíz en vivo)", () => {
+  it("el puerto real duracionesPorActivo trae la sesión ABIERTA (abierta=true)", async () => {
+    const r = await manodeobraRuntime().adapters.ordenes.duracionesPorActivo(TENANT, ACTIVO_ID);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const abierta = r.value.find((s) => s.sesionId === SESION_ABIERTA);
+      expect(abierta).toBeDefined(); // ANTES: la composición sólo miraba CERRADA ⇒ ficha vacía
+      expect(abierta?.abierta).toBe(true);
+      expect(abierta?.estado).toBe("ABIERTA");
+      expect(abierta?.efectivoMs).toBe(EFECTIVO_ABIERTA);
+      expect(abierta?.activoId).toBe(ACTIVO_ID);
+    }
+  });
+
+  it("la consulta valoraciones(activoId) compone EN_CURSO (abierta) + PENDIENTE (cerrada s/valoración)", async () => {
+    const ctx = contextServicioManodeobra(TENANT);
+    const res = await manodeobraRuntime().platform.kernel.queries.execute(
+      ctx,
+      `${MODULO}.valoraciones`,
+      { activoId: ACTIVO_ID },
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      const filas = (res.value as { valoraciones: Record<string, unknown>[] }).valoraciones;
+      // NUNCA vacío: hay trabajo real en el activo (esto era el FAIL en vivo).
+      expect(filas.length).toBeGreaterThanOrEqual(2);
+
+      const enCurso = filas.find((f) => f["sesionId"] === SESION_ABIERTA);
+      expect(enCurso).toBeDefined();
+      expect(enCurso?.["estado"]).toBe("EN_CURSO");
+      expect(enCurso?.["efectivoMs"]).toBe(EFECTIVO_ABIERTA); // horas reales, no 0
+      expect(enCurso?.["costo"]).toBeNull(); // nunca $0 falso (§15)
+
+      const pendiente = filas.find((f) => f["sesionId"] === SESION_CERRADA_SV);
+      expect(pendiente).toBeDefined();
+      expect(pendiente?.["estado"]).toBe("PENDIENTE");
+      expect(pendiente?.["efectivoMs"]).toBe(EFECTIVO_CERRADA);
+      expect(pendiente?.["costo"]).toBeNull();
     }
   });
 });

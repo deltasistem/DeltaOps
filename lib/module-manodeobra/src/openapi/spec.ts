@@ -139,7 +139,10 @@ export function construirOpenApi(): Record<string, unknown> {
         categoriaClave: str({ nullable: true }), tarifaId: str({ nullable: true }),
         tarifaValor: dinero, moneda: str({ nullable: true }), unidad: str({ nullable: true }),
         efectivoMs: int({ minimum: 0 }), costo: dinero,
-        estado: str({ enum: ["VALORADA", "SIN_TARIFA", "SIN_RECURSO"] }),
+        // PENDIENTE: sesión CERRADA con horas pero sin snapshot de valoración.
+        // EN_CURSO: sesión ABIERTA/PAUSADA con horas acumuladas (trabajo activo).
+        // Ambos se componen en la consulta por activo (hoja de vida; DGP-020.3 fix).
+        estado: str({ enum: ["VALORADA", "SIN_TARIFA", "SIN_RECURSO", "PENDIENTE", "EN_CURSO"] }),
         cruzaPeriodos: bool(),
         iniciadoAt: str({ format: "date-time" }), cerradoAt: str({ format: "date-time", nullable: true }),
         valoradoAt: str({ format: "date-time" }),

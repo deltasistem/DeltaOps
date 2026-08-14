@@ -152,7 +152,7 @@ router.get(`${BASE}/catalogos/:catalogo`, async (req, res) => {
 // DGP-020.2 · Sesiones de trabajo — read models (rutas específicas antes de /:id).
 router.get(`${BASE}/sesiones/duraciones`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.sesion.duraciones`, {
-    sesionId: strQuery(req.query.sesionId), ordenId: strQuery(req.query.ordenId),
+    sesionId: strQuery(req.query.sesionId), ordenId: strQuery(req.query.ordenId), activoId: strQuery(req.query.activoId),
   }));
 });
 router.get(`${BASE}/sesiones/:sesionId/tramos`, async (req, res) => {

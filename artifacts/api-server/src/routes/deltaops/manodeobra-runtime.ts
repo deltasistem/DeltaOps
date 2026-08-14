@@ -130,6 +130,17 @@ const ordenesSesionPort: OrdenesSesionPort = {
     }
     return ok(out);
   },
+  async duracionesPorActivo(tenantId: string, activoId: string): Promise<Result<DuracionSesion[], KernelError>> {
+    const ctx = contextForOrdenes("system", "lector", tenantId);
+    const r = await ordenesRuntime().platform.kernel.queries.execute(ctx, "modulo.ordenes.sesion.duraciones", { activoId });
+    if (!r.ok) return r as Result<never, KernelError>;
+    const out: DuracionSesion[] = [];
+    for (const fila of filasDuraciones(r.value)) {
+      const d = normalizarDuracion(fila);
+      if (d) out.push(d);
+    }
+    return ok(out);
+  },
 };
 
 let runtime: ManodeobraRuntime | null = null;

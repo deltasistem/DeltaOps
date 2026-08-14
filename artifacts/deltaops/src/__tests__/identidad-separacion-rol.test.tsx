@@ -341,7 +341,10 @@ describe("H · logout/login reconstruye el AppShell según la identidad", () => 
     // Abrir el menú de perfil (disparador con aria-haspopup="menu") y ejecutar
     // "Cerrar sesión".
     await screen.findByText("Contenido empresarial");
-    const disparador = document.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]');
+    // El menú de perfil es el ÚLTIMO disparador con aria-haspopup="menu" del
+    // header (tras el desplegable «Más» de navegación §22, que va antes).
+    const menus = document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="menu"]');
+    const disparador = menus[menus.length - 1] ?? null;
     expect(disparador).not.toBeNull();
     fireEvent.click(disparador!);
     const cerrar = await screen.findByRole("menuitem", { name: /Cerrar sesión/i });
@@ -405,7 +408,9 @@ describe("H · logout/login reconstruye el AppShell según la identidad", () => 
     expect(screen.queryByText("DeltaOps Console")).toBeNull();
 
     // 2) Logout desde el menú de perfil → sesión a "none" y navega a /login.
-    const disparador = document.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]');
+    // El menú de perfil es el ÚLTIMO disparador (tras el «Más» de nav §22).
+    const menus = document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="menu"]');
+    const disparador = menus[menus.length - 1] ?? null;
     fireEvent.click(disparador!);
     fireEvent.click(await screen.findByRole("menuitem", { name: /Cerrar sesión/i }));
     await waitFor(() => expect(history.at(-1)).toBe("/login"));

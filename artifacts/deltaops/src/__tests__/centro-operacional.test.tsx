@@ -174,7 +174,9 @@ describe("Centro Operacional · resumen con datos reales", () => {
       orden({ id: "2", estado: "EN_EJECUCION" }),
     ]);
     await screen.findByText(/Bienvenido, Usuaria Demo/i);
-    expect(await screen.findByText("Resumen operacional")).toBeInTheDocument();
+    // LITE-08 §23: sección de indicadores (antes «Resumen operacional»). Se
+    // consulta por rol de encabezado para no confundir con el grupo de nav.
+    expect(await screen.findByRole("heading", { name: "Indicadores" })).toBeInTheDocument();
     expect(screen.getByText("Abiertas")).toBeInTheDocument();
     // "En ejecución" aparece como KPI y como acceso de integración → basta con ≥1.
     expect(screen.getAllByText("En ejecución").length).toBeGreaterThan(0);

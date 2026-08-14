@@ -55,13 +55,24 @@ export function useConsulta<T>(
   return { datos, cargando, error, recargar };
 }
 
-export function useListado(filtros: Record<string, string | undefined>): EstadoAsync<ActivoRow[]> {
+export function useListado(
+  filtros: Record<string, string | undefined>,
+  opciones?: {
+    /**
+     * No redirige a /login en 401 (lo trata como error normal). Reservado para
+     * consumidores de PRESENTACIÓN tempranos (p. ej. la Home operacional §23):
+     * un 401 transitorio post-login NO debe arrastrar el navegador a /login.
+     */
+    toleraNoAutorizado?: boolean;
+  },
+): EstadoAsync<ActivoRow[]> {
+  const toleraNoAutorizado = opciones?.toleraNoAutorizado ?? false;
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(filtros)) if (v) qs.set(k, v);
   const query = qs.toString();
   return useConsulta<ActivoRow[]>(
-    (signal) => activosFetch<ActivoRow[]>(query ? `?${query}` : "", { signal }),
-    [query],
+    (signal) => activosFetch<ActivoRow[]>(query ? `?${query}` : "", { signal, toleraNoAutorizado }),
+    [query, toleraNoAutorizado],
   );
 }
 

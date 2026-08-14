@@ -13,6 +13,7 @@ import type {
   Calendario,
   OpcionCatalogo,
   EventoPlan,
+  EstadoRutinasActivo,
 } from "./tipos";
 
 export type { EstadoAsync } from "../ordenes/hooks";
@@ -125,6 +126,26 @@ export function usePlanesDeActivo(activoId: string): EstadoAsync<PlanRow[]> {
       if (!activoId) return [];
       const todos = lista<PlanRow>(await planesFetch(``, { signal, toleraNoEncontrado: true }), "planes");
       return todos.filter((p) => (p.alcance?.activos ?? []).includes(activoId));
+    },
+    [activoId],
+  );
+}
+
+/**
+ * DELTAOPS LITE-08 · Estado operacional de las rutinas por USO/TIEMPO de un
+ * activo (§3-5). Consulta la evaluación del motor de frecuencias del backend
+ * (`GET /planes/activos/:id/estado-rutinas`); los medidores los lee el backend
+ * (autoridad). Devuelve `null` si el endpoint no está disponible (404 tolerado).
+ */
+export function useEstadoRutinas(activoId: string): EstadoAsync<EstadoRutinasActivo | null> {
+  return useConsulta<EstadoRutinasActivo | null>(
+    async (signal) => {
+      if (!activoId) return null;
+      const r = await planesFetch<EstadoRutinasActivo>(
+        `/activos/${encodeURIComponent(activoId)}/estado-rutinas`,
+        { signal, toleraNoEncontrado: true },
+      );
+      return r ?? null;
     },
     [activoId],
   );

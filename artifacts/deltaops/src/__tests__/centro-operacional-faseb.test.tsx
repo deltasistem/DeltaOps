@@ -183,8 +183,9 @@ describe("§21 · landing por los 6 roles canónicos", () => {
       await screen.findByText(/Bienvenido, Usuaria Demo/i);
       expect(screen.queryByText("DeltaOps Console")).toBeNull();
       expect(screen.queryByText(/Estado Global/i)).toBeNull();
-      // Todos con módulo ordenes ven el resumen operacional real.
-      expect(await screen.findByText("Resumen operacional")).toBeInTheDocument();
+      // LITE-08 §23: la sección de indicadores (antes «Resumen operacional») se
+      // renderiza al final para todos los roles con módulo ordenes.
+      expect(await screen.findByRole("heading", { name: "Indicadores" })).toBeInTheDocument();
     });
   }
 });

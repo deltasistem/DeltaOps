@@ -9,6 +9,7 @@ import referenceModuleRouter from "./routes/deltaops/reference-module";
 import activosModuleRouter from "./routes/deltaops/activos-module";
 import preoperacionalModuleRouter from "./routes/deltaops/preoperacional-module";
 import hallazgoModuleRouter from "./routes/deltaops/hallazgo-module";
+import visibilidadModuleRouter from "./routes/deltaops/visibilidad-module";
 import ordenesModuleRouter from "./routes/deltaops/ordenes-module";
 import inventarioModuleRouter from "./routes/deltaops/inventario-module";
 import planesModuleRouter from "./routes/deltaops/planes-module";
@@ -83,6 +84,11 @@ app.use("/api", deltaopsRouter);
 app.use("/api", attachmentServeRouter);
 // La consola de plataforma tiene su propio guard de admin/super-admin.
 app.use("/api", platformConsoleRouter);
+// DELTAOPS LITE-08 §21 · Preferencia de VISIBILIDAD de navegación (no es módulo
+// ni entitlement): se monta antes del guard estricto de módulos porque el shell
+// la lee para TODO rol autenticado. Tiene su propio guard de sesión y de
+// escritura (sólo admin de empresa/SUPER_ADMIN). Visibilidad ≠ seguridad.
+app.use("/api", visibilidadModuleRouter);
 // Guard ESTRICTO de identidad + enforcement de entitlements: se aplican SOLO a
 // las superficies de MÓDULO de negocio. Ya NO hay camino permisivo: toda sesión
 // de módulo debe tener identidad + membresía activa + tenant operativo + epoch

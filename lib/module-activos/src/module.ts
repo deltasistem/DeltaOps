@@ -340,6 +340,47 @@ function resumenDeEvento(tipo: string, p: Record<string, unknown>): string {
 }
 
 /**
+ * Normaliza UNA fila cruda de `platform.timeline.query` al contrato PLANO de la
+ * línea de tiempo del activo. La fila del store viene como `{ id, data: {...} }`
+ * (auto-proyección) o ya con `resumen`/`estado` (registro por comando). Expone
+ * campos legibles y estables para la UI: `eventType`, `tipo` (alias), `resumen`,
+ * `occurredAt`, `ocurridoAt` (alias), `actorId`, `actor`, `estado`,
+ * `entidadRelacionada`, `payload`. Cuando falta `resumen`, se deriva del tipo
+ * real vía `resumenDeEvento` (NO inventa datos: sólo etiqueta el evento real).
+ */
+function normalizarEntradaTimeline(fila: Record<string, unknown>): Record<string, unknown> {
+  const d = (fila["data"] && typeof fila["data"] === "object" ? fila["data"] : fila) as Record<string, unknown>;
+  const payload = (d["payload"] && typeof d["payload"] === "object" ? d["payload"] : {}) as Record<string, unknown>;
+  const eventType = String(d["eventType"] ?? d["tipoEvento"] ?? d["tipo"] ?? "");
+  const occurredAt = d["occurredAt"] ?? d["ocurridoAt"] ?? payload["actualizadoAt"] ?? null;
+  const resumenBruto = d["resumen"];
+  const resumen =
+    typeof resumenBruto === "string" && resumenBruto.trim()
+      ? resumenBruto
+      : eventType
+        ? resumenDeEvento(eventType, payload)
+        : "";
+  const actorId = String(d["actorId"] ?? payload["actorId"] ?? "system");
+  const estado = d["estado"] != null ? String(d["estado"]) : payload["estado"] != null ? String(payload["estado"]) : null;
+  const entidadRelacionada =
+    d["entidadRelacionada"] != null ? String(d["entidadRelacionada"]) : d["entityRef"] != null ? String(d["entityRef"]) : null;
+  return {
+    id: fila["id"] ?? d["id"] ?? undefined,
+    eventType,
+    tipo: eventType, // alias legible que consume la UI de la ficha del activo
+    resumen,
+    descripcion: resumen,
+    estado,
+    actorId,
+    actor: actorId,
+    entidadRelacionada,
+    occurredAt: occurredAt == null ? null : String(occurredAt),
+    ocurridoAt: occurredAt == null ? null : String(occurredAt), // alias legible UI
+    payload,
+  };
+}
+
+/**
  * Aplica UNA fila de línea de tiempo al READ MODEL INTERNO del módulo
  * (`act_historial`), idempotente por event_id. Reutilizable por el handler de
  * proyección y por la reproyección por replay. NO es el Shared Timeline: es el
@@ -1996,7 +2037,7 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             correlationId: ctx.correlationId,
             metadata: { tenantId: tenant.value },
           });
-          return deps.runtime.queries.execute(sys, "platform.timeline.query", {
+          const r = await deps.runtime.queries.execute(sys, "platform.timeline.query", {
             entityRef: input.id ? `activo:${input.id}` : undefined,
             actorId: input.actor,
             estado: input.estado,
@@ -2005,6 +2046,15 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             hasta: input.hasta,
             limit: input.limit,
           });
+          if (!r.ok) return r;
+          // `platform.timeline.query` devuelve las filas CRUDAS del store
+          // (`{ id, data: { eventType, occurredAt, actorId, payload, resumen? } }`).
+          // Se NORMALIZAN al contrato plano de la línea de tiempo del activo: sin
+          // esto la UI recibía objetos anidados y pintaba «Evento» / «Sin datos».
+          // El `resumen` se deriva de `resumenDeEvento` cuando la entrada
+          // auto-proyectada no lo trae (nunca se inventa: se etiqueta el tipo real).
+          const filas = Array.isArray(r.value) ? r.value : [];
+          return ok(filas.map((fila) => normalizarEntradaTimeline(fila as Record<string, unknown>)));
         },
       }),
       // Consola técnica: contrato + configuración efectiva + estado operativo.

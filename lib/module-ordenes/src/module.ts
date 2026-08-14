@@ -1856,6 +1856,14 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             descripcion: z.string().nullable().optional(),
             cantidad: z.number().nullable().optional(),
             unidad: z.string().nullable().optional(),
+            // DELTAOPS LITE-08 §15 · Consumo ligero (repuesto/insumo). Campos
+            // opcionales aditivos que viajan en `datos` (sin tabla nueva). El
+            // dinero es STRING con frontera estricta (nunca float; NO se suma
+            // aquí — la integración con Costos queda como GAP-COST-15 para no
+            // duplicar costo). Proveedor es referencia string sin FK dura.
+            costo: z.string().regex(/^\d+(\.\d{1,2})?$/, "costo debe ser decimal string (p.ej. \"1200.50\")").nullable().optional(),
+            proveedorId: z.string().max(160).nullable().optional(),
+            observacion: z.string().max(500).nullable().optional(),
             id: z.string().optional(),
             opId: z.string().optional(),
           }),
@@ -1873,10 +1881,16 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
 
             const id = input.id ?? crypto.randomUUID();
             const ahora = new Date();
+            // §15 · Metadatos de consumo ligero en el `datos` del recurso
+            // (composición, sin tabla nueva). Sólo se guardan si vienen.
+            const datosRecurso: Record<string, unknown> = {};
+            if (input.costo != null && input.costo !== "") datosRecurso["costo"] = input.costo;
+            if (input.proveedorId != null && input.proveedorId !== "") datosRecurso["proveedorId"] = input.proveedorId;
+            if (input.observacion != null && input.observacion !== "") datosRecurso["observacion"] = input.observacion;
             const recurso: Recurso = {
               id, ordenId: input.ordenId, clase: input.clase, referenciaId: input.referenciaId,
               descripcion: input.descripcion ?? null, cantidad: input.cantidad ?? null, unidad: input.unidad ?? null,
-              datos: {}, createdBy: ctx.principal.id, createdAt: ahora,
+              datos: datosRecurso, createdBy: ctx.principal.id, createdAt: ahora,
             };
             const ins = await adapters.motor.recursoInsert(uow, tenant.value, recurso);
             if (!ins.ok) return ins;
@@ -2485,7 +2499,7 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
       }),
       () => ({
         name: `${MODULO}.sesion.duraciones`,
-        inputSchema: z.object({ sesionId: z.string().optional(), ordenId: z.string().optional() }),
+        inputSchema: z.object({ sesionId: z.string().optional(), ordenId: z.string().optional(), activoId: z.string().optional() }),
         authorization: { permissions: [`${MODULO}.read`] },
         async handle(ctx, input) {
           const tenant = tenantOf(ctx);
@@ -2500,7 +2514,12 @@ export function ordenesModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             if (!r.ok) return r;
             return ok({ duraciones: r.value });
           }
-          return fail(KernelErrors.validation("Especifique sesionId u ordenId"));
+          if (input.activoId) {
+            const r = await adapters.sesiones.duracionesPorActivo(tenant.value, input.activoId);
+            if (!r.ok) return r;
+            return ok({ duraciones: r.value });
+          }
+          return fail(KernelErrors.validation("Especifique sesionId, ordenId o activoId"));
         },
       }),
     ],

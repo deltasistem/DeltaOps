@@ -3642,7 +3642,7 @@
           "Sesiones"
         ],
         "operationId": "ordenes.sesion.duraciones",
-        "summary": "Duraciones (efectivo/pausado/transcurrido) por sesión u OT (read model; el cliente NO calcula duración)",
+        "summary": "Duraciones (efectivo/pausado/transcurrido) por sesión, OT o activo (read model; el cliente NO calcula duración)",
         "parameters": [
           {
             "name": "sesionId",
@@ -3661,6 +3661,15 @@
               "type": "string"
             },
             "description": "Duraciones de todas las sesiones de la OT"
+          },
+          {
+            "name": "activoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Duraciones de todas las sesiones del activo (hoja de vida)"
           }
         ],
         "responses": {
@@ -4456,7 +4465,9 @@
               "material",
               "epp",
               "vehiculo",
-              "equipo-auxiliar"
+              "equipo-auxiliar",
+              "repuesto",
+              "insumo"
             ]
           },
           "referenciaId": {
@@ -4471,6 +4482,20 @@
             "nullable": true
           },
           "unidad": {
+            "type": "string",
+            "nullable": true
+          },
+          "costo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Consumo ligero §15: dinero string (decimal), sin float ni suma automática"
+          },
+          "proveedorId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Referencia string sin FK dura"
+          },
+          "observacion": {
             "type": "string",
             "nullable": true
           },

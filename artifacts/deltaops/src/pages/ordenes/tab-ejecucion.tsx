@@ -442,11 +442,18 @@ function RegistroRecurso({ orden, onCambio }: { orden: OrdenRow; onCambio: () =>
   const { cola } = useOffline();
   const toast = useToast();
   const def = useMemo(() => plantillaRecurso(), []);
-  const form = useFormularioDinamico(def, {}, { clase: "material" });
+  const form = useFormularioDinamico(def, {}, { clase: "repuesto" });
   const [guardando, setGuardando] = useState(false);
 
   async function guardar() {
-    if (!form.esValido()) { toast.mostrar({ variant: "advertencia", titulo: "Completa el recurso (clase y referencia)" }); return; }
+    if (!form.esValido()) { toast.mostrar({ variant: "advertencia", titulo: "Completa el recurso (tipo y referencia)" }); return; }
+    const costoStr = form.valores.costo != null ? String(form.valores.costo).trim() : "";
+    // §15 · Dinero string estricto en frontera: sin float, sin sumas. Si el
+    // usuario escribió algo no decimal, avisar antes de enviar al backend.
+    if (costoStr !== "" && !/^\d+(\.\d{1,2})?$/.test(costoStr)) {
+      toast.mostrar({ variant: "advertencia", titulo: "Costo inválido", mensaje: "Usa un importe decimal, p.ej. 1200.50" });
+      return;
+    }
     setGuardando(true);
     const r = await registrarRecurso(cola, orden.id, {
       clase: String(form.valores.clase),
@@ -454,15 +461,18 @@ function RegistroRecurso({ orden, onCambio }: { orden: OrdenRow; onCambio: () =>
       descripcion: form.valores.descripcion != null ? String(form.valores.descripcion) : null,
       cantidad: form.valores.cantidad != null && form.valores.cantidad !== "" ? Number(form.valores.cantidad) : null,
       unidad: form.valores.unidad != null && form.valores.unidad !== "" ? String(form.valores.unidad) : null,
+      costo: costoStr !== "" ? costoStr : null,
+      proveedorId: form.valores.proveedorId != null && String(form.valores.proveedorId).trim() !== "" ? String(form.valores.proveedorId).trim() : null,
+      observacion: form.valores.observacion != null && String(form.valores.observacion).trim() !== "" ? String(form.valores.observacion).trim() : null,
     });
     setGuardando(false);
     if (r.error) toast.mostrar({ variant: "error", titulo: "Error", mensaje: r.error.message });
-    else { toast.mostrar({ variant: r.encolada ? "info" : "exito", titulo: r.encolada ? "En cola" : "Recurso registrado", mensaje: "Queda registrado en la cronología de la orden." }); form.setValores({ clase: "material" }); onCambio(); }
+    else { toast.mostrar({ variant: r.encolada ? "info" : "exito", titulo: r.encolada ? "En cola" : "Consumo registrado", mensaje: "Queda registrado en la cronología de la orden." }); form.setValores({ clase: "repuesto" }); onCambio(); }
   }
 
   return (
     <Card>
-      <CardHeader><strong>Materiales, herramientas y recursos</strong></CardHeader>
+      <CardHeader><strong>Consumos, repuestos, materiales y herramientas</strong></CardHeader>
       <CardContent>
         <FormularioDinamico definicion={def} valores={form.valores} onCambio={form.setValores} hallazgos={form.hallazgos} />
         <div style={{ marginTop: "var(--do-sp-2)" }}>

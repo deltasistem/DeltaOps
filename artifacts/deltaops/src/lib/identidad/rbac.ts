@@ -156,19 +156,47 @@ export interface GrupoNav {
 }
 
 /**
+ * DELTAOPS LITE-08 §22 · Prioridad de grupos por PERFIL. Reordena la MISMA
+ * navegación por proceso según el rol, poniendo delante lo que ese perfil usa a
+ * diario y relegando los módulos secundarios al grupo «Más». No crea ni elimina
+ * rutas: sólo reordena y baja el peso visual. Cualquier grupo no listado para el
+ * rol se muestra tras los priorizados (excepto los relegados a «Más»).
+ */
+const PRIORIDAD_GRUPOS_POR_ROL: Record<Rol, readonly string[]> = {
+  // Técnico: sus equipos, el trabajo de mantenimiento y el preoperacional.
+  TECNICO: ["equipos", "mantenimiento", "preoperacional"],
+  // Supervisor/Planificador (responsable): equipos, mantenimiento, preoperacional, indicadores.
+  SUPERVISOR: ["equipos", "mantenimiento", "preoperacional", "indicadores"],
+  PLANIFICADOR: ["mantenimiento", "equipos", "preoperacional", "indicadores"],
+  // Admin de empresa: mantenimiento, equipos, indicadores, administración.
+  TENANT_ADMIN: ["mantenimiento", "equipos", "indicadores", "administracion"],
+  SUPER_ADMIN: ["mantenimiento", "equipos", "indicadores", "administracion"],
+  CONSULTA: ["equipos", "mantenimiento", "indicadores"],
+};
+
+/** Grupos SECUNDARIOS que, salvo prioridad explícita del rol, se relegan a «Más». */
+const GRUPOS_SECUNDARIOS: ReadonlySet<string> = new Set(["inventario", "referencia"]);
+
+/**
  * Construye los grupos de navegación visibles para la sesión. Cada ítem sólo se
  * incluye si su módulo está habilitado (o, en Administración, si el rol tiene la
  * capacidad correspondiente). Los grupos vacíos se omiten. El módulo emergente
  * Utilización (sin enum en el contrato) se decide con su guard dedicado pasado
  * por el llamador para no acoplar este helper a esa capa.
+ *
+ * §22 · El resultado se reordena por perfil y los módulos secundarios se
+ * reagrupan bajo «Más» con menor peso visual. §21 · `ocultos` (visibilidad por
+ * preferencia del tenant) filtra ítems SIN tocar seguridad (el backend sigue
+ * siendo la autoridad); nunca puede REVELAR un módulo no habilitado.
  */
 export function gruposNavegacion(
   sesion: Pick<Sesion, "rol" | "modulos">,
-  opciones?: { utilizacionVisible?: boolean },
+  opciones?: { utilizacionVisible?: boolean; ocultos?: ReadonlySet<string> },
 ): GrupoNav[] {
   const tiene = (m: Modulo): boolean => sesion.modulos.includes(m);
   const admin = esAdminEmpresa(sesion.rol);
   const superAdmin = esSuperAdmin(sesion.rol);
+  const esTecnico = sesion.rol === "TECNICO";
   const grupos: GrupoNav[] = [];
 
   // MANTENIMIENTO · trabajo operativo (órdenes, correctivo, preventivo, planes).
@@ -176,16 +204,25 @@ export function gruposNavegacion(
   if (tiene("ordenes")) mantenimiento.push({ clave: "ordenes", nombre: "Órdenes", ruta: "/ordenes" });
   if (tiene("correctivo")) mantenimiento.push({ clave: "correctivo", nombre: "Correctivo", ruta: "/correctivo/solicitudes" });
   if (tiene("preventivo")) mantenimiento.push({ clave: "preventivo", nombre: "Preventivo", ruta: "/preventivo/programas" });
-  if (tiene("planes")) mantenimiento.push({ clave: "planes", nombre: "Planes", ruta: "/planes" });
+  // §22 · Planes es superficie de administración/planificación: baja de peso
+  // para el técnico (no aparece en su nav diario; sigue accesible por rol).
+  if (tiene("planes") && !esTecnico) mantenimiento.push({ clave: "planes", nombre: "Planes", ruta: "/planes" });
   if (mantenimiento.length > 0) grupos.push({ clave: "mantenimiento", titulo: "Mantenimiento", items: mantenimiento });
 
-  // EQUIPOS · activos + utilización.
+  // EQUIPOS · activos + utilización. Para el técnico se rotula «Mis equipos».
   const equipos: ItemNav[] = [];
-  if (tiene("activos")) equipos.push({ clave: "activos", nombre: "Activos", ruta: "/activos" });
+  if (tiene("activos")) equipos.push({ clave: "activos", nombre: esTecnico ? "Mis equipos" : "Activos", ruta: "/activos" });
   if (opciones?.utilizacionVisible) equipos.push({ clave: "utilizacion", nombre: "Utilización", ruta: "/utilizacion/lecturas" });
-  if (equipos.length > 0) grupos.push({ clave: "equipos", titulo: "Equipos", items: equipos });
+  if (equipos.length > 0) grupos.push({ clave: "equipos", titulo: esTecnico ? "Mis equipos" : "Equipos", items: equipos });
 
-  // INVENTARIO · inventario + abastecimiento.
+  // PREOPERACIONAL · acceso directo al flujo de inspección (vive bajo Activos).
+  // §22 lo destaca para técnico/supervisor. No es una ruta nueva: entra por el
+  // listado de activos con la acción de preoperacional.
+  if (tiene("activos")) {
+    grupos.push({ clave: "preoperacional", titulo: "Preoperacional", items: [{ clave: "preoperacional", nombre: "Preoperacional", ruta: "/activos?accion=preoperacional" }] });
+  }
+
+  // INVENTARIO · inventario + abastecimiento (secundario → «Más»).
   const inventario: ItemNav[] = [];
   if (tiene("inventario")) inventario.push({ clave: "inventario", nombre: "Inventario", ruta: "/inventario" });
   if (tiene("abastecimiento")) inventario.push({ clave: "abastecimiento", nombre: "Abastecimiento", ruta: "/abastecimiento/solicitudes" });
@@ -201,8 +238,7 @@ export function gruposNavegacion(
   }
   if (indicadores.length > 0) grupos.push({ clave: "indicadores", titulo: "Indicadores", items: indicadores });
 
-  // Referencia (catálogo transversal) se ofrece dentro de Indicadores/otros sólo
-  // si el módulo está habilitado, conservando su acceso sin ensuciar el nav.
+  // Referencia (catálogo transversal) se relega a «Más».
   if (tiene("referencia")) {
     grupos.push({ clave: "referencia", titulo: "Referencia", items: [{ clave: "referencia", nombre: "Referencia", ruta: "/referencia" }] });
   }
@@ -218,7 +254,36 @@ export function gruposNavegacion(
   }
   if (administracion.length > 0) grupos.push({ clave: "administracion", titulo: "Administración", items: administracion });
 
-  return grupos;
+  // §21 · Filtro de VISIBILIDAD por preferencia del tenant (nunca seguridad):
+  // oculta grupos completos cuya clave esté en `ocultos`. No puede revelar nada.
+  const ocultos = opciones?.ocultos;
+  const visibles = ocultos ? grupos.filter((g) => !ocultos.has(g.clave)) : grupos;
+
+  return ordenarPorPerfil(visibles, sesion.rol);
+}
+
+/**
+ * §22 · Reordena los grupos según la prioridad del perfil y relega los
+ * secundarios (no priorizados y en `GRUPOS_SECUNDARIOS`) al final. El llamador
+ * puede además colapsar la cola bajo un desplegable «Más».
+ */
+function ordenarPorPerfil(grupos: GrupoNav[], rol: Rol): GrupoNav[] {
+  const prioridad = PRIORIDAD_GRUPOS_POR_ROL[rol] ?? [];
+  const peso = (clave: string): number => {
+    const idx = prioridad.indexOf(clave);
+    if (idx >= 0) return idx; // priorizados primero, en orden del perfil
+    if (GRUPOS_SECUNDARIOS.has(clave)) return 1000; // secundarios al final
+    return 500; // el resto, en medio
+  };
+  return [...grupos].sort((a, b) => peso(a.clave) - peso(b.clave));
+}
+
+/**
+ * §22 · ¿La clave de grupo es SECUNDARIA (candidata a colapsarse bajo «Más»)?
+ * El shell la usa para bajar el peso visual sin ocultar el acceso.
+ */
+export function esGrupoSecundario(clave: string): boolean {
+  return GRUPOS_SECUNDARIOS.has(clave);
 }
 
 /* ------------------------------- Landing -------------------------------- */

@@ -226,10 +226,14 @@ export async function registrarRecurso(
     descripcion?: string | null;
     cantidad?: number | null;
     unidad?: string | null;
+    // §15 · Consumo ligero: costo (dinero string), proveedor y observación.
+    costo?: string | null;
+    proveedorId?: string | null;
+    observacion?: string | null;
   },
 ): Promise<ResultadoMutacion> {
   const opId = nuevoOpId();
-  const cuerpo = {
+  const cuerpo: Record<string, unknown> = {
     ordenId,
     opId,
     clase: datos.clase,
@@ -238,6 +242,11 @@ export async function registrarRecurso(
     cantidad: datos.cantidad ?? null,
     unidad: datos.unidad ?? null,
   };
+  // Sólo enviar los opcionales de consumo ligero si vienen con contenido: el
+  // backend valida el costo como decimal string estricto.
+  if (datos.costo != null && datos.costo !== "") cuerpo["costo"] = datos.costo;
+  if (datos.proveedorId != null && datos.proveedorId !== "") cuerpo["proveedorId"] = datos.proveedorId;
+  if (datos.observacion != null && datos.observacion !== "") cuerpo["observacion"] = datos.observacion;
   return mutarConOffline(cola, {
     comando: `${MODULO}.registrar-recurso`,
     input: cuerpo,

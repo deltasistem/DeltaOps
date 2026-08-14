@@ -1239,6 +1239,76 @@
         }
       }
     },
+    "/api/deltaops/planes/activos/{activoId}/estado-rutinas": {
+      "get": {
+        "tags": [
+          "Generación"
+        ],
+        "operationId": "planes.estado-rutinas",
+        "summary": "Estado operacional (semáforo + faltante) de las rutinas por uso/tiempo de un activo; medidores leídos server-side",
+        "parameters": [
+          {
+            "name": "activoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del activo"
+          },
+          {
+            "name": "ahora",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Instante ISO de evaluación (por defecto, ahora)"
+          },
+          {
+            "name": "umbral",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Umbral de proximidad 0..1 (por defecto 0.9)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoRutinasActivo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado (sesión ausente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No autorizado (KRN-AUTH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/deltaops/planes/catalogos/{catalogo}": {
       "get": {
         "tags": [
@@ -2638,6 +2708,102 @@
             "type": "string"
           }
         },
+        "additionalProperties": false
+      },
+      "EstadoRutina": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string"
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipoPlan": {
+            "type": "string"
+          },
+          "prioridad": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "vencida": {
+            "type": "boolean"
+          },
+          "semaforo": {
+            "type": "string",
+            "enum": [
+              "verde",
+              "amarillo",
+              "rojo",
+              "sin-datos"
+            ]
+          },
+          "etiqueta": {
+            "type": "string"
+          },
+          "faltante": {
+            "type": "number",
+            "nullable": true
+          },
+          "excedente": {
+            "type": "number",
+            "nullable": true
+          },
+          "meta": {
+            "type": "string",
+            "nullable": true
+          },
+          "unidad": {
+            "type": "string",
+            "nullable": true
+          },
+          "dominio": {
+            "type": "string",
+            "enum": [
+              "uso",
+              "temporal",
+              "eventos",
+              "desconocido"
+            ]
+          },
+          "progreso": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "planId",
+          "nombre",
+          "vencida",
+          "semaforo",
+          "etiqueta"
+        ],
+        "additionalProperties": false
+      },
+      "EstadoRutinasActivo": {
+        "type": "object",
+        "properties": {
+          "activoId": {
+            "type": "string"
+          },
+          "ahora": {
+            "type": "string"
+          },
+          "rutinas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EstadoRutina"
+            }
+          }
+        },
+        "required": [
+          "activoId",
+          "rutinas"
+        ],
         "additionalProperties": false
       },
       "Consola": {

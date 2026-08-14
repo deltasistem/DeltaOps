@@ -1714,7 +1714,9 @@
             "enum": [
               "VALORADA",
               "SIN_TARIFA",
-              "SIN_RECURSO"
+              "SIN_RECURSO",
+              "PENDIENTE",
+              "EN_CURSO"
             ]
           },
           "cruzaPeriodos": {

@@ -218,6 +218,8 @@ function useCatalogosPlantilla(): Partial<Record<NombreCatalogo, OpcionSeleccion
   const usados: NombreCatalogo[] = [
     "tipos", "categorias", "familias", "subfamilias", "criticidades",
     "prioridades", "fabricantes", "modelos", "ubicaciones", "proveedores",
+    // §16 · Centro de costos capturable en el alta (catálogo autorizado).
+    "centros-costo",
   ];
   // Hooks fijos (orden estable): uno por catálogo usado.
   const resultados = usados.map((c) => ({ c, r: useCatalogo(c) }));

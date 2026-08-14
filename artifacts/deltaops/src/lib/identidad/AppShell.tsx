@@ -21,14 +21,20 @@ import {
   Modal,
   Field,
   Select,
+  Switch,
   AppShell,
   type DropdownItem,
 } from "@workspace/design-system";
-import { Building2, UserCircle, Palette, MapPin } from "lucide-react";
+import { Building2, UserCircle, Palette, MapPin, Eye } from "lucide-react";
 import { useSesion } from "./sesion";
 import { OpcionesApariencia } from "./SelectorApariencia";
 import { BrandingProvider, useBranding } from "./branding";
-import { esAdminEmpresa, esSuperAdmin, gruposNavegacion, nombreRol } from "./rbac";
+import { esAdminEmpresa, esSuperAdmin, gruposNavegacion, esGrupoSecundario, nombreRol } from "./rbac";
+import {
+  useVisibilidadNav,
+  guardarVisibilidadNav,
+  GRUPOS_CONFIGURABLES,
+} from "./visibilidad-nav";
 import { utilizacionVisible } from "../utilizacion/capacidades";
 import { useCatalogo } from "../activos/hooks";
 import { CentroCostosProvider, useCentroCostos, CENTRO_TODOS, type OpcionCentro } from "../centro/contexto";
@@ -143,6 +149,8 @@ function MenuPerfil({ sesion }: { sesion: Sesion }) {
   // Estado del modal de apariencia (Perfil → Preferencias → Apariencia). Vive
   // fuera del Dropdown para poder abrirse tras cerrarse el menú.
   const [aparienciaAbierta, setAparienciaAbierta] = useState(false);
+  // §21 · Modal de visibilidad de módulos (sólo admin de empresa/SUPER_ADMIN).
+  const [visibilidadAbierta, setVisibilidadAbierta] = useState(false);
 
   const items: DropdownItem[] = [
     { etiqueta: "Mi perfil", onSelect: () => setLocation("/perfil") },
@@ -151,6 +159,7 @@ function MenuPerfil({ sesion }: { sesion: Sesion }) {
   ];
   if (esAdminEmpresa(sesion.rol)) {
     items.push({ etiqueta: "Configuración de empresa", onSelect: () => setLocation("/administracion/configuracion") });
+    items.push({ etiqueta: "Visibilidad de módulos", icono: Eye, onSelect: () => setVisibilidadAbierta(true) });
     items.push({ etiqueta: "Usuarios", onSelect: () => setLocation("/administracion/usuarios") });
   }
   if (esSuperAdmin(sesion.rol)) {
@@ -199,7 +208,110 @@ function MenuPerfil({ sesion }: { sesion: Sesion }) {
         </p>
         <OpcionesApariencia />
       </Modal>
+      {esAdminEmpresa(sesion.rol) && (
+        <ConfiguracionVisibilidad
+          abierto={visibilidadAbierta}
+          onClose={() => setVisibilidadAbierta(false)}
+          tenantId={sesion.tenant.id}
+        />
+      )}
     </>
+  );
+}
+
+/* -------------------- Visibilidad de módulos (§21) --------------------- */
+
+/**
+ * DELTAOPS LITE-08 §21 · Configuración de VISIBILIDAD de módulos por el admin.
+ * Compone sobre la preferencia del tenant (Record Store): decide qué GRUPOS del
+ * nav se OCULTAN. Visibilidad ≠ seguridad: el backend sigue rechazando accesos
+ * no autorizados; ocultar un grupo no revoca ni concede permisos. Sólo escribe
+ * si el backend lo autoriza (admin de empresa/SUPER_ADMIN).
+ */
+function ConfiguracionVisibilidad({
+  abierto,
+  onClose,
+  tenantId,
+}: {
+  abierto: boolean;
+  onClose: () => void;
+  tenantId: string;
+}) {
+  const { lista, cargando, recargar } = useVisibilidadNav(tenantId);
+  const [ocultos, setOcultos] = useState<Set<string>>(new Set());
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Sincroniza el estado editable cuando se abre / cambia la preferencia.
+  React.useEffect(() => {
+    if (abierto) setOcultos(new Set(lista));
+  }, [abierto, lista]);
+
+  function alternar(clave: string, mostrar: boolean) {
+    setOcultos((prev) => {
+      const next = new Set(prev);
+      if (mostrar) next.delete(clave);
+      else next.add(clave);
+      return next;
+    });
+  }
+
+  async function guardar() {
+    setGuardando(true);
+    setError(null);
+    try {
+      await guardarVisibilidadNav([...ocultos]);
+      recargar();
+      onClose();
+    } catch {
+      setError("No se pudo guardar la preferencia. Intenta de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <Modal
+      abierto={abierto}
+      onClose={onClose}
+      titulo="Visibilidad de módulos"
+      size="sm"
+      pie={
+        <>
+          <Button variant="fantasma" onClick={onClose} disabled={guardando}>Cancelar</Button>
+          <Button variant="primario" onClick={() => void guardar()} disabled={guardando || cargando} style={{ minHeight: 48 }}>
+            {guardando ? "Guardando…" : "Guardar"}
+          </Button>
+        </>
+      }
+    >
+      <p style={{ margin: "0 0 var(--do-sp-4)", color: "var(--do-texto-suave)", fontSize: "var(--do-text-sm)" }}>
+        Elige qué grupos de módulos se muestran en la navegación de tu empresa.
+        Ocultar un grupo sólo cambia la presentación: no afecta a la seguridad ni
+        a los permisos (el sistema sigue protegiendo cada acceso).
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
+        {GRUPOS_CONFIGURABLES.map((g) => {
+          const visible = !ocultos.has(g.clave);
+          return (
+            <div
+              key={g.clave}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--do-sp-3)", minHeight: 48 }}
+            >
+              <Switch
+                label={g.etiqueta}
+                checked={visible}
+                onChange={(e) => alternar(g.clave, e.target.checked)}
+                aria-label={`Mostrar ${g.etiqueta}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {error && (
+        <p role="alert" style={{ marginTop: "var(--do-sp-3)", color: "var(--do-error)" }}>{error}</p>
+      )}
+    </Modal>
   );
 }
 
@@ -256,8 +368,20 @@ function esActiva(location: string, ruta: string): boolean {
  * se reagrupa la presentación por entitlement/capacidad reales.
  */
 function Navegacion({ sesion }: { sesion: Sesion }) {
-  const [location] = useLocation();
-  const grupos = gruposNavegacion(sesion, { utilizacionVisible: utilizacionVisible(sesion) });
+  const [location, setLocation] = useLocation();
+  // §21 · Preferencia de visibilidad de módulos por tenant (nunca seguridad).
+  const { ocultos } = useVisibilidadNav(sesion.tenant.id);
+  const grupos = gruposNavegacion(sesion, {
+    utilizacionVisible: utilizacionVisible(sesion),
+    ocultos,
+  });
+  // §22 · Los grupos secundarios se colapsan bajo «Más» con menor peso visual;
+  // los primarios (priorizados por perfil) se muestran en línea.
+  const primarios = grupos.filter((g) => !esGrupoSecundario(g.clave));
+  const secundarios = grupos.filter((g) => esGrupoSecundario(g.clave));
+  const itemsMas: DropdownItem[] = secundarios.flatMap((g) =>
+    g.items.map((it) => ({ etiqueta: `${g.titulo} · ${it.nombre}`, onSelect: () => setLocation(it.ruta) })),
+  );
   return (
     <>
       <Link href="/">
@@ -265,7 +389,7 @@ function Navegacion({ sesion }: { sesion: Sesion }) {
           Inicio
         </Button>
       </Link>
-      {grupos.map((g) => (
+      {primarios.map((g) => (
         <div key={g.clave} className="do-nav-grupo" role="group" aria-label={g.titulo}>
           <span className="do-nav-grupo__titulo">{g.titulo}</span>
           <div className="do-nav-grupo__items">
@@ -283,6 +407,14 @@ function Navegacion({ sesion }: { sesion: Sesion }) {
           </div>
         </div>
       ))}
+      {itemsMas.length > 0 && (
+        <div className="do-nav-grupo" role="group" aria-label="Más">
+          <span className="do-nav-grupo__titulo">Más</span>
+          <div className="do-nav-grupo__items">
+            <Dropdown etiquetaMenu="Más módulos" disparador={<span>Más</span>} items={itemsMas} />
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -141,14 +141,19 @@ export function construirOpenApi(): Record<string, unknown> {
       reintentables: int(), rechazadas: int(), resultados: arr(obj({}, [])),
     }),
     ResultadoComando: obj({ id: str(), version: int(), estado: str({ enum: estados }), idempotente: bool() }),
+    // Entrada PLANA y legible de la línea de tiempo del activo (normalizada desde
+    // `platform.timeline.query`). `tipo`/`ocurridoAt`/`actor` son alias que
+    // consume la UI de la ficha; `resumen` se deriva del tipo real si falta.
     EntradaTimeline: obj({
-      id: str(), tenantId: str(), service: str(), recordType: str(), status: str(),
-      data: obj({
-        eventType: str(), entityRef: str(), actorId: str(), resumen: str(),
-        estado: str({ nullable: true }), entidadRelacionada: str({ nullable: true }),
-        occurredAt: str({ format: "date-time" }),
-      }, []),
-    }),
+      id: str(),
+      eventType: str(), tipo: str(),
+      resumen: str(), descripcion: str(),
+      estado: str({ nullable: true }),
+      actorId: str(), actor: str(),
+      entidadRelacionada: str({ nullable: true }),
+      occurredAt: str({ format: "date-time", nullable: true }),
+      ocurridoAt: str({ format: "date-time", nullable: true }),
+    }, ["eventType", "tipo"]),
     EntradaHistorial: obj({
       eventId: str(), activoId: str(), tipoEvento: str(), estado: str({ nullable: true }),
       version: int(), actorId: str(), resumen: str(), registradoAt: str({ format: "date-time" }),

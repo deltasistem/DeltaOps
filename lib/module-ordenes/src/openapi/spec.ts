@@ -56,7 +56,7 @@ const queryParam = (name: string, description: string): Schema => ({ name, in: "
 export function construirOpenApi(): Record<string, unknown> {
   const acciones = ["inicio", "pausa", "reanudacion", "espera", "cambio-responsable", "llegada", "salida", "finalizacion"];
   const tiposAsignacion = ["persona", "grupo", "cuadrilla", "contratista"];
-  const clasesRecurso = ["herramienta", "material", "epp", "vehiculo", "equipo-auxiliar"];
+  const clasesRecurso = ["herramienta", "material", "epp", "vehiculo", "equipo-auxiliar", "repuesto", "insumo"];
   const categoriasRelacion = ["activo", "orden", "formulario", "checklist", "evidencia", "recurso"];
 
   const schemas: Record<string, Schema> = {
@@ -164,7 +164,7 @@ export function construirOpenApi(): Record<string, unknown> {
       ["ordenId", "tipo", "asignadoId"],
     ),
     RegistrarRecurso: obj(
-      { ordenId: str(), clase: str({ enum: clasesRecurso }), referenciaId: str(), descripcion: str({ nullable: true }), cantidad: num({ nullable: true }), unidad: str({ nullable: true }), id: str(), opId: str() },
+      { ordenId: str(), clase: str({ enum: clasesRecurso }), referenciaId: str(), descripcion: str({ nullable: true }), cantidad: num({ nullable: true }), unidad: str({ nullable: true }), costo: str({ nullable: true, description: "Consumo ligero §15: dinero string (decimal), sin float ni suma automática" }), proveedorId: str({ nullable: true, description: "Referencia string sin FK dura" }), observacion: str({ nullable: true }), id: str(), opId: str() },
       ["ordenId", "clase", "referenciaId"],
     ),
     DefinirSla: obj(
@@ -488,8 +488,12 @@ export function construirOpenApi(): Record<string, unknown> {
   });
   add(`${BASE}/sesiones/duraciones`, "get", {
     tags: ["Sesiones"], operationId: "ordenes.sesion.duraciones",
-    summary: "Duraciones (efectivo/pausado/transcurrido) por sesión u OT (read model; el cliente NO calcula duración)",
-    parameters: [queryParam("sesionId", "Duraciones de una sesión"), queryParam("ordenId", "Duraciones de todas las sesiones de la OT")],
+    summary: "Duraciones (efectivo/pausado/transcurrido) por sesión, OT o activo (read model; el cliente NO calcula duración)",
+    parameters: [
+      queryParam("sesionId", "Duraciones de una sesión"),
+      queryParam("ordenId", "Duraciones de todas las sesiones de la OT"),
+      queryParam("activoId", "Duraciones de todas las sesiones del activo (hoja de vida)"),
+    ],
     responses: { "200": jsonOk(obj({ duraciones: obj({}, []) }, [])), ...errores("400", "401", "403") },
   });
 

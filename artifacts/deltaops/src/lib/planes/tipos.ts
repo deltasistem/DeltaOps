@@ -195,3 +195,39 @@ export interface ResultadoGeneracion {
   readonly errores?: ErrorGeneracion[];
   readonly idempotente?: boolean;
 }
+
+/**
+ * DELTAOPS LITE-08 · Estado operacional de UNA rutina por uso/tiempo de un
+ * activo (proyección de la consulta `modulo.planes.estado-rutinas`). Refleja el
+ * cálculo del motor de frecuencias del backend; el frontend sólo lo presenta.
+ */
+export interface EstadoRutinaActivo {
+  readonly planId: string;
+  readonly codigo?: string;
+  readonly nombre: string;
+  readonly tipoPlan?: string;
+  readonly prioridad?: string;
+  readonly version?: number;
+  /** ¿Rutina vencida por uso/tiempo? */
+  readonly vencida: boolean;
+  /** Semáforo del backend: verde/amarillo/rojo/sin-datos. */
+  readonly semaforo: "verde" | "amarillo" | "rojo" | "sin-datos";
+  /** Texto del estado (siempre presente, §3: color + texto). */
+  readonly etiqueta: string;
+  /** Faltante hacia la meta en unidades de la regla (negativo si excedida). */
+  readonly faltante: number | null;
+  readonly excedente: number | null;
+  /** Meta absoluta (valor de medidor o fecha ISO). */
+  readonly meta: string | null;
+  /** Unidad legible del faltante ("h", "km", "días", …). */
+  readonly unidad: string | null;
+  readonly dominio?: "uso" | "temporal" | "eventos" | "desconocido";
+  readonly progreso?: number;
+}
+
+/** Respuesta de `estado-rutinas` para un activo. */
+export interface EstadoRutinasActivo {
+  readonly activoId: string;
+  readonly ahora?: string;
+  readonly rutinas: EstadoRutinaActivo[];
+}

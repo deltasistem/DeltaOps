@@ -41,7 +41,11 @@ export type TipoAsignacion = (typeof TIPOS_ASIGNACION)[number];
 /* ------------------------------- Recursos -------------------------------- */
 
 export const RECURSO_REGISTRADO = "modulo.ordenes.recurso-registrado";
-export const CLASES_RECURSO = ["herramienta", "material", "epp", "vehiculo", "equipo-auxiliar"] as const;
+// DELTAOPS LITE-08 §15 · Consumo ligero en OT (repuesto/insumo) añadido de
+// forma ADITIVA y compatible: preserva las clases físicas existentes. No exige
+// inventario; el costo/proveedor/observación viajan en el `datos` del recurso
+// (composición sobre la estructura existente, sin tabla nueva).
+export const CLASES_RECURSO = ["herramienta", "material", "epp", "vehiculo", "equipo-auxiliar", "repuesto", "insumo"] as const;
 export type ClaseRecurso = (typeof CLASES_RECURSO)[number];
 
 /* --------------------------------- SLA ----------------------------------- */

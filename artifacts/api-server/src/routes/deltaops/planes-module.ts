@@ -15,7 +15,8 @@ import { eq } from "drizzle-orm";
 import { db, deltaopsUsersTable } from "@workspace/db";
 import type { ExecutionContext, KernelError, Result } from "@workspace/kernel";
 import { ColaSyncSchema, MODULO } from "@workspace/module-planes";
-import { planesRuntime, contextForPlanes } from "./planes-runtime";
+import { planesRuntime, contextForPlanes, contextoRutinasDeActivo } from "./planes-runtime";
+import { aRolLegacy } from "../../deltaops/identity/rbac";
 
 const router: IRouter = Router();
 const BASE = "/deltaops/planes";
@@ -102,6 +103,34 @@ router.get(`${BASE}/:id/historial`, async (req, res) => {
 });
 router.get(`${BASE}/:id/generaciones`, async (req, res) => {
   send(res, await query(ctxOf(res), `${MODULO}.generaciones`, { planId: req.params.id }));
+});
+
+// DELTAOPS LITE-08 §3-5: estado operacional de rutinas por USO/TIEMPO de un
+// ACTIVO. Consulta pura (no genera OT). Los medidores del activo se leen
+// SERVER-SIDE del módulo de Activos (autoridad backend); `ahora` se inyecta.
+router.get(`${BASE}/activos/:activoId/estado-rutinas`, async (req, res) => {
+  const user = res.locals.user as { id: string; rol: string; tenant: string };
+  // Contexto operacional (medidores REALES del VO + clasificación de alcance)
+  // leído del módulo de Activos con el ROL REAL de la sesión (sin elevación).
+  // FAIL-CLOSED: si Activos deniega la lectura (KRN-AUTH ⇒ 403) o falla, se
+  // propaga; NUNCA se evalúan rutinas con medidores/candidato vacíos.
+  const ctxOp = await contextoRutinasDeActivo(
+    user.tenant,
+    String(user.id),
+    aRolLegacy(user.rol),
+    req.params.activoId,
+  );
+  if (!ctxOp.ok) {
+    send(res, ctxOp);
+    return;
+  }
+  send(res, await query(ctxOf(res), `${MODULO}.estado-rutinas`, {
+    activoId: req.params.activoId,
+    ahora: strQuery(req.query.ahora) ?? new Date().toISOString(),
+    medidores: ctxOp.value.medidores,
+    candidato: ctxOp.value.candidato,
+    umbralProximidad: numQuery(req.query.umbral),
+  }));
 });
 
 // Listado + detalle de planes.

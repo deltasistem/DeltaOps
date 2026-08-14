@@ -79,6 +79,19 @@ const sinRecurso: Valoracion = {
   estado: "SIN_RECURSO",
 };
 
+// DGP-020.3 fix · sesión CERRADA del activo aún SIN snapshot de valoración: la
+// hoja de vida debe mostrar sus HORAS (horas sin costo ≠ sin datos).
+const pendiente: Valoracion = {
+  sesionId: "s-4",
+  ordenId: "OT-2",
+  activoId: "AC-1",
+  identityId: "id-ana",
+  nombre: "Ana Soto",
+  efectivoMs: MS_2H30,
+  costo: null,
+  estado: "PENDIENTE",
+};
+
 /* -------------------------------- Formato ------------------------------- */
 
 describe("formato · tiempo y dinero", () => {
@@ -270,5 +283,28 @@ describe("VistaManoDeObraActivo", () => {
   it("estado vacío", () => {
     wrap(<VistaManoDeObraActivo valoraciones={[]} />);
     expect(screen.getByText("Sin mano de obra")).toBeInTheDocument();
+  });
+  it("sesión cerrada SIN valoración (PENDIENTE): muestra HORAS y «Pendiente de valorar», nunca «Sin mano de obra» ni «$0»", () => {
+    const { container } = wrap(<VistaManoDeObraActivo valoraciones={[pendiente]} />);
+    // Horas reales visibles (autoridad = sesión), aunque no haya costo.
+    expect(within(container).getByText("02:30:00")).toBeInTheDocument();
+    expect(within(container).getByText("OT-2")).toBeInTheDocument();
+    // Costo honesto: «Pendiente de valorar», NUNCA un importe con moneda ni $0.
+    expect(within(container).getAllByText("Pendiente de valorar").length).toBeGreaterThan(0);
+    // No se pinta un costo monetario (símbolo $ o código de moneda) para un
+    // pendiente: sería un «$0» falso (§15).
+    expect(within(container).queryByText(/\$\s?\d|CLP\s?\d/)).toBeNull();
+    // NO es el estado vacío honesto (hay datos: horas de una sesión cerrada).
+    expect(screen.queryByText("Sin mano de obra")).toBeNull();
+  });
+  it("sesión ABIERTA (EN_CURSO): muestra HORAS y «En curso», nunca «Sin mano de obra» ni «$0» (causa raíz en vivo)", () => {
+    // Causa raíz verificada en vivo: CAM-001/OT-000022 dejó su sesión ABIERTA.
+    // La ficha DEBE reflejar el trabajo en curso con sus horas acumuladas.
+    const enCurso: Valoracion = { ...pendiente, sesionId: "s-viva", estado: "EN_CURSO" };
+    const { container } = wrap(<VistaManoDeObraActivo valoraciones={[enCurso]} />);
+    expect(within(container).getByText("02:30:00")).toBeInTheDocument();
+    expect(within(container).getAllByText("En curso").length).toBeGreaterThan(0);
+    expect(within(container).queryByText(/\$\s?\d|CLP\s?\d/)).toBeNull();
+    expect(screen.queryByText("Sin mano de obra")).toBeNull();
   });
 });

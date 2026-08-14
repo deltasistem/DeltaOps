@@ -20,7 +20,7 @@ export const PASOS_WIZARD: { clave: string; etiqueta: string; campos: string[] }
   { clave: "clasificacion", etiqueta: "Clasificación", campos: ["tipo", "categoria", "familia", "subfamilia", "criticidad", "prioridad"] },
   { clave: "tecnica", etiqueta: "Información técnica", campos: ["fabricante", "modelo", "serie", "anio", "vidaUtil"] },
   { clave: "ubicacion", etiqueta: "Ubicación", campos: ["ubicacionId", "ubicacionEtiqueta"] },
-  { clave: "responsables", etiqueta: "Responsables", campos: ["responsable", "supervisor"] },
+  { clave: "responsables", etiqueta: "Responsables", campos: ["responsable", "supervisor", "centroCosto"] },
   { clave: "garantia", etiqueta: "Garantía", campos: ["fechaCompra", "fechaPuestaServicio", "proveedor", "garantiaMeses"] },
   { clave: "documentacion", etiqueta: "Documentación", campos: ["observaciones"] },
 ];
@@ -91,6 +91,10 @@ export function plantillaAlta(
             hijos: [
               campo({ clave: "responsable", tipo: "texto", etiqueta: "Responsable" }),
               campo({ clave: "supervisor", tipo: "texto", etiqueta: "Supervisor" }),
+              // §16 · Centro de costos: fuente de verdad en el activo (catálogo
+              // autorizado `centros-costo`). Sólo se captura aquí (alta/edición),
+              // NUNCA desde una OT.
+              campo({ clave: "centroCosto", tipo: "select", etiqueta: "Centro de costos", opciones: op("centros-costo") }),
             ],
           },
           {
@@ -144,6 +148,8 @@ export function plantillaEdicion(
           campo({ clave: "descripcion", tipo: "texto", etiqueta: "Descripción", restricciones: { longitudMax: 500 } }),
           campo({ clave: "criticidad", tipo: "select", etiqueta: "Criticidad", opciones: op("criticidades") }),
           campo({ clave: "prioridad", tipo: "select", etiqueta: "Prioridad", opciones: op("prioridades") }),
+          // §16 · Centro de costos editable SÓLO desde el activo (nunca la OT).
+          campo({ clave: "centroCosto", tipo: "select", etiqueta: "Centro de costos", opciones: op("centros-costo") }),
           campo({ clave: "observaciones", tipo: "texto", etiqueta: "Observaciones", restricciones: { longitudMax: 1000 } }),
         ],
       },

@@ -104,6 +104,8 @@ export const ETIQUETA_VALORACION: Record<EstadoValoracion, string> = {
   VALORADA: "Valorada",
   SIN_TARIFA: "Sin tarifa",
   SIN_RECURSO: "Sin recurso",
+  PENDIENTE: "Pendiente de valorar",
+  EN_CURSO: "En curso",
 };
 
 /** Tono del Badge (Design System) por estado de valoración. */
@@ -112,6 +114,8 @@ export const TONO_VALORACION: Record<EstadoValoracion, TonoValoracion> = {
   VALORADA: "exito",
   SIN_TARIFA: "advertencia",
   SIN_RECURSO: "advertencia",
+  PENDIENTE: "info",
+  EN_CURSO: "info",
 };
 
 /** Nombre de presentación de una identidad (fallback al id corto). */

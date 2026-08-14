@@ -238,7 +238,9 @@ function CabeceraOperacional({ a }: { a: ActivoRow }) {
     const v = d[k];
     return typeof v === "string" && v !== "" ? v : "—";
   };
-  const centro = centroDeRegistro(d) ?? "—";
+  // §8/§25 · Honestidad de datos: si el activo no tiene centro de costos
+  // configurado, se dice explícitamente (nunca "—" ambiguo ni cero simulado).
+  const centro = centroDeRegistro(d) ?? "Sin centro de costos configurado";
   const ubicacion = a.ubicacionId && a.ubicacionId !== "" ? a.ubicacionId : txt("ubicacion");
   const responsable = txt("responsable");
   const equipoMtto = ((): string => {
@@ -435,19 +437,23 @@ function EdicionModal({ a, onCerrar, onGuardado }: { a: ActivoRow; onCerrar: () 
   const d = a.datos ?? {};
   const criticidades = useCatalogo("criticidades");
   const prioridades = useCatalogo("prioridades");
+  const centrosCosto = useCatalogo("centros-costo");
   const def = useMemo(
     () =>
       plantillaEdicion({
         criticidades: (criticidades.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
         prioridades: (prioridades.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
+        "centros-costo": (centrosCosto.datos ?? []).map((o) => ({ valor: o.valor, etiqueta: o.etiqueta })),
       }),
-    [criticidades.datos, prioridades.datos],
+    [criticidades.datos, prioridades.datos, centrosCosto.datos],
   );
   const form = useFormularioDinamico(def, {}, {
     nombre: a.nombre,
     descripcion: String(d.descripcion ?? ""),
     criticidad: a.criticidad ?? "",
     prioridad: String(d.prioridad ?? ""),
+    // §16 · Precarga el centro de costos actual del activo (fuente de verdad).
+    centroCosto: String(d.centroCosto ?? ""),
     observaciones: String(d.observaciones ?? ""),
   });
   const [guardando, setGuardando] = useState(false);
@@ -467,6 +473,8 @@ function EdicionModal({ a, onCerrar, onGuardado }: { a: ActivoRow; onCerrar: () 
       descripcion: s("descripcion"),
       criticidad: s("criticidad"),
       prioridad: s("prioridad"),
+      // §16 · Centro de costos editable SÓLO desde el activo.
+      centroCosto: s("centroCosto"),
       observaciones: s("observaciones"),
     });
     setGuardando(false);

@@ -38,12 +38,20 @@ export function urlNuevaOrden(ctx: {
   activoEtiqueta?: string;
   componente?: string;
   ubicacion?: string;
+  /** DELTAOPS LITE-08: plan/rutina que origina el mantenimiento (prefill). */
+  plan?: string;
+  planEtiqueta?: string;
+  /** Motivo prellenado (p. ej. "Rutina vencida por horómetro"). */
+  motivo?: string;
 } = {}): string {
   const p = new URLSearchParams();
   if (ctx.activo) p.set("activo", ctx.activo);
   if (ctx.activoEtiqueta) p.set("activoEtiqueta", ctx.activoEtiqueta);
   if (ctx.componente) p.set("componente", ctx.componente);
   if (ctx.ubicacion) p.set("ubicacion", ctx.ubicacion);
+  if (ctx.plan) p.set("plan", ctx.plan);
+  if (ctx.planEtiqueta) p.set("planEtiqueta", ctx.planEtiqueta);
+  if (ctx.motivo) p.set("motivo", ctx.motivo);
   const q = p.toString();
   return q ? `/ordenes/nueva?${q}` : "/ordenes/nueva";
 }

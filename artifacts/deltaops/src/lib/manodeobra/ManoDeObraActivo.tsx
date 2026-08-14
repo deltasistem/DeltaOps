@@ -23,6 +23,11 @@ import type { Valoracion } from "./tipos";
 
 function Fila({ v }: { v: Valoracion }) {
   const hayTarifa = v.estado === "VALORADA" && v.costo != null;
+  // Sesión sin snapshot de valoración: horas visibles, costo honesto (nunca «$0»
+  // ni «Sin tarifa» falso). EN_CURSO = trabajo activo; PENDIENTE = cerrada por
+  // valorar.
+  const textoCosto =
+    v.estado === "EN_CURSO" ? "En curso" : v.estado === "PENDIENTE" ? "Pendiente de valorar" : SIN_TARIFA_TEXTO;
   return (
     <li
       style={{
@@ -51,7 +56,7 @@ function Fila({ v }: { v: Valoracion }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>Costo</div>
         <div style={{ fontWeight: 600 }}>
-          {hayTarifa ? costoPresentacion(v.costo, v.moneda, true) : <span style={{ color: "var(--do-texto-suave)" }}>{SIN_TARIFA_TEXTO}</span>}
+          {hayTarifa ? costoPresentacion(v.costo, v.moneda, true) : <span style={{ color: "var(--do-texto-suave)" }}>{textoCosto}</span>}
         </div>
       </div>
       <div>

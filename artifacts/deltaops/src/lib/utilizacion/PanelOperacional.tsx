@@ -37,14 +37,18 @@ import {
   Alert,
   Modal,
   OfflineBadge,
+  Select,
   useToast,
 } from "@workspace/design-system";
 import type { ActivoRow } from "../activos/tipos";
-import { useResumen, useTanqueos, useLecturas } from "./hooks";
+import { useResumen, useTanqueos, useLecturas, useUltimaLectura, useCombustibles } from "./hooks";
 import { useOrdenesDeActivo, useTimelineActivo } from "../ecosistema/hooks";
-import { usePlanesDeActivo } from "../planes/hooks";
+import { useEstadoRutinas } from "../planes/hooks";
+import type { EstadoRutinaActivo } from "../planes/tipos";
 import { OfflineProvider, useOffline } from "../offline/contexto";
 import { useSesion } from "../identidad/sesion";
+import { moduloHabilitado } from "../identidad/rbac";
+import type { Sesion } from "../identidad/tipos";
 import { capacidadesUtilizacion, type CapacidadesUtilizacion } from "./capacidades";
 import { capacidadesOrdenes, type CapacidadesOrdenes } from "../ordenes/capacidades";
 import { registrarLectura, registrarTanqueo } from "./mutaciones";
@@ -68,7 +72,6 @@ import {
   fmtNumero,
 } from "./ficha-operacional";
 import { urlOrden, urlNuevaOrden, urlActivoTab } from "../ecosistema/deep-links";
-import { urlPlan } from "../planes/deep-links";
 import { ETIQUETA_ESTADO as ETIQUETA_ESTADO_ORDEN, TONO_ESTADO as TONO_ESTADO_ORDEN, ESTADOS_FINALES } from "../ordenes/constantes";
 import type { OrdenRow } from "../ordenes/tipos";
 
@@ -109,7 +112,7 @@ function PanelContenido({ activo, ahoraIso }: { activo: ActivoRow; ahoraIso?: st
 
   return (
     <>
-      <CabeceraOperacional activo={activo} cap={cap} capOrd={capOrd} rol={rol} onAccion={setAccion} />
+      <CabeceraOperacional activo={activo} cap={cap} capOrd={capOrd} rol={rol} sesion={sesion} onAccion={setAccion} />
 
       <IndicadoresOperacionales
         activo={activo}
@@ -120,7 +123,7 @@ function PanelContenido({ activo, ahoraIso }: { activo: ActivoRow; ahoraIso?: st
       />
 
       <div style={{ display: "grid", gap: "var(--do-sp-5)", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
-        <SeccionMantenimiento activoId={activo.id} activoNombre={activo.nombre} />
+        <SeccionMantenimiento activoId={activo.id} activoNombre={activo.nombre} capOrd={capOrd} />
         <SeccionConsumo activo={activo} resumenActual={resumenActual} resumenAnterior={resumenAnterior} tanqueos={tanqueos} />
       </div>
 
@@ -140,17 +143,21 @@ function PanelContenido({ activo, ahoraIso }: { activo: ActivoRow; ahoraIso?: st
 
 /* =============================== Cabecera ================================= */
 
-function CabeceraOperacional({ activo, cap, capOrd, rol, onAccion }: {
+function CabeceraOperacional({ activo, cap, capOrd, rol, sesion, onAccion }: {
   activo: ActivoRow;
   cap: CapacidadesUtilizacion;
   capOrd: CapacidadesOrdenes;
   rol: string;
+  sesion: Sesion | null | undefined;
   onAccion: (a: "lectura" | "tanqueo") => void;
 }) {
   const ev = estadoVisual(activo.estado);
   const { pendientes, enLinea } = useOffline();
   const estadoSync = !enLinea ? "offline" : pendientes > 0 ? "sincronizando" : "sincronizado";
   const esTecnico = rol === "TECNICO";
+  // Preoperacional se ancla a Activos (mismo entitlement); sólo roles con
+  // escritura (CONSULTA nunca ejecuta). Coincide con el gating de la ficha.
+  const puedePreoperacional = !!sesion && moduloHabilitado(sesion, "activos") && rol !== "CONSULTA";
 
   return (
     <Section titulo="Panel operacional">
@@ -186,27 +193,41 @@ function CabeceraOperacional({ activo, cap, capOrd, rol, onAccion }: {
               <OfflineBadge estado={estadoSync} />
             </div>
 
-            {/* Acciones rápidas por capacidad (§2/§12): ocultar sin permiso. */}
-            <div role="group" aria-label="Acciones rápidas del activo" style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fit, minmax(min(170px, 100%), 1fr))" }}>
+            {/* Acciones del expediente por perfil (§8/§25). Composición: cada
+                acción reutiliza flujos existentes; ocultar sin permiso (§2/§12).
+                [Preoperacional][Registrar lectura][Registrar combustible]
+                [Ver mantenimiento][Registrar trabajo][Ver historial]. */}
+            <div role="group" aria-label="Acciones del activo" style={{ display: "grid", gap: "var(--do-sp-2)", gridTemplateColumns: "repeat(auto-fit, minmax(min(170px, 100%), 1fr))" }}>
+              {puedePreoperacional && (
+                <Link href={`/activos/${encodeURIComponent(activo.id)}/preoperacional`}>
+                  <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Preoperacional</Button>
+                </Link>
+              )}
               {cap.registrarLectura && (
                 <Button variant={esTecnico ? "primario" : "secundario"} size="lg" style={ESTILO_TACTIL} onClick={() => onAccion("lectura")}>
-                  Registrar medidor
+                  Registrar lectura
                 </Button>
               )}
               {cap.registrarTanqueo && (
                 <Button variant={esTecnico ? "primario" : "secundario"} size="lg" style={ESTILO_TACTIL} onClick={() => onAccion("tanqueo")}>
-                  Registrar tanqueo
+                  Registrar combustible
                 </Button>
               )}
-              {/* Crear orden = ESCRITURA de Órdenes: gatear con la capacidad
-                  canónica (ocultar sin permiso, no deshabilitar). */}
+              <Link href={urlActivoTab(activo.id, "planes")}>
+                <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Ver mantenimiento</Button>
+              </Link>
+              {/* Registrar trabajo = ESCRITURA de Órdenes: gatear con la
+                  capacidad canónica (ocultar sin permiso, no deshabilitar). */}
               {capOrd.crear && (
                 <Link href={urlNuevaOrden({ activo: activo.id, activoEtiqueta: activo.nombre })}>
-                  <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Crear orden</Button>
+                  <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Registrar trabajo</Button>
                 </Link>
               )}
               <Link href={esTecnico ? "/ordenes/operaciones" : urlActivoTab(activo.id, "ordenes")}>
                 <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>{esTecnico ? "Mis órdenes" : "Ver órdenes"}</Button>
+              </Link>
+              <Link href={urlActivoTab(activo.id, "timeline")}>
+                <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Ver historial</Button>
               </Link>
               <Link href="/activos/escanear">
                 <Button variant="secundario" size="lg" style={{ ...ESTILO_TACTIL, width: "100%" }}>Escanear QR</Button>
@@ -331,17 +352,11 @@ function SinDatos({ titulo }: { titulo?: string }) {
 
 /* ============================ Mantenimiento ============================== */
 
-function SeccionMantenimiento({ activoId, activoNombre }: { activoId: string; activoNombre: string }) {
-  const planes = usePlanesDeActivo(activoId);
+function SeccionMantenimiento({ activoId, activoNombre, capOrd }: { activoId: string; activoNombre: string; capOrd: CapacidadesOrdenes }) {
+  const rutinas = useEstadoRutinas(activoId);
   const ordenes = useOrdenesDeActivo(activoId);
 
-  const proximos = useMemo(() => {
-    return (planes.datos ?? [])
-      .filter((p) => p.estado === "VIGENTE" && p.proximaOcurrencia)
-      .slice()
-      .sort((a, b) => String(a.proximaOcurrencia).localeCompare(String(b.proximaOcurrencia)))
-      .slice(0, 3);
-  }, [planes.datos]);
+  const filas = useMemo(() => (rutinas.datos?.rutinas ?? []).slice(0, 5), [rutinas.datos]);
 
   const intervenciones = useMemo(() => {
     return (ordenes.datos ?? [])
@@ -351,30 +366,24 @@ function SeccionMantenimiento({ activoId, activoNombre }: { activoId: string; ac
       .slice(0, 4);
   }, [ordenes.datos]);
 
-  const cargando = planes.cargando || ordenes.cargando;
+  const cargando = ordenes.cargando;
 
   return (
     <Section titulo="Mantenimiento">
       <Card>
         <CardHeader><strong>Próximo mantenimiento</strong></CardHeader>
         <CardContent>
-          {cargando ? (
+          {rutinas.cargando ? (
             <div style={{ display: "grid", placeItems: "center", padding: "var(--do-sp-5)" }}><Spinner /></div>
-          ) : proximos.length === 0 ? (
-            <EmptyState titulo="Sin mantenimiento programado" descripcion="Este activo no tiene planes vigentes con próxima ocurrencia." />
+          ) : rutinas.error ? (
+            <ErrorState titulo="No se pudo evaluar el mantenimiento por uso" descripcion={rutinas.error.message} onReintentar={rutinas.recargar} />
+          ) : filas.length === 0 ? (
+            <EmptyState titulo="Sin rutinas por uso" descripcion="Este activo no tiene planes vigentes que apliquen a su uso o tiempo." />
           ) : (
             <ul style={LISTA}>
-              {proximos.map((p) => (
-                <li key={p.id}>
-                  <Link href={urlPlan(p.id)} style={ENLACE_FILA}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)", minWidth: 0 }}>
-                      <span style={{ fontWeight: 600 }}>{p.nombre}</span>
-                      <span style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>
-                        {p.tipoPlan} · Próxima: {fmtFecha(p.proximaOcurrencia)}
-                      </span>
-                    </div>
-                    <Badge variant="info">{p.estado}</Badge>
-                  </Link>
+              {filas.map((r) => (
+                <li key={r.planId}>
+                  <FilaRutina rutina={r} activoId={activoId} activoNombre={activoNombre} puedeGenerar={capOrd.crear} />
                 </li>
               ))}
             </ul>
@@ -411,6 +420,84 @@ function SeccionMantenimiento({ activoId, activoNombre }: { activoId: string; ac
         </CardContent>
       </Card>
     </Section>
+  );
+}
+
+/** Mapea el semáforo del backend a punto de color + variante del DS + emoji. */
+const SEMAFORO_RUTINA: Record<string, { clase: string; variante: "exito" | "advertencia" | "error" | "neutro"; emoji: string }> = {
+  verde: { clase: "operativo", variante: "exito", emoji: "🟢" },
+  amarillo: { clase: "atencion", variante: "advertencia", emoji: "🟡" },
+  rojo: { clase: "fuera", variante: "error", emoji: "🔴" },
+  "sin-datos": { clase: "neutro", variante: "neutro", emoji: "⚪" },
+};
+
+/** Formatea el faltante/excedente en unidades de la regla (h/km/días/…). */
+function textoFaltante(r: EstadoRutinaActivo): string {
+  if (r.faltante == null || !r.unidad) return "Sin datos suficientes";
+  const u = r.unidad === "horometro" ? "h" : r.unidad === "odometro" ? "km" : r.unidad;
+  if (r.vencida) {
+    const exc = r.excedente != null ? Math.abs(r.excedente) : Math.abs(r.faltante);
+    return `Excedido ${fmtNumero(exc, 0)} ${u}`;
+  }
+  return `Faltan ${fmtNumero(r.faltante, 0)} ${u}`;
+}
+
+/**
+ * Fila de una rutina por uso/tiempo (§3-5). Muestra meta · actual/faltante ·
+ * estado con COLOR + TEXTO. Si está vencida (o próxima), ofrece "Generar
+ * mantenimiento" que abre el flujo LITE-05 de creación de OT (nunca crea la OT
+ * automáticamente). El botón se oculta sin capacidad de crear órdenes.
+ */
+function FilaRutina({ rutina, activoId, activoNombre, puedeGenerar }: {
+  rutina: EstadoRutinaActivo;
+  activoId: string;
+  activoNombre: string;
+  puedeGenerar: boolean;
+}) {
+  const sem = SEMAFORO_RUTINA[rutina.semaforo] ?? SEMAFORO_RUTINA["sin-datos"];
+  const metaTexto = rutina.meta && rutina.dominio === "temporal" ? fmtFecha(rutina.meta) : rutina.meta;
+  const unidad = rutina.unidad === "horometro" ? "h" : rutina.unidad === "odometro" ? "km" : rutina.unidad;
+  const ofrecerGenerar = puedeGenerar && (rutina.vencida || rutina.semaforo === "amarillo");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-2)", padding: "var(--do-sp-2) 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-3)", flexWrap: "wrap", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)", minWidth: 0 }}>
+          <span aria-hidden="true" title={rutina.etiqueta} className={`do-semaforo do-semaforo--${sem.clase}`} />
+          <div style={{ minWidth: 0 }}>
+            <span style={{ fontWeight: 600 }}>{rutina.nombre}</span>
+            <div style={{ fontSize: "var(--do-text-sm)", color: "var(--do-texto-suave)" }}>
+              {metaTexto != null && rutina.dominio !== "temporal" && unidad
+                ? `Mantenimiento a ${fmtNumero(Number(metaTexto), 0)} ${unidad}`
+                : metaTexto != null
+                  ? `Próxima: ${metaTexto}`
+                  : rutina.tipoPlan}
+            </div>
+          </div>
+        </div>
+        <Badge variant={sem.variante}>{sem.emoji} {rutina.etiqueta}</Badge>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-3)", flexWrap: "wrap", justifyContent: "space-between" }}>
+        <span style={{ fontSize: "var(--do-text-md)", fontWeight: 600 }}>{textoFaltante(rutina)}</span>
+        {ofrecerGenerar && (
+          <Link
+            href={urlNuevaOrden({
+              activo: activoId,
+              activoEtiqueta: activoNombre,
+              plan: rutina.planId,
+              planEtiqueta: rutina.nombre,
+              motivo: rutina.vencida
+                ? `Rutina vencida: ${rutina.nombre} (${textoFaltante(rutina)})`
+                : `Rutina próxima: ${rutina.nombre} (${textoFaltante(rutina)})`,
+            })}
+          >
+            <Button variant={rutina.vencida ? "primario" : "secundario"} size="sm" style={{ minHeight: 40 }}>
+              Generar mantenimiento
+            </Button>
+          </Link>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -612,7 +699,15 @@ function tonoEvento(tipo: string): "neutro" | "primario" | "exito" | "advertenci
 
 /* ======================== Acciones Offline First ======================== */
 
-function ModalRegistrarLectura({ activoId, onCerrar, onHecho }: { activoId: string; onCerrar: () => void; onHecho: () => void }) {
+/**
+ * DELTAOPS LITE-08 §6-7 · CAPTURA RÁPIDA DE LECTURA (mobile-first).
+ * Experiencia sencilla: equipo → última lectura → nueva lectura → guardar →
+ * feedback inmediato con «Próximo mantenimiento · Faltan N». Compone la
+ * Utilización existente (append-only, valor decreciente ⇒ inconsistente que NO
+ * propaga, regularización auditada intactas) y el patrón offline First — jamás
+ * una segunda cola. Tras guardar, refresca el estado-rutinas del punto 1.
+ */
+export function ModalRegistrarLectura({ activoId, onCerrar, onHecho }: { activoId: string; onCerrar: () => void; onHecho: () => void }) {
   const { cola } = useOffline();
   const toast = useToast();
   const [tipoMedidor, setTipoMedidor] = useState<string>(TIPOS_MEDIDOR[0]);
@@ -620,6 +715,19 @@ function ModalRegistrarLectura({ activoId, onCerrar, onHecho }: { activoId: stri
   const [fecha, setFecha] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [hecho, setHecho] = useState<null | { encolada: boolean; inconsistente: boolean }>(null);
+
+  // Última lectura del medidor seleccionado (para mostrar el punto de partida y
+  // detectar valor decreciente = inconsistente). El backend es la autoridad.
+  const ultima = useUltimaLectura(activoId, tipoMedidor);
+  // Estado de rutinas por uso (para el feedback tras guardar). Se refresca al
+  // cerrar el flujo. Lee medidores server-side (autoridad backend).
+  const rutinas = useEstadoRutinas(activoId);
+
+  const nueva = Number(valor);
+  const valorUltima = typeof ultima.datos?.valor === "number" ? ultima.datos.valor : null;
+  const seraInconsistente = valorUltima != null && Number.isFinite(nueva) && nueva < valorUltima;
+  const unidad = UNIDAD_POR_MEDIDOR[tipoMedidor];
 
   async function guardar() {
     const n = Number(valor);
@@ -631,67 +739,171 @@ function ModalRegistrarLectura({ activoId, onCerrar, onHecho }: { activoId: stri
       activoId,
       tipoMedidor,
       valor: n,
-      unidad: UNIDAD_POR_MEDIDOR[tipoMedidor],
+      unidad,
       fechaHora: new Date(fecha).toISOString(),
     });
     setGuardando(false);
     if (r.error) { setErr(r.error.message); return; }
     toast.mostrar({ variant: r.encolada ? "info" : "exito", titulo: r.encolada ? "Lectura en cola (se sincronizará)" : "Lectura registrada" });
-    onHecho();
+    // Refresca el estado de rutinas para el feedback (el punto 1).
+    rutinas.recargar();
+    setHecho({ encolada: r.encolada, inconsistente: seraInconsistente });
   }
+
+  // Rutinas relevantes al medidor recién capturado (uso: horómetro/odómetro).
+  const rutinasDelMedidor = (rutinas.datos?.rutinas ?? []).filter(
+    (r) => r.dominio === "uso" && (r.unidad === tipoMedidor || r.unidad === unidad),
+  );
 
   return (
     <Modal
       abierto
       onClose={onCerrar}
-      titulo="Registrar medidor"
-      pie={<><Button variant="fantasma" onClick={onCerrar} disabled={guardando}>Cancelar</Button><Button variant="primario" loading={guardando} onClick={() => void guardar()}>Registrar</Button></>}
+      titulo="Registrar lectura"
+      pie={
+        hecho ? (
+          <Button variant="primario" onClick={onHecho}>Cerrar</Button>
+        ) : (
+          <><Button variant="fantasma" onClick={onCerrar} disabled={guardando}>Cancelar</Button><Button variant="primario" loading={guardando} onClick={() => void guardar()}>Registrar</Button></>
+        )
+      }
     >
-      {err && <Alert variant="error" titulo={err} />}
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
-        <div role="group" aria-label="Tipo de medidor" style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
-          {TIPOS_MEDIDOR.map((t) => (
-            <Button key={t} size="sm" variant={tipoMedidor === t ? "primario" : "fantasma"} aria-pressed={tipoMedidor === t} onClick={() => setTipoMedidor(t)}>
-              {ETIQUETA_TIPO_MEDIDOR[t]}
-            </Button>
-          ))}
+      {hecho ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }} data-testid="lectura-feedback">
+          <Alert
+            variant={hecho.encolada ? "info" : "exito"}
+            titulo={hecho.encolada ? "Lectura en cola (se sincronizará)" : "Lectura registrada"}
+          >
+            {ETIQUETA_TIPO_MEDIDOR[tipoMedidor]}: {fmtNumero(nueva, 0)} {unidad}
+          </Alert>
+          {hecho.inconsistente && (
+            <Alert variant="advertencia" titulo="Lectura menor que la anterior (inconsistente)">
+              Se guarda para auditoría pero NO actualiza el medidor del activo. Si el medidor se reinició, usa la regularización auditada.
+            </Alert>
+          )}
+          <div>
+            <strong style={{ fontSize: "var(--do-text-sm)" }}>Próximo mantenimiento</strong>
+            {rutinas.cargando ? (
+              <div style={{ padding: "var(--do-sp-3)" }}><Spinner /></div>
+            ) : rutinasDelMedidor.length === 0 ? (
+              <p style={{ margin: "var(--do-sp-1) 0 0", color: "var(--do-texto-suave)", fontSize: "var(--do-text-sm)" }}>
+                Sin rutinas por {ETIQUETA_TIPO_MEDIDOR[tipoMedidor].toLowerCase()} para este activo.
+              </p>
+            ) : (
+              <ul style={{ ...LISTA, marginTop: "var(--do-sp-2)" }}>
+                {rutinasDelMedidor.slice(0, 3).map((r) => {
+                  const sem = SEMAFORO_RUTINA[r.semaforo] ?? SEMAFORO_RUTINA["sin-datos"];
+                  return (
+                    <li key={r.planId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--do-sp-2)" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-2)", minWidth: 0 }}>
+                        <span aria-hidden="true" className={`do-semaforo do-semaforo--${sem.clase}`} />
+                        <span style={{ fontWeight: 600 }}>{r.nombre}</span>
+                      </span>
+                      <Badge variant={sem.variante}>{sem.emoji} {textoFaltante(r)}</Badge>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p style={{ margin: "var(--do-sp-2) 0 0", color: "var(--do-texto-suave)", fontSize: "var(--do-text-xs)" }}>
+              El estado se recalcula cuando la lectura se sincroniza al activo.
+            </p>
+          </div>
         </div>
-        <label style={CAMPO_LABEL}>
-          <span>Valor ({UNIDAD_POR_MEDIDOR[tipoMedidor]})</span>
-          <input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} style={CAMPO_INPUT} />
-        </label>
-        <label style={CAMPO_LABEL}>
-          <span>Fecha y hora</span>
-          <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} style={CAMPO_INPUT} />
-        </label>
-      </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
+          {err && <Alert variant="error" titulo={err} />}
+          <div role="group" aria-label="Tipo de medidor" style={{ display: "flex", gap: "var(--do-sp-2)", flexWrap: "wrap" }}>
+            {TIPOS_MEDIDOR.map((t) => (
+              <Button key={t} size="sm" variant={tipoMedidor === t ? "primario" : "fantasma"} aria-pressed={tipoMedidor === t} onClick={() => setTipoMedidor(t)}>
+                {ETIQUETA_TIPO_MEDIDOR[t]}
+              </Button>
+            ))}
+          </div>
+          <div style={{ padding: "var(--do-sp-2) var(--do-sp-3)", borderRadius: "var(--do-radius-sm)", background: "var(--do-surface-2)", fontSize: "var(--do-text-sm)" }}>
+            {ultima.cargando ? (
+              <span style={{ color: "var(--do-texto-suave)" }}>Cargando última lectura…</span>
+            ) : valorUltima != null ? (
+              <>Última lectura: <strong>{fmtNumero(valorUltima, 0)} {unidad}</strong>{ultima.datos?.fechaHora ? ` · ${fmtFechaHora(ultima.datos.fechaHora)}` : ""}</>
+            ) : (
+              <span style={{ color: "var(--do-texto-suave)" }}>Sin lecturas previas de {ETIQUETA_TIPO_MEDIDOR[tipoMedidor].toLowerCase()}.</span>
+            )}
+          </div>
+          <label style={CAMPO_LABEL}>
+            <span>Nueva lectura ({unidad})</span>
+            <input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} style={CAMPO_INPUT} />
+          </label>
+          {seraInconsistente && (
+            <Alert variant="advertencia" titulo="El valor es menor que la última lectura">
+              Se registrará como inconsistente (no actualiza el medidor). Si el medidor se reinició, usa la regularización auditada.
+            </Alert>
+          )}
+          <label style={CAMPO_LABEL}>
+            <span>Fecha y hora</span>
+            <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} style={CAMPO_INPUT} />
+          </label>
+        </div>
+      )}
     </Modal>
   );
 }
 
-function ModalRegistrarTanqueo({ activoId, onCerrar, onHecho }: { activoId: string; onCerrar: () => void; onHecho: () => void }) {
+/** Claves de combustible por defecto si el catálogo del tenant está vacío. */
+const COMBUSTIBLES_FALLBACK = ["diesel", "gasolina", "gas-natural", "glp", "electrico", "biodiesel"] as const;
+
+/**
+ * DELTAOPS LITE-08 §9-13 · Experiencia de tanqueo/abastecimiento del activo.
+ * Compone el dominio existente de Utilización (append-only, catálogo
+ * multi-energía tipos-combustible, dinero snapshot, proveedor string sin FK).
+ * Captura los campos §9 disponibles: activo (implícito), fecha, cantidad,
+ * tipo de energía (catálogo real del tenant), costo, proveedor +
+ * identificación (opcionales, snapshot), observación; y muestra la última
+ * lectura del activo como contexto. GAP-TANQUEO: la cantidad es "litros" en el
+ * contrato congelado (no hay campo unidad multi-energía) — no se convierte en
+ * silencio; se documenta.
+ */
+export function ModalRegistrarTanqueo({ activoId, onCerrar, onHecho }: { activoId: string; onCerrar: () => void; onHecho: () => void }) {
   const { cola } = useOffline();
   const toast = useToast();
+  const combustibles = useCombustibles();
+  // Contexto: última lectura del horómetro (referencia §9 «lectura del activo»).
+  const ultimaHoro = useUltimaLectura(activoId, TIPOS_MEDIDOR[0]);
+  const opciones = (combustibles.datos ?? []).filter((o) => o.habilitado !== false);
   const [litros, setLitros] = useState("");
-  const [combustible, setCombustible] = useState("diesel");
+  const [combustible, setCombustible] = useState("");
   const [fecha, setFecha] = useState("");
   const [costo, setCosto] = useState("");
+  const [proveedor, setProveedor] = useState("");
+  const [identificacion, setIdentificacion] = useState("");
+  const [observacion, setObservacion] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
+  // Selección efectiva: 1º catálogo del tenant, luego fallback.
+  const listaCombustible = opciones.length > 0 ? opciones.map((o) => o.clave) : [...COMBUSTIBLES_FALLBACK];
+  const combustibleSel = combustible || listaCombustible[0] || "diesel";
+
   async function guardar() {
     const l = Number(litros);
-    if (!Number.isFinite(l) || l <= 0) { setErr("Indica los litros del tanqueo."); return; }
+    if (!Number.isFinite(l) || l <= 0) { setErr("Indica la cantidad del tanqueo."); return; }
     if (!fecha.trim()) { setErr("Indica la fecha y hora del tanqueo."); return; }
     setGuardando(true);
     setErr(null);
     const c = Number(costo);
+    // Proveedor + identificación (opcional) → snapshot transaccional en un solo
+    // string (proveedorId sin FK dura). La identificación se concatena de forma
+    // legible sin inventar estructura no soportada por el contrato congelado.
+    const proveedorId = proveedor.trim() !== ""
+      ? (identificacion.trim() !== "" ? `${proveedor.trim()} · ${identificacion.trim()}` : proveedor.trim())
+      : undefined;
     const r = await registrarTanqueo(cola, {
       activoId,
       litros: l,
-      tipoCombustible: combustible,
+      tipoCombustible: combustibleSel,
       fechaHora: new Date(fecha).toISOString(),
       costoTotal: costo.trim() !== "" && Number.isFinite(c) ? c : undefined,
+      proveedorId,
+      observacion: observacion.trim() !== "" ? observacion.trim() : undefined,
     });
     setGuardando(false);
     if (r.error) { setErr(r.error.message); return; }
@@ -703,26 +915,48 @@ function ModalRegistrarTanqueo({ activoId, onCerrar, onHecho }: { activoId: stri
     <Modal
       abierto
       onClose={onCerrar}
-      titulo="Registrar tanqueo"
+      titulo="Registrar combustible"
       pie={<><Button variant="fantasma" onClick={onCerrar} disabled={guardando}>Cancelar</Button><Button variant="primario" loading={guardando} onClick={() => void guardar()}>Registrar</Button></>}
     >
       {err && <Alert variant="error" titulo={err} />}
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-3)" }}>
+        {/* Contexto: última lectura del activo (referencia §9). */}
+        <div style={{ padding: "var(--do-sp-2) var(--do-sp-3)", borderRadius: "var(--do-radius-sm)", background: "var(--do-surface-2)", fontSize: "var(--do-text-sm)" }}>
+          {ultimaHoro.cargando ? (
+            <span style={{ color: "var(--do-texto-suave)" }}>Cargando lectura del activo…</span>
+          ) : typeof ultimaHoro.datos?.valor === "number" ? (
+            <>Lectura del activo: <strong>{fmtNumero(ultimaHoro.datos.valor, 0)} {ultimaHoro.datos.unidad ?? "h"}</strong></>
+          ) : (
+            <span style={{ color: "var(--do-texto-suave)" }}>Sin lectura previa del activo.</span>
+          )}
+        </div>
         <label style={CAMPO_LABEL}>
-          <span>Litros</span>
-          <input inputMode="decimal" value={litros} onChange={(e) => setLitros(e.target.value)} style={CAMPO_INPUT} />
+          <span>Tipo de energía / combustible</span>
+          <Select value={combustibleSel} onChange={(e) => setCombustible(e.target.value)}>
+            {opciones.length > 0
+              ? opciones.map((o) => <option key={o.clave} value={o.clave}>{o.etiqueta}</option>)
+              : listaCombustible.map((c) => <option key={c} value={c}>{etiquetaCombustible(c)}</option>)}
+          </Select>
         </label>
         <label style={CAMPO_LABEL}>
-          <span>Combustible</span>
-          <select value={combustible} onChange={(e) => setCombustible(e.target.value)} style={CAMPO_INPUT}>
-            {["diesel", "gasolina", "gas-natural", "glp", "electrico", "biodiesel"].map((c) => (
-              <option key={c} value={c}>{etiquetaCombustible(c)}</option>
-            ))}
-          </select>
+          <span>Cantidad (litros)</span>
+          <input inputMode="decimal" value={litros} onChange={(e) => setLitros(e.target.value)} style={CAMPO_INPUT} />
         </label>
         <label style={CAMPO_LABEL}>
           <span>Costo total (opcional)</span>
           <input inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} style={CAMPO_INPUT} />
+        </label>
+        <label style={CAMPO_LABEL}>
+          <span>Proveedor (opcional)</span>
+          <input value={proveedor} onChange={(e) => setProveedor(e.target.value)} style={CAMPO_INPUT} />
+        </label>
+        <label style={CAMPO_LABEL}>
+          <span>Identificación / ticket proveedor (opcional)</span>
+          <input value={identificacion} onChange={(e) => setIdentificacion(e.target.value)} style={CAMPO_INPUT} />
+        </label>
+        <label style={CAMPO_LABEL}>
+          <span>Observación (opcional)</span>
+          <input value={observacion} onChange={(e) => setObservacion(e.target.value)} style={CAMPO_INPUT} />
         </label>
         <label style={CAMPO_LABEL}>
           <span>Fecha y hora</span>

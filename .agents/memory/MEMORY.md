@@ -51,4 +51,5 @@
 - [Hallazgo→OT LITE-05](deltaops-hallazgo-ot-lite05.md) — unicidad vía ids deterministas (uuidv5) sobre dedup existente; gates congelados exigen abrir+decidir; suites PG borran el tenant demo (re-seed antes de E2E).
 - [Auditoría funcional LITE-06](deltaops-auditoria-funcional-lite06.md) — 107 páginas vs ~25 operativas (ocultar≠eliminar); centroCosto vacío en datos reales; MTTR/MTBF sin insumos; 6 roles colapsan a 3 buckets.
 - [Aterrizaje LITE-07](deltaops-aterrizaje-lite07.md) — «faltan X h» ya existe en backend (no expuesto); proveedor ya es snapshot; inventario no bloquea cierre de OT; centro de trabajo y config-por-rol no existen; 10 preguntas abiertas a Dirección.
+- [Implementación LITE-08](deltaops-implementacion-lite08.md) — libs se consumen compiladas (rebuild antes de restart); cerrar OT no cierra sesiones (estado EN_CURSO); timeline se normaliza plano en la frontera.
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.

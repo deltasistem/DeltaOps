@@ -62,4 +62,15 @@ describe("construirInput", () => {
     const input = construirInput({ garantiaMeses: "24" });
     expect(input.garantia).toEqual({ meses: 24 });
   });
+
+  // DELTAOPS LITE-08 §16 · Centro de costos capturado en el alta.
+  it("§16 · mapea el centro de costos cuando se selecciona", () => {
+    const input = construirInput({ codigoEmpresarial: "EQ-2", nombre: "Grúa", tipo: "maquinaria", centroCosto: "CC-100" });
+    expect(input.centroCosto).toBe("CC-100");
+  });
+
+  it("§16 · descarta el centro de costos vacío (sin inventar valores)", () => {
+    const input = construirInput({ codigoEmpresarial: "EQ-3", nombre: "Grúa", tipo: "maquinaria", centroCosto: "" });
+    expect(input).not.toHaveProperty("centroCosto");
+  });
 });
