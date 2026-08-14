@@ -127,7 +127,19 @@ Contrato transversal de idempotencia (verificado): todos los comandos de creaci�
 - Tenant exclusivamente del contexto autenticado; rol CONSULTA jamás importa.
 - Activos alquilados con mantenimiento TERCERO: regla dura de exclusión de rutinas internas e OT propias.
 
-## 8. Preguntas de negocio abiertas (bloqueantes — §26 de la directiva)
+## 8. Preguntas de negocio — RESUELTAS por Dirección (2026-08-14)
+
+| # | Decisión de Dirección |
+|---|---|
+| P-1a | SEM05=SEM 5 GPR, SEM06=SEM 6 GPR, SEM07=SEM 7 GPR: **mismo activo, unificar** (canónicos SEM05/SEM06/SEM07). |
+| P-1b | C-9: **equipo tercero** (no se crea; sus filas se excluyen con reporte). |
+| P-2 | **Solo flota operada por Delta** se crea como activo: C1–C8, C11 (C11 SIGAR), M1–M13, DISAN #1, DISAN #2, SEM05–SEM07. Excluidos con reporte: CAMIONETA ALVARO, Serpomar Liugong 856, SDR, A02, RETRO 312 BL, 950-01, 950-03, VOLVO L70F, C-9. Excepción P-6: Baritanque. |
+| P-3 | Horas hombre: **lecturas de horómetro + jornada histórica consultable en hoja de vida** (sin tocar contratos congelados de mano de obra). |
+| P-4 | PMP: **evento de mantenimiento histórico en hoja de vida** (fecha, tipo, técnico, falla, tiempos, ítems) **sin fabricar OT**. |
+| P-5 | Preoperacionales: **conforme** — sello de servidor = fecha de importación; fecha real del hecho como dato; hoja de vida ordena por fecha real. |
+| P-6 | Baritanque: **se importa como movimientos del tanque** (se crea el activo Baritanque como tanque de almacenamiento, excepción a P-2). |
+
+### Preguntas originales (referencia)
 
 - **P-1** ¿`SEM05/SEM 5 GPR`, `SEM06/SEM 6 GPR`, `SEM07/SEM 7 GPR` son respectivamente el mismo activo? ¿Y `C-9` es un noveno cargador de la flota o un equipo tercero?
 - **P-2** ¿Deben crearse como activos los equipos incidentales/de terceros: `CAMIONETA ALVARO`, `Serpomar Logístic Sas, Liugong 856`, `Baritanque` (tanque), `SDR` (1 fila), `A02`, `RETRO 312 BL`, `950-01/950-03`, `VOLVO L70F`? ¿O solo la flota propia/alquilada operada por Delta (C1–C8, C11, M1–M13, DISAN #1/#2, SEM05–07) y el resto queda fuera con su combustible/horas conservados contra el activo si se crea, u omitidos con reporte?

@@ -151,6 +151,7 @@ router.get(`${BASE}/:id/historial`, async (req, res) => {
 // actor, estado, entidadRelacionada, rango de fechas (desde/hasta).
 router.get(`${BASE}/:id/timeline`, async (req, res) => {
   const q = req.query;
+  const limitNum = typeof q.limit === "string" ? Number(q.limit) : undefined;
   send(res, await query(ctxOf(res), `${MODULO}.timeline`, {
     id: req.params.id,
     actor: typeof q.actor === "string" ? q.actor : undefined,
@@ -158,6 +159,10 @@ router.get(`${BASE}/:id/timeline`, async (req, res) => {
     entidadRelacionada: typeof q.entidadRelacionada === "string" ? q.entidadRelacionada : undefined,
     desde: typeof q.desde === "string" ? q.desde : undefined,
     hasta: typeof q.hasta === "string" ? q.hasta : undefined,
+    // Paginación estable por cursor (aditiva): `?paginado=1&limit=N&cursor=...`.
+    limit: limitNum != null && Number.isFinite(limitNum) && limitNum > 0 ? limitNum : undefined,
+    cursor: typeof q.cursor === "string" ? q.cursor : undefined,
+    paginado: q.paginado === "1" || q.paginado === "true" ? true : undefined,
   }));
 });
 

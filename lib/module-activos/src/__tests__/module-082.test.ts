@@ -326,6 +326,61 @@ describe("DGP-008.2 · historial y línea de tiempo", () => {
     const vacio = await query(rt, ctx, `${MODULO}.timeline`, { id: A, actor: "no-existe" });
     expect(vacio.ok && (vacio.value as unknown[]).length).toBe(0);
   });
+
+  it("LITE-09 · la cronología del activo devuelve TODAS sus entradas (no se recorta a 200) y muestra el proveedor del tanqueo", async () => {
+    const rt = runtime();
+    const ctx = ctxOf("hist-lite09");
+    const A = crypto.randomUUID();
+    const entityRef = `activo:${A}`;
+    await sembrarCatalogos(rt, ctx);
+    await crearActivo(rt, ctx, A, "A");
+    await drain(rt);
+
+    // 260 eventos "recientes" (simulan jornadas/lecturas) que ANTES empujaban
+    // los eventos antiguos (preop/tanqueo) fuera de la primera página de 200.
+    for (let i = 0; i < 260; i += 1) {
+      await exec(rt, ctx, "platform.timeline.record", {
+        entryId: `reciente-${i}`,
+        entityRef,
+        eventType: "historico.jornada",
+        actorId: "u-1",
+        occurredAt: new Date(2026, 5, 1, 0, 0, i).toISOString(),
+        resumen: "Jornada histórica",
+      });
+    }
+    // Un tanqueo ANTIGUO con snapshot de proveedor (canónico) …
+    await exec(rt, ctx, "platform.timeline.record", {
+      entryId: "tanqueo-antiguo",
+      entityRef,
+      eventType: "modulo.utilizacion.tanqueo-registrado",
+      actorId: "u-2",
+      occurredAt: "2025-09-26T00:00:00.000Z",
+      resumen: "Tanqueo 69L diesel",
+      payload: { snapshot: { proveedorId: "COMBGAS" } },
+    });
+    // … y un preoperacional ANTIGUO.
+    await exec(rt, ctx, "platform.timeline.record", {
+      entryId: "preop-antiguo",
+      entityRef,
+      eventType: "historico.preoperacional",
+      actorId: "u-3",
+      occurredAt: "2025-10-14T10:00:00.000Z",
+      resumen: "Preoperacional APTO",
+    });
+
+    const tl = await query(rt, ctx, `${MODULO}.timeline`, { id: A });
+    expect(tl.ok).toBe(true);
+    if (!tl.ok) return;
+    const items = tl.value as Array<{ eventType: string; resumen: string }>;
+    // Se devuelven MÁS de 200 (todas), no se recorta la página.
+    expect(items.length).toBeGreaterThan(200);
+    // El preoperacional antiguo está presente pese a los 260 eventos recientes.
+    expect(items.some((i) => i.eventType === "historico.preoperacional")).toBe(true);
+    // El tanqueo muestra el proveedor en el resumen.
+    const tanqueo = items.find((i) => i.eventType === "modulo.utilizacion.tanqueo-registrado");
+    expect(tanqueo).toBeTruthy();
+    expect(tanqueo?.resumen).toContain("COMBGAS");
+  });
 });
 
 /* ---------------------- Reproyección por replay -------------------------- */

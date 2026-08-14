@@ -13,7 +13,7 @@ import {
   ErrorState,
 } from "@workspace/design-system";
 import type { TimelineTono } from "@workspace/design-system";
-import { useTimeline } from "../../lib/activos/hooks";
+import { useTimelinePaginado } from "../../lib/activos/hooks";
 import { ESTADOS_ACTIVO, etiquetaEstado, type EventoTimeline } from "../../lib/activos/tipos";
 import { FormularioDinamico } from "../../lib/forms/FormularioDinamico";
 import { plantillaFiltrosTimeline } from "../../lib/forms/plantillas";
@@ -37,7 +37,7 @@ function fecha(ev: EventoTimeline): string {
 
 export function TabTimeline({ id }: { id: string }) {
   const [filtros, setFiltros] = useState<Record<string, string>>({});
-  const { datos, cargando, error, recargar } = useTimeline(id, filtros);
+  const { eventos: datos, cargando, cargandoMas, error, hayMas, cargarMas, recargar } = useTimelinePaginado(id, filtros);
   const defFiltros = useMemo(
     () => plantillaFiltrosTimeline(ESTADOS_ACTIVO.map((e) => ({ valor: e, etiqueta: etiquetaEstado(e) }))),
     [],
@@ -74,7 +74,16 @@ export function TabTimeline({ id }: { id: string }) {
           ) : eventos.length === 0 ? (
             <EmptyState titulo="Sin eventos" descripcion="No hay eventos que coincidan con los filtros." />
           ) : (
-            <Timeline eventos={eventos} label={`Cronología del activo ${id}`} />
+            <>
+              <Timeline eventos={eventos} label={`Cronología del activo ${id}`} />
+              {hayMas ? (
+                <div style={{ display: "grid", placeItems: "center", marginTop: "var(--do-sp-4)" }}>
+                  <Button variant="secundario" size="sm" onClick={cargarMas} disabled={cargandoMas}>
+                    {cargandoMas ? "Cargando…" : "Cargar más"}
+                  </Button>
+                </div>
+              ) : null}
+            </>
           )}
         </CardContent>
       </Card>

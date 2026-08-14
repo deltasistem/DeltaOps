@@ -248,16 +248,18 @@ export function hallazgoService(): PlatformServiceDefinition {
           if (typeof tenant !== "string" || tenant.length === 0) {
             return fail(KernelErrors.validation("Contexto sin tenantId"));
           }
+          // `activoId` se empuja al almacén (igualdad JSONB) para no depender de
+          // una ventana global de `limit` filas cuando el volumen crece; `estado`
+          // se mapea al filtro de estado nativo del almacén.
           const rows = await deps.store.list(tenant, {
             service: SERVICIO_HALLAZGO,
             recordType: RECORD_DESCARTE,
+            ...(input.activoId ? { dataEquals: { activoId: input.activoId } } : {}),
+            ...(input.estado ? { status: input.estado } : {}),
             limit: input.limit ?? 500,
           });
           if (!rows.ok) return rows;
-          let items = rows.value;
-          if (input.activoId) items = items.filter((r) => r.data["activoId"] === input.activoId);
-          if (input.estado) items = items.filter((r) => r.status === input.estado);
-          return ok(items);
+          return ok(rows.value);
         },
       }),
     ],

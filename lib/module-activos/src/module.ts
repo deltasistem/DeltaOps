@@ -348,18 +348,50 @@ function resumenDeEvento(tipo: string, p: Record<string, unknown>): string {
  * `entidadRelacionada`, `payload`. Cuando falta `resumen`, se deriva del tipo
  * real vía `resumenDeEvento` (NO inventa datos: sólo etiqueta el evento real).
  */
+/**
+ * Extrae el nombre del proveedor de un evento de tanqueo para PRESENTACIÓN en la
+ * cronología. Fuente canónica: `payload.snapshot.proveedorId`; si falta, intenta
+ * `payload.snapshot.observacion.proveedorSnapshot` (JSON de procedencia de los
+ * históricos). Devuelve cadena vacía si no aplica o no hay dato (nunca inventa).
+ */
+function proveedorDeTanqueo(eventType: string, payload: Record<string, unknown>): string {
+  if (!eventType.includes("tanqueo")) return "";
+  const snap = (payload["snapshot"] && typeof payload["snapshot"] === "object"
+    ? payload["snapshot"]
+    : {}) as Record<string, unknown>;
+  const directo = snap["proveedorId"] ?? payload["proveedorId"];
+  if (typeof directo === "string" && directo.trim()) return directo.trim();
+  const obs = snap["observacion"] ?? payload["observacion"];
+  if (typeof obs === "string" && obs.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(obs) as Record<string, unknown>;
+      const snapObs = parsed["proveedorSnapshot"];
+      if (typeof snapObs === "string" && snapObs.trim()) return snapObs.trim();
+    } catch {
+      // procedencia no-JSON: se ignora en silencio (sin proveedor).
+    }
+  }
+  return "";
+}
+
 function normalizarEntradaTimeline(fila: Record<string, unknown>): Record<string, unknown> {
   const d = (fila["data"] && typeof fila["data"] === "object" ? fila["data"] : fila) as Record<string, unknown>;
   const payload = (d["payload"] && typeof d["payload"] === "object" ? d["payload"] : {}) as Record<string, unknown>;
   const eventType = String(d["eventType"] ?? d["tipoEvento"] ?? d["tipo"] ?? "");
   const occurredAt = d["occurredAt"] ?? d["ocurridoAt"] ?? payload["actualizadoAt"] ?? null;
   const resumenBruto = d["resumen"];
-  const resumen =
+  const resumenBase =
     typeof resumenBruto === "string" && resumenBruto.trim()
       ? resumenBruto
       : eventType
         ? resumenDeEvento(eventType, payload)
         : "";
+  // Presentación: para tanqueos, anteponer el proveedor al resumen si el payload
+  // lo trae (snapshot del combustible). NO altera contratos: sólo enriquece el
+  // campo derivado `resumen`/`descripcion` que consume la ficha; nunca inventa
+  // datos (si no hay proveedor, el resumen queda igual).
+  const proveedor = proveedorDeTanqueo(eventType, payload);
+  const resumen = proveedor && resumenBase ? `${resumenBase} · ${proveedor}` : resumenBase;
   const actorId = String(d["actorId"] ?? payload["actorId"] ?? "system");
   const estado = d["estado"] != null ? String(d["estado"]) : payload["estado"] != null ? String(payload["estado"]) : null;
   const entidadRelacionada =
@@ -2026,7 +2058,12 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           entidadRelacionada: z.string().optional(),
           desde: z.string().optional(),
           hasta: z.string().optional(),
-          limit: z.number().int().positive().max(200).optional(),
+          limit: z.number().int().positive().max(500).optional(),
+          // Paginación estable por cursor (aditiva): con `cursor` o `paginado`
+          // la respuesta es `{ items, nextCursor }`; sin ellos, array (contrato
+          // histórico). La ficha usa cursor para el "cargar más".
+          cursor: z.string().optional(),
+          paginado: z.boolean().optional(),
         }),
         authorization: { permissions: ["modulo.activos.read"] },
         async handle(ctx, input) {
@@ -2045,6 +2082,8 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
             desde: input.desde,
             hasta: input.hasta,
             limit: input.limit,
+            cursor: input.cursor,
+            paginado: input.paginado,
           });
           if (!r.ok) return r;
           // `platform.timeline.query` devuelve las filas CRUDAS del store
@@ -2053,6 +2092,15 @@ export function activosModule(adapters: ModuleAdapters): PlatformServiceDefiniti
           // esto la UI recibía objetos anidados y pintaba «Evento» / «Sin datos».
           // El `resumen` se deriva de `resumenDeEvento` cuando la entrada
           // auto-proyectada no lo trae (nunca se inventa: se etiqueta el tipo real).
+          const paginado = input.paginado === true || input.cursor != null;
+          if (paginado) {
+            const v = (r.value ?? {}) as { items?: unknown; nextCursor?: unknown };
+            const items = Array.isArray(v.items) ? v.items : [];
+            return ok({
+              items: items.map((fila) => normalizarEntradaTimeline(fila as Record<string, unknown>)),
+              nextCursor: typeof v.nextCursor === "string" ? v.nextCursor : null,
+            });
+          }
           const filas = Array.isArray(r.value) ? r.value : [];
           return ok(filas.map((fila) => normalizarEntradaTimeline(fila as Record<string, unknown>)));
         },

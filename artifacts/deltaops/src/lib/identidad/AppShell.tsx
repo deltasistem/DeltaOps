@@ -161,6 +161,7 @@ function MenuPerfil({ sesion }: { sesion: Sesion }) {
     items.push({ etiqueta: "Configuración de empresa", onSelect: () => setLocation("/administracion/configuracion") });
     items.push({ etiqueta: "Visibilidad de módulos", icono: Eye, onSelect: () => setVisibilidadAbierta(true) });
     items.push({ etiqueta: "Usuarios", onSelect: () => setLocation("/administracion/usuarios") });
+    items.push({ etiqueta: "Datos históricos", onSelect: () => setLocation("/administracion/historicos") });
   }
   if (esSuperAdmin(sesion.rol)) {
     items.push({ etiqueta: "Administración SaaS", onSelect: () => setLocation("/administracion/saas") });

@@ -184,7 +184,15 @@ function registrarEnTimeline() {
     if (!activoId) return ok(undefined);
     const entityRef = refActivo(activoId);
     const resumen = String(p["resumen"] ?? event.type);
-    const occurredAt = String(p["actualizadoAt"] ?? p["fechaHora"] ?? new Date().toISOString());
+    // `occurredAt` de la hoja de vida = FECHA REAL DEL HECHO (fechaHora del
+    // snapshot / payload), NO la de importación/actualización. Antes se
+    // priorizaba `actualizadoAt` (tiempo de servidor) y los tanqueos/lecturas
+    // históricos aparecían en la cronología con la fecha de importación en vez
+    // de la operacional (SEVERO-2). `actualizadoAt` sólo se usa como último
+    // recurso cuando no hay fecha del hecho (p. ej. anulaciones sin snapshot).
+    const snap = (p["snapshot"] as Record<string, unknown> | undefined) ?? {};
+    const fechaHecho = p["fechaHora"] ?? snap["fechaHora"];
+    const occurredAt = String(fechaHecho ?? p["actualizadoAt"] ?? new Date().toISOString());
     const sys = createExecutionContext({ principal: SYSTEM_PRINCIPAL, correlationId: event.correlationId, metadata: { tenantId } });
     const r = await deps.runtime.commands.execute(sys, "platform.timeline.record", {
       entryId: event.id,

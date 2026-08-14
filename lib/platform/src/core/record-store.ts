@@ -135,6 +135,9 @@ export class FakeRecordStore implements RecordStorePort {
     tenantId: TenantId,
     filter: RecordFilter,
   ): Promise<Result<PlatformRecord[], KernelError>> {
+    const dataEquals = filter.dataEquals
+      ? Object.entries(filter.dataEquals)
+      : [];
     const all = [...this.rows.values()]
       .filter(
         (r) =>
@@ -142,7 +145,8 @@ export class FakeRecordStore implements RecordStorePort {
           r.service === filter.service &&
           (!filter.recordType || r.recordType === filter.recordType) &&
           (!filter.status || r.status === filter.status) &&
-          (filter.includeDeleted || r.deletedAt === null),
+          (filter.includeDeleted || r.deletedAt === null) &&
+          dataEquals.every(([k, v]) => String(r.data[k] ?? "") === v),
       )
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     const offset = filter.offset ?? 0;
@@ -316,24 +320,35 @@ export class PgRecordStore implements RecordStorePort {
     filter: RecordFilter,
   ): Promise<Result<PlatformRecord[], KernelError>> {
     try {
+      // Filtros de igualdad sobre `data` (JSONB) aplicados en el motor: cada par
+      // añade `data->>$clave = $valor` con parámetros posicionales (nunca se
+      // interpola texto). Así se acota, p. ej., por `entityRef` ANTES de aplicar
+      // `LIMIT`, evitando que una ventana global de N filas deje fuera lo buscado.
+      const params: unknown[] = [
+        tenantId,
+        filter.service,
+        filter.recordType ?? null,
+        filter.status ?? null,
+        filter.includeDeleted ?? false,
+        filter.limit ?? 100,
+        filter.offset ?? 0,
+      ];
+      let dataSql = "";
+      for (const [clave, valor] of Object.entries(filter.dataEquals ?? {})) {
+        const iClave = params.push(clave);
+        const iValor = params.push(valor);
+        dataSql += ` AND data->>($${iClave}::text) = $${iValor}::text`;
+      }
       const res = await this.readWithTenant(tenantId, (client) =>
         client.query<Row>(
           `SELECT * FROM deltaops.platform_records
            WHERE tenant_id = $1 AND service = $2
              AND ($3::text IS NULL OR record_type = $3)
              AND ($4::text IS NULL OR status = $4)
-             AND ($5::boolean OR deleted_at IS NULL)
+             AND ($5::boolean OR deleted_at IS NULL)${dataSql}
            ORDER BY created_at ASC
            LIMIT $6 OFFSET $7`,
-          [
-            tenantId,
-            filter.service,
-            filter.recordType ?? null,
-            filter.status ?? null,
-            filter.includeDeleted ?? false,
-            filter.limit ?? 100,
-            filter.offset ?? 0,
-          ],
+          params,
         ),
       );
       return ok(res.rows.map(toRecord));

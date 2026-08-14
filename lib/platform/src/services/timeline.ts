@@ -15,6 +15,15 @@ import { TASK_ASSIGNED, TASK_COMPLETED, TASK_CREATED } from "./task";
 
 const SERVICE = "platform.timeline";
 
+/**
+ * Cursor de paginación ESTABLE de una entrada: `<occurredAtISO>|<id>`. El `id`
+ * desempata para determinismo cuando dos entradas comparten `occurredAt`. Es
+ * opaco para el consumidor (la UI sólo lo reenvía tal cual).
+ */
+function cursorDe(entry: { id: string; data: Record<string, unknown> }): string {
+  return `${String(entry.data["occurredAt"] ?? "")}|${String(entry.id)}`;
+}
+
 /** Eventos de plataforma que se proyectan a la línea temporal. */
 const PROJECTED_EVENTS = [
   COMMENT_CREATED,
@@ -205,9 +214,23 @@ export function timelineService(): PlatformServiceDefinition {
         async handle(ctx, input) {
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
-          const rows = await deps.store.list(tenant.value, { service: SERVICE, recordType: "entry", limit: 500 });
-          if (!rows.ok) return rows;
-          return ok(rows.value.filter((r) => r.data["entityRef"] === input.entityRef));
+          // Recorre TODO el conjunto de la entidad paginando por offset (sin tope
+          // silencioso de 500): la cronología de un activo puede superar 500.
+          const rows: { id: string; data: Record<string, unknown> }[] = [];
+          const BATCH = 500;
+          for (let offset = 0; ; offset += BATCH) {
+            const page = await deps.store.list(tenant.value, {
+              service: SERVICE,
+              recordType: "entry",
+              dataEquals: { entityRef: input.entityRef },
+              limit: BATCH,
+              offset,
+            });
+            if (!page.ok) return page;
+            rows.push(...page.value);
+            if (page.value.length < BATCH) break;
+          }
+          return ok(rows);
         },
       }),
       (deps) => ({
@@ -224,8 +247,15 @@ export function timelineService(): PlatformServiceDefinition {
           });
         },
       }),
-      // Consulta cronológica con filtros obligatorios: actor, rango de fechas,
-      // estado, entidad relacionada y entityRef. Devuelve entradas ordenadas.
+      // Consulta cronológica con filtros: actor, rango de fechas, estado, entidad
+      // relacionada y entityRef. Devuelve entradas ordenadas DESC por (occurredAt,
+      // id). Soporta PAGINACIÓN ESTABLE por cursor `(occurredAt|id)` (aditiva):
+      //  - Sin `cursor`/`limit`: contrato histórico (array de entradas).
+      //  - Con `cursor` o `paginado:true`: envoltura `{ items, nextCursor }`.
+      // NO hay topes silenciosos: con `entityRef` se recorre TODO el conjunto de
+      // la entidad (paginando el `list` del almacén por offset) para no perder
+      // entradas antiguas; la UI puede recorrer todo por cursor. Sin `entityRef`
+      // (global) se conserva un tope conservador para no barrer el tenant entero.
       (deps) => ({
         name: `${SERVICE}.query`,
         inputSchema: z.object({
@@ -237,16 +267,44 @@ export function timelineService(): PlatformServiceDefinition {
           desde: z.string().optional(),
           hasta: z.string().optional(),
           limit: z.number().int().positive().max(500).optional(),
+          cursor: z.string().optional(),
+          paginado: z.boolean().optional(),
         }),
         authorization: { permissions: ["platform.timeline.read"] },
         async handle(ctx, input) {
           const tenant = tenantOf(ctx);
           if (!tenant.ok) return tenant;
-          const rows = await deps.store.list(tenant.value, { service: SERVICE, recordType: "entry", limit: 500 });
-          if (!rows.ok) return rows;
+          // Recolección de filas. Con `entityRef` (alta cardinalidad) el filtro va
+          // al almacén (dataEquals) y se PAGINA el `list` por offset hasta agotar
+          // el conjunto de la entidad (sin tope silencioso). Sin `entityRef` se
+          // trae una única ventana global acotada.
+          const filas: { id: string; data: Record<string, unknown> }[] = [];
+          if (input.entityRef) {
+            const BATCH = 500;
+            for (let offset = 0; ; offset += BATCH) {
+              const page = await deps.store.list(tenant.value, {
+                service: SERVICE,
+                recordType: "entry",
+                dataEquals: { entityRef: input.entityRef },
+                limit: BATCH,
+                offset,
+              });
+              if (!page.ok) return page;
+              filas.push(...page.value);
+              if (page.value.length < BATCH) break;
+            }
+          } else {
+            const page = await deps.store.list(tenant.value, {
+              service: SERVICE,
+              recordType: "entry",
+              limit: 500,
+            });
+            if (!page.ok) return page;
+            filas.push(...page.value);
+          }
           const desde = input.desde ? new Date(input.desde).getTime() : null;
           const hasta = input.hasta ? new Date(input.hasta).getTime() : null;
-          const filtered = rows.value.filter((r) => {
+          const filtered = filas.filter((r) => {
             const d = r.data;
             if (input.entityRef && d["entityRef"] !== input.entityRef) return false;
             if (input.actorId && d["actorId"] !== input.actorId) return false;
@@ -258,12 +316,35 @@ export function timelineService(): PlatformServiceDefinition {
             if (hasta != null && (ts == null || ts > hasta)) return false;
             return true;
           });
+          // Orden ESTABLE DESC por (occurredAt, id): el id desempata para que el
+          // cursor sea determinista aun con `occurredAt` iguales.
           filtered.sort((a, b) => {
             const ta = new Date(String(a.data["occurredAt"] ?? 0)).getTime();
             const tb = new Date(String(b.data["occurredAt"] ?? 0)).getTime();
-            return tb - ta;
+            if (tb !== ta) return tb - ta;
+            return String(b.id).localeCompare(String(a.id));
           });
-          return ok(filtered.slice(0, input.limit ?? 200));
+
+          // ¿Paginación por cursor? (aditiva). Cursor = `<occurredAtISO>|<id>`.
+          const usaPaginacion = input.paginado === true || input.cursor != null;
+          if (usaPaginacion) {
+            const pageSize = input.limit ?? 100;
+            let inicio = 0;
+            if (input.cursor) {
+              const idx = filtered.findIndex((r) => cursorDe(r) === input.cursor);
+              inicio = idx >= 0 ? idx + 1 : 0;
+            }
+            const items = filtered.slice(inicio, inicio + pageSize);
+            const hayMas = inicio + pageSize < filtered.length;
+            const nextCursor = hayMas && items.length > 0 ? cursorDe(items[items.length - 1]) : null;
+            return ok({ items, nextCursor });
+          }
+
+          // Contrato histórico (array). Con `entityRef` se devuelve TODO el
+          // conjunto de la entidad (sin recorte a 200 que dejaba fuera eventos
+          // antiguos); en consulta global se mantiene un tope conservador.
+          const tope = input.limit ?? (input.entityRef ? filtered.length : 200);
+          return ok(filtered.slice(0, tope));
         },
       }),
     ],

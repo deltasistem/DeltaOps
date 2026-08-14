@@ -245,6 +245,89 @@ describe("Servicios (adaptadores Fake = modo offline)", () => {
     expect(rel.ok && (rel.value as unknown[]).length).toBe(1);
   });
 
+  it("timeline.query: entityRef se filtra en el almacén (no queda fuera de la ventana de límite)", async () => {
+    // Regresión LITE-09: con muchos eventos de OTROS activos, el filtro por
+    // entityRef debe aplicarse en el almacén (dataEquals) y NO depender de una
+    // ventana global de las primeras N filas por created_at. Antes, el activo
+    // buscado quedaba fuera de esa ventana y la ficha mostraba «Sin eventos».
+    const rt = runtime();
+    const ctx = ctxOf("t-vol");
+    // 600 eventos de un activo "ruidoso" (> ventana de 500 del handler)…
+    for (let i = 0; i < 600; i += 1) {
+      await rt.kernel.commands.execute(ctx, "platform.timeline.record", {
+        entryId: `ruido-${i}`,
+        entityRef: "activo:RUIDO",
+        eventType: "modulo.demo.evento",
+        actorId: "u-1",
+        occurredAt: new Date(2024, 0, 1, 0, 0, i).toISOString(),
+        resumen: "ruido",
+      });
+    }
+    // …y UN evento del activo objetivo, insertado al final (created_at posterior).
+    await rt.kernel.commands.execute(ctx, "platform.timeline.record", {
+      entryId: "objetivo-1",
+      entityRef: "activo:OBJETIVO",
+      eventType: "historico.jornada",
+      actorId: "u-2",
+      occurredAt: "2024-06-01T10:00:00.000Z",
+      resumen: "jornada histórica",
+    });
+    const soloObjetivo = await rt.kernel.queries.execute(ctx, "platform.timeline.query", {
+      entityRef: "activo:OBJETIVO",
+    });
+    expect(soloObjetivo.ok && (soloObjetivo.value as unknown[]).length).toBe(1);
+    const porEntidad = await rt.kernel.queries.execute(ctx, "platform.timeline.byEntity", {
+      entityRef: "activo:OBJETIVO",
+    });
+    expect(porEntidad.ok && (porEntidad.value as unknown[]).length).toBe(1);
+  });
+
+  it("timeline.query: paginación ESTABLE por cursor recorre TODO el historial de la entidad (SEVERO-3)", async () => {
+    // Regresión LITE-09 SEVERO-3: sin topes silenciosos. Una entidad con más
+    // entradas que un lote de página debe poder recorrerse por completo por
+    // cursor, en orden DESC estable por (occurredAt, id), sin duplicados/huecos.
+    const rt = runtime();
+    const ctx = ctxOf("t-pag");
+    const TOTAL = 250;
+    for (let i = 0; i < TOTAL; i += 1) {
+      await rt.kernel.commands.execute(ctx, "platform.timeline.record", {
+        entryId: `pag-${String(i).padStart(4, "0")}`,
+        entityRef: "activo:PAG",
+        eventType: "historico.jornada",
+        actorId: "u-1",
+        // Fechas crecientes: la más reciente (i mayor) queda primero (DESC).
+        occurredAt: new Date(2025, 0, 1, 0, 0, i).toISOString(),
+        resumen: `evento ${i}`,
+      });
+    }
+    const vistos = new Set<string>();
+    let cursor: string | null = null;
+    let paginas = 0;
+    let previo = Number.POSITIVE_INFINITY;
+    for (;;) {
+      const page: { ok: boolean; value?: unknown } = await rt.kernel.queries.execute(
+        ctx,
+        "platform.timeline.query",
+        { entityRef: "activo:PAG", paginado: true, limit: 100, ...(cursor ? { cursor } : {}) },
+      );
+      expect(page.ok).toBe(true);
+      const v = page.value as { items: Array<{ id: string; data: Record<string, unknown> }>; nextCursor: string | null };
+      for (const it of v.items) {
+        expect(vistos.has(it.id)).toBe(false); // sin duplicados
+        vistos.add(it.id);
+        const ts = new Date(String(it.data["occurredAt"])).getTime();
+        expect(ts).toBeLessThanOrEqual(previo); // DESC monótono
+        previo = ts;
+      }
+      paginas += 1;
+      if (!v.nextCursor) break;
+      cursor = v.nextCursor;
+      expect(paginas).toBeLessThan(10); // corta bucles infinitos
+    }
+    expect(vistos.size).toBe(TOTAL); // se alcanzó TODO el historial
+    expect(paginas).toBe(3); // 100 + 100 + 50
+  });
+
   it("task: asignación, transición inválida y recordatorios", async () => {
     const rt = runtime();
     const ctx = ctxOf("t1");

@@ -86,6 +86,7 @@ import Invitacion from '@/pages/invitacion';
 import Perfil from '@/pages/perfil';
 import AdministracionUsuarios from '@/pages/administracion-usuarios';
 import AdministracionConfiguracion from '@/pages/administracion-configuracion';
+import AdministracionHistoricos from '@/pages/administracion-historicos';
 import AdministracionSaaS from '@/pages/administracion-saas';
 import { SesionProvider } from '@/lib/identidad/sesion';
 import { SoloSuperAdmin } from '@/lib/identidad/GuardaRuta';
@@ -124,6 +125,7 @@ function Router() {
       <Route path="/perfil/contrasena" component={Perfil} />
       <Route path="/administracion/usuarios" component={AdministracionUsuarios} />
       <Route path="/administracion/configuracion" component={AdministracionConfiguracion} />
+      <Route path="/administracion/historicos" component={AdministracionHistoricos} />
       <Route path="/administracion/saas">
         <SoloSuperAdmin><AdministracionSaaS /></SoloSuperAdmin>
       </Route>

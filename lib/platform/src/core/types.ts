@@ -30,6 +30,14 @@ export interface RecordFilter {
   readonly includeDeleted?: boolean;
   readonly limit?: number;
   readonly offset?: number;
+  /**
+   * Filtro de igualdad sobre campos escalares de `data` (JSONB), aplicado en el
+   * almacén (push-down). Cada par exige `data->>clave = valor`. Permite acotar
+   * por p. ej. `entityRef` SIN depender de una ventana global de `limit` filas:
+   * imprescindible cuando un tenant acumula muchas entradas (p. ej. históricos)
+   * y el filtro en memoria sobre las primeras N dejaba fuera lo buscado.
+   */
+  readonly dataEquals?: Readonly<Record<string, string>>;
 }
 
 /** Extrae el tenant del contexto. Multitenancy es obligatoria: sin tenant, falla. */

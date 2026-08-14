@@ -147,6 +147,104 @@ export function useTimeline(id: string, filtros: Record<string, string | undefin
   );
 }
 
+/** Página del timeline (contrato paginado del backend: `{ items, nextCursor }`). */
+interface PaginaTimeline {
+  items: EventoTimeline[];
+  nextCursor: string | null;
+}
+
+export interface EstadoTimelinePaginado {
+  eventos: EventoTimeline[];
+  cargando: boolean; // carga de la primera página / recarga
+  cargandoMas: boolean; // carga incremental ("cargar más")
+  error: Error | null;
+  hayMas: boolean;
+  cargarMas: () => void;
+  recargar: () => void;
+}
+
+const TIMELINE_PAGE_SIZE = 100;
+
+/**
+ * Cronología paginada por CURSOR estable (sin topes silenciosos): carga la
+ * primera página y expone `cargarMas()` para recorrer incrementalmente TODO el
+ * historial del activo. Al cambiar filtros/id se reinicia. La UI acumula.
+ */
+export function useTimelinePaginado(
+  id: string,
+  filtros: Record<string, string | undefined>,
+): EstadoTimelinePaginado {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(filtros)) if (v) qs.set(k, v);
+  const query = qs.toString();
+
+  const [eventos, setEventos] = useState<EventoTimeline[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hayMas, setHayMas] = useState(false);
+  const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const pedir = useCallback(
+    (signal: AbortSignal, desdeCursor: string | null): Promise<PaginaTimeline> => {
+      const p = new URLSearchParams(query);
+      p.set("paginado", "1");
+      p.set("limit", String(TIMELINE_PAGE_SIZE));
+      if (desdeCursor) p.set("cursor", desdeCursor);
+      return activosFetch<PaginaTimeline>(`/${id}/timeline?${p.toString()}`, { signal });
+    },
+    [id, query],
+  );
+
+  // Primera página (y recarga por `recargar()` / cambio de filtros).
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setCargando(true);
+    setError(null);
+    setEventos([]);
+    setCursor(null);
+    setHayMas(false);
+    pedir(ctrl.signal, null)
+      .then((pag) => {
+        if (ctrl.signal.aborted) return;
+        setEventos(pag.items ?? []);
+        setCursor(pag.nextCursor ?? null);
+        setHayMas(Boolean(pag.nextCursor));
+      })
+      .catch((e: Error) => {
+        if (!ctrl.signal.aborted && e.name !== "AbortError") setError(e);
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setCargando(false);
+      });
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, query, tick]);
+
+  const cargarMas = useCallback(() => {
+    if (!cursor || cargandoMas) return;
+    const ctrl = new AbortController();
+    setCargandoMas(true);
+    pedir(ctrl.signal, cursor)
+      .then((pag) => {
+        if (ctrl.signal.aborted) return;
+        setEventos((prev) => [...prev, ...(pag.items ?? [])]);
+        setCursor(pag.nextCursor ?? null);
+        setHayMas(Boolean(pag.nextCursor));
+      })
+      .catch((e: Error) => {
+        if (!ctrl.signal.aborted && e.name !== "AbortError") setError(e);
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setCargandoMas(false);
+      });
+  }, [cursor, cargandoMas, pedir]);
+
+  const recargar = useCallback(() => setTick((t) => t + 1), []);
+  return { eventos, cargando, cargandoMas, error, hayMas, cargarMas, recargar };
+}
+
 export function useComentarios(id: string): EstadoAsync<Comentario[]> {
   return useConsulta<Comentario[]>((signal) => activosFetch<Comentario[]>(`/${id}/comentarios`, { signal }), [id]);
 }

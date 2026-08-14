@@ -215,16 +215,21 @@ export function preoperacionalService(): PlatformServiceDefinition {
           if (typeof tenant !== "string" || tenant.length === 0) {
             return fail(KernelErrors.validation("Contexto sin tenantId"));
           }
+          // `activoId`/`veredicto` (identidad de la fila) se empujan al almacén
+          // como igualdad JSONB para NO depender de una ventana global de `limit`
+          // filas: con volúmenes históricos (miles de ejecuciones selladas) el
+          // filtrado en memoria sobre las primeras N dejaba fuera activos enteros.
+          const dataEquals: Record<string, string> = {};
+          if (input.activoId) dataEquals["activoId"] = input.activoId;
+          if (input.veredicto) dataEquals["veredicto"] = input.veredicto;
           const rows = await deps.store.list(tenant, {
             service: SERVICIO_PREOP,
             recordType: RECORD_EJECUCION,
+            ...(Object.keys(dataEquals).length > 0 ? { dataEquals } : {}),
             limit: input.limit ?? 200,
           });
           if (!rows.ok) return rows;
-          let items = rows.value;
-          if (input.activoId) items = items.filter((r) => r.data["activoId"] === input.activoId);
-          if (input.veredicto) items = items.filter((r) => r.data["veredicto"] === input.veredicto);
-          return ok(items);
+          return ok(rows.value);
         },
       }),
     ],

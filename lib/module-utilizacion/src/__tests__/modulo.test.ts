@@ -169,6 +169,26 @@ describe("J · Tanqueos con catálogo canónico", () => {
     const r = await cmd(rt, ctx, "registrar-tanqueo", { activoId: A, fechaHora: "2024-01-01T08:00:00Z", litros: 50, tipoCombustible: "plutonio" });
     expect(r.ok).toBe(false);
   });
+
+  it("SEVERO-2 · la hoja de vida usa la FECHA REAL del hecho (fechaHora), no la de importación", async () => {
+    const ctx = rt.ctx(T);
+    const fechaReal = "2025-09-26T00:00:00.000Z";
+    const rTq = await cmd(rt, ctx, "registrar-tanqueo", { activoId: A, fechaHora: fechaReal, litros: 60, tipoCombustible: "diesel" });
+    expect(rTq.ok).toBe(true);
+    const rLe = await cmd(rt, ctx, "registrar-lectura", { activoId: A, tipoMedidor: "horometro", valor: 100, fechaHora: fechaReal });
+    expect(rLe.ok).toBe(true);
+    await rt.drenar();
+    // El proyector de utilización escribe en platform.timeline con occurredAt =
+    // fechaHora del hecho (no `actualizadoAt`/tiempo de servidor).
+    const tl = await rt.platform.kernel.queries.execute(ctx, "platform.timeline.query", { entityRef: `activo:${A}` });
+    expect(tl.ok).toBe(true);
+    const filas = ((tl as { value: unknown }).value as Array<{ data: Record<string, unknown> }>);
+    const util = filas.filter((f) => String(f.data["eventType"] ?? "").startsWith("modulo.utilizacion."));
+    expect(util.length).toBeGreaterThanOrEqual(2);
+    for (const f of util) {
+      expect(String(f.data["occurredAt"])).toBe(fechaReal);
+    }
+  });
 });
 
 describe("K · Resumen operacional (cálculos puros)", () => {

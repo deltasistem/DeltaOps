@@ -9,6 +9,7 @@ import referenceModuleRouter from "./routes/deltaops/reference-module";
 import activosModuleRouter from "./routes/deltaops/activos-module";
 import preoperacionalModuleRouter from "./routes/deltaops/preoperacional-module";
 import hallazgoModuleRouter from "./routes/deltaops/hallazgo-module";
+import historicosModuleRouter from "./routes/deltaops/historicos-module";
 import visibilidadModuleRouter from "./routes/deltaops/visibilidad-module";
 import ordenesModuleRouter from "./routes/deltaops/ordenes-module";
 import inventarioModuleRouter from "./routes/deltaops/inventario-module";
@@ -107,6 +108,11 @@ app.use("/api", preoperacionalModuleRouter);
 // entitlement que lo gobierna es `activos` (mismo segmento que el preoperacional
 // que origina los hallazgos); no introduce módulo ni entitlement nuevo.
 app.use("/api", hallazgoModuleRouter);
+// DELTAOPS LITE-09 · Importación de datos históricos: comparte el prefijo
+// `/deltaops/activos/historicos`; se monta ANTES de activos (catch-all `/:id`).
+// Lo gobierna el entitlement `activos`; no introduce módulo ni entitlement nuevo.
+// Solo administración de empresa importa (guard propio); CONSULTA jamás.
+app.use("/api", historicosModuleRouter);
 app.use("/api", activosModuleRouter);
 app.use("/api", ordenesModuleRouter);
 app.use("/api", inventarioModuleRouter);
