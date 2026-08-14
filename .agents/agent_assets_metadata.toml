@@ -6,3 +6,10 @@ id = "CHcS09acvi6bYXQ4aMk1T"
 uri = "file://exports/sgma-proyecto.zip"
 type = "unspecified"
 title = "SGMA — Proyecto completo (ZIP)"
+
+[[outputs]]
+id = "XtUofI45awgWni3PSaPH5"
+uri = "file://exports/deltaops-proyecto.zip"
+type = "unspecified"
+title = "DeltaOps — proyecto completo (ZIP)"
+description = "Código fuente completo del monorepo DeltaOps hasta LITE-05 (commit e178cb2), sin node_modules, .git ni artefactos de build."
