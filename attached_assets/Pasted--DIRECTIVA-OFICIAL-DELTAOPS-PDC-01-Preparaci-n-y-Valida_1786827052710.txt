@@ -1,0 +1,910 @@
+# DIRECTIVA OFICIAL — DELTAOPS
+# PDC-01 «Preparación y Validación para Producción Controlada»
+
+## 0. CAMBIO DE ETAPA
+
+DELTAOPS LITE HA TERMINADO SU ETAPA DE DESARROLLO.
+
+A partir de esta directiva NO se deben crear nuevas funcionalidades de negocio.
+
+El objetivo ahora es preparar DeltaOps Lite para una PRODUCCIÓN CONTROLADA.
+
+La filosofía cambia de:
+
+DESARROLLAR
+
+a:
+
+PREPARAR → VERIFICAR → PROTEGER → DESPLEGAR CONTROLADAMENTE → OBSERVAR
+
+No crear LITE-12.
+
+No crear nuevos módulos.
+
+No agregar funcionalidades por iniciativa propia.
+
+No ampliar el alcance del producto.
+
+No convertir DeltaOps Lite nuevamente en un CMMS/ERP sobredimensionado.
+
+---
+
+# 1. FUENTES DE VERDAD
+
+Tomar como fuente principal:
+
+- docs/dgp/DELTAOPS-LITE-11-CIERRE-FINAL.md
+- docs/manual/DELTAOPS-LITE-MANUAL-USUARIO.md
+- docs/manual/DELTAOPS-LITE-MANUAL-TECNICO.md
+- docs/manual/DELTAOPS-LITE-MANUAL-OPERACION.md
+
+Y todos los cierres anteriores de:
+
+- DGP-023.2
+- DGP-023.3
+- DGP-023.4
+- DGP-023.5
+- DGP-023.6
+- DELTAOPS-LITE-01
+- DELTAOPS-LITE-02
+- DELTAOPS-LITE-03
+- DELTAOPS-LITE-04
+- DELTAOPS-LITE-05
+- DELTAOPS-LITE-06
+- DELTAOPS-LITE-07
+- DELTAOPS-LITE-08
+- DELTAOPS-LITE-09
+- DELTAOPS-LITE-10
+- DELTAOPS-LITE-11
+
+La fuente de verdad final debe ser:
+
+CÓDIGO ACTUAL + CONFIGURACIÓN ACTUAL + BASE DE DATOS ACTUAL + EVIDENCIA DE PRUEBAS.
+
+No asumir que una afirmación de un documento anterior sigue siendo cierta sin verificarla cuando sea relevante para producción.
+
+---
+
+# 2. OBJETIVO
+
+El objetivo es llegar a:
+
+DELTAOPS LITE
+↓
+RELEASE CANDIDATE
+↓
+PRODUCCIÓN CONTROLADA
+
+No producción masiva todavía.
+
+La salida de esta fase debe permitir que Dirección pueda responder:
+
+"¿Podemos poner DeltaOps Lite en un entorno real con un grupo pequeño de usuarios sin poner en riesgo los datos?"
+
+La respuesta debe basarse en evidencia.
+
+---
+
+# 3. REGLA DE NO DESARROLLO
+
+NO crear:
+
+- módulos;
+- pantallas nuevas;
+- funcionalidades de negocio;
+- nuevos roles;
+- nuevos motores;
+- nuevas tablas;
+- nuevas colas;
+- nuevos sistemas de inventario;
+- nuevos sistemas de planificación;
+- nuevas funcionalidades de proveedores.
+
+Solo se permite modificar código cuando sea estrictamente necesario para:
+
+- seguridad;
+- estabilidad;
+- protección de datos;
+- despliegue;
+- configuración de producción;
+- observabilidad;
+- corrección de un bug bloqueante.
+
+Si una mejora no es necesaria para producción:
+
+DOCUMENTARLA COMO FUTURA.
+
+---
+
+# 4. BACKUP — BLOQUEANTE
+
+LITE-11 dejó pendiente:
+
+"Verificar y ensayar backup/restauración con el proveedor de la plataforma."
+
+Esto debe investigarse y documentarse.
+
+Determinar:
+
+1. ¿Quién aloja actualmente la base de datos?
+2. ¿Qué mecanismo de backup proporciona?
+3. ¿Qué frecuencia tiene?
+4. ¿Cuál es la retención?
+5. ¿Es automático?
+6. ¿Cómo se solicita una restauración?
+7. ¿Se puede restaurar a una base independiente?
+8. ¿Cuál es el RPO?
+9. ¿Cuál es el RTO?
+10. ¿Existe snapshot/manual backup?
+11. ¿Cómo se comprueba que el backup realmente sirve?
+
+NO afirmar que existe un backup utilizable si no se ha comprobado.
+
+---
+
+# 5. ENSAYO DE RESTAURACIÓN
+
+Si la plataforma permite realizar un restore seguro:
+
+NO restaurar sobre producción.
+
+Realizar:
+
+BACKUP
+↓
+COPIA / RESTORE AISLADO
+↓
+VERIFICACIÓN
+↓
+COMPARACIÓN
+
+Comprobar:
+
+- empresas;
+- activos;
+- órdenes;
+- preoperacionales;
+- combustible;
+- horómetros;
+- históricos;
+- usuarios;
+- relaciones;
+- integridad.
+
+Nunca utilizar producción como laboratorio.
+
+Si el proveedor no permite realizar la prueba desde el entorno actual:
+
+clasificar:
+
+🟡 NO VERIFICADO
+
+y documentar exactamente qué debe hacer Dirección/Infraestructura.
+
+---
+
+# 6. HEALTH GATE
+
+Corregir si todavía corresponde:
+
+Deployment health gate:
+
+/health
+
+debe ser sustituido por:
+
+/ready
+
+cuando el proveedor/plataforma lo permita.
+
+La razón es:
+
+/health = proceso vivo
+
+/ready = aplicación realmente preparada para atender solicitudes y dependencias críticas.
+
+Verificar después del cambio:
+
+- aplicación arrancando;
+- DB disponible;
+- /ready 200 cuando está lista;
+- /ready no OK cuando la DB no está disponible;
+- deployment reconoce correctamente el estado.
+
+No modificar /health innecesariamente.
+
+---
+
+# 7. VARIABLES DE PRODUCCIÓN
+
+Crear una matriz de variables requerida.
+
+Como mínimo revisar:
+
+- NODE_ENV
+- DATABASE_URL
+- DATABASE_MIGRATION_URL
+- DELTAOPS_APP_PASSWORD
+- SESSION_SECRET
+- ATTACHMENT_URL_SECRET
+- CORS_ORIGINS
+- GRAPH_*
+- PORT
+- cualquier otra variable obligatoria detectada por el código.
+
+Para cada variable indicar:
+
+| Variable | Obligatoria | Producción | Uso | Secret | Verificada |
+|---|---|---|---|---|---|
+
+NO mostrar valores reales.
+
+NO escribir secretos en documentación.
+
+NO pegar secrets en código.
+
+---
+
+# 8. REGLA CRÍTICA DE DATABASE_URL
+
+En producción:
+
+NO permitir fallback silencioso a una conexión superusuario.
+
+Si falta:
+
+DELTAOPS_APP_PASSWORD
+
+la aplicación debe fallar de manera segura.
+
+Debe quedar garantizado:
+
+PRODUCCIÓN
+↓
+deltaops_app
+↓
+NO SUPERUSER
+↓
+NO BYPASSRLS
+
+Verificar en vivo cuando sea posible.
+
+---
+
+# 9. MIGRACIONES
+
+Verificar el procedimiento:
+
+DESARROLLO
+↓
+MIGRACIÓN CONTROLADA
+↓
+deltaops_owner
+↓
+VALIDACIÓN
+↓
+RUNTIME
+↓
+deltaops_app
+
+El runtime NO debe ejecutar DDL.
+
+Documentar:
+
+1. cómo ejecutar migraciones;
+2. quién puede ejecutarlas;
+3. qué variable utiliza;
+4. cómo validar;
+5. cómo hacer rollback si aplica.
+
+No ejecutar migraciones destructivas sobre producción.
+
+---
+
+# 10. CORS
+
+Configurar:
+
+CORS_ORIGINS
+
+con los dominios reales que utilizará producción.
+
+No utilizar:
+
+*
+
+en producción.
+
+Probar:
+
+- dominio permitido;
+- dominio no permitido;
+- preflight;
+- login;
+- requests autenticados.
+
+---
+
+# 11. DOMINIO Y HTTPS
+
+Determinar el dominio definitivo de DeltaOps.
+
+No asumir el dominio hasta que Dirección lo confirme.
+
+Verificar:
+
+- DNS;
+- HTTPS;
+- certificado;
+- redirección HTTP → HTTPS;
+- cookies Secure;
+- trust proxy;
+- CORS.
+
+Si el dominio aún no está decidido:
+
+dejar:
+
+🟡 PENDIENTE DE DIRECCIÓN
+
+No inventar un dominio.
+
+---
+
+# 12. SECRETS DEMO
+
+Auditar usuarios y credenciales de demostración.
+
+Identificar:
+
+- usuarios demo;
+- passwords demo;
+- tenants demo;
+- tokens;
+- secrets de desarrollo;
+- cuentas de prueba.
+
+Clasificar cada uno:
+
+CONSERVAR
+ELIMINAR
+ROTAR
+REEMPLAZAR
+
+NO eliminar automáticamente.
+
+Dirección debe recibir una lista clara de lo que debe retirarse antes del lanzamiento.
+
+---
+
+# 13. DATOS REALES E HISTÓRICOS
+
+Los datos históricos importados en LITE-09 son datos valiosos.
+
+NO eliminarlos.
+
+NO modificarlos para "limpiar" la aplicación.
+
+NO crear datos ficticios para llenar indicadores.
+
+Verificar nuevamente:
+
+- activos;
+- nombres;
+- C11/C11 SIGAR;
+- terceros;
+- horómetros;
+- preoperacionales;
+- mantenimientos;
+- combustible;
+- jornadas;
+- hoja de vida.
+
+Los históricos deben conservar su fecha operacional real.
+
+---
+
+# 14. DEMO VS PRODUCCIÓN
+
+Definir una estrategia clara.
+
+Actualmente existe:
+
+delta-demo
+
+Determinar:
+
+A) ¿Se convierte en el tenant de producción?
+
+B) ¿Se crea un tenant de producción nuevo y se migran los datos?
+
+C) ¿Se conserva delta-demo como entorno demo independiente?
+
+NO decidir por suposición.
+
+Analizar qué implica cada opción.
+
+Recomendar una opción técnicamente segura.
+
+No borrar delta-demo hasta tener una decisión explícita.
+
+---
+
+# 15. DATOS DE PRODUCCIÓN
+
+Preparar checklist de carga:
+
+- empresas;
+- centros;
+- ubicaciones;
+- activos;
+- responsables;
+- usuarios;
+- roles;
+- centros de costos;
+- equipos de terceros;
+- históricos;
+- rutinas;
+- configuraciones.
+
+No cargar datos manualmente si existe el importador oficial.
+
+Cuando corresponda:
+
+Excel
+↓
+Importador
+↓
+Preview
+↓
+Validación
+↓
+Confirmación
+↓
+Importación
+↓
+Reporte
+
+---
+
+# 16. IMPORTADOR HISTÓRICO
+
+El importador debe permanecer:
+
+- admin-only;
+- validado;
+- idempotente;
+- seguro;
+- con preview;
+- con reporte de omitidos.
+
+No convertirlo en una herramienta accesible a usuarios operativos.
+
+No permitir que una importación accidental cree duplicados.
+
+---
+
+# 17. SEGURIDAD FINAL
+
+Verificar:
+
+- RLS;
+- FORCE RLS;
+- RBAC;
+- backend authority;
+- tenant isolation;
+- sesiones;
+- cookies;
+- CORS;
+- secrets;
+- endpoints;
+- importador.
+
+Realizar prueba:
+
+TENANT A
+↓
+NO puede consultar/modificar
+↓
+TENANT B
+
+Verificar:
+
+CONSULTA
+↓
+lectura
+↓
+403 en mutaciones.
+
+---
+
+# 18. PRUEBA DE USUARIO PILOTO
+
+NO desplegar inicialmente a toda la organización.
+
+Definir un piloto controlado.
+
+Idealmente:
+
+- un centro;
+- pocos usuarios;
+- algunos activos reales;
+- operación real.
+
+No es necesario crear un nuevo módulo piloto.
+
+El piloto es simplemente una estrategia de despliegue.
+
+---
+
+# 19. CASO OPERACIONAL PILOTO
+
+Ejecutar con usuarios reales:
+
+### Día operacional
+
+1. Login.
+2. Home.
+3. Seleccionar equipo.
+4. Registrar horómetro.
+5. Revisar rutina.
+6. Ejecutar preoperacional.
+7. Obtener APTO/NO APTO.
+8. Si existe hallazgo, generar mantenimiento.
+9. Ejecutar OT.
+10. Registrar mano de obra.
+11. Registrar repuesto/insumo.
+12. Registrar combustible cuando aplique.
+13. Validar.
+14. Cerrar.
+15. Consultar hoja de vida.
+
+Debe sentirse natural para un trabajador.
+
+---
+
+# 20. EQUIPOS ARRENDADOS
+
+Validar específicamente:
+
+C11 SIGAR
+
+Debe:
+
+- existir como activo;
+- permitir combustible;
+- mostrar historial correspondiente;
+- NO inventar mantenimientos internos de Delta.
+
+La aplicación debe respetar la regla:
+
+"El mantenimiento de equipos alquilados/terceros no es responsabilidad de Delta salvo que el negocio lo indique explícitamente."
+
+---
+
+# 21. HORÓMETRO Y RUTINAS
+
+Validar en piloto:
+
+- lectura;
+- inconsistencia;
+- próxima rutina;
+- faltan X horas;
+- vencimiento;
+- generación manual de mantenimiento.
+
+No generar automáticamente una OT solo porque una rutina esté vencida.
+
+---
+
+# 22. PREOPERACIONAL
+
+Validar:
+
+APTO
+
+APTO CON OBSERVACIONES
+
+NO APTO
+
+Y:
+
+NO APTO
+↓
+HALLAZGO
+↓
+MANTENIMIENTO
+
+No modificar las reglas ya aprobadas.
+
+---
+
+# 23. COMBUSTIBLE
+
+Validar:
+
+- activo;
+- fecha;
+- combustible;
+- cantidad;
+- unidad;
+- proveedor como snapshot;
+- identificación;
+- horómetro;
+- observación.
+
+No exigir creación previa de proveedores.
+
+---
+
+# 24. HOJA DE VIDA
+
+La hoja de vida debe mostrar información real.
+
+Validar al menos:
+
+- lecturas;
+- preoperacionales;
+- mantenimientos;
+- OT;
+- combustible;
+- mano de obra;
+- repuestos/insumos;
+- cronología.
+
+No aceptar eventos ficticios.
+
+---
+
+# 25. RENDIMIENTO
+
+Realizar una prueba con datos históricos reales.
+
+Revisar:
+
+- tiempo de carga;
+- ficha de activos;
+- hoja de vida;
+- filtros;
+- cronología;
+- consultas;
+- paginación.
+
+No optimizar prematuramente.
+
+Solo corregir problemas que afecten la experiencia real.
+
+---
+
+# 26. LOGS Y MONITOREO
+
+Definir:
+
+- dónde se observan logs;
+- cómo detectar errores 5xx;
+- cómo detectar caída de DB;
+- cómo revisar /ready;
+- cómo detectar fallos de autenticación;
+- cómo identificar errores de importación.
+
+NO registrar:
+
+- passwords;
+- tokens;
+- cookies;
+- secrets;
+- credenciales.
+
+---
+
+# 27. BACKUP OPERACIONAL
+
+Crear procedimiento para Dirección:
+
+ANTES DEL DEPLOY:
+
+1. Backup.
+2. Verificación.
+3. Registro de timestamp.
+4. Confirmación de disponibilidad del restore.
+
+ANTES DE MIGRACIÓN:
+
+1. Backup.
+2. Validación.
+3. Migración.
+4. Smoke test.
+5. Rollback si falla.
+
+---
+
+# 28. PLAN DE ROLLBACK
+
+Documentar:
+
+### Aplicación
+
+volver a versión estable anterior.
+
+### Base de datos
+
+utilizar mecanismo de restauración/migración definido.
+
+### Configuración
+
+restaurar valores anteriores.
+
+### Secrets
+
+rotar/revertir según procedimiento.
+
+Nunca:
+
+"volver a superusuario".
+
+---
+
+# 29. CRITERIOS PARA INICIAR PRODUCCIÓN
+
+Solo recomendar producción cuando:
+
+🟢 backup verificado
+🟢 restore ensayado o procedimiento formalmente verificado
+🟢 /ready configurado
+🟢 secrets definidos
+🟢 CORS configurado
+🟢 HTTPS
+🟢 runtime deltaops_app
+🟢 RLS
+🟢 RBAC
+🟢 tests aislados
+🟢 datos históricos validados
+🟢 demo definido
+🟢 rollback documentado
+🟢 piloto definido
+
+Si algo está:
+
+🔴 BLOQUEANTE
+
+NO recomendar producción.
+
+Si existe:
+
+🟡 OPERATIVO / PENDIENTE
+
+debe indicarse claramente quién debe completarlo.
+
+---
+
+# 30. NO HACER DEPLOY FINAL AUTOMÁTICAMENTE
+
+Esta directiva NO autoriza:
+
+- publicación definitiva;
+- migración irreversible;
+- eliminación de demo;
+- eliminación de usuarios;
+- eliminación de históricos;
+- cambio irreversible de infraestructura.
+
+La tarea es PREPARAR.
+
+El despliegue final requiere aprobación explícita de Dirección.
+
+---
+
+# 31. ENTREGABLE
+
+Crear:
+
+docs/dgp/DELTAOPS-PDC-01-CIERRE-PREPARACION-PRODUCCION.md
+
+Debe contener:
+
+1. Estado actual.
+2. Infraestructura.
+3. Base de datos.
+4. Backup.
+5. Restore.
+6. Secrets.
+7. CORS.
+8. HTTPS.
+9. Health/Ready.
+10. Migraciones.
+11. Runtime PostgreSQL.
+12. RLS.
+13. RBAC.
+14. Datos históricos.
+15. Importador.
+16. Demo vs producción.
+17. Usuarios.
+18. Seguridad.
+19. Pruebas.
+20. Piloto.
+21. Rollback.
+22. Observabilidad.
+23. Riesgos.
+24. Bloqueantes.
+25. Pendientes.
+26. Recomendación de Dirección.
+
+Cada punto debe clasificarse:
+
+🟢 VERIFICADO
+🟡 PENDIENTE
+🔴 BLOQUEANTE
+⚪ NO APLICA
+
+---
+
+# 32. REVISIÓN INDEPENDIENTE
+
+Antes del cierre realizar revisión independiente.
+
+Buscar específicamente:
+
+- posibilidad de test destructivo sobre producción;
+- fallback a superusuario;
+- secrets;
+- CORS;
+- RLS;
+- RBAC;
+- pérdida de históricos;
+- duplicación;
+- restore;
+- health gate;
+- configuración demo;
+- problemas de deployment.
+
+La revisión debe poder contradecir al implementador.
+
+---
+
+# 33. CRITERIO FINAL
+
+El resultado debe terminar con uno de estos tres estados:
+
+### 🟢 PRODUCCIÓN CONTROLADA AUTORIZABLE
+
+Todo lo crítico está verificado.
+
+### 🟡 PRODUCCIÓN CONTROLADA CONDICIONADA
+
+No existen bloqueantes técnicos, pero existen tareas operativas que Dirección debe completar antes del lanzamiento.
+
+### 🔴 NO LISTO
+
+Existe al menos un bloqueante.
+
+No ocultar problemas.
+
+No minimizar riesgos.
+
+No declarar producción lista sin evidencia.
+
+---
+
+# 34. REGLA FINAL DE DETENCIÓN
+
+Al finalizar esta directiva:
+
+NO crear nuevas funcionalidades.
+
+NO crear una nueva fase automáticamente.
+
+NO iniciar otro ciclo de desarrollo.
+
+Entregar:
+
+1. Informe PDC-01.
+2. Lista de bloqueantes.
+3. Lista de pendientes.
+4. Checklist de producción.
+5. Recomendación final.
+
+DETENERSE.
+
+La decisión posterior corresponde a Dirección.
+
+# FIN DE DIRECTIVA PDC-01

@@ -29,5 +29,6 @@ PORT = "8080"
 NODE_ENV = "production"
 
 [services.production.health.startup]
-# DGP-023.2: migrado de /api/healthz (legacy SGMA) a la ruta de salud DeltaOps existente.
-path = "/api/deltaops/platform/health"
+# PDC-01 §6: health gate de despliegue apuntado a /ready (readiness real: BD + SESSION_SECRET),
+# en lugar de /health (solo liveness). Ver docs/dgp/DELTAOPS-PDC-01-CIERRE-PREPARACION-PRODUCCION.md.
+path = "/api/deltaops/platform/ready"

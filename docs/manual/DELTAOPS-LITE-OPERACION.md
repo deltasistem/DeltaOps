@@ -237,12 +237,14 @@ pnpm --filter @workspace/db run push          # drizzle-kit push (aplica migraci
   - `GET …/info` → nombre, versión, entorno, uptime, versión de Node.
   - `GET …/metrics` → métricas en memoria (no persistentes).
 
-> **REQUIERE VERIFICACIÓN / CONFIGURACIÓN (hallazgo I-09, DGP-023.6):** el
-> *gate* de salud del despliegue apunta hoy a `…/health` (liveness), que no
-> comprueba la base de datos. Se recomienda **apuntar el gate a `…/ready`** (o
-> añadir verificación de BD a `…/health`) para que un proceso que arrancó pero no
-> puede hablar con PostgreSQL no se marque como sano. No se ha modificado la
-> configuración del gate en esta fase.
+> **CORREGIDO EN PDC-01 (hallazgo I-09, DGP-023.6):** el *gate* de salud del
+> despliegue (`artifact.toml` → `services.production.health.startup.path`) fue
+> **reapuntado a `…/ready`** (readiness real: BD + `SESSION_SECRET`). `…/health`
+> se conserva sin cambios como liveness. La verificación local del endpoint está
+> hecha (200 con BD disponible, 503 si falla una dependencia crítica); el
+> reconocimiento del gate por el despliegue real queda **PENDIENTE** hasta la
+> primera publicación controlada (validar allí el comportamiento de reintentos
+> del proveedor mientras la BD de producción se aprovisiona).
 
 - **Apagado ordenado (graceful shutdown):** implementado (LITE-10 §27). Ante
   `SIGTERM`/`SIGINT` deja de aceptar conexiones, espera a las en curso, cierra el
@@ -286,12 +288,18 @@ si no se separó `ATTACHMENT_URL_SECRET`), `DELTAOPS_APP_PASSWORD`,
 4. Construir y arrancar con `NODE_ENV=production` y credencial `deltaops_app`.
 5. Verificar `…/ready` y el inicio de sesión de un SUPER_ADMIN.
 
-> **REQUIERE VERIFICACIÓN:** los mecanismos de **backup/restauración que provee
-> la plataforma de alojamiento (Replit u otra)** —automatización, retención,
-> *point-in-time recovery*, snapshots— **no pudieron comprobarse desde este
-> entorno** y quedan como **NO VERIFICADO**. Debe confirmarse con la
-> documentación/consola del proveedor y validarse con una restauración de prueba
-> antes de considerar el plan de recuperación operativo.
+> **Actualización PDC-01 (§27/§28) — VERIFICADO EN DOCUMENTACIÓN, ensayo
+> pendiente:** los mecanismos de **backup/restauración de la plataforma Replit**
+> se han **confirmado en la documentación del proveedor**: *Point-in-Time
+> Recovery* (PITR) automático, retención de **7 días** (plan Core) / **28 días**
+> (planes Pro/Teams), **restore a una instancia SEPARADA** (sin sobrescribir
+> producción) vía *Database pane → restore settings*; las bases de **desarrollo y
+> producción son SEPARADAS** y el esquema se aplica **al publicar**. El **ensayo
+> real de restauración** (restaurar a instancia aislada y comparar
+> empresas/activos/órdenes/preoperacionales/combustible/horómetros/históricos/
+> usuarios/relaciones/integridad) **aún está PENDIENTE** y debe ejecutarlo
+> Infraestructura antes de autorizar producción. Detalle:
+> `docs/dgp/DELTAOPS-PDC-01-PREPARACION-OPERATIVA.md` (§27/§28).
 
 ### 3.7 Monitoreo por logs y observabilidad
 
