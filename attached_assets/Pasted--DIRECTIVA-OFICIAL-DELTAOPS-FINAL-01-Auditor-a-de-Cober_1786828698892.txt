@@ -1,0 +1,1003 @@
+# DIRECTIVA OFICIAL — DELTAOPS FINAL-01
+# «Auditoría de Cobertura Funcional, Datos, Informes y BI»
+
+## 0. CAMBIO DE ETAPA
+
+DeltaOps Lite ha completado su etapa principal de construcción y hardening.
+
+NO iniciar todavía el despliegue de producción.
+
+La arquitectura objetivo de producción será:
+
+REPLIT
+  ↓
+GITHUB
+  ↓
+DIGITALOCEAN DROPLET
+  ↓
+NEON POSTGRESQL
+
+Replit continúa siendo entorno de desarrollo y agente de programación.
+No tratar Replit como infraestructura de producción.
+
+Antes de desplegar, Dirección quiere responder una pregunta fundamental:
+
+> ¿DeltaOps Lite ya cubre realmente las necesidades operacionales y de información que actualmente se manejan mediante Microsoft Forms, Excel y Power BI?
+
+La respuesta debe basarse en evidencia real.
+
+Esta directiva es de DISCOVERY Y AUDITORÍA.
+
+NO implementar funcionalidades durante esta fase.
+
+NO crear pantallas.
+
+NO crear dashboards.
+
+NO crear APIs.
+
+NO modificar la base de datos.
+
+NO crear migraciones.
+
+NO modificar RBAC/RLS.
+
+NO modificar contratos.
+
+NO modificar workflows.
+
+NO modificar navegación.
+
+NO modificar UI.
+
+NO importar datos.
+
+NO eliminar datos.
+
+NO alterar los históricos.
+
+La única excepción permitida es corregir documentación si fuera necesario para que el informe sea preciso.
+
+---
+
+# 1. FUENTES DE VERDAD
+
+Auditar, como mínimo:
+
+## Código actual
+
+- frontend DeltaOps Lite;
+- api-server;
+- módulos;
+- read models;
+- indicadores;
+- hoja de vida;
+- Activos;
+- Preoperacional;
+- Checklists;
+- Órdenes;
+- Correctivo;
+- Combustible;
+- Mano de obra;
+- Planes/Rutinas;
+- Lecturas/Horómetro;
+- configuración;
+- importador histórico;
+- exportaciones existentes;
+- endpoints;
+- consultas;
+- contratos.
+
+## Base de datos
+
+Utilizar la base de desarrollo disponible únicamente en modo lectura.
+
+No ejecutar mutaciones.
+
+Verificar qué datos existen realmente.
+
+## Documentación DGP/LITE
+
+Utilizar todos los informes anteriores, especialmente:
+
+- DGP-023.2
+- DGP-023.3
+- DGP-023.4
+- DGP-023.5
+- DGP-023.6
+- DELTAOPS-LITE-01
+- DELTAOPS-LITE-02
+- DELTAOPS-LITE-03
+- DELTAOPS-LITE-04
+- DELTAOPS-LITE-05
+- DELTAOPS-LITE-06
+- DELTAOPS-LITE-07
+- DELTAOPS-LITE-08
+- DELTAOPS-LITE-09
+- DELTAOPS-LITE-10
+- DELTAOPS-LITE-11
+- DELTAOPS-PDC-01
+
+## Datos históricos
+
+Auditar los archivos Excel reales proporcionados por Dirección y utilizados durante LITE-09.
+
+NO inventar estructuras.
+
+NO asumir que todos los Excel tienen el mismo formato.
+
+Identificar cada archivo, sus hojas, columnas, registros y propósito.
+
+---
+
+# 2. OBJETIVO PRINCIPAL
+
+Determinar con precisión:
+
+1. Qué información actualmente genera Delta.
+2. Qué información actualmente se captura mediante Forms.
+3. Qué información actualmente se consolida en Excel.
+4. Qué información actualmente se visualiza en Power BI.
+5. Qué información DeltaOps Lite ya captura.
+6. Qué información DeltaOps Lite ya almacena.
+7. Qué información DeltaOps Lite ya puede consultar.
+8. Qué información DeltaOps Lite ya puede visualizar.
+9. Qué información DeltaOps Lite puede exportar.
+10. Qué información falta.
+11. Qué información existe pero está incompleta.
+12. Qué información existe pero todavía no tiene una visualización.
+13. Qué indicadores pueden calcularse de manera confiable.
+14. Qué indicadores NO pueden calcularse todavía.
+15. Qué debería implementarse antes de producción.
+16. Qué puede quedar para una fase posterior.
+
+---
+
+# 3. REGLA DE HONESTIDAD
+
+Cada conclusión debe clasificarse obligatoriamente como:
+
+🟢 VERIFICADO
+🟡 PARCIAL
+🔵 EXISTE PERO NO EXPUESTO
+🟠 EXISTE DATO PERO FALTA CAPACIDAD
+🔴 FALTA
+⚪ NO VERIFICABLE CON LA INFORMACIÓN DISPONIBLE
+
+No convertir:
+
+"existe una tabla"
+
+en:
+
+"la funcionalidad existe".
+
+No convertir:
+
+"existe un campo"
+
+en:
+
+"el usuario puede utilizarlo".
+
+Distinguir siempre:
+
+DATOS EXISTENTES
+vs.
+CAPACIDAD FUNCIONAL
+vs.
+VISUALIZACIÓN
+vs.
+INDICADOR.
+
+---
+
+# 4. INVENTARIO DE FUENTES ACTUALES
+
+Construir una matriz de todos los archivos Excel encontrados.
+
+Para cada archivo:
+
+| Archivo | Hoja | Propósito | Registros | Campos relevantes | Período | Fuente |
+|---|---|---|---:|---|---|---|
+
+No modificar ningún archivo.
+
+No asumir que el nombre del archivo representa correctamente su contenido.
+
+Cuando haya archivos duplicados o versiones:
+
+identificarlos como tales.
+
+---
+
+# 5. MAPA EXCEL → DELTAOPS
+
+Para cada Excel relevante determinar:
+
+| Campo Excel | Equivalente DeltaOps | Módulo | Estado | Transformación |
+|---|---|---|---|---|
+
+Ejemplo conceptual:
+
+Equipo → Activo.nombre
+
+Horómetro → Lectura.valor
+
+Fecha → fechaOperacional
+
+Pero SOLO establecer equivalencias cuando estén demostradas por los datos y el código.
+
+---
+
+# 6. FORMULARIOS ACTUALES
+
+Auditar la documentación y evidencia disponible de Microsoft Forms.
+
+Identificar:
+
+- formulario;
+- propósito;
+- campos;
+- frecuencia;
+- quién lo diligencia;
+- qué proceso inicia;
+- dónde termina el dato;
+- qué Excel alimenta;
+- qué indicador alimenta;
+- qué información se pierde.
+
+Construir:
+
+FORM
+↓
+CAMPO
+↓
+EXCEL / PROCESO
+↓
+POWER BI
+↓
+EQUIVALENTE DELTAOPS
+
+---
+
+# 7. POWER BI
+
+Auditar la evidencia disponible de los dashboards actuales.
+
+Para cada visualización o indicador conocido:
+
+| Dashboard | Indicador | Fuente | Fórmula/criterio | DeltaOps equivalente | Estado |
+|---|---|---|---|---|---|
+
+NO inventar fórmulas.
+
+Si la fórmula del KPI no está disponible:
+
+marcar:
+
+⚪ NO VERIFICABLE
+
+No asumir que un nombre como MTBF significa que actualmente esté correctamente calculado.
+
+---
+
+# 8. INFORMACIÓN OPERACIONAL MÍNIMA
+
+Verificar individualmente:
+
+## Equipos
+
+- código;
+- nombre;
+- tipo;
+- marca;
+- modelo;
+- placa/identificación;
+- centro de costos;
+- ubicación;
+- responsable;
+- condición/estado;
+- tenencia;
+- equipo propio/tercero/alquilado.
+
+## Horómetro
+
+- lectura actual;
+- historial;
+- fecha;
+- usuario;
+- inconsistencias;
+- próxima rutina.
+
+## Preoperacional
+
+- equipo;
+- plantilla;
+- versión;
+- fecha;
+- usuario;
+- respuestas;
+- resultado;
+- hallazgos;
+- evidencia;
+- histórico.
+
+## Mantenimiento
+
+- OT;
+- tipo;
+- equipo;
+- fecha;
+- descripción;
+- hallazgo;
+- técnico;
+- estado;
+- ejecución;
+- validación;
+- cierre.
+
+## Mano de obra
+
+- técnico;
+- OT;
+- fecha;
+- inicio;
+- fin;
+- duración;
+- valoración si existe.
+
+## Combustible
+
+- equipo;
+- fecha;
+- combustible;
+- cantidad;
+- unidad;
+- horómetro;
+- proveedor;
+- identificación;
+- observación.
+
+## Repuestos/insumos
+
+- OT;
+- equipo;
+- descripción;
+- cantidad;
+- costo;
+- proveedor si existe;
+- fecha.
+
+## Hoja de vida
+
+Determinar exactamente qué eventos ya aparecen.
+
+---
+
+# 9. RUTINAS
+
+Verificar:
+
+- periodicidad por horas;
+- periodicidad por kilómetros;
+- periodicidad por ciclos;
+- última ejecución;
+- próxima ejecución;
+- faltan X;
+- vencido;
+- histórico.
+
+Determinar si cada dato:
+
+🟢 se calcula correctamente;
+🟡 existe pero no se expone;
+🔴 requiere desarrollo.
+
+No crear mantenimiento automático si la decisión actual es que la rutina notifique y permita generar mantenimiento manualmente.
+
+---
+
+# 10. MULTICENTRO
+
+Auditar específicamente:
+
+- empresa;
+- tenant;
+- centro de costos;
+- ubicación;
+- centro de trabajo;
+- equipo/grupo de mantenimiento;
+- responsable;
+- activo.
+
+Determinar qué dimensiones realmente existen.
+
+NO inventar jerarquías.
+
+Respetar que algunos centros pueden no tener coordinador/líder de mantenimiento.
+
+La aplicación debe permitir centros donde una misma persona pueda ejecutar varias capacidades, siempre respetando auditoría y reglas existentes.
+
+---
+
+# 11. EQUIPOS DE TERCEROS / ALQUILADOS
+
+Validar específicamente el caso:
+
+C11 → C11 SIGAR
+
+Debe mantenerse la regla de negocio:
+
+- control de combustible;
+- información operacional necesaria;
+- NO inventar mantenimiento interno de Delta cuando Delta no es responsable.
+
+Verificar si esta regla está reflejada correctamente en los datos y visualizaciones.
+
+---
+
+# 12. DASHBOARD OPERACIONAL
+
+Determinar si DeltaOps actualmente puede mostrar, con datos reales:
+
+- total de equipos;
+- equipos activos;
+- equipos inactivos;
+- preoperacionales;
+- APTO;
+- APTO CON OBSERVACIONES;
+- NO APTO;
+- hallazgos pendientes;
+- OT abiertas;
+- OT cerradas;
+- OT por tipo;
+- mantenimientos;
+- rutinas vencidas;
+- rutinas próximas;
+- combustible;
+- consumo;
+- horas hombre;
+- repuestos/insumos;
+- costos cuando existan datos.
+
+Para cada uno:
+
+🟢 DISPONIBLE
+🟡 PARCIAL
+🔵 DATO EXISTE PERO NO SE VISUALIZA
+🔴 NO DISPONIBLE
+
+---
+
+# 13. INDICADORES
+
+Auditar especialmente:
+
+- consumo por equipo;
+- consumo por hora;
+- consumo por km;
+- costo de mantenimiento;
+- costo por hora;
+- costo por km;
+- horas hombre;
+- frecuencia de mantenimiento;
+- OT abiertas;
+- OT cerradas;
+- cumplimiento de rutinas;
+- cumplimiento de preoperacionales;
+- fallas;
+- hallazgos.
+
+Y evaluar:
+
+- MTTR;
+- MTBF;
+- disponibilidad;
+- utilización.
+
+Para MTTR/MTBF/disponibilidad:
+
+NO declararlos disponibles únicamente porque exista el concepto.
+
+Determinar si los insumos históricos realmente permiten calcularlos.
+
+---
+
+# 14. INFORMES
+
+Determinar qué informes ya existen.
+
+Como mínimo analizar:
+
+## Informe de mantenimiento
+
+Filtros potenciales:
+
+- fecha;
+- equipo;
+- centro;
+- tipo;
+- técnico;
+- estado.
+
+## Informe de combustible
+
+## Informe de horómetro
+
+## Informe de preoperacionales
+
+## Informe de OT
+
+## Informe de horas hombre
+
+## Informe de costos
+
+## Hoja de vida
+
+Para cada uno determinar:
+
+- ¿existe?
+- ¿qué datos utiliza?
+- ¿se puede consultar?
+- ¿se puede filtrar?
+- ¿se puede exportar?
+- ¿falta algo?
+
+NO crear estos informes durante esta fase.
+
+---
+
+# 15. EXPORTACIÓN
+
+Auditar si DeltaOps actualmente permite:
+
+- Excel;
+- CSV;
+- PDF;
+- impresión;
+- descarga de datos.
+
+No implementar nada.
+
+Simplemente clasificar:
+
+🟢 EXISTE
+🟡 PARCIAL
+🔴 NO EXISTE
+
+Y determinar cuáles exportaciones son realmente necesarias para la operación.
+
+---
+
+# 16. POWER BI VS DELTAOPS
+
+Construir una matriz final:
+
+| Capacidad actual Power BI | DeltaOps | ¿Puede reemplazarlo? | Observación |
+|---|---|---|---|
+
+Separar:
+
+### Operación diaria
+
+Debe priorizarse DeltaOps.
+
+### Análisis gerencial
+
+Puede continuar en Power BI si aporta valor.
+
+### Datos fuente
+
+DeltaOps debe ser fuente operacional.
+
+No asumir que Power BI debe desaparecer completamente.
+
+---
+
+# 17. FORMS VS DELTAOPS
+
+Construir:
+
+| Formulario actual | Proceso equivalente DeltaOps | ¿Ya reemplazado? |
+|---|---|---|
+
+Determinar cuáles Forms podrían dejar de utilizarse inmediatamente después del piloto y cuáles todavía son necesarios.
+
+---
+
+# 18. EXCEL VS DELTAOPS
+
+Construir:
+
+| Excel | Proceso | DeltaOps | Estado |
+|---|---|---|---|
+
+Identificar:
+
+- Excel operativo;
+- Excel histórico;
+- Excel utilizado como catálogo;
+- Excel utilizado como cálculo;
+- Excel utilizado como reporte.
+
+No confundir histórico con operación.
+
+---
+
+# 19. DATOS HISTÓRICOS
+
+Utilizar los datos reales importados en LITE-09.
+
+Verificar que los históricos pueden responder preguntas como:
+
+> ¿Qué mantenimiento ha tenido este equipo?
+
+> ¿Cuándo fue su último preoperacional?
+
+> ¿Qué horómetro tenía?
+
+> ¿Cuánto combustible consumió?
+
+> ¿Quién realizó la actividad?
+
+> ¿Cuántas horas hombre se registraron?
+
+> ¿Qué OT tuvo?
+
+> ¿Qué ocurrió durante un período determinado?
+
+Si alguna respuesta no puede obtenerse:
+
+documentar exactamente por qué.
+
+---
+
+# 20. TRAZABILIDAD DE DATOS
+
+Para cada dato importante:
+
+FUENTE
+↓
+CAPTURA
+↓
+PERSISTENCIA
+↓
+CONSULTA
+↓
+VISUALIZACIÓN
+↓
+INFORME
+
+Identificar dónde se rompe la cadena.
+
+Ejemplo:
+
+"El dato existe en PostgreSQL pero no tiene read model ni visualización."
+
+Eso debe quedar:
+
+🔵 EXISTE PERO NO EXPUESTO.
+
+---
+
+# 21. CALIDAD DE DATOS
+
+Analizar:
+
+- campos vacíos;
+- duplicados;
+- inconsistencias;
+- fechas;
+- unidades;
+- activos;
+- nombres;
+- centros;
+- proveedores;
+- usuarios;
+- históricos.
+
+No modificar datos.
+
+No corregirlos durante esta fase.
+
+Solo reportarlos.
+
+---
+
+# 22. DATOS QUE NO DEBEMOS INVENTAR
+
+Especialmente:
+
+- costos;
+- proveedores;
+- MTBF;
+- MTTR;
+- disponibilidad;
+- utilización;
+- centros;
+- responsables;
+- mantenimientos.
+
+Si no existe fuente confiable:
+
+"Sin datos suficientes."
+
+---
+
+# 23. EXPERIENCIA DEL USUARIO
+
+Auditar si un usuario operativo puede responder fácilmente:
+
+1. ¿Qué equipos tengo?
+2. ¿Cuál necesita atención?
+3. ¿Qué rutina está próxima?
+4. ¿Cuál está vencida?
+5. ¿Qué preoperacionales debo hacer?
+6. ¿Qué hallazgos tengo?
+7. ¿Qué OT tengo pendientes?
+8. ¿Qué combustible registré?
+9. ¿Qué mantenimiento ha tenido el equipo?
+
+No modificar UI.
+
+Solo evaluar.
+
+---
+
+# 24. COBERTURA FINAL
+
+Construir una matriz global:
+
+| Proceso | Fuente actual | DeltaOps | Cobertura | Acción |
+|---|---|---|---|---|
+
+Clasificación:
+
+🟢 100% cubierto
+🟡 cubierto parcialmente
+🔵 datos existen pero falta presentación
+🟠 capacidad existe pero requiere exposición
+🔴 requiere desarrollo
+
+---
+
+# 25. PRIORIZACIÓN
+
+Clasificar los gaps encontrados:
+
+### A — BLOQUEANTE PARA PRODUCCIÓN
+
+Sin esto DeltaOps no puede cumplir su propósito operacional.
+
+### B — IMPORTANTE ANTES DE PRODUCCIÓN
+
+Debe implementarse antes del piloto o lanzamiento.
+
+### C — IMPORTANTE POSTERIOR
+
+No bloquea la operación inicial.
+
+### D — MEJORA
+
+Puede esperar.
+
+### E — NO HACER
+
+Funcionalidad que no aporta suficiente valor para DeltaOps Lite.
+
+No inflar la categoría A.
+
+---
+
+# 26. RECOMENDACIÓN DE ARQUITECTURA
+
+El informe debe responder explícitamente:
+
+¿DeltaOps Lite debe convertirse en:
+
+A) reemplazo completo de Forms + Excel + Power BI;
+
+B) sistema operacional + Power BI como capa analítica;
+
+C) sistema operacional + informes internos básicos + Power BI para análisis avanzado;
+
+D) otra arquitectura?
+
+Recomendar una opción con argumentos técnicos y operacionales.
+
+---
+
+# 27. CRITERIO PARA CONTINUAR DESARROLLO
+
+Al finalizar, generar una lista:
+
+## IMPLEMENTAR ANTES DE PRODUCCIÓN
+
+Solo los elementos realmente necesarios.
+
+## IMPLEMENTAR DESPUÉS DEL PILOTO
+
+Mejoras importantes pero no bloqueantes.
+
+## NO IMPLEMENTAR
+
+Funcionalidades que volverían a inflar DeltaOps Lite sin beneficio proporcional.
+
+---
+
+# 28. REGLA DE NO SOBRECOSTO
+
+Una de las prioridades de Dirección es controlar el costo de desarrollo en Replit.
+
+Por eso:
+
+NO proponer 20 prompts de desarrollo.
+
+Agrupar funcionalidades relacionadas.
+
+Si existen varios gaps pequeños que puedan resolverse en una sola fase coherente, proponer una sola fase.
+
+La solución debe priorizar:
+
+COMPOSICIÓN > EXTENSIÓN > NUEVA ESTRUCTURA.
+
+---
+
+# 29. NO MODIFICAR
+
+Durante esta fase está prohibido:
+
+- código funcional;
+- base de datos;
+- migraciones;
+- roles;
+- RLS;
+- API;
+- OpenAPI;
+- UI;
+- navegación;
+- datos históricos;
+- importador;
+- configuración.
+
+Solo documentación.
+
+---
+
+# 30. REVISIÓN INDEPENDIENTE
+
+Antes del cierre:
+
+realizar revisión independiente del informe.
+
+La revisión debe verificar:
+
+- cobertura;
+- datos reales;
+- Excel;
+- Forms;
+- Power BI;
+- código;
+- base de datos;
+- indicadores;
+- informes;
+- conclusiones;
+- prioridades.
+
+El revisor debe poder marcar:
+
+FAIL
+
+si alguna afirmación importante no está sustentada.
+
+---
+
+# 31. ENTREGABLE
+
+Crear:
+
+docs/dgp/DELTAOPS-FINAL-01-AUDITORIA-COBERTURA-FUNCIONAL-BI.md
+
+El documento debe contener como mínimo:
+
+1. Resumen ejecutivo.
+2. Fuentes actuales.
+3. Inventario Excel.
+4. Inventario Forms.
+5. Inventario Power BI.
+6. Inventario DeltaOps.
+7. Mapa Excel → DeltaOps.
+8. Mapa Forms → DeltaOps.
+9. Mapa Power BI → DeltaOps.
+10. Cobertura operacional.
+11. Cobertura de datos.
+12. Cobertura de indicadores.
+13. Cobertura de informes.
+14. Exportaciones.
+15. Histórico.
+16. Calidad de datos.
+17. Multicentro.
+18. Terceros/alquilados.
+19. Horómetro.
+20. Rutinas.
+21. Preoperacional.
+22. Mantenimiento.
+23. Combustible.
+24. Mano de obra.
+25. Repuestos/insumos.
+26. Hoja de vida.
+27. Power BI futuro.
+28. Gaps.
+29. Priorización.
+30. Recomendación final.
+
+---
+
+# 32. CRITERIO DE CIERRE
+
+El informe debe terminar respondiendo claramente:
+
+### ¿DeltaOps Lite está funcionalmente listo para producción?
+
+### ¿Qué información del proceso actual ya cubre?
+
+### ¿Qué información falta?
+
+### ¿Qué informes puede entregar actualmente?
+
+### ¿Qué dashboards puede entregar actualmente?
+
+### ¿Qué datos históricos ya están disponibles?
+
+### ¿Qué reemplaza actualmente de Forms?
+
+### ¿Qué reemplaza actualmente de Excel?
+
+### ¿Qué reemplaza actualmente de Power BI?
+
+### ¿Qué NO reemplaza todavía?
+
+### ¿Qué debemos implementar antes de producción?
+
+### ¿Qué puede esperar?
+
+### ¿Qué definitivamente NO debemos construir?
+
+### ¿Cuántas fases/prompts de desarrollo adicionales recomienda?
+
+La respuesta debe incluir una estimación prudente de esfuerzo por fase, NO una cantidad inflada de prompts.
+
+---
+
+# 33. ESTADO FINAL
+
+Al finalizar:
+
+NO implementar.
+
+NO desplegar.
+
+NO cargar datos.
+
+NO modificar producción.
+
+Entregar únicamente:
+
+1. Informe FINAL-01.
+2. Matriz de cobertura.
+3. Lista de gaps.
+4. Priorización A–E.
+5. Recomendación arquitectónica.
+6. Número recomendado de fases adicionales.
+7. Criterios para considerar DeltaOps Lite listo para deployment en:
+
+GitHub
+↓
+DigitalOcean
+↓
+Neon
+
+DETENERSE.
+
+# FIN DE DIRECTIVA

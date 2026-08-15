@@ -56,4 +56,5 @@
 - [Afinamiento LITE-10](deltaops-afinamiento-lite10.md) — recomposición de nav exige test por rol; suites PG borran el tenant demo incl. históricos (re-import idempotente); responsive real = composición móvil, no solo sin overflow.
 - [Auditoría final LITE-11](deltaops-auditoria-final-lite11.md) — guard BD-test B1–B4 por subpath sin efectos; lazy mount de Tabs debe ser persistente; RC condicionado (backup/health-gate/CORS/secretos prod).
 - [Preparación producción PDC-01](deltaops-pdc01-produccion.md) — PITR Replit 7/28d con restore a instancia separada; health gate por artifact.toml → /ready; demo-vs-prod Opción C; veredicto condicionado sin bloqueantes.
+- [Auditoría cobertura FINAL-01](deltaops-final01-cobertura.md) — producción vía GitHub→DigitalOcean→Neon; Opción C con Power BI gerencial; exportación inexistente y 1 fase «Informes y Exportación» pre-producción; horas hombre (Forms) sin reemplazo.
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.
