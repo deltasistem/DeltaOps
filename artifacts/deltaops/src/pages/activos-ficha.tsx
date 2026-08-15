@@ -184,6 +184,7 @@ function Ficha({ id }: { id: string }) {
 
       <Tabs
         porDefecto={leerParam(typeof window !== "undefined" ? window.location.search : "", "tab")}
+        montarInactivas={false}
         items={[
           { id: "ordenes", etiqueta: "Órdenes", contenido: <TabOrdenes activoId={id} activoNombre={a.nombre} /> },
           { id: "planes", etiqueta: "Planes", contenido: <TabPlanes activoId={id} activoNombre={a.nombre} /> },

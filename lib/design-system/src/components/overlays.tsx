@@ -671,12 +671,47 @@ export interface TabsProps {
   /** Etiqueta accesible de la lista de pestañas. */
   etiquetaLista?: string;
   className?: string;
+  /**
+   * ¿Montar en el DOM el contenido de las pestañas INACTIVAS?
+   *
+   * Por defecto `true` (comportamiento histórico: todos los paneles se montan de
+   * entrada y los inactivos se ocultan con `hidden`).
+   *
+   * Poner `false` para MONTAJE PEREZOSO PERSISTENTE: una pestaña se monta la
+   * PRIMERA vez que se visita y, una vez montada, PERMANECE montada (oculta con
+   * `hidden`) al cambiar de pestaña. Así se obtiene el beneficio de TTI (al abrir
+   * sólo se monta la pestaña activa, no las N restantes) SIN destruir el estado
+   * de las pestañas ya visitadas: borradores de formularios (Correctivo inline,
+   * Comentarios en redacción, Documentación/Relaciones) sobreviven a la
+   * navegación entre pestañas. Extensión ADITIVA: no altera el contrato existente.
+   */
+  montarInactivas?: boolean;
 }
 
-export function Tabs({ items, porDefecto, etiquetaLista = "Pestañas", className }: TabsProps) {
+export function Tabs({ items, porDefecto, etiquetaLista = "Pestañas", className, montarInactivas = true }: TabsProps) {
   const habilitadas = items.filter((t) => !t.disabled);
-  const [activa, setActiva] = useState<string>(porDefecto ?? habilitadas[0]?.id ?? items[0]?.id);
+  const inicial = porDefecto ?? habilitadas[0]?.id ?? items[0]?.id;
+  const [activa, setActiva] = useState<string>(inicial);
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
+  // MONTAJE PEREZOSO PERSISTENTE (montarInactivas=false): conjunto de pestañas
+  // ya visitadas. Se monta el contenido cuando la pestaña se visita por primera
+  // vez y permanece montado después (oculto con `hidden`), preservando su estado.
+  const [visitadas, setVisitadas] = useState<Set<string>>(() => new Set(inicial ? [inicial] : []));
+  const marcarVisitada = useCallback((id: string) => {
+    setVisitadas((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+  const seleccionar = useCallback(
+    (id: string) => {
+      setActiva(id);
+      marcarVisitada(id);
+    },
+    [marcarVisitada],
+  );
 
   function onKeyDown(e: React.KeyboardEvent) {
     const indices = items.map((t, i) => (!t.disabled ? i : -1)).filter((i) => i >= 0);
@@ -706,7 +741,7 @@ export function Tabs({ items, porDefecto, etiquetaLista = "Pestañas", className
         return;
     }
     const idx = indices[siguiente];
-    setActiva(items[idx].id);
+    seleccionar(items[idx].id);
     tabsRef.current[idx]?.focus();
   }
 
@@ -729,26 +764,33 @@ export function Tabs({ items, porDefecto, etiquetaLista = "Pestañas", className
               tabIndex={seleccionada ? 0 : -1}
               disabled={tab.disabled}
               className={cx("do-tabs__tab", seleccionada && "do-tabs__tab--activa")}
-              onClick={() => setActiva(tab.id)}
+              onClick={() => seleccionar(tab.id)}
             >
               {tab.etiqueta}
             </button>
           );
         })}
       </div>
-      {items.map((tab) => (
-        <div
-          key={tab.id}
-          role="tabpanel"
-          id={`do-tabpanel-${tab.id}`}
-          aria-labelledby={`do-tab-${tab.id}`}
-          className="do-tabs__panel"
-          tabIndex={0}
-          hidden={tab.id !== activa}
-        >
-          {tab.contenido}
-        </div>
-      ))}
+      {items.map((tab) => {
+        const seleccionada = tab.id === activa;
+        // Montaje perezoso PERSISTENTE: con `montarInactivas=false` se monta el
+        // contenido cuando la pestaña es (o ha sido) visitada; una vez montado
+        // permanece en el DOM (oculto con `hidden`), preservando su estado.
+        const montar = montarInactivas || seleccionada || visitadas.has(tab.id);
+        return (
+          <div
+            key={tab.id}
+            role="tabpanel"
+            id={`do-tabpanel-${tab.id}`}
+            aria-labelledby={`do-tab-${tab.id}`}
+            className="do-tabs__panel"
+            tabIndex={0}
+            hidden={!seleccionada}
+          >
+            {montar ? tab.contenido : null}
+          </div>
+        );
+      })}
     </div>
   );
 }

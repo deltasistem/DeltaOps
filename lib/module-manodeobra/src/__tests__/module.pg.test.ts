@@ -9,6 +9,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import { createExecutionContext, type ExecutionContext, type Principal, type Result } from "@workspace/kernel";
 import { officialServices } from "@workspace/platform";
 import {
@@ -20,8 +22,7 @@ import {
   type ManodeobraRuntime,
 } from "..";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+const suite = suiteDestructiva(describe);
 
 const MDO_PERMS = manodeobraModule({
   recursos: null as never, tarifas: null as never, valoraciones: null as never, recibos: null as never,
@@ -54,7 +55,7 @@ suite("DGP-020.3 · Mano de Obra · PostgreSQL", { timeout: 30_000 }, () => {
     ordenes.set(t, { sesionId, ordenId, activoId: "act1", identityId, estado: "CERRADA", efectivoMs, abierta: false, iniciadoAt: D(iniciadoAt), cerradoAt: D("2024-03-01T05:00:00Z") });
 
   beforeAll(() => {
-    pool = new pg.Pool({ connectionString: DATABASE_URL, max: 20 });
+    pool = crearPoolDestructivo();
     identidad = new FakeIdentidadPort();
     ordenes = new FakeOrdenesSesionPort();
     for (const t of [T_A, T_B]) identidad.registrar(t, "u1", "Ana Soto");

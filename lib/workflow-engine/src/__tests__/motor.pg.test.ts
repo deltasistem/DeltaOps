@@ -7,6 +7,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import {
   createExecutionContext,
   MemoryLogger,
@@ -17,8 +19,7 @@ import { officialServices } from "@workspace/platform";
 import { createWorkflowRuntime, crearMotorWorkflow, nombresInstancia, type WorkflowRuntime } from "..";
 import { PERMISO_REVISAR, SERVICIO, workflowSolicitud, workflowTicket } from "./ejemplo";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+const suite = suiteDestructiva(describe);
 
 const ALL_PERMISSIONS = [
   ...new Set([
@@ -49,7 +50,7 @@ suite("Workflow Engine · PostgreSQL", () => {
   }
 
   beforeAll(async () => {
-    pool = new pg.Pool({ connectionString: DATABASE_URL });
+    pool = crearPoolDestructivo();
     rt = createWorkflowRuntime({ servicio: SERVICIO }, { pool, logger: new MemoryLogger() });
     await publicarActivar(ctx(T));
     // Multiplexación: un SEGUNDO proceso activo (clave distinta) bajo el mismo

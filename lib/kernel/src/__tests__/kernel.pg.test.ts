@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import { z } from "zod";
 import {
   createDomainEvent,
@@ -19,11 +21,10 @@ import {
  * Prueba la atomicidad datos+outbox del Transaction Runtime y el lease
  * concurrente del outbox. Se omite si no hay DATABASE_URL.
  */
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+const suite = suiteDestructiva(describe);
 
 suite("PgUnitOfWork + PgOutbox (base de datos real)", () => {
-  const pool = new pg.Pool({ connectionString: DATABASE_URL });
+  const pool = crearPoolDestructivo();
   const TABLE = "deltaops.kernel_test_rows";
   const EVENT = "kernel.test.row-created";
 

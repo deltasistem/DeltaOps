@@ -5,6 +5,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import {
   createExecutionContext,
   MemoryLogger,
@@ -13,8 +15,7 @@ import {
 } from "@workspace/kernel";
 import { createPlatformRuntime, officialServices, type PlatformRuntime } from "..";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const describePg = DATABASE_URL ? describe : describe.skip;
+const describePg = suiteDestructiva(describe);
 
 const ADMIN: Principal = {
   id: "pg-admin",
@@ -24,7 +25,7 @@ const ADMIN: Principal = {
 };
 
 describePg("Plataforma sobre PostgreSQL", () => {
-  const pool = new pg.Pool({ connectionString: DATABASE_URL });
+  const pool = crearPoolDestructivo();
   let rt: PlatformRuntime;
   const tenantA = `pgtest-a-${Date.now()}`;
   const tenantB = `pgtest-b-${Date.now()}`;

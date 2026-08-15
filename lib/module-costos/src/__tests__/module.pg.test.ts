@@ -9,6 +9,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import { createExecutionContext, type ExecutionContext, type Principal, type Result } from "@workspace/kernel";
 import { officialServices } from "@workspace/platform";
 import {
@@ -21,8 +23,7 @@ import {
   type CostosRuntime,
 } from "..";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+const suite = suiteDestructiva(describe);
 
 const MOD_PERMS = costosModule({
   hechos: null as never, recibos: null as never, identidad: null as never,
@@ -60,7 +61,7 @@ suite("DGP-021.1 · Costos · PostgreSQL", { timeout: 30_000 }, () => {
   };
 
   beforeAll(() => {
-    pool = new pg.Pool({ connectionString: DATABASE_URL, max: 20 });
+    pool = crearPoolDestructivo();
     ordenes = new FakeOrdenesPort();
     costoExacto = new FakeCostoExactoPort();
     const identidad = new FakeIdentidadPort();

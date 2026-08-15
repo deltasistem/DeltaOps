@@ -5,9 +5,11 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./test-guard": "./src/test-guard.ts"
   },
   "scripts": {
+    "test": "vitest run",
     "push": "DELTAOPS_DB_ROLE=owner drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "DELTAOPS_DB_ROLE=owner drizzle-kit push --force --config ./drizzle.config.ts"
   },
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "^8.20.0",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "vitest": "^4.1.10"
   }
 }

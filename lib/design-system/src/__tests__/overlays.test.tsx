@@ -1,6 +1,7 @@
 /**
  * DGP-005 · Pruebas de la familia overlays/feedback del Design System DeltaOps.
  */
+import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
 
@@ -103,6 +104,89 @@ describe("Tabs", () => {
     expect(screen.getByRole("tab", { name: "Dos" })).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(lista, { key: "ArrowLeft" });
     expect(screen.getByRole("tab", { name: "Uno" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("por defecto (montarInactivas=true) monta el contenido de TODAS las pestañas", () => {
+    render(<Tabs items={items} />);
+    // Todos los paneles están en el DOM aunque los inactivos estén ocultos.
+    expect(screen.getByText("Panel uno")).toBeInTheDocument();
+    expect(screen.getByText("Panel dos")).toBeInTheDocument();
+    expect(screen.getByText("Panel tres")).toBeInTheDocument();
+  });
+
+  it("con montarInactivas=false, al ABRIR sólo se monta el contenido de la pestaña activa (TTI)", () => {
+    render(<Tabs items={items} montarInactivas={false} porDefecto="a" />);
+    expect(screen.getByText("Panel uno")).toBeInTheDocument();
+    expect(screen.queryByText("Panel dos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Panel tres")).not.toBeInTheDocument();
+  });
+
+  it("con montarInactivas=false, al VISITAR otra pestaña ésta se monta", () => {
+    render(<Tabs items={items} montarInactivas={false} porDefecto="a" />);
+    fireEvent.click(screen.getByRole("tab", { name: "Dos" }));
+    expect(screen.getByText("Panel dos")).toBeInTheDocument();
+  });
+
+  it("con montarInactivas=false, al VOLVER la pestaña anterior SIGUE montada (montaje perezoso PERSISTENTE)", () => {
+    render(<Tabs items={items} montarInactivas={false} porDefecto="a" />);
+    // Visitamos la segunda...
+    fireEvent.click(screen.getByRole("tab", { name: "Dos" }));
+    expect(screen.getByText("Panel dos")).toBeInTheDocument();
+    // ...y al volver a la primera, la segunda YA visitada permanece en el DOM
+    // (oculta, no desmontada).
+    fireEvent.click(screen.getByRole("tab", { name: "Uno" }));
+    expect(screen.getByText("Panel uno")).toBeInTheDocument();
+    expect(screen.getByText("Panel dos")).toBeInTheDocument();
+    // La tercera, nunca visitada, sigue sin montarse.
+    expect(screen.queryByText("Panel tres")).not.toBeInTheDocument();
+  });
+
+  it("con montarInactivas=false, el ESTADO de un panel ya visitado SOBREVIVE al cambio de pestaña", () => {
+    function Editor() {
+      const [valor, setValor] = React.useState("");
+      return (
+        <input
+          aria-label="borrador"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+        />
+      );
+    }
+    const conEditor = [
+      { id: "a", etiqueta: "Uno", contenido: <Editor /> },
+      { id: "b", etiqueta: "Dos", contenido: "Panel dos" },
+    ];
+    render(<Tabs items={conEditor} montarInactivas={false} porDefecto="a" />);
+    const input = screen.getByLabelText("borrador") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "borrador sin guardar" } });
+    expect(input.value).toBe("borrador sin guardar");
+    // Cambiamos a la otra pestaña y volvemos: el borrador debe conservarse.
+    fireEvent.click(screen.getByRole("tab", { name: "Dos" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Uno" }));
+    const inputTrasVolver = screen.getByLabelText("borrador") as HTMLInputElement;
+    expect(inputTrasVolver.value).toBe("borrador sin guardar");
+  });
+
+  it("con montarInactivas=false, un panel visitado se monta UNA sola vez (no se remonta al volver)", () => {
+    const montajes = vi.fn();
+    function Contador() {
+      React.useEffect(() => {
+        montajes();
+      }, []);
+      return <span>panel-contado</span>;
+    }
+    const conContador = [
+      { id: "a", etiqueta: "Uno", contenido: "Panel uno" },
+      { id: "b", etiqueta: "Dos", contenido: <Contador /> },
+    ];
+    render(<Tabs items={conContador} montarInactivas={false} porDefecto="a" />);
+    expect(montajes).toHaveBeenCalledTimes(0); // aún no visitado
+    fireEvent.click(screen.getByRole("tab", { name: "Dos" }));
+    expect(montajes).toHaveBeenCalledTimes(1);
+    // Volver y regresar NO debe remontar (sigue montado, sólo se oculta/muestra).
+    fireEvent.click(screen.getByRole("tab", { name: "Uno" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dos" }));
+    expect(montajes).toHaveBeenCalledTimes(1);
   });
 });
 

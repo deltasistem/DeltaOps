@@ -10,12 +10,13 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import { createExecutionContext, type ExecutionContext, type Principal } from "@workspace/kernel";
 import { officialServices } from "@workspace/platform";
 import { crearOrdenesRuntime, FakeIdentidad, MODULO, ordenesModule, type OrdenesRuntime } from "..";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+const suite = suiteDestructiva(describe);
 
 const PERMS = [
   ...new Set([
@@ -167,7 +168,7 @@ suite("DGP-020.2 · Sesiones de trabajo · PostgreSQL", { timeout: 30_000 }, () 
     // una conexión propia MIENTRAS el comando mantiene abierta la UoW; con la
     // suite completa compartiendo el pool, un `max` pequeño podía provocar
     // contención/espera. Un margen amplio hace las lecturas deterministas.
-    pool = new pg.Pool({ connectionString: DATABASE_URL, max: 20 });
+    pool = crearPoolDestructivo();
     const identidad = new FakeIdentidad();
     for (const t of [T_A, T_B]) {
       identidad.registrar({ identityId: TEC, tenantId: t, nombre: "Tec Uno", email: "tec1@e.co" });

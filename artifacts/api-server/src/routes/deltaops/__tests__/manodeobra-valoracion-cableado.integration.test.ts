@@ -27,7 +27,9 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
-import { pool } from "@workspace/db";
+import { poolDestructivo as pool, suiteDestructiva } from "../../../test-support/pg-destructivo";
+// LITE-11 §2/§3/§4 — gate FAIL-CLOSED contra DATABASE_TEST_URL (nunca DATABASE_URL).
+const suite = suiteDestructiva();
 import { calcularCosto, MODULO } from "@workspace/module-manodeobra";
 import {
   manodeobraRuntime,
@@ -137,7 +139,7 @@ afterAll(async () => {
   });
 });
 
-describe("DGP-020.3 · cableado REAL de la valoración (regresión §41)", () => {
+suite("DGP-020.3 · cableado REAL de la valoración (regresión §41)", () => {
   it("el puerto real duracionesDeSesion resuelve el shape {duraciones:<objeto>} (no null)", async () => {
     // Camino EXACTO que estaba roto: consultar por sesionId a través del
     // adaptador de producción `ordenesSesionPort` (compuesto en manodeobraRuntime).
@@ -201,7 +203,7 @@ describe("DGP-020.3 · cableado REAL de la valoración (regresión §41)", () =>
  * camino real (PG `SELECT ... WHERE activo_id=$2` + `listadoPorActivo`) nunca se
  * ejercitaba. Este bloque cierra el gap contra la BD real.
  */
-describe("DGP-020.3 · hoja de vida por ACTIVO (cableado REAL, causa raíz en vivo)", () => {
+suite("DGP-020.3 · hoja de vida por ACTIVO (cableado REAL, causa raíz en vivo)", () => {
   it("el puerto real duracionesPorActivo trae la sesión ABIERTA (abierta=true)", async () => {
     const r = await manodeobraRuntime().adapters.ordenes.duracionesPorActivo(TENANT, ACTIVO_ID);
     expect(r.ok).toBe(true);

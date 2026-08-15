@@ -11,6 +11,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { createExecutionContext, SYSTEM_PRINCIPAL } from "@workspace/kernel";
+import { resolverSecretoAdjuntos } from "@workspace/platform";
 import { activosRuntime } from "./activos-runtime";
 
 const router: IRouter = Router();
@@ -36,9 +37,14 @@ router.get("/deltaops/platform/attachments/:id", async (req, res): Promise<void>
     res.status(400).json({ error: "URL firmada incompleta", code: "KRN-VAL-001" });
     return;
   }
-  const secret = process.env.SESSION_SECRET;
+  // LITE-11 §10 (S-2) — misma resolución que al firmar: ATTACHMENT_URL_SECRET
+  // (dedicada) con fallback a SESSION_SECRET.
+  const secret = resolverSecretoAdjuntos();
   if (!secret) {
-    res.status(500).json({ error: "SESSION_SECRET no configurado", code: "KRN-INF-001" });
+    res.status(500).json({
+      error: "Ni ATTACHMENT_URL_SECRET ni SESSION_SECRET configurados",
+      code: "KRN-INF-001",
+    });
     return;
   }
   // Verificación HMAC (payload = tenant:id:expires) — la firma es la autorización.

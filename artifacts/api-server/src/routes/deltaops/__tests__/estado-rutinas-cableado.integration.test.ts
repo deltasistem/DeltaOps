@@ -25,7 +25,9 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
-import { pool } from "@workspace/db";
+import { poolDestructivo as pool, suiteDestructiva } from "../../../test-support/pg-destructivo";
+// LITE-11 §2/§3/§4 — gate FAIL-CLOSED contra DATABASE_TEST_URL (nunca DATABASE_URL).
+const suite = suiteDestructiva();
 import { createExecutionContext } from "@workspace/kernel";
 import { alcanceIncluye, crearAlcanceActivos } from "@workspace/module-planes";
 import { contextoRutinasDeActivo } from "../planes-runtime";
@@ -100,7 +102,7 @@ afterAll(async () => {
   });
 });
 
-describe("LITE-08 · estado-rutinas · cableado REAL (3 hallazgos del arquitecto)", () => {
+suite("LITE-08 · estado-rutinas · cableado REAL (3 hallazgos del arquitecto)", () => {
   it("(a) extrae MEDIDORES reales del VO `{valor}` del ActivoReadRow (no descarta por número)", async () => {
     // Rol REAL de la sesión (lector/CONSULTA legacy = "lector"): tiene lectura.
     const r = await contextoRutinasDeActivo(TENANT, ACTOR, "lector", ACTIVO_ID);

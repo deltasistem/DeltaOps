@@ -22,7 +22,9 @@
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { pool } from "@workspace/db";
+import { poolDestructivo as pool, suiteDestructiva } from "../../../test-support/pg-destructivo";
+// LITE-11 §2/§3/§4 — gate FAIL-CLOSED contra DATABASE_TEST_URL (nunca DATABASE_URL).
+const suite = suiteDestructiva();
 import app from "../../../app";
 import { proveedorSolicitado } from "../notification-provider";
 import { hashPassword } from "../crypto";
@@ -193,7 +195,7 @@ afterAll(async () => {
   }
 });
 
-describe("E2E · login DEMO devuelve SessionResponse completa (no legacy)", () => {
+suite("E2E · login DEMO devuelve SessionResponse completa (no legacy)", () => {
   it("POST /auth/login → SessionResponse con tenant, rol, modulos y membresias", async () => {
     const c = crearCliente();
     const r = await c.req("POST", "/deltaops/auth/login", {
@@ -245,7 +247,7 @@ describe("E2E · login DEMO devuelve SessionResponse completa (no legacy)", () =
   });
 });
 
-describe("E2E · login del administrador de plataforma", () => {
+suite("E2E · login del administrador de plataforma", () => {
   it("admin de plataforma → SessionResponse con rol SUPER_ADMIN", async () => {
     const c = crearCliente();
     const r = await c.req("POST", "/deltaops/auth/login", { email: EMAIL_PLAT, password: PASS_PLAT, tenantId: TENANT_B });
@@ -258,7 +260,7 @@ describe("E2E · login del administrador de plataforma", () => {
   });
 });
 
-describe("E2E · entitlements de módulo (rechazo backend)", () => {
+suite("E2E · entitlements de módulo (rechazo backend)", () => {
   it("módulo NO contratado por el tenant ⇒ 403 MODULE_NOT_ENTITLED", async () => {
     // El tenant B ÚNICO de esta corrida NO contrató `correctivo` (solo
     // referencia/activos) — aislado del semilla `deltaops` que el seed reescribe.
@@ -270,7 +272,7 @@ describe("E2E · entitlements de módulo (rechazo backend)", () => {
   });
 });
 
-describe("E2E · estado global del proveedor de correo exige SUPER_ADMIN", () => {
+suite("E2E · estado global del proveedor de correo exige SUPER_ADMIN", () => {
   const RUTA = "/deltaops/admin/notifications/provider-status";
 
   it("sin sesión ⇒ 401", async () => {
@@ -311,7 +313,7 @@ describe("E2E · estado global del proveedor de correo exige SUPER_ADMIN", () =>
   });
 });
 
-describe("E2E · AISLAMIENTO CRÍTICO de sesiones concurrentes A/B (misma identidad)", () => {
+suite("E2E · AISLAMIENTO CRÍTICO de sesiones concurrentes A/B (misma identidad)", () => {
   it("A no adopta el tenant/rol de B ni tras login/switch-tenant en B", async () => {
     // Sesión A: identidad A/B en tenant A (delta-demo) como TENANT_ADMIN.
     const A = crearCliente();
@@ -360,7 +362,7 @@ describe("E2E · AISLAMIENTO CRÍTICO de sesiones concurrentes A/B (misma identi
   });
 });
 
-describe("E2E · recuperación neutra y logout", () => {
+suite("E2E · recuperación neutra y logout", () => {
   it("POST /auth/password/forgot responde 202 neutro (exista o no el correo)", async () => {
     const c = crearCliente();
     const existe = await c.req("POST", "/deltaops/auth/password/forgot", { email: "admin@delta.demo", tenantId: "delta-demo" });
@@ -403,7 +405,7 @@ describe("E2E · recuperación neutra y logout", () => {
 /* superficies /health,/ready,/info,/metrics NO pertenecen a la consola */
 /* (liveness pública sin datos de tenant) y quedan fuera de este ACL.   */
 /* ==================================================================== */
-describe("E2E · PLATFORM-CONSOLE-ACL (DGP-022.1) — barrido endpoints × roles", () => {
+suite("E2E · PLATFORM-CONSOLE-ACL (DGP-022.1) — barrido endpoints × roles", () => {
   // Enumeración EXACTA de la consola (platform-console.ts). Todos GET.
   const ENDPOINTS_PLATAFORMA = [
     "/deltaops/platform/services",

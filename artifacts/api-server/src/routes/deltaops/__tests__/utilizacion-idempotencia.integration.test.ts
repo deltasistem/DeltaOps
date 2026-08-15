@@ -14,7 +14,9 @@
  * Requiere DATABASE_URL. Usa un tenant efímero y lo limpia al final.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { pool } from "@workspace/db";
+import { poolDestructivo as pool, suiteDestructiva } from "../../../test-support/pg-destructivo";
+// LITE-11 §2/§3/§4 — gate FAIL-CLOSED contra DATABASE_TEST_URL (nunca DATABASE_URL).
+const suite = suiteDestructiva();
 import {
   crearUtilizacionRuntimeOperacional,
   MODULO,
@@ -67,7 +69,7 @@ afterAll(async () => {
   }
 });
 
-describe("API Server · idempotencia de opId bajo concurrencia (PG real)", () => {
+suite("API Server · idempotencia de opId bajo concurrencia (PG real)", () => {
   it("doble POST simultáneo con el mismo opId ⇒ EXACTAMENTE un hecho y respuestas coherentes", async () => {
     const opId = `op-concurrente-${SUF}`;
     // MISMO id de cliente + MISMO opId en ambas: la carrera la resuelve el claim.

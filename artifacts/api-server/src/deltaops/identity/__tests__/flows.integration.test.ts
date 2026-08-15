@@ -12,7 +12,9 @@
  * Requiere DATABASE_URL. Crea tenants efímeros con prefijo único y los limpia.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { pool } from "@workspace/db";
+import { poolDestructivo as pool, suiteDestructiva } from "../../../test-support/pg-destructivo";
+// LITE-11 §2/§3/§4 — gate FAIL-CLOSED contra DATABASE_TEST_URL (nunca DATABASE_URL).
+const suite = suiteDestructiva();
 import { hashPassword } from "../crypto";
 import {
   crearIdentidad,
@@ -89,7 +91,7 @@ afterAll(async () => {
   }
 });
 
-describe("Login y promoción de rol", () => {
+suite("Login y promoción de rol", () => {
   it("autentica con credenciales correctas y expone tenant+rol", async () => {
     const r = await loginConCredenciales(emailA, PASS, TA);
     expect(r.ok).toBe(true);
@@ -126,7 +128,7 @@ describe("Login y promoción de rol", () => {
   });
 });
 
-describe("Cambio de tenant seguro", () => {
+suite("Cambio de tenant seguro", () => {
   it("permite cambiar a un tenant con membresía y niega el resto", async () => {
     // idA sólo pertenece a TA.
     const ok = await prepararCambioTenant(idA, TA);
@@ -136,7 +138,7 @@ describe("Cambio de tenant seguro", () => {
   });
 });
 
-describe("Aislamiento multitenant de usuarios", () => {
+suite("Aislamiento multitenant de usuarios", () => {
   it("listar usuarios de A no incluye identidades de B", async () => {
     const usersA = await listarUsuariosDeTenant(TA);
     const emails = usersA.map((u) => u.email);
@@ -145,7 +147,7 @@ describe("Aislamiento multitenant de usuarios", () => {
   });
 });
 
-describe("Invitaciones · un solo uso, expiración, revocación", () => {
+suite("Invitaciones · un solo uso, expiración, revocación", () => {
   it("valida un token de invitación vigente y lo consume una vez", async () => {
     const { invitacion, token } = await crearInvitacion({
       tenantId: TA, email: `inv.${SUF}@a.test`, rol: "TECNICO", invitadoPor: idA,
@@ -175,7 +177,7 @@ describe("Invitaciones · un solo uso, expiración, revocación", () => {
   });
 });
 
-describe("Recuperación de contraseña · un solo uso", () => {
+suite("Recuperación de contraseña · un solo uso", () => {
   it("valida y consume el token exactamente una vez", async () => {
     const token = await crearReset({ identityId: idA, tenantId: TA });
     const v = await validarReset(TA, token);
@@ -197,7 +199,7 @@ describe("Recuperación de contraseña · un solo uso", () => {
   });
 });
 
-describe("Notificaciones · idempotencia y aislamiento", () => {
+suite("Notificaciones · idempotencia y aislamiento", () => {
   it("enqueue idempotente por (tenant, idempotencyKey)", async () => {
     const key = `k-${SUF}`;
     const r1 = await enqueueEmail({
@@ -219,7 +221,7 @@ describe("Notificaciones · idempotencia y aislamiento", () => {
   });
 });
 
-describe("Auditoría · registro y aislamiento por tenant", () => {
+suite("Auditoría · registro y aislamiento por tenant", () => {
   it("registra eventos y los aísla por tenant", async () => {
     await auditarIdentidad(TA, "login-exitoso", idA, idA, { via: "test" });
     await auditarIdentidad(TB, "login-exitoso", idB, idB, { via: "test" });
@@ -229,7 +231,7 @@ describe("Auditoría · registro y aislamiento por tenant", () => {
   });
 });
 
-describe("Puerto de correo Fake (aislado de red)", () => {
+suite("Puerto de correo Fake (aislado de red)", () => {
   it("permite inspeccionar envíos sin salir a Internet", async () => {
     const fake = new FakeEmailProvider();
     await fake.send({

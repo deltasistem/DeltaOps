@@ -19,6 +19,19 @@ function sign(secret: string, payload: string): string {
   return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
+/**
+ * DELTAOPS LITE-11 §10 (S-2) — resolución de la clave HMAC de URLs firmadas de
+ * adjuntos. Se prefiere una clave DEDICADA `ATTACHMENT_URL_SECRET`; si no está
+ * configurada, se hace fallback a `SESSION_SECRET` (compatibilidad). La MISMA
+ * resolución debe usarse al FIRMAR (este servicio) y al VERIFICAR
+ * (attachment-serve.ts), de lo contrario las URLs no validarían.
+ */
+export function resolverSecretoAdjuntos(
+  env: Record<string, string | undefined> = process.env,
+): string | undefined {
+  return env.ATTACHMENT_URL_SECRET ?? env.SESSION_SECRET;
+}
+
 export function attachmentService(): PlatformServiceDefinition {
   return {
     name: SERVICE,
@@ -163,11 +176,11 @@ export function attachmentService(): PlatformServiceDefinition {
           const ttl = await deps.tenantConfig.get(tenant.value, `${SERVICE}.url-firmada-ttl-seg`);
           const seconds = ttl.ok ? Number(ttl.value) : 300;
           const expiresAt = Date.now() + seconds * 1000;
-          const secret = process.env.SESSION_SECRET;
+          const secret = resolverSecretoAdjuntos();
           if (!secret) {
             return fail(
               KernelErrors.infrastructure(
-                "SESSION_SECRET no configurado: no se pueden emitir URLs firmadas",
+                "Ni ATTACHMENT_URL_SECRET ni SESSION_SECRET configurados: no se pueden emitir URLs firmadas",
               ),
             );
           }

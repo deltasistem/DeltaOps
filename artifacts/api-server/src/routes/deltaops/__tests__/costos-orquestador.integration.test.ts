@@ -24,7 +24,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
-import { pool } from "@workspace/db";
+import { poolDestructivo as pool, suiteDestructiva } from "../../../test-support/pg-destructivo";
 import {
   orquestarDesdeMover,
   reprocesarPendientes,
@@ -32,8 +32,8 @@ import {
 } from "../costos-orquestador";
 import { costosRuntime } from "../costos-runtime";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+// LITE-11 §2/§3/§4 — gate FAIL-CLOSED contra DATABASE_TEST_URL (nunca DATABASE_URL).
+const suite = suiteDestructiva();
 
 const RUN = randomUUID().slice(0, 8);
 const T_A = `cos-orq-a-${RUN}`;

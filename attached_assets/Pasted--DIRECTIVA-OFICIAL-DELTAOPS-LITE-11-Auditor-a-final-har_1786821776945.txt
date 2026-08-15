@@ -1,0 +1,1236 @@
+# DIRECTIVA OFICIAL — DELTAOPS LITE-11
+# «Auditoría final, hardening, preparación para producción y base del manual»
+
+## 0. OBJETIVO DE LA FASE
+
+Esta es la FASE FINAL TÉCNICA de DeltaOps Lite.
+
+NO crear DeltaOps Lite-12, Lite-13 ni nuevas fases automáticamente.
+
+NO ampliar el alcance funcional.
+
+NO convertir DeltaOps Lite nuevamente en un ERP/CMMS empresarial sobredimensionado.
+
+El objetivo es determinar si DeltaOps Lite está realmente preparada para pasar a producción.
+
+La filosofía de esta fase es:
+
+AUDITAR → CORREGIR → PROBAR → ASEGURAR → DOCUMENTAR → DETENERSE
+
+El producto ya tiene:
+
+- activos;
+- centros de costos;
+- horómetro;
+- rutinas;
+- preoperacional;
+- checklist;
+- hallazgos;
+- OT;
+- ejecución;
+- validación;
+- cierre;
+- mano de obra;
+- repuestos/insumos;
+- combustible;
+- hoja de vida;
+- indicadores;
+- datos históricos reales;
+- importador histórico;
+- RBAC;
+- RLS;
+- aislamiento multi-tenant;
+- UX/UI;
+- responsive;
+- tema claro/oscuro.
+
+Por lo tanto, el objetivo NO es agregar más funcionalidades.
+
+El objetivo es demostrar que lo existente es:
+
+SEGUR0 + ESTABLE + CONSISTENTE + RECUPERABLE + USABLE + DESPLEGABLE.
+
+---
+
+# 1. FUENTES DE VERDAD
+
+Antes de modificar cualquier cosa, estudiar obligatoriamente:
+
+- docs/dgp/DGP-023.2*
+- docs/dgp/DGP-023.3*
+- docs/dgp/DGP-023.4*
+- docs/dgp/DGP-023.5*
+- docs/dgp/DGP-023.6*
+- docs/dgp/DELTAOPS-LITE-01-DISCOVERY.md
+- docs/dgp/DELTAOPS-LITE-02-DISEÑO-FUNCIONAL-UX.md
+- docs/dgp/DELTAOPS-LITE-03*
+- docs/dgp/DELTAOPS-LITE-04*
+- docs/dgp/DELTAOPS-LITE-05*
+- docs/dgp/DELTAOPS-LITE-06-AUDITORIA-FUNCIONAL-MAPA.md
+- docs/dgp/DELTAOPS-LITE-07-ATERRIZAJE-OPERACIONAL.md
+- docs/dgp/DELTAOPS-LITE-08-CIERRE-IMPLEMENTACION-OPERACIONAL.md
+- docs/dgp/DELTAOPS-LITE-09-CIERRE-MIGRACION.md
+- docs/dgp/DELTAOPS-LITE-10-CIERRE-AFINAMIENTO-FINAL.md
+
+También revisar:
+
+- código actual;
+- tests;
+- configuración;
+- workflows;
+- contratos;
+- OpenAPI;
+- RBAC;
+- RLS;
+- scripts;
+- seeds;
+- importador histórico;
+- configuración de producción.
+
+No asumir que los documentos antiguos siguen siendo verdad si el código actual demuestra lo contrario.
+
+La fuente de verdad final es:
+
+CÓDIGO + BASE DE DATOS + CONFIGURACIÓN ACTUAL + EVIDENCIA DE PRUEBAS.
+
+---
+
+# 2. REGLA CRÍTICA SOBRE LA BASE DE DATOS
+
+Durante LITE-10 ocurrió un incidente:
+
+Las suites de integración PostgreSQL ejecutadas contra la BD compartida eliminaron el tenant demo y los datos históricos reales importados durante LITE-09.
+
+Los datos fueron restaurados mediante:
+
+- seed;
+- importador oficial;
+- importación idempotente;
+- verificación SQL.
+
+Este incidente NO debe volver a ser posible.
+
+## REQUISITO BLOQUEANTE
+
+NINGUNA SUITE DE TEST AUTOMATIZADA DEBE PODER DESTRUIR, TRUNCAR, REEMPLAZAR O MODIFICAR DATOS HISTÓRICOS REALES DE UNA BD DE DESARROLLO/DEMOSTRACIÓN.
+
+La separación debe ser conceptualmente:
+
+TEST:
+
+tests
+↓
+BASE DE DATOS DE TEST AISLADA
+
+DESARROLLO:
+
+aplicación
+↓
+BASE DE DATOS DE DESARROLLO
+↓
+datos demo/históricos
+
+PRODUCCIÓN:
+
+aplicación
+↓
+BASE DE DATOS PRODUCCIÓN
+↓
+datos reales
+
+No permitir que una suite de test destructiva apunte accidentalmente a DATABASE_URL de desarrollo.
+
+---
+
+# 3. HARDENING DE TESTS
+
+Auditar todas las suites que utilicen PostgreSQL.
+
+Buscar especialmente:
+
+- TRUNCATE;
+- DELETE masivo;
+- DROP;
+- RESET;
+- seed destructivo;
+- migraciones destructivas;
+- limpieza global;
+- DATABASE_URL;
+- variables de conexión;
+- scripts de integración;
+- fixtures;
+- beforeAll/beforeEach;
+- afterAll/afterEach.
+
+Determinar exactamente qué suites pueden modificar datos.
+
+## Implementar protección fail-fast
+
+Una suite de test destructiva debe ABORTAR si detecta que está conectada a una base de datos que no es inequívocamente una BD de test.
+
+No utilizar heurísticas débiles como solamente:
+
+NODE_ENV=test
+
+porque puede ser insuficiente.
+
+Implementar la protección más segura compatible con la arquitectura actual.
+
+Ejemplos aceptables si encajan con el proyecto:
+
+- DATABASE_TEST_URL obligatoria para suites destructivas;
+- marcador explícito de BD de test;
+- nombre de base de datos permitido;
+- usuario de test dedicado;
+- combinación de protecciones.
+
+NO asumir que cambiar una variable es suficiente.
+
+Documentar:
+
+- cómo ejecutar tests;
+- qué BD utilizan;
+- cuáles son destructivos;
+- cómo se evita apuntar a desarrollo/producción.
+
+---
+
+# 4. PRODUCCIÓN NUNCA DEBE SER DESTINO DE TEST
+
+Agregar una barrera explícita para evitar que tests destructivos se ejecuten cuando:
+
+NODE_ENV=production
+
+o cuando la conexión sea identificada como producción.
+
+Resultado esperado:
+
+FAIL-CLOSED.
+
+El test debe detenerse antes de modificar cualquier dato.
+
+---
+
+# 5. DATOS HISTÓRICOS
+
+LITE-09 importó datos reales.
+
+NO borrar.
+
+NO regenerar.
+
+NO fabricar.
+
+NO modificar los datos históricos solamente para que una prueba pase.
+
+Validar:
+
+- activos;
+- preoperacionales;
+- horómetros;
+- mantenimientos;
+- horas hombre;
+- combustible;
+- hoja de vida;
+- cronología.
+
+Verificar especialmente los datos restaurados durante LITE-10.
+
+Los conteos esperados deben contrastarse contra el estado actual de la BD y el informe de LITE-09/LITE-10.
+
+Si existe una diferencia:
+
+NO corregir automáticamente.
+
+Investigar primero y documentar.
+
+---
+
+# 6. IMPORTADOR HISTÓRICO
+
+Auditar el importador creado en LITE-09.
+
+Debe continuar permitiendo:
+
+- análisis;
+- preview;
+- validación;
+- importación;
+- reporte de omitidos;
+- idempotencia.
+
+Debe permanecer admin-only.
+
+Validar:
+
+- C11/C11 SIGAR;
+- equipos de terceros;
+- preoperacionales;
+- jornadas;
+- combustible;
+- horómetros;
+- mantenimientos.
+
+Una segunda importación idéntica debe producir:
+
+Δ = 0
+
+No crear duplicados.
+
+---
+
+# 7. RLS
+
+NO rediseñar RLS.
+
+NO deshacer DGP-023.5.
+
+Validar que el runtime continúe usando:
+
+deltaops_app
+
+y que:
+
+rolsuper = false
+rolbypassrls = false
+rolcreaterole = false
+rolcreatedb = false
+rolreplication = false
+
+El runtime no debe ser owner de los objetos protegidos.
+
+Validar FORCE RLS según la decisión vigente.
+
+No cambiar políticas existentes salvo que exista un bloqueante demostrado.
+
+---
+
+# 8. AISLAMIENTO MULTI-TENANT
+
+Realizar pruebas reales:
+
+TENANT A → datos A permitidos.
+
+TENANT A → datos B rechazados/ocultos.
+
+TENANT B → datos B permitidos.
+
+TENANT B → datos A rechazados/ocultos.
+
+Probar:
+
+- activos;
+- órdenes;
+- preoperacionales;
+- hallazgos;
+- combustible;
+- lecturas;
+- hoja de vida;
+- históricos.
+
+Nunca confiar únicamente en la UI.
+
+La prueba debe ejecutarse a nivel HTTP/backend/DB según corresponda.
+
+---
+
+# 9. RBAC
+
+Validar los seis roles existentes.
+
+No crear OPERADOR salvo que ya exista una decisión posterior explícita.
+
+Verificar:
+
+- login;
+- navegación;
+- lectura;
+- escritura;
+- asignación;
+- ejecución;
+- validación;
+- cierre;
+- administración;
+- importación histórica.
+
+IMPORTANTE:
+
+VISIBILIDAD ≠ SEGURIDAD.
+
+Un módulo oculto en UI no debe implicar acceso indebido.
+
+El backend debe continuar rechazando las operaciones no autorizadas.
+
+---
+
+# 10. AUTENTICACIÓN Y SESIONES
+
+Auditar:
+
+- login;
+- logout;
+- refresh;
+- expiración;
+- cookies;
+- sesión;
+- CSRF si aplica;
+- redirects;
+- múltiples logins;
+- login consecutivo;
+- errores 401;
+- errores 403.
+
+Verificar:
+
+- httpOnly;
+- SameSite;
+- Secure en producción;
+- SESSION_SECRET obligatorio;
+- ausencia de defaults inseguros.
+
+Revisar el hallazgo pendiente:
+
+SESSION_SECRET utilizado también como clave HMAC.
+
+Determinar si debe:
+
+A) separarse en producción;
+
+B) mantenerse temporalmente con riesgo documentado.
+
+Si se puede separar sin romper arquitectura, hacerlo.
+
+Si requiere cambio amplio, documentarlo como deuda.
+
+NO introducir complejidad innecesaria.
+
+---
+
+# 11. SECRETS
+
+Auditar todos los secrets utilizados.
+
+Especialmente:
+
+- DATABASE_URL;
+- DATABASE_MIGRATION_URL;
+- DELTAOPS_APP_PASSWORD;
+- SESSION_SECRET;
+- CORS_ORIGINS;
+- GRAPH_*;
+- cualquier secreto adicional.
+
+Reglas:
+
+- ningún secreto real en Git;
+- ningún secreto en logs;
+- ningún secreto en documentación;
+- ningún secreto en fixtures;
+- ningún secreto en mensajes de error;
+- producción debe fallar si falta un secreto obligatorio.
+
+Revisar específicamente el hallazgo I-03 de LITE-06:
+
+Si falta DELTAOPS_APP_PASSWORD en producción, NO se debe permitir fallback silencioso a una conexión superusuario.
+
+Debe existir:
+
+FAIL-FAST.
+
+---
+
+# 12. POSTGRESQL RUNTIME
+
+Confirmar que producción utilice:
+
+deltaops_app
+
+y no:
+
+postgres
+superuser
+owner
+rol con BYPASSRLS.
+
+El fallback:
+
+DATABASE_URL
+
+solo debe existir si es seguro y compatible con el entorno.
+
+En producción:
+
+NO permitir fallback a superusuario.
+
+---
+
+# 13. MIGRACIONES
+
+Separar claramente:
+
+MIGRACIÓN:
+
+deltaops_owner / DATABASE_MIGRATION_URL
+
+RUNTIME:
+
+deltaops_app
+
+El runtime no debe ejecutar DDL.
+
+Validar startup:
+
+- no CREATE;
+- no ALTER;
+- no DROP;
+- no TRUNCATE;
+- no migraciones automáticas destructivas.
+
+Documentar procedimiento de migración de producción.
+
+---
+
+# 14. HEALTH / READINESS
+
+Validar:
+
+/health
+
+y:
+
+/ready
+
+La readiness debe verificar las dependencias críticas, especialmente DB.
+
+El deployment debe utilizar:
+
+/ready
+
+como gate cuando corresponda.
+
+Si el proveedor actual requiere otra configuración, documentarla.
+
+No dejar un health gate que diga "estoy vivo" cuando la aplicación no puede conectarse a DB.
+
+---
+
+# 15. CORS
+
+Validar que LITE-10 haya eliminado:
+
+cors()
+
+abierto globalmente.
+
+Producción debe utilizar allowlist.
+
+Validar:
+
+- origen autorizado;
+- origen no autorizado;
+- requests sin Origin;
+- preflight;
+- credentials cuando corresponda.
+
+No utilizar wildcard innecesariamente.
+
+---
+
+# 16. GRACEFUL SHUTDOWN
+
+Validar SIGTERM.
+
+Debe permitir:
+
+- detener nuevas solicitudes;
+- completar solicitudes en curso;
+- cerrar pool;
+- liberar recursos;
+- finalizar correctamente.
+
+No dejar conexiones colgadas.
+
+---
+
+# 17. BACKUP Y RECUPERACIÓN
+
+Determinar exactamente:
+
+- cómo se realiza backup;
+- quién lo realiza;
+- frecuencia;
+- retención;
+- cómo se restaura;
+- cómo verificar una restauración.
+
+No afirmar que existe backup si no se ha comprobado.
+
+Clasificar:
+
+VERIFICADO
+NO VERIFICADO
+REQUIERE CONFIGURACIÓN
+
+No ejecutar restauraciones destructivas sobre datos reales.
+
+Si es necesario probar restauración, utilizar una copia aislada.
+
+---
+
+# 18. ROLLBACK
+
+Documentar rollback de:
+
+- aplicación;
+- migraciones;
+- configuración;
+- secrets;
+- despliegue.
+
+El rollback nunca debe consistir en:
+
+"volver a conectar como superusuario permanentemente".
+
+Debe respetar DGP-023.5.
+
+---
+
+# 19. DEPLOYMENT
+
+Auditar configuración actual.
+
+Verificar:
+
+- build;
+- start command;
+- PORT;
+- NODE_ENV;
+- secrets;
+- DATABASE_URL;
+- DATABASE_MIGRATION_URL;
+- CORS_ORIGINS;
+- readiness;
+- health;
+- logs;
+- dominio;
+- HTTPS.
+
+No desplegar todavía a producción si existe un bloqueante.
+
+---
+
+# 20. DATOS DEMO VS PRODUCCIÓN
+
+Identificar:
+
+- seed demo;
+- datos demo;
+- tenants demo;
+- usuarios demo;
+- activos demo;
+- credenciales demo.
+
+Determinar exactamente qué debe:
+
+CONSERVARSE
+
+ELIMINARSE
+
+REEMPLAZARSE
+
+antes de producción.
+
+NO eliminar nada automáticamente.
+
+La salida a producción debe tener una lista explícita.
+
+---
+
+# 21. FLUJO DE NEGOCIO FINAL
+
+Ejecutar E2E con datos reales.
+
+### Caso 1 — Operación normal
+
+Login
+→ Equipo
+→ Lectura
+→ Rutina
+→ Preoperacional
+→ APTO
+→ Hoja de vida
+
+### Caso 2 — Hallazgo
+
+Login
+→ Equipo
+→ Preoperacional
+→ NO APTO
+→ Hallazgo
+→ Generar mantenimiento
+→ OT
+→ Asignación
+→ Ejecución
+→ Mano de obra
+→ Repuesto/insumo
+→ Validación
+→ Cierre
+→ Hoja de vida
+
+### Caso 3 — No requiere mantenimiento
+
+NO APTO
+→ Hallazgo
+→ No requiere mantenimiento
+→ Motivo
+→ Descarte
+→ Reapertura
+→ Nueva decisión
+
+### Caso 4 — Combustible
+
+Equipo
+→ Registrar tanqueo
+→ proveedor/dato transaccional
+→ cantidad
+→ horómetro
+→ Hoja de vida
+
+### Caso 5 — Tercero
+
+C11 SIGAR
+→ consultar
+→ combustible
+→ hoja de vida
+
+Verificar que NO aparezcan mantenimientos internos ficticios.
+
+---
+
+# 22. PRUEBAS DE USUARIO
+
+Simular como mínimo:
+
+### Perfil operativo
+
+Debe poder:
+
+- entrar;
+- seleccionar equipo;
+- registrar horómetro;
+- realizar preoperacional;
+- reportar hallazgo;
+- consultar sus órdenes;
+- ejecutar mantenimiento;
+- registrar información operacional.
+
+### Perfil técnico
+
+Debe poder:
+
+- ejecutar;
+- registrar horas;
+- registrar repuestos/insumos;
+- registrar observaciones;
+- consultar historial.
+
+### Perfil validador
+
+Debe poder:
+
+- revisar;
+- validar;
+- cerrar cuando corresponda.
+
+### Perfil consulta
+
+Debe:
+
+- consultar;
+- NO modificar.
+
+### Administrador
+
+Debe:
+
+- administrar;
+- importar históricos;
+- configurar lo permitido;
+- consultar información global de su ámbito.
+
+No asumir que todos los centros deben tener la misma segregación.
+
+---
+
+# 23. RESPONSIVE Y UX FINAL
+
+No hacer otro rediseño.
+
+Solo verificar y corregir regresiones.
+
+Pantallas prioritarias:
+
+1. Login
+2. Home
+3. Activos
+4. Ficha de activo
+5. Lectura
+6. Preoperacional
+7. Resultado
+8. Hallazgo
+9. OT
+10. Ejecución
+11. Combustible
+12. Hoja de vida
+13. Importación histórica
+14. Administración
+
+Probar:
+
+360
+390
+430
+768
+1024
+1280
+1440
+
+Claro y oscuro.
+
+No debe existir:
+
+- overflow;
+- texto cortado;
+- botón inaccesible;
+- modal fuera de pantalla;
+- menú imposible de usar;
+- contraste insuficiente.
+
+---
+
+# 24. PERFORMANCE
+
+Con datos históricos reales revisar:
+
+- listado de activos;
+- hoja de vida;
+- timeline;
+- preoperacionales;
+- órdenes;
+- combustible;
+- lecturas;
+- filtros;
+- paginación.
+
+No cargar toda la historia en memoria si no es necesario.
+
+No eliminar paginación para "simplificar".
+
+La experiencia debe mantenerse fluida con crecimiento de datos.
+
+---
+
+# 25. OBSERVABILIDAD
+
+Auditar:
+
+- logs de aplicación;
+- errores;
+- errores 4xx;
+- errores 5xx;
+- DB errors;
+- startup;
+- shutdown;
+- autenticación;
+- fallos de integración.
+
+NO registrar:
+
+- passwords;
+- secrets;
+- tokens;
+- cookies;
+- datos sensibles innecesarios.
+
+Los errores mostrados al usuario deben ser comprensibles.
+
+---
+
+# 26. DOCUMENTACIÓN DE OPERACIÓN
+
+Crear o actualizar documentación para:
+
+### Desarrollo
+
+- instalar;
+- ejecutar;
+- tests;
+- build.
+
+### Staging
+
+- configuración;
+- secrets;
+- DB;
+- migraciones;
+- pruebas.
+
+### Producción
+
+- variables;
+- deploy;
+- rollback;
+- backup;
+- restauración;
+- monitoreo.
+
+No inventar procedimientos no comprobados.
+
+---
+
+# 27. MANUAL DE USUARIO — BASE
+
+Crear:
+
+docs/manual/DELTAOPS-LITE-MANUAL-USUARIO.md
+
+Debe quedar estructurado para posteriormente convertirse en PDF/documento final.
+
+Contenido:
+
+1. Introducción
+2. Conceptos básicos
+3. Inicio de sesión
+4. Inicio / Home
+5. Equipos
+6. Hoja de vida
+7. Lectura de horómetro
+8. Rutinas
+9. Preoperacional
+10. Checklist
+11. Resultado
+12. Hallazgos
+13. Generar mantenimiento
+14. Órdenes de trabajo
+15. Asignación
+16. Ejecución
+17. Mano de obra
+18. Repuestos/insumos
+19. Combustible
+20. Historial
+21. Indicadores
+22. Importación histórica
+23. Administración
+24. Roles
+25. Centros de costos
+26. Equipos de terceros
+27. Preguntas frecuentes
+28. Errores frecuentes
+
+Para cada pantalla importante explicar:
+
+- para qué sirve;
+- quién puede usarla;
+- qué muestra;
+- qué botones tiene;
+- qué ocurre al pulsarlos;
+- qué datos modifica;
+- qué datos genera;
+- qué hacer si ocurre un error.
+
+No documentar funcionalidades que no existan.
+
+---
+
+# 28. MANUAL TÉCNICO
+
+Crear:
+
+docs/manual/DELTAOPS-LITE-MANUAL-TECNICO.md
+
+Debe documentar:
+
+- arquitectura;
+- frontend;
+- backend;
+- PostgreSQL;
+- roles;
+- RLS;
+- autenticación;
+- secrets;
+- migraciones;
+- importador;
+- tests;
+- deployment;
+- backup;
+- rollback;
+- observabilidad.
+
+El manual técnico NO debe contener secretos reales.
+
+---
+
+# 29. MATRIZ FINAL DE PRODUCCIÓN
+
+Crear una tabla:
+
+| Área | Estado | Evidencia | Bloqueante | Acción |
+|---|---|---|---|---|
+| Seguridad | | | | |
+| RLS | | | | |
+| RBAC | | | | |
+| PostgreSQL | | | | |
+| Secrets | | | | |
+| Tests | | | | |
+| Datos | | | | |
+| Backup | | | | |
+| Rollback | | | | |
+| UX | | | | |
+| Responsive | | | | |
+| Performance | | | | |
+| Importador | | | | |
+| Deploy | | | | |
+| Manual | | | | |
+
+Usar únicamente:
+
+🟢 LISTO
+
+🟡 PENDIENTE / CONFIGURACIÓN
+
+🔴 BLOQUEANTE
+
+---
+
+# 30. CRITERIO DE PRODUCCIÓN
+
+No declarar "LISTO PARA PRODUCCIÓN" únicamente porque:
+
+- build funciona;
+- tests pasan;
+- aplicación abre.
+
+Debe cumplirse:
+
+### Seguridad
+
+🟢
+
+### Integridad de datos
+
+🟢
+
+### Tests aislados
+
+🟢
+
+### RLS/RBAC
+
+🟢
+
+### Datos históricos
+
+🟢
+
+### Backup/rollback
+
+🟢 o procedimiento explícitamente verificado
+
+### Configuración
+
+🟢
+
+### UX
+
+🟢
+
+### E2E
+
+🟢
+
+### Manual
+
+🟢
+
+Si algún punto crítico está 🔴:
+
+VEREDICTO = NO LISTO.
+
+Si existen 🟡:
+
+VEREDICTO = LISTO CONDICIONADO
+
+Solo si todos los bloqueantes están cerrados puede recomendarse producción.
+
+---
+
+# 31. REGLA DE CAMBIOS
+
+Se permiten cambios únicamente cuando:
+
+1. Corrigen un riesgo real.
+2. Corrigen un bug real.
+3. Protegen datos.
+4. Mejoran seguridad.
+5. Mejoran estabilidad.
+6. Corrigen una regresión.
+7. Son necesarios para producción.
+8. Son necesarios para el manual/documentación.
+
+NO realizar cambios funcionales nuevos por iniciativa propia.
+
+---
+
+# 32. REGLA ABSOLUTA SOBRE DATOS
+
+No borrar históricos.
+
+No modificar históricos para satisfacer tests.
+
+No fabricar registros.
+
+No cambiar fechas históricas.
+
+No crear OT históricas donde LITE-09 decidió explícitamente no fabricarlas.
+
+No alterar C11/C11 SIGAR.
+
+No alterar la clasificación de terceros.
+
+---
+
+# 33. REVISIÓN INDEPENDIENTE
+
+Antes del cierre, realizar una revisión independiente de la propia implementación.
+
+El revisor debe buscar específicamente:
+
+- tests contra BD incorrecta;
+- secretos;
+- fallback a superusuario;
+- RLS bypass;
+- endpoints sin autorización;
+- datos ficticios;
+- pérdida de históricos;
+- duplicados;
+- importación no idempotente;
+- problemas responsive;
+- problemas de sesión;
+- errores de producción.
+
+No aceptar automáticamente la evaluación del implementador.
+
+---
+
+# 34. CRITERIO DE HONESTIDAD
+
+Cada resultado debe clasificarse como:
+
+VERIFICADO
+
+PARCIAL
+
+NO VERIFICADO
+
+GAP
+
+BLOQUEANTE
+
+No afirmar que algo está listo si solo se infiere.
+
+No afirmar backup si no se probó.
+
+No afirmar aislamiento si no se probó.
+
+No afirmar producción si no se comprobó.
+
+---
+
+# 35. ENTREGABLE FINAL
+
+Crear:
+
+docs/dgp/DELTAOPS-LITE-11-CIERRE-FINAL.md
+
+Debe contener:
+
+1. Resumen ejecutivo.
+2. Estado del producto.
+3. Cambios realizados.
+4. Seguridad.
+5. PostgreSQL.
+6. RLS.
+7. RBAC.
+8. Autenticación.
+9. Secrets.
+10. Tests.
+11. Aislamiento de BD de pruebas.
+12. Datos históricos.
+13. Importador.
+14. E2E.
+15. Responsive.
+16. UX/UI.
+17. Performance.
+18. Observabilidad.
+19. Backup.
+20. Recuperación.
+21. Rollback.
+22. Deployment.
+23. Manual usuario.
+24. Manual técnico.
+25. Riesgos.
+26. GAPs.
+27. Deuda técnica.
+28. Matriz final de producción.
+29. Recomendación final.
+30. Evidencia.
+
+---
+
+# 36. VEREDICTO FINAL
+
+Al finalizar:
+
+Si todo crítico está correcto:
+
+DELTAOPS LITE
+= RELEASE CANDIDATE
+= RECOMENDADO PARA PRODUCCIÓN CONTROLADA
+
+Si existe algún bloqueante:
+
+DELTAOPS LITE
+= NO LISTO
+= indicar exactamente qué falta.
+
+No ocultar problemas.
+
+No minimizar riesgos.
+
+No continuar automáticamente con otra fase.
+
+---
+
+# 37. REGLA DE DETENCIÓN
+
+ESTA ES LA ÚLTIMA DIRECTIVA DE DESARROLLO DE DELTAOPS LITE.
+
+Al finalizar:
+
+- no crear LITE-12;
+- no iniciar nuevas funcionalidades;
+- no ampliar módulos;
+- no inventar mejoras.
+
+Entregar el informe final.
+
+Esperar decisión explícita de Dirección sobre:
+
+1. Producción controlada.
+2. Correcciones puntuales si existen bloqueantes.
+3. Elaboración final del manual.
+4. Plan de capacitación.
+
+DETENERSE.
+
+# FIN DE DIRECTIVA DELTAOPS LITE-11

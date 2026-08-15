@@ -757,6 +757,9 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
 
   lib/design-system:
     dependencies:
@@ -831,6 +834,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -850,6 +856,9 @@ importers:
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -878,6 +887,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -906,6 +918,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -931,6 +946,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -959,6 +977,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -984,6 +1005,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1012,6 +1036,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1037,6 +1064,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1071,6 +1101,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1099,6 +1132,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1130,6 +1166,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1155,6 +1194,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1202,6 +1244,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -1230,6 +1275,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.20.0
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)

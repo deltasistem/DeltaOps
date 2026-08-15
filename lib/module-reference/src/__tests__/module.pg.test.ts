@@ -5,6 +5,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import {
   createExecutionContext,
   MemoryLogger,
@@ -14,8 +16,7 @@ import {
 import { officialServices } from "@workspace/platform";
 import { createReferenceRuntime, MODULO, referenceModule, type ReferenceRuntime } from "..";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+const suite = suiteDestructiva(describe);
 
 const ALL_PERMISSIONS = [
   ...new Set([
@@ -37,7 +38,7 @@ suite("Reference Module · PostgreSQL", () => {
     rt.platform.kernel.commands.execute(c, cmd, input);
 
   beforeAll(() => {
-    pool = new pg.Pool({ connectionString: DATABASE_URL });
+    pool = crearPoolDestructivo();
     rt = createReferenceRuntime({ pool, logger: new MemoryLogger() });
   });
 

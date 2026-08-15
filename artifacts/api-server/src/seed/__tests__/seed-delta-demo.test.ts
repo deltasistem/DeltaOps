@@ -14,13 +14,26 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import bcrypt from "bcryptjs";
 import { pool, deltaopsUsersTable, type DbPoolClient } from "@workspace/db";
+// El guard viene del subpath sin efectos (no crea el pool de runtime).
+import { runtimeEsBdDeTest } from "@workspace/db/test-guard";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { DELTAOPS_TENANT } from "../../routes/deltaops/reference-runtime";
 import { DEMO_ADMIN, DEMO_TENANT, seedDeltaDemo } from "../seed-delta-demo";
 import { credencialDemo, CLAVES_ENV } from "../seed-credentials";
 
-const sinDb = !process.env.DATABASE_URL;
+/**
+ * LITE-11 §2/§3/§4 — GATE FAIL-CLOSED para la ÚNICA suite que escribe a través
+ * del `pool`/`db` de RUNTIME (el seed oficial está hard-wired a `@workspace/db`
+ * y no admite pool inyectado sin refactor mayor). Reglas:
+ *   - Producción ⇒ ABORTA (lo impone `runtimeEsBdDeTest` en beforeAll).
+ *   - Sin `DATABASE_TEST_URL` ⇒ se OMITE (no se siembra jamás sobre desarrollo).
+ *   - Con `DATABASE_TEST_URL` pero runtime NO marcado como test ⇒ ABORTA en
+ *     beforeAll antes de sembrar (verificación en vivo del marcador/allowlist).
+ * Esto reemplaza el gateo débil anterior (`!process.env.DATABASE_URL`), que
+ * permitía sembrar sobre la BD de desarrollo (incidente LITE-10).
+ */
+const sinBdDeTest = !process.env.DATABASE_TEST_URL;
 
 /**
  * Cuenta filas de una tabla read model para un tenant EXACTAMENTE como lo hacen
@@ -73,8 +86,21 @@ async function contarPorTenant(tabla: string, tenant: string): Promise<number> {
   return Number(r.rows[0]?.n ?? 0);
 }
 
-describe.skipIf(sinDb)("DGP-011.3 · seed DEMO oficial (integración DB)", () => {
+describe.skipIf(sinBdDeTest)(
+  "DGP-011.3 · seed DEMO oficial (integración DB) [OMITIDA sin DATABASE_TEST_URL]",
+  () => {
   beforeAll(async () => {
+    // LITE-11 §2/§3/§4 — barrera EN VIVO antes de sembrar: el pool de runtime
+    // debe apuntar a una BD inequívocamente de test (marcador o allowlist).
+    // Fail-closed: si no lo es (o es producción) se ABORTA sin escribir nada.
+    const veredicto = await runtimeEsBdDeTest(pool);
+    if (!veredicto.ok) {
+      throw new Error(
+        "[seed-demo.test] ABORTADO (fail-closed): el pool de runtime NO apunta " +
+          `a una BD de test (${veredicto.motivo}). No se ejecuta el seed para no ` +
+          "modificar datos de desarrollo/producción (incidente LITE-10).",
+      );
+    }
     // Garantiza el estado sembrado antes de las aserciones (idempotente).
     await seedDeltaDemo();
   }, 120_000);

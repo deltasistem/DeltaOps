@@ -11,6 +11,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+// LITE-11 §2/§3/§4 — guard FAIL-CLOSED de BD de test (subpath sin efectos @workspace/db/test-guard).
+import { suiteDestructiva, crearPoolDestructivo } from "@workspace/db/test-guard";
 import {
   createExecutionContext,
   ok,
@@ -28,8 +30,7 @@ import {
 } from "..";
 import { ActivosPruebaTodos, DynamicFormsPruebaOk } from "../test-runtime";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const suite = DATABASE_URL ? describe : describe.skip;
+const suite = suiteDestructiva(describe);
 
 const MODULE_PERMISSIONS = [
   "modulo.correctivo.read", "modulo.correctivo.write", "modulo.correctivo.govern",
@@ -133,7 +134,7 @@ suite("Módulo Enterprise Corrective Maintenance · PostgreSQL", () => {
   }
 
   beforeAll(() => {
-    pool = new pg.Pool({ connectionString: DATABASE_URL });
+    pool = crearPoolDestructivo();
     rt = crearCorrectivoRuntimeOperacional({
       pool, materializador,
       activos: new ActivosPruebaTodos(),
