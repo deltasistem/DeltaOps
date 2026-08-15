@@ -100,85 +100,152 @@ describe("§23 · atencionHome (orden estricto y filtrado de ceros)", () => {
   });
 });
 
-/* --------------------------- §22 navegación por perfil ------------------- */
+/* ------------- §8 navegación por proceso (4 macro-grupos) --------------- */
 
-describe("§22 · gruposNavegacion por perfil", () => {
-  it("el técnico ve «Mis equipos» y NO ve Planes en Mantenimiento", () => {
-    const grupos = gruposNavegacion({ rol: "TECNICO", modulos: TODOS_MODULOS });
-    const equipos = grupos.find((g) => g.clave === "equipos");
-    expect(equipos?.titulo).toBe("Mis equipos");
-    expect(equipos?.items.find((i) => i.clave === "activos")?.nombre).toBe("Mis equipos");
-    const mantenimiento = grupos.find((g) => g.clave === "mantenimiento");
-    expect(mantenimiento?.items.some((i) => i.clave === "planes")).toBe(false);
-  });
-
-  it("el no-técnico (SUPERVISOR) sí ve Planes y el rótulo «Activos»/«Equipos»", () => {
-    const grupos = gruposNavegacion({ rol: "SUPERVISOR", modulos: TODOS_MODULOS });
-    const equipos = grupos.find((g) => g.clave === "equipos");
-    expect(equipos?.titulo).toBe("Equipos");
-    expect(equipos?.items.find((i) => i.clave === "activos")?.nombre).toBe("Activos");
-    const mantenimiento = grupos.find((g) => g.clave === "mantenimiento");
-    expect(mantenimiento?.items.some((i) => i.clave === "planes")).toBe(true);
-  });
-
-  it("expone el grupo Preoperacional cuando activos está habilitado (sin ruta nueva)", () => {
-    const grupos = gruposNavegacion({ rol: "TECNICO", modulos: ["activos"] });
-    const preop = grupos.find((g) => g.clave === "preoperacional");
-    expect(preop).toBeDefined();
-    expect(preop?.items[0]?.ruta).toBe("/activos?accion=preoperacional");
-  });
-
-  it("los grupos secundarios (inventario, referencia) se relegan al final", () => {
+describe("§8 · gruposNavegacion: cuatro macro-grupos por proceso", () => {
+  it("produce el orden canónico OPERACIÓN → INFORMACIÓN → APOYO → ADMINISTRACIÓN", () => {
     const grupos = gruposNavegacion({ rol: "TENANT_ADMIN", modulos: TODOS_MODULOS });
     const claves = grupos.map((g) => g.clave);
-    const idxInventario = claves.indexOf("inventario");
-    const idxMantenimiento = claves.indexOf("mantenimiento");
-    expect(idxInventario).toBeGreaterThan(idxMantenimiento);
-    expect(esGrupoSecundario("inventario")).toBe(true);
-    expect(esGrupoSecundario("referencia")).toBe(true);
-    expect(esGrupoSecundario("mantenimiento")).toBe(false);
+    expect(claves).toEqual(["operacion", "informacion", "apoyo", "administracion"]);
   });
 
-  it("el orden refleja la prioridad del perfil (técnico: mantenimiento/equipos primero)", () => {
+  it("OPERACIÓN contiene Equipos, Mantenimiento y Preoperacional", () => {
+    const grupos = gruposNavegacion({ rol: "SUPERVISOR", modulos: TODOS_MODULOS });
+    const op = grupos.find((g) => g.clave === "operacion");
+    expect(op?.titulo).toBe("Operación");
+    const claves = op?.items.map((i) => i.clave) ?? [];
+    expect(claves).toContain("activos");
+    expect(claves).toContain("ordenes");
+    expect(claves).toContain("preoperacional");
+    // El item de Equipos rotula «Equipos» para el no-técnico.
+    expect(op?.items.find((i) => i.clave === "activos")?.nombre).toBe("Equipos");
+  });
+
+  it("el técnico ve «Mis equipos» y «Mis órdenes» y NO ve Planes/Preventivo/Correctivo en OPERACIÓN", () => {
     const grupos = gruposNavegacion({ rol: "TECNICO", modulos: TODOS_MODULOS });
-    const primeras = grupos.slice(0, 2).map((g) => g.clave);
-    expect(primeras).toContain("equipos");
-    expect(primeras).toContain("mantenimiento");
+    const op = grupos.find((g) => g.clave === "operacion");
+    expect(op?.items.find((i) => i.clave === "activos")?.nombre).toBe("Mis equipos");
+    expect(op?.items.find((i) => i.clave === "ordenes")?.nombre).toBe("Mis órdenes");
+    expect(op?.items.some((i) => i.clave === "planes")).toBe(false);
+    expect(op?.items.some((i) => i.clave === "preventivo")).toBe(false);
+    expect(op?.items.some((i) => i.clave === "correctivo")).toBe(false);
+  });
+
+  it("INFORMACIÓN contiene Hoja de vida, Combustible (si utilización visible) e Indicadores", () => {
+    const grupos = gruposNavegacion(
+      { rol: "SUPERVISOR", modulos: TODOS_MODULOS },
+      { utilizacionVisible: true },
+    );
+    const info = grupos.find((g) => g.clave === "informacion");
+    expect(info?.titulo).toBe("Información");
+    const claves = info?.items.map((i) => i.clave) ?? [];
+    expect(claves).toContain("hoja-de-vida");
+    expect(claves).toContain("combustible");
+    expect(claves).toContain("analytics");
+    expect(info?.items.find((i) => i.clave === "hoja-de-vida")?.ruta).toBe("/activos");
+    expect(info?.items.find((i) => i.clave === "combustible")?.ruta).toBe("/utilizacion/tanqueos");
+  });
+
+  it("Combustible NO aparece si Utilización no está visible", () => {
+    const grupos = gruposNavegacion({ rol: "SUPERVISOR", modulos: TODOS_MODULOS });
+    const info = grupos.find((g) => g.clave === "informacion");
+    expect(info?.items.some((i) => i.clave === "combustible")).toBe(false);
+  });
+
+  // LITE-10 · regresión SEVERO-1 (code-review): la recomposición del nav había
+  // eliminado el punto de entrada a /utilizacion/lecturas. Contrato: con
+  // Utilización visible deben ser accesibles TANTO Lecturas (OPERACIÓN, flujo
+  // Equipo→Lectura) COMO Combustible/tanqueos (INFORMACIÓN), para TODO rol con
+  // la capacidad. Esta prueba impide que la omisión se vuelva a codificar.
+  describe("SEVERO-1 · Utilización visible expone Lecturas Y Tanqueos por rol", () => {
+    const ROLES_UTIL: Rol[] = ["SUPER_ADMIN", "TENANT_ADMIN", "SUPERVISOR", "PLANIFICADOR", "TECNICO", "CONSULTA"];
+    for (const rol of ROLES_UTIL) {
+      it(`${rol}: Lecturas en OPERACIÓN y Combustible(tanqueos) en INFORMACIÓN`, () => {
+        const grupos = gruposNavegacion(
+          { rol, modulos: TODOS_MODULOS },
+          { utilizacionVisible: true },
+        );
+        const op = grupos.find((g) => g.clave === "operacion");
+        const info = grupos.find((g) => g.clave === "informacion");
+        const lecturas = op?.items.find((i) => i.clave === "lecturas");
+        const tanqueos = info?.items.find((i) => i.clave === "combustible");
+        // Lecturas: presente y apuntando al flujo real (sin ruta nueva).
+        expect(lecturas, `${rol} debe ver Lecturas de horómetro`).toBeDefined();
+        expect(lecturas?.ruta).toBe("/utilizacion/lecturas");
+        // Tanqueos: la capacidad existente NO se oculta.
+        expect(tanqueos, `${rol} debe ver Combustible/tanqueos`).toBeDefined();
+        expect(tanqueos?.ruta).toBe("/utilizacion/tanqueos");
+      });
+    }
+
+    it("sin Utilización visible NO aparece Lecturas (visibilidad, no omisión codificada)", () => {
+      const grupos = gruposNavegacion({ rol: "TECNICO", modulos: TODOS_MODULOS });
+      const op = grupos.find((g) => g.clave === "operacion");
+      expect(op?.items.some((i) => i.clave === "lecturas")).toBe(false);
+    });
+  });
+
+  it("expone Preoperacional (sin ruta nueva) cuando activos está habilitado", () => {
+    const grupos = gruposNavegacion({ rol: "TECNICO", modulos: ["activos"] });
+    const op = grupos.find((g) => g.clave === "operacion");
+    const preop = op?.items.find((i) => i.clave === "preoperacional");
+    expect(preop).toBeDefined();
+    expect(preop?.ruta).toBe("/activos?accion=preoperacional");
+  });
+
+  it("APOYO (inventario/referencia/abastecimiento) es secundario y va tras OPERACIÓN/INFORMACIÓN", () => {
+    const grupos = gruposNavegacion({ rol: "TENANT_ADMIN", modulos: TODOS_MODULOS });
+    const claves = grupos.map((g) => g.clave);
+    expect(claves.indexOf("apoyo")).toBeGreaterThan(claves.indexOf("operacion"));
+    expect(claves.indexOf("apoyo")).toBeGreaterThan(claves.indexOf("informacion"));
+    expect(esGrupoSecundario("apoyo")).toBe(true);
+    expect(esGrupoSecundario("operacion")).toBe(false);
+    expect(esGrupoSecundario("administracion")).toBe(false);
+  });
+
+  it("ADMINISTRACIÓN solo aparece para roles con capacidad de administración", () => {
+    const admin = gruposNavegacion({ rol: "TENANT_ADMIN", modulos: TODOS_MODULOS });
+    expect(admin.some((g) => g.clave === "administracion")).toBe(true);
+    const tecnico = gruposNavegacion({ rol: "TECNICO", modulos: TODOS_MODULOS });
+    expect(tecnico.some((g) => g.clave === "administracion")).toBe(false);
   });
 });
 
 /* --------------------- §21 visibilidad (nunca es seguridad) -------------- */
 
 describe("§21 · ocultos filtra presentación sin tocar seguridad", () => {
-  it("ocultar un grupo lo retira de la navegación", () => {
+  it("ocultar un macro-grupo lo retira de la navegación", () => {
     const base = gruposNavegacion({ rol: "TENANT_ADMIN", modulos: TODOS_MODULOS });
-    expect(base.some((g) => g.clave === "inventario")).toBe(true);
+    expect(base.some((g) => g.clave === "apoyo")).toBe(true);
     const filtrados = gruposNavegacion(
       { rol: "TENANT_ADMIN", modulos: TODOS_MODULOS },
-      { ocultos: new Set(["inventario"]) },
+      { ocultos: new Set(["apoyo"]) },
     );
-    expect(filtrados.some((g) => g.clave === "inventario")).toBe(false);
+    expect(filtrados.some((g) => g.clave === "apoyo")).toBe(false);
   });
 
   it("ocultos JAMÁS revela un módulo no habilitado (visibilidad ≠ seguridad)", () => {
-    // El tenant NO tiene inventario/analytics/planes: aunque se pida «mostrar»
-    // (ausente de ocultos), no aparecen porque el entitlement manda.
+    // El tenant NO tiene inventario/analytics/planes/referencia/abastecimiento:
+    // aunque no se pidan ocultar, APOYO e INFORMACIÓN (indicadores) no aparecen
+    // porque el entitlement manda. OPERACIÓN sí (activos+ordenes).
     const grupos = gruposNavegacion(
       { rol: "TENANT_ADMIN", modulos: ["activos", "ordenes"] },
       { ocultos: new Set() },
     );
-    expect(grupos.some((g) => g.clave === "inventario")).toBe(false);
-    expect(grupos.some((g) => g.clave === "indicadores")).toBe(false);
+    expect(grupos.some((g) => g.clave === "apoyo")).toBe(false);
+    const info = grupos.find((g) => g.clave === "informacion");
+    // Sin analytics ni utilización: sólo «Hoja de vida» (reutiliza activos).
+    expect(info?.items.some((i) => i.clave === "analytics")).toBe(false);
+    expect(info?.items.some((i) => i.clave === "combustible")).toBe(false);
   });
 
-  it("ocultar todos los grupos secundarios no afecta a los primarios habilitados", () => {
+  it("ocultar el macro-grupo secundario no afecta a OPERACIÓN/INFORMACIÓN habilitados", () => {
     const grupos = gruposNavegacion(
       { rol: "TENANT_ADMIN", modulos: TODOS_MODULOS },
-      { ocultos: new Set(["inventario", "referencia", "indicadores"]) },
+      { ocultos: new Set(["apoyo"]) },
     );
-    expect(grupos.some((g) => g.clave === "mantenimiento")).toBe(true);
-    expect(grupos.some((g) => g.clave === "equipos")).toBe(true);
-    expect(grupos.some((g) => g.clave === "inventario")).toBe(false);
-    expect(grupos.some((g) => g.clave === "indicadores")).toBe(false);
+    expect(grupos.some((g) => g.clave === "operacion")).toBe(true);
+    expect(grupos.some((g) => g.clave === "informacion")).toBe(true);
+    expect(grupos.some((g) => g.clave === "apoyo")).toBe(false);
   });
 });

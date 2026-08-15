@@ -79,7 +79,7 @@ function ResumenConteos({ rep }: { rep: ReporteImportacion }) {
     { icono: <FileSpreadsheet size={18} />, etiqueta: "Omitidos (fuera de flota)", valor: rep.filasExcluidas.length, color: "var(--do-text-muted, var(--do-fg-muted))" },
   ];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: gap(3) }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: gap(3) }}>
       {items.map((it) => (
         <Card key={it.etiqueta}>
           <CardContent>

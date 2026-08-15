@@ -64,7 +64,35 @@ app.use(
     },
   }),
 );
-app.use(cors());
+// DELTAOPS LITE-10 §27 · CORS por lista blanca de orígenes (no destructivo,
+// gobernado por env). Reglas:
+//   - CORS_ORIGINS definido → sólo esos orígenes (coma-separados) con
+//     credenciales; cualquier otro origen recibe respuesta sin cabeceras CORS.
+//   - Sin CORS_ORIGINS en development/test → se refleja el origen de la petición
+//     (comportamiento permisivo actual, para no romper el desarrollo local).
+//   - Sin CORS_ORIGINS en production → CORS cerrado (sólo mismo origen), el
+//     valor por defecto seguro. La API vive tras el mismo origen que el front en
+//     el despliegue actual, así que esto no rompe el tráfico legítimo.
+const corsAllowlist = (deltaopsConfig.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter((o) => o.length > 0);
+const corsPermisivoDev =
+  corsAllowlist.length === 0 && deltaopsConfig.NODE_ENV !== "production";
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      // Peticiones sin Origin (curl, same-origin, health checks) siempre pasan.
+      if (!origin) return callback(null, true);
+      if (corsPermisivoDev) return callback(null, true);
+      if (corsAllowlist.includes(origin)) return callback(null, true);
+      // Origen no permitido: sin error (no rompe la petición), pero sin
+      // cabeceras CORS → el navegador bloquea el acceso cross-origin.
+      return callback(null, false);
+    },
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

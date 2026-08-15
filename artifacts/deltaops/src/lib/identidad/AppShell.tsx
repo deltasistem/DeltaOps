@@ -420,6 +420,27 @@ function Navegacion({ sesion }: { sesion: Sesion }) {
   );
 }
 
+/**
+ * LITE-10 SEVERO-2 · Bloque de acciones de contexto/cuenta de la barra: estado
+ * de la empresa, selector de centro, selector de empresa (multiempresa) y menú
+ * de perfil. Instancia ÚNICA (no se duplica en el DOM): la adaptación a móvil es
+ * puramente CSS — a ≤767px los controles se compactan (etiquetas ocultas, ancho
+ * máximo acotado y elipsis) para que la barra siga en UNA fila sin desbordar a
+ * 360/390px con nombres de centro/empresa/usuario largos.
+ */
+function AccionesContexto({ sesion }: { sesion: Sesion }) {
+  return (
+    <>
+      {sesion.tenant.estado && sesion.tenant.estado.toUpperCase() !== "ACTIVO" && (
+        <Badge variant="advertencia">Empresa {sesion.tenant.estado}</Badge>
+      )}
+      <SelectorCentro />
+      <SelectorEmpresa sesion={sesion} />
+      <MenuPerfil sesion={sesion} />
+    </>
+  );
+}
+
 /* -------------------------------- Shell --------------------------------- */
 
 export interface AppShellIdentidadProps {
@@ -450,13 +471,12 @@ function ShellInterno({ sesion, children }: { sesion: Sesion; children: React.Re
             nav={<Navegacion sesion={sesion} />}
             labelNav="Navegación por proceso"
             acciones={
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--do-sp-3)" }}>
-                {sesion.tenant.estado && sesion.tenant.estado.toUpperCase() !== "ACTIVO" && (
-                  <Badge variant="advertencia">Empresa {sesion.tenant.estado}</Badge>
-                )}
-                <SelectorCentro />
-                <SelectorEmpresa sesion={sesion} />
-                <MenuPerfil sesion={sesion} />
+              // LITE-10 SEVERO-2 · Instancia ÚNICA de acciones en la barra. La
+              // adaptación a móvil es CSS: los controles se compactan (etiquetas
+              // ocultas, ancho acotado y elipsis) para que la barra siga en UNA
+              // fila sin desbordar a 360/390px con textos largos.
+              <div className="do-shell__acciones-barra" role="group" aria-label="Contexto y cuenta">
+                <AccionesContexto sesion={sesion} />
               </div>
             }
           >

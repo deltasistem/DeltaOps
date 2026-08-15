@@ -53,4 +53,5 @@
 - [Aterrizaje LITE-07](deltaops-aterrizaje-lite07.md) — «faltan X h» ya existe en backend (no expuesto); proveedor ya es snapshot; inventario no bloquea cierre de OT; centro de trabajo y config-por-rol no existen; 10 preguntas abiertas a Dirección.
 - [Implementación LITE-08](deltaops-implementacion-lite08.md) — libs se consumen compiladas (rebuild antes de restart); cerrar OT no cierra sesiones (estado EN_CURSO); timeline se normaliza plano en la frontera.
 - [Migración histórica LITE-09](deltaops-migracion-lite09.md) — push-down de filtros al record store (list+filter en memoria = vacíos con volumen); paginación por entidad sin topes silenciosos; unidades al canónico en la frontera.
+- [Afinamiento LITE-10](deltaops-afinamiento-lite10.md) — recomposición de nav exige test por rol; suites PG borran el tenant demo incl. históricos (re-import idempotente); responsive real = composición móvil, no solo sin overflow.
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.

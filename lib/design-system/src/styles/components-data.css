@@ -536,21 +536,106 @@
   margin: 0 auto;
   padding: var(--do-sp-2) var(--do-sp-4);
   min-height: 56px;
+  /* LITE-10 §4-5 (E1) · La barra es SIEMPRE una sola fila (móvil incluido): el
+     menú vive en el cajón, no en la barra. `min-width:0` permite que los hijos
+     flexibles se encojan y activen su propia elipsis/scroll sin desbordar. */
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .do-shell__logo {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  /* El logo no se comprime, pero acota su alto para mantener la fila única. */
+  max-height: 40px;
+  overflow: hidden;
+}
+.do-shell__logo :where(img, svg) {
+  max-height: 32px;
+  width: auto;
+}
+/* LITE-10 SEVERO-2 · A ≤767px el logo cede ancho para dejar sitio a los
+   controles compactos de la barra: se acota su ancho manteniendo proporción
+   (el alto ya está limitado). Evita que logo + acciones desborden a 360px. */
+@media (max-width: 767.98px) {
+  .do-shell__logo {
+    max-width: 104px;
+  }
+  .do-shell__logo :where(img, svg) {
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+  }
 }
 .do-shell__acciones {
   display: flex;
   align-items: center;
   gap: var(--do-sp-2);
   margin-left: auto;
-  flex-shrink: 0;
+  /* LITE-10 §4-5 (E3) · En escritorio la nav y las acciones se disputan el
+     ancho a 1280px. Las acciones pueden encogerse (min-width:0) para no empujar
+     la barra fuera del viewport; cada control interno gestiona su elipsis. */
+  min-width: 0;
+  flex-shrink: 1;
+}
+.do-shell__acciones > * {
+  min-width: 0;
+}
+/* LITE-10 SEVERO-2 · Acciones de contexto/cuenta en la BARRA (instancia única).
+   Contención estricta: `min-width:0` permite que los controles internos
+   (selector de centro/empresa, perfil) se encojan y trunquen en lugar de
+   empujar la barra fuera del viewport. */
+.do-shell__acciones-barra {
+  display: flex;
+  align-items: center;
+  gap: var(--do-sp-3);
+  min-width: 0;
+  flex-shrink: 1;
+}
+.do-shell__acciones-barra > * {
+  min-width: 0;
+}
+/* Los textos internos (nombre de empresa en el selector, nombre/rol en el
+   perfil, valor del `<select>` de centro) truncan con elipsis. El objetivo
+   táctil se mantiene con la altura mínima de los propios controles del DS. */
+.do-shell__acciones-barra button {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.do-shell__acciones-barra label {
+  min-width: 0;
+}
+
+/* LITE-10 SEVERO-2 · Compactación a ≤767px: la barra debe caber en UNA fila a
+   360/390px con textos largos. Se ocultan las etiquetas textuales redundantes
+   (el icono ya identifica el control) y se acotan anchos + gap para evitar que
+   los controles salgan del viewport; cada control conserva su elipsis. */
+@media (max-width: 767.98px) {
+  .do-shell__acciones-barra {
+    gap: var(--do-sp-2);
+  }
+  /* Etiqueta «Centro de costos» ya se oculta vía `.do-solo-desktop`. El `<span>`
+     que envuelve el `<select>` trae `min-width:180` inline: lo acotamos para que
+     el selector se encoja sin desbordar (queda como control compacto icon+select). */
+  .do-shell__acciones-barra label > span:last-child {
+    min-width: 0 !important;
+    max-width: 44vw;
+  }
+  /* El botón de empresa (icono + nombre) y el perfil (icono + nombre/rol) acotan
+     su ancho y truncan el texto; el icono queda siempre visible como ancla. */
+  .do-shell__acciones-barra > button,
+  .do-shell__acciones-barra > * button {
+    max-width: 40vw;
+  }
 }
 .do-shell__menu-btn {
   color: var(--do-shell-texto);
+  flex-shrink: 0;
+  /* Objetivo táctil ≥44px (WCAG 2.5.5 / directiva UX). */
+  min-width: 44px;
+  min-height: 44px;
 }
 .do-shell__menu-btn:hover {
   background: color-mix(in srgb, var(--do-shell-texto) 12%, transparent);
@@ -598,6 +683,24 @@
   padding: var(--do-sp-4);
 }
 
+/* LITE-10 §4-5 (E1) · Móvil: en el cajón, cada elemento navegable (enlaces y
+   botones, incluidos los DS Button anidados) cumple el objetivo táctil mínimo
+   de 44px de alto. El cajón desplaza verticalmente si el contenido excede la
+   altura visible. */
+@media (max-width: 767.98px) {
+  .do-shell__nav {
+    max-height: calc(100dvh - 56px);
+    overflow-y: auto;
+  }
+  .do-shell__nav a,
+  .do-shell__nav button {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+  }
+}
+
 /* Escritorio: navegación horizontal en línea, sin botón de menú */
 /* breakpoint lg (tokens.json) */
 @media (min-width: 768px) {
@@ -612,6 +715,13 @@
     border-bottom: none;
     padding: 0;
     gap: var(--do-sp-1);
+    /* LITE-10 §4-5 (E3) · A 1280px la nav y las acciones se disputan el ancho.
+       `min-width:0` permite que la nav se encoja y desplace internamente en
+       lugar de empujar las acciones fuera de la barra. */
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow-x: auto;
+    scrollbar-width: thin;
   }
   .do-shell__contenido {
     padding: var(--do-sp-6);

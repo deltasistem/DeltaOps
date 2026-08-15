@@ -414,11 +414,16 @@ function RegistroHoras({ orden, onCambio }: { orden: OrdenRow; onCambio: () => v
 
   async function guardar() {
     if (!form.esValido()) { toast.mostrar({ variant: "advertencia", titulo: "Completa las horas" }); return; }
+    // El backend registra el tiempo REAL como duración en MINUTOS (unidad neutra
+    // y serializable). Las horas capturadas se convierten aquí; el detalle
+    // opcional viaja como `detalle` de la duración (no como diagnóstico).
+    const horas = Number(form.valores.horas);
+    const detalle = form.valores.descripcion != null && String(form.valores.descripcion).trim() !== ""
+      ? String(form.valores.descripcion).trim()
+      : undefined;
     setGuardando(true);
     const r = await registrarEjecucion(cola, orden.id, orden.version, {
-      tipo: "horas",
-      horas: Number(form.valores.horas),
-      descripcion: form.valores.descripcion ?? null,
+      tiempoReal: { minutos: Math.round(horas * 60), ...(detalle ? { detalle } : {}) },
     });
     setGuardando(false);
     if (r.error) toast.mostrar({ variant: "error", titulo: "Error", mensaje: r.error.message });
@@ -493,8 +498,9 @@ function Observaciones({ orden, onCambio }: { orden: OrdenRow; onCambio: () => v
   async function guardar() {
     if (!form.esValido()) { toast.mostrar({ variant: "advertencia", titulo: "Escribe una observación" }); return; }
     setGuardando(true);
+    // Las observaciones viajan como campo de primer nivel `observaciones` (texto
+    // libre), NO dentro del bloque `diagnostico` (que es strict).
     const r = await registrarEjecucion(cola, orden.id, orden.version, {
-      tipo: "observacion",
       observaciones: String(form.valores.texto),
     });
     setGuardando(false);

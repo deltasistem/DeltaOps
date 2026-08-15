@@ -1,0 +1,1049 @@
+# DIRECTIVA OFICIAL — DELTAOPS LITE-10
+# «Afinamiento final, UX/UI, operación real y preparación para producción»
+
+## 0. CONTEXTO Y OBJETIVO
+
+Esta es una fase de FINALIZACIÓN de DeltaOps Lite.
+
+NO estamos creando un nuevo DeltaOps.
+NO estamos ampliando el alcance funcional.
+NO estamos creando un ERP.
+NO estamos agregando módulos por el simple hecho de que existan capacidades técnicas.
+NO debemos volver a convertir DeltaOps Lite en la aplicación robusta original.
+
+El objetivo de esta fase es:
+
+1. Tomar el producto real existente después de LITE-09.
+2. Corregir los problemas de UX/UI que todavía existen.
+3. Hacer que la aplicación sea realmente responsive y usable.
+4. Asegurar que el flujo operacional principal sea simple.
+5. Validar que los datos históricos reales importados se visualicen correctamente.
+6. Afinar rutinas, horómetro, combustible, hoja de vida, OT y preoperacional.
+7. Mantener el modelo multicentro/multisitio.
+8. Mantener la flexibilidad de roles sin imponer un coordinador de mantenimiento.
+9. Preparar la aplicación técnicamente para una futura salida a producción.
+10. NO implementar funcionalidades que Delta no necesita actualmente.
+
+La filosofía de esta fase es:
+
+COMPOSICIÓN > EXTENSIÓN > NUEVA ESTRUCTURA
+
+Y:
+
+SIMPLIFICAR > AGREGAR
+
+---
+
+# 1. FUENTES DE VERDAD OBLIGATORIAS
+
+Antes de modificar código, estudiar obligatoriamente:
+
+- docs/dgp/DELTAOPS-LITE-06-AUDITORIA-FUNCIONAL-MAPA.md
+- docs/dgp/DELTAOPS-LITE-07-ATERRIZAJE-OPERACIONAL.md
+- docs/dgp/DELTAOPS-LITE-08-CIERRE-IMPLEMENTACION-OPERACIONAL.md
+- docs/dgp/DELTAOPS-LITE-09-CIERRE-MIGRACION.md
+
+También estudiar el código real y los contratos actuales.
+
+LITE-09 es especialmente importante porque ahora existen DATOS HISTÓRICOS REALES dentro de la aplicación.
+
+No asumir que los datos actuales son datos demo.
+
+---
+
+# 2. REGLA ABSOLUTA: NO AGRANDAR DELTAOPS LITE
+
+No crear:
+
+- nuevos módulos grandes;
+- nuevos motores;
+- nuevos sistemas de planificación;
+- nuevos sistemas de inventario;
+- nuevos maestros innecesarios;
+- nuevos workflows complejos;
+- nuevas colas offline;
+- nuevos sistemas de autenticación;
+- nuevas estructuras de persistencia si puede reutilizarse lo existente;
+- nuevos roles sin justificación de negocio;
+- un coordinador obligatorio de mantenimiento;
+- una estructura burocrática de aprobación.
+
+Antes de crear cualquier estructura nueva, demostrar por qué no puede reutilizarse una existente.
+
+Si una funcionalidad existe pero no es necesaria para la operación de Delta, puede quedar oculta del flujo principal.
+
+NO eliminar capacidades existentes.
+
+La simplificación debe realizarse principalmente mediante:
+
+- navegación;
+- visibilidad;
+- contexto;
+- composición;
+- lenguaje;
+- priorización;
+- UX/UI.
+
+---
+
+# 3. FLUJO OPERACIONAL PRINCIPAL
+
+El flujo que debe sentirse natural para un usuario operativo es:
+
+EQUIPO
+↓
+LECTURA DE HORÓMETRO
+↓
+RUTINA / AVISO DE MANTENIMIENTO
+↓
+PREOPERACIONAL
+↓
+CHECKLIST
+↓
+APTO / APTO CON OBSERVACIONES / NO APTO
+↓
+HALLAZGO
+↓
+¿REQUIERE MANTENIMIENTO?
+↓
+OT
+↓
+ASIGNACIÓN
+↓
+EJECUCIÓN
+↓
+HORAS HOMBRE / REPUESTOS / INSUMOS / COMBUSTIBLE CUANDO APLIQUE
+↓
+VALIDACIÓN
+↓
+CIERRE
+↓
+HOJA DE VIDA DEL EQUIPO
+
+Este flujo debe ser el centro de DeltaOps Lite.
+
+El usuario no debería necesitar conocer la arquitectura interna para realizarlo.
+
+---
+
+# 4. UX/UI — PROBLEMA PRIORITARIO
+
+La aplicación actualmente sigue presentando problemas visuales que deben corregirse.
+
+Se ha observado:
+
+- elementos que no encajan correctamente;
+- exceso de espacio lateral;
+- navegación demasiado ancha;
+- componentes que se salen de la pantalla;
+- comportamiento responsive insuficiente;
+- problemas de contraste entre tema claro y oscuro;
+- logo que pierde visibilidad en determinados fondos;
+- encabezado/nav demasiado cargado;
+- páginas que parecen diseñadas para desktop y no para operación móvil;
+- formularios y tablas que no se adaptan correctamente.
+
+Esto DEBE corregirse.
+
+No quiero una aplicación "bonita" solamente.
+
+Quiero:
+
+PROFESIONAL + SIMPLE + LEGIBLE + OPERACIONAL.
+
+---
+
+# 5. RESPONSIVE REAL
+
+Auditar y corregir como mínimo:
+
+- 360 px
+- 390 px
+- 430 px
+- 768 px
+- 1024 px
+- 1280 px
+- 1440 px
+
+Debe comprobarse:
+
+- cero overflow horizontal accidental;
+- cero textos cortados;
+- cero botones fuera de pantalla;
+- navegación adaptable;
+- tablas adaptables;
+- filtros adaptables;
+- formularios adaptables;
+- tarjetas adaptables;
+- modales adaptables;
+- menú móvil usable;
+- botones táctiles adecuados;
+- acciones principales accesibles con una mano en móvil.
+
+En móvil NO simplemente reducir tamaños.
+
+Debe cambiar la composición cuando sea necesario.
+
+Ejemplo:
+
+Desktop:
+tabla → filtros → acciones.
+
+Móvil:
+búsqueda → filtros → tarjetas/listado → acción.
+
+---
+
+# 6. TEMA CLARO Y OSCURO
+
+Realizar auditoría visual completa.
+
+Debe cumplirse:
+
+- logo visible en ambos temas;
+- texto principal legible;
+- texto secundario legible;
+- botones legibles;
+- selects legibles;
+- inputs legibles;
+- placeholders legibles;
+- badges legibles;
+- estados APTO/OBSERVACIÓN/NO APTO distinguibles;
+- tablas legibles;
+- modales legibles;
+- menú legible.
+
+NO utilizar colores aislados que funcionen únicamente en un tema.
+
+Utilizar el Design System existente y sus tokens.
+
+No crear un segundo sistema visual.
+
+---
+
+# 7. IDENTIDAD VISUAL DELTA
+
+La aplicación debe sentirse como una aplicación de Delta, no como un prototipo genérico de software.
+
+Mantener la identidad existente.
+
+Revisar:
+
+- logo;
+- encabezado;
+- navegación;
+- tipografía;
+- tamaños;
+- espaciado;
+- botones;
+- tarjetas;
+- iconografía;
+- estados;
+- formularios.
+
+No inventar una nueva identidad visual.
+
+No hacer un rediseño artístico.
+
+El objetivo es mejorar la calidad visual utilizando los recursos que ya existen.
+
+---
+
+# 8. NAVEGACIÓN
+
+La navegación debe estar orientada al proceso.
+
+Prioridad:
+
+### OPERACIÓN
+
+- Inicio
+- Equipos
+- Mantenimiento
+- Preoperacional
+- Mis órdenes
+
+### INFORMACIÓN
+
+- Hoja de vida
+- Combustible
+- Indicadores
+
+### APOYO
+
+- Inventario
+- Referencia
+
+### ADMINISTRACIÓN
+
+Solo para quienes tengan autorización.
+
+No mostrar al técnico módulos que no necesita.
+
+No confundir:
+
+VISIBILIDAD ≠ SEGURIDAD
+
+El backend/RBAC/RLS continúa siendo la autoridad.
+
+---
+
+# 9. ROLES Y CENTROS DE TRABAJO
+
+Debe mantenerse una característica fundamental de Delta:
+
+NO existe un coordinador de mantenimiento obligatorio en todos los centros.
+
+Hay centros donde una misma persona puede:
+
+- asignar;
+- ejecutar;
+- revisar;
+- supervisar;
+- cerrar,
+
+si sus capacidades lo permiten.
+
+En otros centros puede existir segregación.
+
+Por tanto:
+
+NO codificar una jerarquía universal.
+
+NO crear dependencia obligatoria de un "Coordinador de Mantenimiento".
+
+Utilizar las capacidades existentes.
+
+La trazabilidad debe registrar:
+
+- quién;
+- cuándo;
+- qué acción;
+- estado anterior;
+- estado nuevo.
+
+---
+
+# 10. MULTICENTRO
+
+Delta tiene equipos distribuidos en diferentes centros/localizaciones.
+
+Debe mantenerse la separación conceptual entre:
+
+- empresa/tenant;
+- centro de costos;
+- ubicación;
+- responsable;
+- equipo/grupo de mantenimiento.
+
+No duplicar equipos porque estén en diferentes centros.
+
+El activo sigue siendo único.
+
+El centro de costos debe provenir de la fuente de verdad del activo.
+
+No aceptar centro de costos enviado arbitrariamente por frontend.
+
+Si no existe configuración:
+
+"Sin centro de costos configurado"
+
+Nunca inventar datos.
+
+---
+
+# 11. ACTIVOS
+
+El activo debe ser el centro de la aplicación.
+
+La ficha del equipo debe permitir entender rápidamente:
+
+- nombre;
+- código;
+- tipo;
+- estado;
+- centro de costos;
+- ubicación;
+- responsable;
+- horómetro actual;
+- próxima rutina;
+- estado del preoperacional;
+- órdenes;
+- mantenimientos;
+- combustible;
+- horas hombre;
+- repuestos/insumos;
+- historial.
+
+La hoja de vida debe ser una composición de información existente.
+
+NO crear una segunda base histórica.
+
+---
+
+# 12. HORÓMETRO
+
+Mantener el comportamiento actual.
+
+Debe mostrarse claramente:
+
+- última lectura;
+- fecha;
+- usuario;
+- lectura actual;
+- inconsistencias;
+- próxima rutina;
+- horas restantes;
+- horas vencidas cuando aplique.
+
+Las lecturas menores NO deben sobrescribirse silenciosamente.
+
+Mantener la regularización auditada existente.
+
+La experiencia debe ser simple:
+
+"Registrar lectura"
+
+y luego mostrar:
+
+"Próximo mantenimiento: 1.000 h"
+
+"Actual: 950 h"
+
+"Faltan: 50 h"
+
+o:
+
+"Mantenimiento vencido por 25 h"
+
+---
+
+# 13. RUTINAS
+
+NO convertir las rutinas en un sistema complejo de planificación.
+
+La lógica principal debe ser:
+
+RUTINA → HORÓMETRO/KM/CICLOS → AVISO
+
+Cuando corresponda:
+
+"Faltan 50 h"
+
+"Próximo mantenimiento en 50 h"
+
+"Vencido"
+
+La aplicación NO debe crear automáticamente una OT solamente porque una rutina llegó a vencimiento.
+
+La decisión vigente de Dirección es mantener:
+
+[GENERAR MANTENIMIENTO]
+
+como acción explícita.
+
+---
+
+# 14. PREOPERACIONAL
+
+Mantener LITE-04.
+
+El flujo debe ser:
+
+Equipo → Iniciar preoperacional → Checklist → Resultado.
+
+Los estados deben ser claros:
+
+🟢 APTO
+🟡 APTO CON OBSERVACIONES
+🔴 NO APTO
+
+No depender exclusivamente del color.
+
+Debe existir texto.
+
+Los hallazgos deben conservar:
+
+- equipo;
+- ítem;
+- respuesta;
+- observación;
+- evidencia;
+- severidad;
+- usuario;
+- fecha;
+- origen.
+
+---
+
+# 15. HALLAZGO → OT
+
+Mantener LITE-05.
+
+Cuando exista un hallazgo:
+
+[GENERAR MANTENIMIENTO]
+
+debe llevar la información necesaria a la OT.
+
+Debe evitarse la duplicación.
+
+Si ya existe mantenimiento:
+
+"Mantenimiento ya generado"
+
+y navegar a la OT existente.
+
+Si no requiere mantenimiento:
+
+"No requiere mantenimiento"
+
+debe permanecer como decisión auditable y reversible.
+
+---
+
+# 16. COMBUSTIBLE
+
+El combustible debe estar asociado al activo.
+
+Debe permitir registrar como mínimo:
+
+- fecha;
+- activo;
+- tipo de energía/combustible;
+- cantidad;
+- unidad;
+- proveedor como dato transaccional;
+- identificación del proveedor cuando esté disponible;
+- observación;
+- lectura de horómetro/km cuando aplique;
+- origen.
+
+NO crear un maestro obligatorio de proveedores.
+
+Esto es una decisión explícita de Dirección:
+
+Un mismo repuesto o combustible puede comprarse hoy a un proveedor y mañana a otro.
+
+Por tanto:
+
+PROVEEDOR = DATO DE LA TRANSACCIÓN
+
+No crear un complejo módulo de proveedores para DeltaOps Lite.
+
+---
+
+# 17. INVENTARIO Y REPUESTOS
+
+El inventario formal actualmente NO es una prioridad operacional de Delta.
+
+NO convertir DeltaOps Lite en un sistema ERP de inventarios.
+
+Para mantenimiento debe bastar con capturar:
+
+- repuesto/insumo;
+- descripción;
+- cantidad;
+- unidad;
+- costo cuando se conozca;
+- proveedor opcional como dato;
+- observación.
+
+El inventario NO debe bloquear el cierre de una OT.
+
+Mantener la arquitectura actual.
+
+---
+
+# 18. MANO DE OBRA
+
+Mantener la captura simple existente.
+
+Debe ser posible relacionar:
+
+- técnico;
+- OT;
+- inicio;
+- fin;
+- duración;
+- observaciones;
+- estado de valoración cuando corresponda.
+
+No crear un sistema completo de nómina.
+
+---
+
+# 19. HOJA DE VIDA
+
+Esta es una de las pantallas MÁS IMPORTANTES.
+
+Debe mostrar una cronología útil y comprensible.
+
+Por ejemplo:
+
+### EQUIPO CAM-001
+
+**Información actual**
+- Horómetro: 8.542 h
+- Centro: Barranquilla
+- Ubicación: Patio X
+- Responsable: Juan Pérez
+- Próximo mantenimiento: 9.000 h
+- Faltan: 458 h
+
+### HISTORIAL
+
+2026-08-10
+Preoperacional
+APTO
+
+2026-08-08
+Mantenimiento preventivo
+OT-000145
+Cerrado
+
+2026-08-05
+Tanqueo
+120 L
+
+2026-08-03
+Lectura
+8.510 h
+
+2026-07-30
+Mantenimiento correctivo
+OT-000138
+Cerrado
+
+Todo debe provenir de datos reales.
+
+No inventar eventos.
+
+---
+
+# 20. DATOS HISTÓRICOS REALES
+
+LITE-09 ya importó información real.
+
+NO reemplazarla.
+
+NO regenerarla.
+
+NO crear datos ficticios para "llenar" las pantallas.
+
+Los datos importados deben utilizarse para validar:
+
+- activos;
+- nombres;
+- horómetros;
+- mantenimientos;
+- preoperacionales;
+- horas hombre;
+- combustible;
+- hoja de vida;
+- cronología.
+
+La aplicación debe verse como una aplicación que ya pertenece a Delta, no como una demo.
+
+---
+
+# 21. EQUIPOS ARRENDADOS / TERCEROS
+
+Mantener la decisión aplicada en LITE-09.
+
+Ejemplo:
+
+C11 → C11 SIGAR
+
+Es el mismo equipo.
+
+La razón del nombre es operacional:
+
+C11 SIGAR identifica que pertenece a un tercero/alquiler.
+
+Para estos equipos:
+
+- puede existir control de combustible;
+- puede existir información operacional;
+- NO asumir que Delta realiza su mantenimiento;
+- NO fabricar mantenimientos internos inexistentes.
+
+No crear OT históricas artificiales.
+
+---
+
+# 22. PLANES
+
+NO convertir "Planes" en el centro de la operación.
+
+La prioridad real es la rutina por uso.
+
+Por ejemplo:
+
+Equipo → 1.000 horas → rutina → aviso → mantenimiento.
+
+Si una organización tiene coordinador y utiliza planificación, puede utilizarla.
+
+Si una organización no tiene coordinador, la aplicación NO debe bloquear la operación.
+
+---
+
+# 23. HOME
+
+La Home debe responder:
+
+## ¿Qué necesita tu atención?
+
+Ejemplos:
+
+- Preoperacionales pendientes.
+- Equipos con mantenimiento próximo.
+- Mantenimientos vencidos.
+- Hallazgos pendientes.
+- OT pendientes de ejecución.
+- OT pendientes de validación.
+
+Después:
+
+## Mi trabajo de hoy
+
+Y finalmente:
+
+## Equipos que requieren atención
+
+Evitar llenar la Home con 20 indicadores que no aporten a la operación.
+
+---
+
+# 24. INDICADORES
+
+No inventar KPIs.
+
+Solo mostrar indicadores cuando exista fuente real.
+
+Diferenciar:
+
+- dato real;
+- indicador calculado;
+- indicador no disponible.
+
+No fabricar MTBF, MTTR, disponibilidad u otros indicadores si faltan insumos.
+
+---
+
+# 25. PERFORMANCE
+
+Con datos reales importados, revisar:
+
+- consultas de activos;
+- hoja de vida;
+- timeline;
+- preoperacionales;
+- órdenes;
+- combustible;
+- lecturas;
+- filtros;
+- paginación.
+
+No cargar miles de registros innecesariamente en frontend.
+
+Mantener filtros/paginación server-side cuando el contrato ya lo permita.
+
+No introducir regresiones por querer mejorar la UI.
+
+---
+
+# 26. SEGURIDAD
+
+NO modificar la arquitectura RLS de LITE-05.
+
+NO volver a conectar como superusuario.
+
+Mantener:
+
+- deltaops_app;
+- FORCE RLS;
+- tenant isolation;
+- backend authority;
+- RBAC;
+- fail-closed.
+
+Toda nueva acción debe validar autorización en backend.
+
+Ocultar un botón no es una medida de seguridad.
+
+---
+
+# 27. PRODUCCIÓN — PREPARACIÓN, NO DESPLIEGUE
+
+En esta fase NO realizar todavía el despliegue final.
+
+Sí realizar una auditoría de preparación:
+
+- NODE_ENV;
+- secrets;
+- DATABASE_URL;
+- DATABASE_MIGRATION_URL;
+- SESSION_SECRET;
+- CORS;
+- cookies Secure;
+- readiness;
+- health;
+- graceful shutdown;
+- logs;
+- errores;
+- build producción;
+- variables requeridas;
+- dependencias;
+- almacenamiento;
+- backups;
+- migraciones;
+- rollback;
+- dominio;
+- HTTPS.
+
+Identificar claramente:
+
+🟢 LISTO
+🟡 REQUIERE CONFIGURACIÓN
+🔴 BLOQUEANTE
+
+No realizar cambios destructivos.
+
+---
+
+# 28. PRUEBAS OBLIGATORIAS
+
+Ejecutar:
+
+- typecheck;
+- build;
+- tests existentes;
+- regresiones;
+- API;
+- RLS;
+- RBAC;
+- E2E;
+- responsive;
+- tema claro;
+- tema oscuro.
+
+E2E mínimo:
+
+1. Login.
+2. Home.
+3. Equipo.
+4. Lectura.
+5. Rutina.
+6. Preoperacional.
+7. NO APTO.
+8. Hallazgo.
+9. Generar OT.
+10. Asignar.
+11. Ejecutar.
+12. Registrar mano de obra.
+13. Registrar repuesto/insumo.
+14. Registrar combustible.
+15. Validar.
+16. Cerrar.
+17. Revisar hoja de vida.
+18. Verificar historial.
+19. Repetir con CONSULTA.
+20. Verificar que CONSULTA no pueda modificar.
+
+Probar con datos históricos reales.
+
+---
+
+# 29. CRITERIO ESPECIAL DE UX
+
+No aceptar como "responsive" simplemente que la página no tenga scroll horizontal.
+
+Debe evaluarse visualmente.
+
+Para cada pantalla prioritaria:
+
+- ¿Se entiende qué hacer?
+- ¿La acción principal es evidente?
+- ¿Los datos importantes están arriba?
+- ¿Hay demasiado espacio vacío?
+- ¿Hay elementos comprimidos?
+- ¿El usuario debe desplazarse innecesariamente?
+- ¿Los botones son fáciles de tocar?
+- ¿Los textos son legibles?
+- ¿Funciona en claro y oscuro?
+- ¿La pantalla parece una aplicación profesional de Delta?
+
+Priorizar estas pantallas:
+
+1. Home
+2. Activos/listado
+3. Ficha del activo
+4. Preoperacional
+5. Resultado del preoperacional
+6. Hallazgo
+7. OT
+8. Ejecución
+9. Hoja de vida
+10. Combustible
+11. Lectura de horómetro
+
+---
+
+# 30. NO MODIFICAR POR ESTÉTICA LO QUE FUNCIONA
+
+No cambiar contratos existentes únicamente para mejorar visualmente.
+
+No cambiar modelos de datos si una composición resuelve el problema.
+
+No crear migraciones salvo que exista una necesidad técnica real y demostrada.
+
+No cambiar RLS.
+
+No cambiar RBAC sin necesidad real.
+
+No eliminar funcionalidades.
+
+No borrar históricos.
+
+---
+
+# 31. ENTREGABLE FINAL DE LITE-10
+
+Crear:
+
+docs/dgp/DELTAOPS-LITE-10-CIERRE-AFINAMIENTO-FINAL.md
+
+Debe contener:
+
+1. Qué se encontró.
+2. Qué se corrigió.
+3. Qué se decidió NO modificar.
+4. Pantallas afectadas.
+5. Responsive.
+6. Tema claro/oscuro.
+7. Identidad Delta.
+8. Navegación.
+9. Roles.
+10. Multicentro.
+11. Activos.
+12. Horómetro.
+13. Rutinas.
+14. Preoperacional.
+15. Hallazgos.
+16. OT.
+17. Combustible.
+18. Mano de obra.
+19. Repuestos.
+20. Hoja de vida.
+21. Datos históricos reales.
+22. Indicadores.
+23. Seguridad.
+24. Performance.
+25. Producción.
+26. Pruebas.
+27. GAPs.
+28. Deuda técnica.
+29. Riesgos.
+30. Criterio de salida a LITE-11.
+
+Cada afirmación debe clasificarse:
+
+VERIFICADO
+PARCIAL
+NO VERIFICADO
+GAP
+BLOQUEANTE
+
+No maquillar resultados.
+
+---
+
+# 32. REGLA SOBRE PREGUNTAS DE DIRECCIÓN
+
+NO detener el trabajo por preguntas que ya fueron decididas en LITE-04 a LITE-09.
+
+Utilizar como decisiones vigentes:
+
+- criticidad declarada en plantilla;
+- NO APTO si existe crítico incumplido;
+- NO requiere mantenimiento = descarte auditable;
+- OT no se crea automáticamente por rutina;
+- mantenimiento generado explícitamente;
+- proveedor como dato transaccional;
+- inventario no bloquea OT;
+- equipos de terceros no generan mantenimientos ficticios;
+- no existe coordinador obligatorio;
+- capacidades determinan las acciones;
+- centro de costos proviene del activo;
+- datos históricos reales deben conservarse;
+- C11/C11 SIGAR representa el mismo equipo;
+- LITE debe permanecer simple.
+
+Solo preguntar a Dirección si aparece una decisión NUEVA que no pueda resolverse usando estas reglas.
+
+---
+
+# 33. REGLA DE SEGURIDAD CONTRA SOBRE-INGENIERÍA
+
+Antes de implementar cualquier cosa preguntarse:
+
+¿Esto resuelve una necesidad real de Delta?
+
+Si NO:
+NO IMPLEMENTAR.
+
+¿Existe ya una pieza que pueda reutilizarse?
+
+Si SÍ:
+REUTILIZAR.
+
+¿La solución agrega complejidad que el usuario no necesita?
+
+Si SÍ:
+SIMPLIFICAR.
+
+---
+
+# 34. REGLA FINAL
+
+DeltaOps Lite no se considera exitoso porque tenga muchas funcionalidades.
+
+Se considera exitoso si un trabajador de Delta puede hacer su trabajo con pocos pasos y la organización obtiene trazabilidad real.
+
+El producto objetivo es:
+
+EQUIPO → PREOPERACIONAL → MANTENIMIENTO → CIERRE → HOJA DE VIDA
+
+con:
+
+HORÓMETRO
+RUTINAS
+COMBUSTIBLE
+MANO DE OBRA
+REPUESTOS/INSUMOS
+CENTRO DE COSTOS
+DATOS HISTÓRICOS
+INDICADORES REALES
+
+todo integrado y sin burocracia innecesaria.
+
+---
+
+# 35. MODO DE EJECUCIÓN
+
+Primero realizar una auditoría breve del estado actual contra esta directiva.
+
+Después implementar únicamente los cambios necesarios.
+
+Después ejecutar pruebas.
+
+Después ejecutar revisión independiente.
+
+Finalmente generar el documento de cierre.
+
+NO iniciar LITE-11 automáticamente.
+
+DETENERSE al finalizar esta fase y entregar el informe.
+
+# FIN DE DIRECTIVA LITE-10

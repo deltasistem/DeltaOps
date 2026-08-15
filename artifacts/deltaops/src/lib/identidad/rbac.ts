@@ -156,38 +156,36 @@ export interface GrupoNav {
 }
 
 /**
- * DELTAOPS LITE-08 §22 · Prioridad de grupos por PERFIL. Reordena la MISMA
- * navegación por proceso según el rol, poniendo delante lo que ese perfil usa a
- * diario y relegando los módulos secundarios al grupo «Más». No crea ni elimina
- * rutas: sólo reordena y baja el peso visual. Cualquier grupo no listado para el
- * rol se muestra tras los priorizados (excepto los relegados a «Más»).
+ * DELTAOPS LITE-10 §8 · Orden CANÓNICO de los cuatro macro-grupos por PROCESO.
+ * La navegación se organiza en OPERACIÓN → INFORMACIÓN → APOYO → ADMINISTRACIÓN,
+ * un orden estable e igual para todos los roles: la diferenciación por perfil se
+ * consigue OCULTANDO ítems/grupos que el rol no necesita (visibilidad), no
+ * reordenando macro-grupos. El backend sigue siendo la autoridad (RBAC/RLS).
  */
-const PRIORIDAD_GRUPOS_POR_ROL: Record<Rol, readonly string[]> = {
-  // Técnico: sus equipos, el trabajo de mantenimiento y el preoperacional.
-  TECNICO: ["equipos", "mantenimiento", "preoperacional"],
-  // Supervisor/Planificador (responsable): equipos, mantenimiento, preoperacional, indicadores.
-  SUPERVISOR: ["equipos", "mantenimiento", "preoperacional", "indicadores"],
-  PLANIFICADOR: ["mantenimiento", "equipos", "preoperacional", "indicadores"],
-  // Admin de empresa: mantenimiento, equipos, indicadores, administración.
-  TENANT_ADMIN: ["mantenimiento", "equipos", "indicadores", "administracion"],
-  SUPER_ADMIN: ["mantenimiento", "equipos", "indicadores", "administracion"],
-  CONSULTA: ["equipos", "mantenimiento", "indicadores"],
-};
+const ORDEN_MACRO_GRUPOS: readonly string[] = [
+  "operacion",
+  "informacion",
+  "apoyo",
+  "administracion",
+];
 
-/** Grupos SECUNDARIOS que, salvo prioridad explícita del rol, se relegan a «Más». */
-const GRUPOS_SECUNDARIOS: ReadonlySet<string> = new Set(["inventario", "referencia"]);
+/** Macro-grupo SECUNDARIO (menor peso visual; el shell puede colapsarlo en «Más»). */
+const GRUPOS_SECUNDARIOS: ReadonlySet<string> = new Set(["apoyo"]);
 
 /**
- * Construye los grupos de navegación visibles para la sesión. Cada ítem sólo se
- * incluye si su módulo está habilitado (o, en Administración, si el rol tiene la
- * capacidad correspondiente). Los grupos vacíos se omiten. El módulo emergente
- * Utilización (sin enum en el contrato) se decide con su guard dedicado pasado
- * por el llamador para no acoplar este helper a esa capa.
+ * Construye los cuatro macro-grupos de navegación por proceso (§8) visibles para
+ * la sesión. Cada ítem sólo se incluye si su módulo está habilitado (o, en
+ * Administración, si el rol tiene la capacidad correspondiente). Los grupos
+ * vacíos se omiten. El módulo emergente Utilización (sin enum en el contrato) se
+ * decide con su guard dedicado pasado por el llamador para no acoplar este helper
+ * a esa capa.
  *
- * §22 · El resultado se reordena por perfil y los módulos secundarios se
- * reagrupan bajo «Más» con menor peso visual. §21 · `ocultos` (visibilidad por
- * preferencia del tenant) filtra ítems SIN tocar seguridad (el backend sigue
- * siendo la autoridad); nunca puede REVELAR un módulo no habilitado.
+ * §8 · SOLO presentación: no se crean rutas nuevas ni se elimina ninguna. Se
+ * reagrupan las MISMAS rutas existentes bajo los macro-grupos de proceso. El
+ * técnico no ve módulos que no necesita porque sus ítems no se incluyen (p. ej.
+ * Planes/Administración), no porque se le revoque acceso (visibilidad ≠
+ * seguridad). §21 · `ocultos` (preferencia del tenant) filtra grupos SIN tocar
+ * seguridad; nunca puede REVELAR un módulo no habilitado.
  */
 export function gruposNavegacion(
   sesion: Pick<Sesion, "rol" | "modulos">,
@@ -199,51 +197,54 @@ export function gruposNavegacion(
   const esTecnico = sesion.rol === "TECNICO";
   const grupos: GrupoNav[] = [];
 
-  // MANTENIMIENTO · trabajo operativo (órdenes, correctivo, preventivo, planes).
-  const mantenimiento: ItemNav[] = [];
-  if (tiene("ordenes")) mantenimiento.push({ clave: "ordenes", nombre: "Órdenes", ruta: "/ordenes" });
-  if (tiene("correctivo")) mantenimiento.push({ clave: "correctivo", nombre: "Correctivo", ruta: "/correctivo/solicitudes" });
-  if (tiene("preventivo")) mantenimiento.push({ clave: "preventivo", nombre: "Preventivo", ruta: "/preventivo/programas" });
-  // §22 · Planes es superficie de administración/planificación: baja de peso
-  // para el técnico (no aparece en su nav diario; sigue accesible por rol).
-  if (tiene("planes") && !esTecnico) mantenimiento.push({ clave: "planes", nombre: "Planes", ruta: "/planes" });
-  if (mantenimiento.length > 0) grupos.push({ clave: "mantenimiento", titulo: "Mantenimiento", items: mantenimiento });
+  /* ------------------------------ OPERACIÓN ------------------------------ */
+  // El trabajo diario del usuario operativo: Equipos, Mantenimiento,
+  // Preoperacional, Mis órdenes. (Inicio lo aporta el shell fuera de esta lista.)
+  const operacion: ItemNav[] = [];
+  if (tiene("activos")) operacion.push({ clave: "activos", nombre: esTecnico ? "Mis equipos" : "Equipos", ruta: "/activos" });
+  // Mantenimiento agrupa el trabajo operativo. Para no cargar la barra, se ofrece
+  // el punto de entrada (Órdenes) y las superficies especializadas cuando aplican.
+  if (tiene("ordenes")) operacion.push({ clave: "ordenes", nombre: esTecnico ? "Mis órdenes" : "Mantenimiento", ruta: "/ordenes" });
+  if (tiene("correctivo") && !esTecnico) operacion.push({ clave: "correctivo", nombre: "Correctivo", ruta: "/correctivo/solicitudes" });
+  if (tiene("preventivo") && !esTecnico) operacion.push({ clave: "preventivo", nombre: "Preventivo", ruta: "/preventivo/programas" });
+  // Planes es superficie de planificación: fuera del nav diario del técnico.
+  if (tiene("planes") && !esTecnico) operacion.push({ clave: "planes", nombre: "Planes", ruta: "/planes" });
+  // Preoperacional: acceso directo al flujo de inspección (vive bajo Activos; no
+  // es una ruta nueva). Se ofrece a todos los roles con módulo de activos.
+  if (tiene("activos")) operacion.push({ clave: "preoperacional", nombre: "Preoperacional", ruta: "/activos?accion=preoperacional" });
+  // Lecturas de horómetro: punto de entrada directo al flujo operativo
+  // Equipo→Lectura (§3/§8). Pertenece a OPERACIÓN (trabajo diario de captura) y
+  // se ofrece a TODO rol con Utilización visible; nunca debe omitirse cuando la
+  // capacidad existe (regresión LITE-10). No es una ruta nueva.
+  if (opciones?.utilizacionVisible) operacion.push({ clave: "lecturas", nombre: "Lecturas", ruta: "/utilizacion/lecturas" });
+  if (operacion.length > 0) grupos.push({ clave: "operacion", titulo: "Operación", items: operacion });
 
-  // EQUIPOS · activos + utilización. Para el técnico se rotula «Mis equipos».
-  const equipos: ItemNav[] = [];
-  if (tiene("activos")) equipos.push({ clave: "activos", nombre: esTecnico ? "Mis equipos" : "Activos", ruta: "/activos" });
-  if (opciones?.utilizacionVisible) equipos.push({ clave: "utilizacion", nombre: "Utilización", ruta: "/utilizacion/lecturas" });
-  if (equipos.length > 0) grupos.push({ clave: "equipos", titulo: esTecnico ? "Mis equipos" : "Equipos", items: equipos });
-
-  // PREOPERACIONAL · acceso directo al flujo de inspección (vive bajo Activos).
-  // §22 lo destaca para técnico/supervisor. No es una ruta nueva: entra por el
-  // listado de activos con la acción de preoperacional.
-  if (tiene("activos")) {
-    grupos.push({ clave: "preoperacional", titulo: "Preoperacional", items: [{ clave: "preoperacional", nombre: "Preoperacional", ruta: "/activos?accion=preoperacional" }] });
-  }
-
-  // INVENTARIO · inventario + abastecimiento (secundario → «Más»).
-  const inventario: ItemNav[] = [];
-  if (tiene("inventario")) inventario.push({ clave: "inventario", nombre: "Inventario", ruta: "/inventario" });
-  if (tiene("abastecimiento")) inventario.push({ clave: "abastecimiento", nombre: "Abastecimiento", ruta: "/abastecimiento/solicitudes" });
-  if (inventario.length > 0) grupos.push({ clave: "inventario", titulo: "Inventario", items: inventario });
-
-  // INDICADORES · analytics + costos.
-  const indicadores: ItemNav[] = [];
-  if (tiene("analytics")) indicadores.push({ clave: "analytics", nombre: "Analytics", ruta: "/analytics" });
+  /* ----------------------------- INFORMACIÓN ---------------------------- */
+  // Consulta transversal: Hoja de vida, Combustible, Indicadores.
+  const informacion: ItemNav[] = [];
+  // «Hoja de vida» reutiliza el listado de equipos (cada ficha lleva su
+  // cronología/timeline). No se crea ruta nueva.
+  if (tiene("activos")) informacion.push({ clave: "hoja-de-vida", nombre: "Hoja de vida", ruta: "/activos" });
+  // «Combustible» reutiliza la superficie de tanqueos de Utilización.
+  if (opciones?.utilizacionVisible) informacion.push({ clave: "combustible", nombre: "Combustible", ruta: "/utilizacion/tanqueos" });
+  if (tiene("analytics")) informacion.push({ clave: "analytics", nombre: "Indicadores", ruta: "/analytics" });
   // Costos es una superficie propia (/costos) sin enum de módulo; se ofrece a
   // roles con capacidad de consulta administrativa/supervisión.
   if (tiene("analytics") && (admin || sesion.rol === "SUPERVISOR" || sesion.rol === "PLANIFICADOR")) {
-    indicadores.push({ clave: "costos", nombre: "Costos", ruta: "/costos" });
+    informacion.push({ clave: "costos", nombre: "Costos", ruta: "/costos" });
   }
-  if (indicadores.length > 0) grupos.push({ clave: "indicadores", titulo: "Indicadores", items: indicadores });
+  if (informacion.length > 0) grupos.push({ clave: "informacion", titulo: "Información", items: informacion });
 
-  // Referencia (catálogo transversal) se relega a «Más».
-  if (tiene("referencia")) {
-    grupos.push({ clave: "referencia", titulo: "Referencia", items: [{ clave: "referencia", nombre: "Referencia", ruta: "/referencia" }] });
-  }
+  /* -------------------------------- APOYO ------------------------------- */
+  // Soporte: Inventario/Abastecimiento y Referencia (secundario → «Más»).
+  const apoyo: ItemNav[] = [];
+  if (tiene("inventario")) apoyo.push({ clave: "inventario", nombre: "Inventario", ruta: "/inventario" });
+  if (tiene("abastecimiento")) apoyo.push({ clave: "abastecimiento", nombre: "Abastecimiento", ruta: "/abastecimiento/solicitudes" });
+  if (tiene("referencia")) apoyo.push({ clave: "referencia", nombre: "Referencia", ruta: "/referencia" });
+  if (apoyo.length > 0) grupos.push({ clave: "apoyo", titulo: "Apoyo", items: apoyo });
 
-  // ADMINISTRACIÓN · por capacidad de administración del rol (no entitlement).
+  /* ---------------------------- ADMINISTRACIÓN -------------------------- */
+  // Solo para roles con capacidad de administración (no entitlement de módulo).
   const administracion: ItemNav[] = [];
   if (admin) {
     administracion.push({ clave: "usuarios", nombre: "Usuarios", ruta: "/administracion/usuarios" });
@@ -259,28 +260,25 @@ export function gruposNavegacion(
   const ocultos = opciones?.ocultos;
   const visibles = ocultos ? grupos.filter((g) => !ocultos.has(g.clave)) : grupos;
 
-  return ordenarPorPerfil(visibles, sesion.rol);
+  return ordenarPorProceso(visibles);
 }
 
 /**
- * §22 · Reordena los grupos según la prioridad del perfil y relega los
- * secundarios (no priorizados y en `GRUPOS_SECUNDARIOS`) al final. El llamador
- * puede además colapsar la cola bajo un desplegable «Más».
+ * §8 · Ordena los macro-grupos según el orden canónico de proceso
+ * (OPERACIÓN → INFORMACIÓN → APOYO → ADMINISTRACIÓN), estable para todos los
+ * roles. La diferenciación por perfil ya ocurrió al construir los ítems.
  */
-function ordenarPorPerfil(grupos: GrupoNav[], rol: Rol): GrupoNav[] {
-  const prioridad = PRIORIDAD_GRUPOS_POR_ROL[rol] ?? [];
+function ordenarPorProceso(grupos: GrupoNav[]): GrupoNav[] {
   const peso = (clave: string): number => {
-    const idx = prioridad.indexOf(clave);
-    if (idx >= 0) return idx; // priorizados primero, en orden del perfil
-    if (GRUPOS_SECUNDARIOS.has(clave)) return 1000; // secundarios al final
-    return 500; // el resto, en medio
+    const idx = ORDEN_MACRO_GRUPOS.indexOf(clave);
+    return idx >= 0 ? idx : 500;
   };
   return [...grupos].sort((a, b) => peso(a.clave) - peso(b.clave));
 }
 
 /**
- * §22 · ¿La clave de grupo es SECUNDARIA (candidata a colapsarse bajo «Más»)?
- * El shell la usa para bajar el peso visual sin ocultar el acceso.
+ * §8/§22 · ¿La clave de macro-grupo es SECUNDARIA (candidata a colapsarse bajo
+ * «Más»)? El shell la usa para bajar el peso visual sin ocultar el acceso.
  */
 export function esGrupoSecundario(clave: string): boolean {
   return GRUPOS_SECUNDARIOS.has(clave);

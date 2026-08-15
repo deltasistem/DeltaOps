@@ -146,15 +146,44 @@ export async function asignar(
   });
 }
 
-/** Registra ejecución (diagnóstico/tiempos). */
+/**
+ * Campos de la ejecución de una OT (todos opcionales; se completan a lo largo
+ * del ciclo). Espeja el `inputSchema` del comando backend
+ * `modulo.ordenes.registrarEjecucion`: `diagnostico` (bloque técnico strict),
+ * `tiempoReal`/`costoReal` (duración/costo) y `observaciones` (texto libre).
+ *
+ * IMPORTANTE (bug histórico corregido): NO se debe enviar el diagnóstico como un
+ * objeto con claves ajenas al esquema `Diagnostico` ({motivo,causa,diagnostico,
+ * solucion}); hacerlo dispara "Diagnóstico inválido" por el `.strict()` del
+ * dominio. Horas → `tiempoReal.minutos`; observaciones → `observaciones`.
+ */
+export interface CamposEjecucion {
+  readonly diagnostico?: {
+    motivo?: string;
+    causa?: string;
+    diagnostico?: string;
+    solucion?: string;
+  };
+  readonly tiempoReal?: { minutos: number; detalle?: string };
+  readonly costoReal?: unknown;
+  readonly observaciones?: string;
+}
+
+/** Registra ejecución (diagnóstico/tiempos/costos/observaciones). */
 export async function registrarEjecucion(
   cola: ColaSync,
   id: string,
   expectedVersion: number,
-  diagnostico: Record<string, unknown> = {},
+  campos: CamposEjecucion = {},
 ): Promise<ResultadoMutacion> {
   const opId = nuevoOpId();
-  const cuerpo = { id, expectedVersion, diagnostico, opId };
+  // Sólo se envían los campos presentes: el backend actualiza lo aportado y
+  // conserva el resto de la ejecución (no pisa con undefined).
+  const cuerpo: Record<string, unknown> = { id, expectedVersion, opId };
+  if (campos.diagnostico !== undefined) cuerpo.diagnostico = campos.diagnostico;
+  if (campos.tiempoReal !== undefined) cuerpo.tiempoReal = campos.tiempoReal;
+  if (campos.costoReal !== undefined) cuerpo.costoReal = campos.costoReal;
+  if (campos.observaciones !== undefined) cuerpo.observaciones = campos.observaciones;
   return mutarConOffline(cola, {
     comando: `${MODULO}.registrarEjecucion`,
     input: cuerpo,

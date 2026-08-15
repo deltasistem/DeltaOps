@@ -88,8 +88,17 @@ export function WidgetRenderer({ widget, indicador, filtrosGlobales = {}, period
     );
   } else if (error) {
     cuerpo = <ErrorState titulo="No se pudo evaluar el indicador" descripcion={error.message} onReintentar={recargar} />;
-  } else if (!datos || (datos.muestras === 0 && datos.grupos.length === 0 && datos.valor === 0)) {
-    cuerpo = <EmptyState titulo="Sin datos" descripcion="La evaluación no arrojó muestras para los filtros actuales." />;
+  } else if (!datos || (datos.muestras === 0 && datos.grupos.length === 0)) {
+    // DELTAOPS LITE-10 §24 · Honestidad de indicadores: sin muestras NO hay
+    // insumos suficientes (MTTR/MTBF/disponibilidad, etc.). Mostrar el valor
+    // (aunque no sea 0) induciría a error, así que se dice explícitamente que el
+    // indicador no está disponible por falta de datos.
+    cuerpo = (
+      <EmptyState
+        titulo="Indicador no disponible"
+        descripcion="Sin datos suficientes para calcular este indicador con los filtros actuales."
+      />
+    );
   } else {
     cuerpo = <CuerpoWidget widget={widget} datos={datos} indicador={indicador} />;
   }

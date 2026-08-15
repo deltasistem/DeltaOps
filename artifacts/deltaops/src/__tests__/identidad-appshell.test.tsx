@@ -81,11 +81,13 @@ describe("AppShell · entitlements (sólo módulos habilitados)", () => {
     renderShell(sesionBase({ modulos: ["activos"] }));
     await screen.findByText(/Ada Lovelace/i);
     const nav = screen.getByRole("navigation");
-    expect(nav).toHaveTextContent("Activos");
-    // "Órdenes" NO está contratado en esta sesión → no aparece.
+    // LITE-10 §8 · El ítem de activos se rotula «Equipos» (no-técnico) dentro
+    // del macro-grupo OPERACIÓN.
+    expect(nav).toHaveTextContent("Equipos");
+    // "Mantenimiento"/"Órdenes" NO está contratado en esta sesión → no aparece.
     expect(nav).not.toHaveTextContent("Órdenes");
-    // "Analytics" nunca (no está en modulos).
-    expect(nav).not.toHaveTextContent("Analytics");
+    // "Indicadores"/"Analytics" nunca (no está en modulos).
+    expect(nav).not.toHaveTextContent("Indicadores");
   });
 });
 

@@ -13,6 +13,12 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL es obligatoria"),
   SESSION_SECRET: z.string().min(1, "SESSION_SECRET es obligatoria"),
   LOG_LEVEL: z.string().optional(),
+  // DELTAOPS LITE-10 §27 · Lista blanca de orígenes CORS separada por comas
+  // (p.ej. "https://app.deltaops.co,https://admin.deltaops.co"). NO destructiva:
+  // si no se define, en desarrollo/test se mantiene el comportamiento permisivo
+  // actual (reflejo de origen); en producción, sin allowlist, CORS queda cerrado
+  // (sólo mismo origen), que es el comportamiento seguro por defecto.
+  CORS_ORIGINS: z.string().optional(),
 });
 
 export type DeltaopsEnv = z.infer<typeof envSchema>;

@@ -124,10 +124,20 @@ describe("WidgetRenderer · estados honestos", () => {
     expect(await screen.findByText(/No se pudo evaluar el indicador/i)).toBeInTheDocument();
   });
 
-  it("estado vacío cuando no hay muestras ni grupos", async () => {
+  it("§24 · indicador no disponible cuando no hay muestras ni grupos", async () => {
     mockEvaluar({ ...EVAL_CON_GRUPOS, valor: 0, muestras: 0, grupos: [], semaforo: null, cumplimiento: null });
     renderWidget(widget("bar"));
-    expect(await screen.findByText(/Sin datos/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Indicador no disponible/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sin datos suficientes/i)).toBeInTheDocument();
+  });
+
+  it("§24 · un valor sin muestras (p.ej. MTTR sin insumos) NO se muestra como cifra engañosa", async () => {
+    // El backend puede devolver un valor numérico aunque no haya insumos; sin
+    // muestras, el indicador debe declararse NO DISPONIBLE, no pintar la cifra.
+    mockEvaluar({ ...EVAL_CON_GRUPOS, valor: 42, muestras: 0, grupos: [], semaforo: null, cumplimiento: null });
+    renderWidget(widget("card"));
+    expect(await screen.findByText(/Indicador no disponible/i)).toBeInTheDocument();
+    expect(screen.queryByText("42")).not.toBeInTheDocument();
   });
 
   it("estado de carga (status accesible) antes de resolver", () => {

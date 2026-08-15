@@ -48,6 +48,7 @@ import { TabCorrectivo } from "./ficha/tab-correctivo";
 import { TabPreoperacional } from "./ficha/tab-preoperacional";
 import { leerParam } from "../lib/ecosistema/deep-links";
 import { PanelOperacional } from "../lib/utilizacion/PanelOperacional";
+import { ResumenCabecera } from "../lib/utilizacion/ResumenCabecera";
 import { utilizacionVisible } from "../lib/utilizacion/capacidades";
 import { estadoVisual } from "../lib/utilizacion/ficha-operacional";
 import { capacidadesActivos } from "../lib/activos/capacidades";
@@ -191,7 +192,7 @@ function Ficha({ id }: { id: string }) {
           { id: "preoperacional", etiqueta: "Preoperacional", contenido: <TabPreoperacional activoId={id} activoNombre={a.nombre} /> },
           { id: "manodeobra", etiqueta: "Mano de obra", contenido: <ManoDeObraActivo activoId={id} /> },
           { id: "costos", etiqueta: "Costos", contenido: <CostosActivo activoId={id} /> },
-          { id: "timeline", etiqueta: "Timeline", contenido: <TabTimeline id={id} /> },
+          { id: "timeline", etiqueta: "Timeline", contenido: <TabTimeline id={id} activo={a} /> },
           { id: "documentacion", etiqueta: "Documentación", contenido: <TabDocumentacion id={id} /> },
           { id: "relaciones", etiqueta: "Relaciones", contenido: <TabRelaciones id={id} nombre={a.nombre} onNavegar={(x) => navegar(`/activos/${x}`)} /> },
           { id: "historicos", etiqueta: "Históricos", contenido: <TabHistoricos id={id} /> },
@@ -267,6 +268,18 @@ function CabeceraOperacional({ a }: { a: ActivoRow }) {
           {item(<MapPin size={16} />, "Ubicación", ubicacion)}
           {item(<User size={16} />, "Responsable", responsable)}
           {item(<Wrench size={16} />, "Equipo mantenimiento", equipoMtto)}
+        </div>
+        {/* LITE-10 §11/§12 · Resumen operacional compuesto: horómetro actual,
+            próxima rutina (Faltan N h / Vencido por X h) y último preoperacional.
+            Sólo datos reales; estados vacíos honestos. */}
+        <div
+          style={{
+            marginTop: "var(--do-sp-4)",
+            paddingTop: "var(--do-sp-4)",
+            borderTop: "var(--do-border-fino) solid var(--do-borde)",
+          }}
+        >
+          <ResumenCabecera activoId={a.id} />
         </div>
       </CardContent>
     </Card>

@@ -1,11 +1,17 @@
 /**
- * DGP-008.3 · Pestaña Timeline visual de la ficha.
+ * DGP-008.3 · Pestaña Timeline visual de la ficha (Hoja de vida del equipo).
  * Muestra eventos + cambios de estado con filtros (actor/estado/entidad/rango).
+ *
+ * DELTAOPS LITE-10 §19 · Sobre la cronología, un bloque «Información actual»
+ * compone (sin datos nuevos) el estado presente del equipo: horómetro, centro de
+ * costos, ubicación, responsable y próximo mantenimiento. Toda ausencia se dice
+ * de forma honesta.
  */
 import React, { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
+  CardHeader,
   Timeline,
   Button,
   EmptyState,
@@ -13,11 +19,13 @@ import {
   ErrorState,
 } from "@workspace/design-system";
 import type { TimelineTono } from "@workspace/design-system";
+import { MapPin, User, Building2 } from "lucide-react";
 import { useTimelinePaginado } from "../../lib/activos/hooks";
-import { ESTADOS_ACTIVO, etiquetaEstado, type EventoTimeline } from "../../lib/activos/tipos";
+import { ESTADOS_ACTIVO, etiquetaEstado, type EventoTimeline, type ActivoRow } from "../../lib/activos/tipos";
 import { FormularioDinamico } from "../../lib/forms/FormularioDinamico";
 import { plantillaFiltrosTimeline } from "../../lib/forms/plantillas";
 import type { ValoresFormulario } from "../../lib/forms/tipos";
+import { centroDeRegistro } from "../../lib/centro/contexto";
 
 function tono(ev: EventoTimeline): TimelineTono {
   const t = (ev.tipo ?? "").toLowerCase();
@@ -35,7 +43,62 @@ function fecha(ev: EventoTimeline): string {
   return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("es");
 }
 
-export function TabTimeline({ id }: { id: string }) {
+/**
+ * §19 · «Información actual»: estado presente del equipo por composición pura.
+ * El resumen operacional (horómetro + próximo mantenimiento + último preop) vive
+ * en la cabecera de la ficha (visible sobre las tabs); aquí sólo se muestran los
+ * datos propios del bloque —centro de costos, ubicación y responsable— del read
+ * model del activo. Estados vacíos honestos. (LITE-10 MENOR-1: sin doble montaje.)
+ */
+function InformacionActual({ activo }: { activo: ActivoRow }) {
+  const d = activo.datos ?? {};
+  const txt = (k: string): string => {
+    const v = d[k];
+    return typeof v === "string" && v !== "" ? v : "—";
+  };
+  const centro = centroDeRegistro(d) ?? "Sin centro de costos configurado";
+  const ubicacion = activo.ubicacionId && activo.ubicacionId !== "" ? activo.ubicacionId : txt("ubicacion");
+  const responsable = txt("responsable");
+  const item = (icono: React.ReactNode, etiqueta: string, valor: string) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-1)", minWidth: "min(180px, 100%)", flex: "1 1 160px" }}>
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "var(--do-sp-1)",
+          fontSize: "var(--do-text-xs)",
+          color: "var(--do-texto-suave)",
+          textTransform: "uppercase",
+          letterSpacing: "var(--do-tracking-etiquetas)",
+        }}
+      >
+        <span aria-hidden="true" style={{ display: "inline-flex" }}>{icono}</span>
+        {etiqueta}
+      </span>
+      <span style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{valor}</span>
+    </div>
+  );
+  return (
+    <Card>
+      <CardHeader><strong>Información actual</strong></CardHeader>
+      <CardContent>
+        {/* LITE-10 MENOR-1 (code-review) · El resumen operacional (horómetro +
+            próxima rutina + último preoperacional) YA vive en la cabecera de la
+            ficha (`DatosGenerales` → `ResumenCabecera`), visible sobre las tabs.
+            Aquí se evita montarlo por segunda vez (queries duplicadas) y se dejan
+            sólo los datos propios del bloque: centro de costos, ubicación y
+            responsable, que no aparecen en la cabecera. */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--do-sp-3) var(--do-sp-5)", alignItems: "flex-start" }}>
+          {item(<Building2 size={14} />, "Centro de costos", centro)}
+          {item(<MapPin size={14} />, "Ubicación", ubicacion)}
+          {item(<User size={14} />, "Responsable", responsable)}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function TabTimeline({ id, activo }: { id: string; activo?: ActivoRow }) {
   const [filtros, setFiltros] = useState<Record<string, string>>({});
   const { eventos: datos, cargando, cargandoMas, error, hayMas, cargarMas, recargar } = useTimelinePaginado(id, filtros);
   const defFiltros = useMemo(
@@ -58,6 +121,8 @@ export function TabTimeline({ id }: { id: string }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--do-sp-4)" }}>
+      {activo && <InformacionActual activo={activo} />}
+
       <Card>
         <CardContent>
           <FormularioDinamico definicion={defFiltros} valores={filtros as ValoresFormulario} onCambio={alCambiar} />
