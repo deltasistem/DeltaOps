@@ -4,6 +4,8 @@
 **Fecha de cierre:** 15 de agosto de 2026
 **Estado:** COMPLETADO — revisión independiente PASS, 12/12 pruebas de integración, E2E en navegador real PASS.
 
+> **FE DE ERRATAS (16 de agosto de 2026, autorizada por la directiva de correcciones pre-deploy):** las cifras de utilización citadas en este documento (6.564 lecturas / 807 tanqueos, con 4.048 inconsistentes) describen el estado de los **read models** al cierre de FINAL-02, no la autoridad. La auditoría pre-deploy detectó que la segunda corrida de importación (15-ago 19:00Z) dejó 1.033 lecturas y 293 tanqueos sin proyectar por un drenaje de outbox interrumpido. Tras la reproyección oficial (`utilizacion.reproyectar`, replay no destructivo de `utl_eventos`, 8.697 eventos aplicados) los conteos correctos y verificados en toda la cadena autoridad→read model→API→informe→CSV/XLSX son **7.597 lecturas y 1.100 tanqueos** en `delta-demo`. Los informes no requirieron cambio alguno: sirven los read models, que ahora reflejan la autoridad completa. El resto de cifras del documento (3.736 preoperacionales históricos, 109 mantenimientos, 38 activos) fue verificado exacto.
+
 ---
 
 ## 1. Discovery

@@ -1,4 +1,11 @@
+import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Galería del design system: import dinámico SOLO en desarrollo; en producción
+// el módulo no se referencia y Vite lo excluye del bundle.
+const DesignSystemDev = import.meta.env.DEV
+  ? lazy(() => import('@/pages/design-system'))
+  : () => null;
 import { ThemeProvider, ToastProvider } from '@workspace/design-system';
 import { Toaster } from '@/components/ui/toaster';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
@@ -7,7 +14,6 @@ import Inicio from '@/pages/inicio';
 import Plataforma from '@/pages/plataforma';
 import Referencia from '@/pages/referencia';
 import ReferenciaDetalle from '@/pages/referencia-detalle';
-import DesignSystem from '@/pages/design-system';
 import Motores from '@/pages/motores';
 import MotoresPlayground from '@/pages/motores-playground';
 import ConsolaActivos from '@/pages/consola-activos';
@@ -131,7 +137,15 @@ function Router() {
       <Route path="/administracion/saas">
         <SoloSuperAdmin><AdministracionSaaS /></SoloSuperAdmin>
       </Route>
-      <Route path="/design-system" component={DesignSystem} />
+      {/* Galería del design system (KPIs de muestra): sólo en desarrollo, jamás en
+          producción. Import dinámico condicionado: la página no entra al bundle prod. */}
+      {import.meta.env.DEV && (
+        <Route path="/design-system">
+          <Suspense fallback={null}>
+            <DesignSystemDev />
+          </Suspense>
+        </Route>
+      )}
       <Route path="/motores/playground">
         <SoloSuperAdmin><MotoresPlayground /></SoloSuperAdmin>
       </Route>

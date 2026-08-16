@@ -1,0 +1,237 @@
+DELTAOPS — AUTORIZACIÓN DE CORRECCIONES PRE-DEPLOY
+
+Autorizo únicamente las correcciones necesarias identificadas en DELTAOPS-AUDITORIA-PRE-DEPLOY.
+
+NO autoriza todavía DEPLOY-01.
+
+OBJETIVO
+
+Dejar DELTAOPS en estado READY FOR DEPLOY, corrigiendo exclusivamente los hallazgos identificados en la auditoría.
+
+==================================================
+1. REPROYECCIÓN DE READ MODELS
+==================================================
+
+Autorizo reproyectar los read models de utilización.
+
+Objetivo:
+
+Lecturas:
+6.564 → 7.597
+
+Tanqueos:
+807 → 1.100
+
+Preoperacionales:
+3.736 → 3.736
+
+Mantenimientos:
+109 → 109
+
+IMPORTANTE:
+
+La reproyección debe ser NO DESTRUCTIVA.
+
+NO modificar, eliminar ni sobrescribir los registros de autoridad.
+
+Antes de ejecutar:
+
+- identificar exactamente qué mecanismo de proyección existe;
+- identificar el checkpoint/cursor actual;
+- determinar los registros pendientes;
+- verificar que los 1.033 registros adicionales de lecturas y 293 tanqueos correspondan a hechos reales y no duplicados;
+- ejecutar la proyección de forma idempotente.
+
+Después de reproyectar:
+
+comparar nuevamente:
+
+AUTORIDAD vs READ MODEL vs API vs INFORMES vs EXPORTACIÓN.
+
+No aceptar la corrección solamente porque cambie el número.
+
+Debe quedar demostrado que los datos nuevos aparecen correctamente en:
+
+- API;
+- UI;
+- informes;
+- filtros;
+- paginación;
+- CSV;
+- XLSX.
+
+==================================================
+2. DATOS DEMO / E2E
+==================================================
+
+NO borres datos de forma indiscriminada.
+
+La estrategia aprobada es:
+
+TENANT PRODUCTIVO:
+solo datos reales LITE-09.
+
+TENANT DEMO:
+conservar datos de demostración.
+
+E2E/TEST:
+mantener aislados de producción.
+
+Antes de limpiar cualquier dato:
+
+generar inventario exacto de:
+
+- activos seed;
+- OTs seed;
+- OTs E2E;
+- preoperacionales E2E;
+- lecturas E2E;
+- tanqueos E2E;
+- sesiones E2E;
+- valoraciones E2E;
+- hechos de costo E2E;
+- tenants efímeros.
+
+NO eliminar registros de autoridad LITE-09.
+
+NO eliminar históricos reales.
+
+NO modificar:
+
+3.736 preoperacionales reales.
+109 mantenimientos reales.
+7.597 lecturas reales.
+1.100 tanqueos reales.
+
+Si la arquitectura permite crear el tenant productivo limpio sin tocar delta-demo, esa es la opción preferida.
+
+Si para realizar la separación se requiere una migración, preparar primero un plan detallado y ejecutarlo únicamente de manera reversible/segura.
+
+==================================================
+3. USUARIOS
+==================================================
+
+No crear todavía usuarios reales de producción.
+
+Confirmar que TENANT_ADMIN puede crear usuarios mediante invitación.
+
+Mantener las cuentas Demo mientras se valida el entorno.
+
+No eliminar usuarios legacy todavía.
+
+Los 329 registros de legacy users deben documentarse y clasificarse antes de decidir si se migran o eliminan.
+
+==================================================
+4. GRÁFICOS
+==================================================
+
+NO implementar todavía un dashboard nuevo.
+
+No quiero que se convierta esta corrección en una nueva fase funcional.
+
+Únicamente verifica que el módulo Analytics existente:
+
+- utilice datos reales;
+- consulte backend;
+- respete tenant;
+- respete roles;
+- respete filtros;
+- no utilice mocks;
+- no tenga KPIs ficticios.
+
+Los KPIs mock del /design-system deben permanecer identificados como mocks de diseño y NO deben aparecer en producción.
+
+El dashboard adicional dentro de /informes permanece fuera de esta corrección, conforme a FINAL-02.
+
+==================================================
+5. FE DE ERRATAS
+==================================================
+
+Corrige la documentación de FINAL-02 para aclarar que las cifras:
+
+6.564 lecturas
+807 tanqueos
+
+correspondían al estado de los read models en el momento del cierre y no representaban el total actual de la autoridad.
+
+La documentación corregida debe reflejar:
+
+7.597 lecturas
+1.100 tanqueos
+
+siempre que la reproyección final confirme esos valores.
+
+No reescribas históricamente el informe para ocultar la discrepancia.
+
+Debe quedar trazabilidad de la corrección.
+
+==================================================
+6. PRUEBAS OBLIGATORIAS POST-CORRECCIÓN
+==================================================
+
+Después de aplicar las correcciones ejecutar nuevamente:
+
+- suite completa de informes;
+- integración PostgreSQL;
+- aislamiento multi-tenant;
+- RBAC;
+- exportación CSV;
+- exportación XLSX;
+- filtros;
+- paginación;
+- E2E;
+- validación móvil.
+
+Además ejecutar una prueba específica:
+
+AUTORIDAD
+↓
+READ MODEL
+↓
+API
+↓
+UI
+↓
+EXPORTACIÓN
+
+para lecturas y tanqueos.
+
+El resultado debe ser exactamente consistente.
+
+==================================================
+7. CRITERIO DE FINALIZACIÓN
+==================================================
+
+NO ejecutar DEPLOY-01.
+
+Después de terminar las correcciones, entregar un nuevo informe:
+
+DELTAOPS — VALIDACIÓN POST-CORRECCIONES
+
+Debe indicar:
+
+- qué se cambió;
+- qué NO se cambió;
+- qué datos se conservaron;
+- qué datos fueron separados;
+- conteos finales;
+- pruebas ejecutadas;
+- resultados;
+- evidencias;
+- commit generado.
+
+El estado esperado al finalizar es:
+
+🟢 READY FOR DEPLOY
+
+Si algún hallazgo permanece, NO marcar READY FOR DEPLOY.
+
+NO desplegar.
+
+NO modificar DNS.
+
+NO tocar DigitalOcean.
+
+NO cambiar configuración de producción.
+
+Primero corregir, verificar y reportar.
