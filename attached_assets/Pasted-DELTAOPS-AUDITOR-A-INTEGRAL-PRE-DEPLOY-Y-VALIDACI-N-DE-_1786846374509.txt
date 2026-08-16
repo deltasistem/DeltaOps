@@ -1,0 +1,469 @@
+DELTAOPS — AUDITORÍA INTEGRAL PRE-DEPLOY Y VALIDACIÓN DE ALCANCE
+
+ANTES DE MODIFICAR CÓDIGO:
+
+Quiero que hagas una auditoría técnica completa de DELTAOPS antes de autorizar DEPLOY-01.
+
+NO quiero que asumas que la aplicación está terminada únicamente porque el documento:
+docs/dgp/DELTAOPS-FINAL-02-CIERRE-INFORMES-EXPORTACION.md
+dice PASS.
+
+Quiero que verifiques directamente el código, la base de datos, las rutas, los modelos, los componentes frontend, los permisos, los datos y las pruebas.
+
+OBJETIVO PRINCIPAL
+
+Determinar con evidencia si TODO lo solicitado para DELTAOPS realmente existe y funciona, y detectar cualquier diferencia entre:
+
+1. Lo solicitado originalmente.
+2. Lo documentado como implementado.
+3. Lo realmente implementado en el código.
+4. Lo realmente existente en PostgreSQL/Neon.
+5. Lo que actualmente muestra la interfaz.
+6. Lo que muestran los informes.
+7. Lo que se exporta a Excel/CSV.
+
+NO des por correcto un dato simplemente porque aparece en pantalla.
+
+==================================================
+FASE 1 — RECONSTRUCCIÓN DEL ALCANCE
+==================================================
+
+Revisa todo el repositorio y reconstruye el alcance funcional real de DELTAOPS.
+
+Identifica:
+
+- módulos existentes;
+- rutas;
+- páginas;
+- componentes;
+- modelos;
+- tablas;
+- relaciones;
+- roles;
+- permisos;
+- informes;
+- filtros;
+- paginación;
+- exportaciones;
+- dashboards;
+- gráficos;
+- indicadores;
+- autenticación;
+- RBAC;
+- RLS;
+- aislamiento multi-tenant;
+- funcionalidades móviles;
+- tema oscuro;
+- datos de demostración;
+- datos históricos;
+- pruebas automatizadas;
+- documentación de requisitos;
+- documentación de cierre.
+
+También revisa commits relevantes, especialmente:
+
+043c787
+
+y cualquier commit inmediatamente anterior relacionado con FINAL-02.
+
+ENTREGA UNA MATRIZ:
+
+REQUISITO | EXISTE EN CÓDIGO | FUNCIONA | ESTÁ EN UI | ESTÁ PROBADO | ESTÁ DOCUMENTADO | ESTADO
+
+Estados permitidos:
+
+IMPLEMENTADO
+PARCIAL
+NO IMPLEMENTADO
+NO VERIFICADO
+CONTRADICTORIO
+
+NO marques IMPLEMENTADO solamente porque exista código relacionado.
+
+==================================================
+FASE 2 — AUDITORÍA REAL DE DATOS
+==================================================
+
+Necesito que audites directamente PostgreSQL/Neon.
+
+NO uses únicamente los números que muestra la interfaz.
+
+Obtén conteos reales de las tablas correspondientes a:
+
+- equipos;
+- activos;
+- mantenimiento;
+- preoperacionales;
+- combustible/tanqueos;
+- horómetros;
+- rutinas;
+- horas hombre;
+- repuestos;
+- costos por equipo;
+- hoja de vida;
+- cualquier otra entidad que intervenga en los informes.
+
+Para cada entidad indica:
+
+TABLA
+REGISTROS TOTALES
+REGISTROS ACTIVOS
+REGISTROS INACTIVOS
+REGISTROS DEMO/FICTICIOS
+REGISTROS HISTÓRICOS
+TENANT
+FECHA MÍNIMA
+FECHA MÁXIMA
+
+IMPORTANTE:
+
+La interfaz actualmente parece indicar que existen "38 activos", pero al revisar los datos visibles aparentemente existen muchos menos.
+
+Investiga específicamente esta discrepancia.
+
+NO la corrijas todavía.
+
+Primero determina:
+
+- ¿De dónde sale el número 38?
+- ¿Qué query genera ese número?
+- ¿Qué tabla utiliza?
+- ¿Existe un COUNT incorrecto?
+- ¿Está contando registros históricos?
+- ¿Está contando equipos repetidos?
+- ¿Está contando activos por tenant incorrectamente?
+- ¿Está incluyendo registros Demo?
+- ¿Está incluyendo registros eliminados/inactivos?
+- ¿Está usando una tabla distinta a la utilizada por el listado?
+- ¿Hay JOIN que esté multiplicando filas?
+- ¿El frontend está mostrando un valor hardcodeado?
+- ¿Existe cache o dato sembrado?
+
+Después compara:
+
+COUNT real en DB
+vs
+COUNT del backend
+vs
+COUNT de API
+vs
+COUNT mostrado en frontend.
+
+Si hay discrepancia, documenta exactamente la causa.
+
+==================================================
+FASE 3 — DATOS FALSOS / DEMO
+==================================================
+
+Necesito identificar todos los datos que sean ficticios, de demostración, seed, mock o creados exclusivamente para pruebas.
+
+NO BORRES NADA TODAVÍA.
+
+Primero crea un inventario:
+
+TABLA | ID | IDENTIFICADOR | TENANT | DATO | ORIGEN | DEMO/REAL | EVIDENCIA
+
+Determina qué datos pertenecen realmente a LITE-09 y cuáles fueron creados para:
+
+- pruebas;
+- E2E;
+- Demo;
+- desarrollo;
+- seed;
+- validación de interfaz.
+
+IMPORTANTE:
+
+El documento FINAL-02 afirma que los históricos LITE-09 deben mantenerse intactos:
+
+3.736 preoperacionales
+109 mantenimientos
+6.564 lecturas
+807 tanqueos
+
+Verifica directamente esos números contra PostgreSQL.
+
+Si existen datos adicionales que no pertenecen a LITE-09 y son ficticios, sepáralos claramente.
+
+NO ejecutes DELETE, TRUNCATE, UPDATE destructivos ni migraciones de limpieza sin mi autorización explícita.
+
+==================================================
+FASE 4 — GRÁFICOS Y DASHBOARD
+==================================================
+
+Quiero verificar qué existe actualmente respecto a gráficos.
+
+Busca:
+
+- charts;
+- dashboards;
+- componentes de visualización;
+- librerías de gráficos;
+- endpoints de estadísticas;
+- consultas agregadas;
+- indicadores;
+- tarjetas KPI;
+- tendencias;
+- gráficos por equipo;
+- gráficos de mantenimiento;
+- gráficos de combustible;
+- gráficos de costos;
+- gráficos de horas;
+- gráficos de preoperacionales;
+- cualquier visualización relacionada.
+
+Determina:
+
+A. Qué gráficos existen actualmente.
+B. Cuáles funcionan.
+C. Cuáles están conectados a datos reales.
+D. Cuáles usan datos ficticios.
+E. Cuáles están incompletos.
+F. Cuáles fueron descartados según FINAL-02.
+G. Cuáles fueron solicitados originalmente.
+H. Cuáles NO estaban dentro del alcance cerrado.
+
+IMPORTANTE:
+
+NO inventes KPIs.
+
+FINAL-02 explícitamente indica que NO deben inventarse:
+
+- MTBF
+- MTTR
+- disponibilidad
+
+Si se agregan gráficos, deben utilizar únicamente métricas cuya definición y fuente de datos puedan demostrarse.
+
+Para cada gráfico propuesto indica:
+
+NOMBRE
+FUENTE DE DATOS
+QUERY
+FILTROS
+MÉTRICA
+DEFINICIÓN
+SI EXISTE EL DATO
+SI ES CONFIABLE
+SI ESTÁ EN EL ALCANCE ACTUAL
+
+==================================================
+FASE 5 — COMPARACIÓN CON POWER BI
+==================================================
+
+No quiero una copia artificial de Power BI.
+
+Quiero determinar qué información operacional debería visualizarse gráficamente para que DELTAOPS tenga una experiencia equivalente o mejor para explotación operacional, utilizando exclusivamente los datos reales existentes.
+
+Analiza si son viables, por ejemplo:
+
+- activos por estado;
+- mantenimiento por tipo;
+- mantenimiento por equipo;
+- mantenimientos por período;
+- costos por equipo;
+- combustible/tanqueos por período;
+- consumo por equipo;
+- horas de operación;
+- horómetros;
+- preoperacionales;
+- incidencias;
+- repuestos;
+- costos acumulados;
+- distribución por proyecto;
+- evolución temporal.
+
+NO agregues ninguna métrica si no existe una fuente de datos confiable.
+
+==================================================
+FASE 6 — VALIDACIÓN DE INFORMES
+==================================================
+
+Para cada uno de los 9 informes operacionales:
+
+1. Identifica el informe.
+2. Identifica su fuente de datos.
+3. Identifica su query/builder.
+4. Ejecuta o valida el conteo real.
+5. Comprueba filtros.
+6. Comprueba paginación.
+7. Comprueba tenant isolation.
+8. Comprueba roles.
+9. Comprueba exportación Excel.
+10. Comprueba exportación CSV.
+11. Comprueba que:
+
+LO CONSULTADO = LO EXPORTADO
+
+Verifica además que:
+
+- "—" se utilice cuando realmente no existe información.
+- No existan KPIs ficticios.
+- No existan registros duplicados.
+- No existan conteos inflados por JOIN.
+- No exista truncamiento silencioso.
+
+==================================================
+FASE 7 — USUARIOS Y ROLES
+==================================================
+
+Audita el sistema de usuarios.
+
+Determina:
+
+- cómo se crean usuarios;
+- dónde se almacenan;
+- cómo se asignan roles;
+- qué roles existen;
+- cómo funciona Admin;
+- cómo funciona Técnico;
+- cómo funciona Consulta;
+- si Admin puede crear usuarios;
+- si existe pantalla de administración;
+- si los usuarios actuales son usuarios reales o solamente usuarios Demo/E2E;
+- si la creación de usuarios requiere despliegue o ya puede hacerse en el entorno actual.
+
+NO crees usuarios reales ni modifiques permisos todavía.
+
+==================================================
+FASE 8 — SEGURIDAD
+==================================================
+
+Verifica nuevamente:
+
+- autenticación;
+- sesión obligatoria;
+- RBAC;
+- RLS;
+- tenant isolation;
+- acceso por rol;
+- exportaciones;
+- endpoints;
+- APIs;
+- acceso directo a rutas;
+- posibilidad de acceder a datos de otro tenant.
+
+Busca especialmente:
+
+- consultas sin filtro tenant;
+- endpoints que acepten tenant_id desde el cliente sin validación;
+- IDs manipulables;
+- rutas protegidas solamente en frontend;
+- datos visibles por API aunque no estén visibles en UI.
+
+==================================================
+FASE 9 — PRUEBAS
+==================================================
+
+Ejecuta las pruebas disponibles.
+
+Clasifica:
+
+PASS
+FAIL
+NO DISPONIBLE
+NO APLICA
+
+No ocultes fallos.
+
+Si una prueba falla, explica:
+
+- qué falla;
+- por qué;
+- dónde;
+- impacto;
+- si afecta producción.
+
+==================================================
+FASE 10 — NO MODIFICAR TODAVÍA
+==================================================
+
+Durante esta auditoría NO:
+
+- borres datos;
+- cambies esquemas;
+- hagas migraciones destructivas;
+- elimines usuarios;
+- modifiques permisos;
+- despliegues;
+- cambies DNS;
+- cambies Neon;
+- cambies DigitalOcean;
+- hagas DEPLOY-01;
+- introduzcas nuevas funcionalidades automáticamente.
+
+Primero necesito el diagnóstico.
+
+==================================================
+ENTREGABLE FINAL DE ESTA AUDITORÍA
+==================================================
+
+Genera un informe:
+
+DELTAOPS — AUDITORÍA PRE-DEPLOY
+
+Debe contener:
+
+1. Resumen ejecutivo.
+2. Estado general.
+3. Matriz completa de requisitos.
+4. Módulos existentes.
+5. Funcionalidades faltantes.
+6. Funcionalidades parciales.
+7. Auditoría de datos.
+8. Conteos reales de PostgreSQL.
+9. Explicación de la discrepancia de "38 activos".
+10. Identificación de datos Demo/ficticios.
+11. Validación de históricos LITE-09.
+12. Auditoría de los 9 informes.
+13. Auditoría de Excel/CSV.
+14. Auditoría de gráficos/dashboard.
+15. Comparación con lo esperado de Power BI.
+16. Auditoría de usuarios y roles.
+17. Auditoría de seguridad.
+18. Resultado de pruebas.
+19. Contradicciones encontradas entre código, DB, UI y documentación.
+20. Riesgos para producción.
+21. Cambios necesarios antes de DEPLOY-01.
+22. Cambios que pueden quedar para una fase posterior.
+23. Recomendación final.
+
+Al final debes emitir UNO de estos veredictos:
+
+🟢 READY FOR DEPLOY
+La aplicación cumple el alcance y no existen bloqueantes.
+
+🟡 READY AFTER FIXES
+La aplicación está cerca, pero existen correcciones obligatorias antes del despliegue.
+
+🔴 NOT READY FOR DEPLOY
+Existen inconsistencias, datos, seguridad, funcionalidades o requisitos que impiden desplegar.
+
+MUY IMPORTANTE:
+
+NO quiero que me digas simplemente "todo está correcto".
+
+Quiero evidencia.
+
+Para cada afirmación importante indica:
+
+- archivo;
+- ruta;
+- función/componente;
+- tabla;
+- query;
+- endpoint;
+- prueba;
+- o dato concreto de PostgreSQL
+
+que permita verificarla.
+
+Si encuentras que FINAL-02 afirma que algo está implementado pero el código demuestra que no lo está, marca la contradicción explícitamente.
+
+Si encuentras que algo que yo estoy pidiendo ahora NO hacía parte del alcance original, también debes decirlo explícitamente.
+
+NO hagas cambios todavía.
+
+PRIMERO AUDITA.
+DESPUÉS REPORTA.
+ESPERA MI AUTORIZACIÓN ANTES DE MODIFICAR.
