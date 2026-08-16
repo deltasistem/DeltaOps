@@ -74,6 +74,8 @@ import UtilizacionTanqueos from '@/pages/utilizacion-tanqueos';
 import UtilizacionTanqueoNuevo from '@/pages/utilizacion-tanqueo-nuevo';
 import UtilizacionResumen from '@/pages/utilizacion-resumen';
 import CostosPage from '@/pages/costos';
+import InformesPage from '@/pages/informes';
+import InformeDetallePage from '@/pages/informes-detalle';
 import AnalyticsHome from '@/pages/analytics-home';
 import AnalyticsIndicadores from '@/pages/analytics-indicadores';
 import AnalyticsIndicador from '@/pages/analytics-indicador';
@@ -139,6 +141,8 @@ function Router() {
       <Route path="/consola-activos">
         <SoloSuperAdmin><ConsolaActivos /></SoloSuperAdmin>
       </Route>
+      <Route path="/informes" component={InformesPage} />
+      <Route path="/informes/:clave" component={InformeDetallePage} />
       <Route path="/activos" component={ActivosListado} />
       <Route path="/activos/nuevo" component={ActivosNuevo} />
       <Route path="/activos/arboles" component={ActivosArboles} />

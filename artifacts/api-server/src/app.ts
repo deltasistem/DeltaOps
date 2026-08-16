@@ -21,6 +21,7 @@ import analyticsModuleRouter from "./routes/deltaops/analytics-module";
 import utilizacionModuleRouter from "./routes/deltaops/utilizacion-module";
 import manodeobraModuleRouter from "./routes/deltaops/manodeobra-module";
 import costosModuleRouter from "./routes/deltaops/costos-module";
+import informesModuleRouter from "./routes/deltaops/informes-module";
 import { logger } from "./lib/logger";
 import { loadDeltaopsConfig } from "./deltaops/config";
 import { createDeltaopsSession } from "./deltaops/session";
@@ -152,6 +153,11 @@ app.use("/api", analyticsModuleRouter);
 app.use("/api", utilizacionModuleRouter);
 app.use("/api", manodeobraModuleRouter);
 app.use("/api", costosModuleRouter);
+// DELTAOPS FINAL-02 · Informes operacionales y exportación: COMPOSICIÓN de
+// lectura sobre queries públicas (sin módulo ni entitlement nuevo). Prefijo
+// propio `/deltaops/informes`; el entitlement de cada dato lo aplica el módulo
+// autoridad al componer con el principal de sesión.
+app.use("/api", informesModuleRouter);
 // DGP-023.2: router legacy SGMA retirado (routers /assets, /work-orders, /dashboard,
 // /spare-parts, /locations, /work-centers, /technicians, /suppliers, /maintenance-plans,
 // /healthz). Health gate migrado a /api/deltaops/platform/health.

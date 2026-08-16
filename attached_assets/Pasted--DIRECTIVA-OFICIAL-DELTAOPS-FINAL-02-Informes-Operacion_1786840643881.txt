@@ -1,0 +1,968 @@
+# DIRECTIVA OFICIAL — DELTAOPS FINAL-02
+# «Informes Operacionales, Exportación y Explotación de Datos»
+
+## 0. OBJETIVO DE LA FASE
+
+Esta es la ÚLTIMA FASE FUNCIONAL PREVIA AL DEPLOYMENT.
+
+DeltaOps Lite ya completó:
+
+- DGP-023.2 a DGP-023.6
+- DELTAOPS-LITE-01 a LITE-11
+- PDC-01
+- FINAL-01
+
+FINAL-01 determinó que:
+
+- no existen bloqueantes funcionales para producción;
+- la operación principal está cubierta;
+- los datos históricos reales ya están cargados;
+- Forms/Excel operacionales están mayormente cubiertos;
+- Power BI puede continuar como capa analítica/gerencial;
+- falta una única capacidad funcional de categoría B:
+
+«INFORMES Y EXPORTACIÓN».
+
+Por tanto, FINAL-02 debe implementar exclusivamente esa capacidad.
+
+Al terminar FINAL-02:
+
+NO debe iniciarse otra fase funcional automáticamente.
+
+La siguiente etapa será exclusivamente:
+
+GitHub → DigitalOcean → Neon → dominio de producción → piloto.
+
+---
+
+# 1. REGLA FUNDAMENTAL
+
+NO convertir DeltaOps Lite en Power BI.
+
+NO crear un sistema de BI paralelo.
+
+NO crear un módulo de analítica empresarial complejo.
+
+NO crear un CMMS/ERP nuevamente.
+
+NO crear dashboards gerenciales complejos.
+
+NO crear KPIs que no tengan datos suficientes.
+
+NO crear MTBF/MTTR/Disponibilidad si los insumos no permiten calcularlos.
+
+NO crear nuevas entidades de dominio salvo que una revisión técnica demuestre que son absolutamente inevitables.
+
+PRIORIDAD:
+
+COMPOSICIÓN
+>
+EXTENSIÓN ADITIVA
+>
+NUEVA ESTRUCTURA
+
+---
+
+# 2. FUENTES DE VERDAD
+
+Utilizar:
+
+- código actual;
+- read models existentes;
+- consultas existentes;
+- datos históricos reales importados en LITE-09;
+- indicadores actuales;
+- hoja de vida;
+- Activos;
+- Preoperacional;
+- Órdenes;
+- Combustible;
+- Mano de Obra;
+- Rutinas/Planes;
+- documentación FINAL-01.
+
+NO crear datos ficticios para llenar informes.
+
+Los datos reales deben ser la fuente.
+
+---
+
+# 3. PRINCIPIO «EL INFORME NO CREA DATOS»
+
+Los informes solamente deben consultar y presentar información existente.
+
+Un informe:
+
+NO modifica datos.
+
+NO crea eventos.
+
+NO crea OT.
+
+NO modifica activos.
+
+NO altera históricos.
+
+NO cambia estados.
+
+NO altera RLS.
+
+---
+
+# 4. PERMISOS
+
+Los informes deben respetar:
+
+- tenant;
+- RLS;
+- RBAC;
+- capacidades actuales;
+- centro de costos cuando corresponda.
+
+La UI no es autoridad de seguridad.
+
+El backend debe aplicar las restricciones.
+
+Un usuario no puede exportar datos que no podría consultar.
+
+La exportación debe respetar exactamente el mismo alcance que la consulta visual.
+
+---
+
+# 5. ÁREA DE INFORMACIÓN
+
+No crear una navegación completamente nueva.
+
+Utilizar la estructura existente de:
+
+INFORMACIÓN
+
+y ubicar allí las capacidades de:
+
+- Indicadores;
+- Informes;
+- Hoja de vida.
+
+La solución debe mantener la navegación Lite.
+
+---
+
+# 6. INFORME 1 — MANTENIMIENTO
+
+Crear una vista operacional para consultar mantenimientos.
+
+Debe permitir filtrar, como mínimo, por:
+
+- fecha inicial;
+- fecha final;
+- activo/equipo;
+- centro de costos cuando exista;
+- tipo de mantenimiento;
+- estado de OT;
+- responsable/técnico cuando exista.
+
+Mostrar como mínimo:
+
+- OT;
+- equipo;
+- código;
+- tipo;
+- fecha;
+- descripción/resumen;
+- estado;
+- responsable;
+- centro de costos;
+- duración/hora cuando exista;
+- costo cuando exista.
+
+No inventar campos.
+
+Si un campo no existe:
+
+mostrar «—».
+
+---
+
+# 7. INFORME 2 — PREOPERACIONALES
+
+Crear consulta consolidada de preoperacionales.
+
+Filtros:
+
+- fecha inicial;
+- fecha final;
+- equipo;
+- centro de costos cuando exista;
+- resultado;
+- usuario cuando corresponda.
+
+Resultados:
+
+- equipo;
+- fecha;
+- plantilla;
+- versión;
+- usuario;
+- resultado;
+- cantidad de hallazgos;
+- críticos cuando exista;
+- estado;
+- referencia a la ejecución.
+
+Debe distinguir:
+
+🟢 APTO
+
+🟡 APTO CON OBSERVACIONES
+
+🔴 NO APTO
+
+No depender únicamente del color.
+
+---
+
+# 8. INFORME 3 — COMBUSTIBLE
+
+Crear informe de tanqueos.
+
+Filtros:
+
+- fecha inicial;
+- fecha final;
+- equipo;
+- centro de costos;
+- tipo de combustible/energía;
+- proveedor cuando exista.
+
+Mostrar:
+
+- fecha;
+- equipo;
+- tipo de combustible;
+- cantidad;
+- unidad;
+- horómetro/lectura;
+- proveedor;
+- identificación;
+- observación;
+- usuario cuando esté disponible.
+
+Para C11 SIGAR:
+
+NO mostrar mantenimientos inventados.
+
+Los tanqueos deben aparecer normalmente porque sí forman parte de su control.
+
+---
+
+# 9. INFORME 4 — HORÓMETROS / LECTURAS
+
+Crear consulta histórica de lecturas.
+
+Mostrar:
+
+- equipo;
+- fecha;
+- lectura;
+- unidad;
+- usuario;
+- estado de consistencia;
+- observación/motivo si existe.
+
+Distinguir claramente:
+
+LECTURA CONSISTENTE
+
+vs.
+
+LECTURA INCONSISTENTE
+
+NO corregir automáticamente históricos.
+
+---
+
+# 10. INFORME 5 — RUTINAS DE FLOTA
+
+Esta es una de las vistas más importantes de FINAL-02.
+
+Crear una vista consolidada:
+
+«Estado de rutinas de la flota».
+
+Debe permitir visualizar:
+
+| Equipo | Horómetro | Rutina | Próxima meta | Estado |
+|---|---:|---|---:|---|
+
+Estados:
+
+🟢 AL DÍA
+
+🟡 PRÓXIMA
+
+🔴 VENCIDA
+
+Cuando sea aplicable mostrar:
+
+«Faltan X h»
+
+«Faltan X km»
+
+«Faltan X ciclos»
+
+«Vencido por X h/km/ciclos»
+
+Los valores deben calcularse server-side utilizando el motor existente.
+
+NO duplicar el motor de Planes.
+
+NO crear otro sistema de periodicidad.
+
+NO generar OT automáticamente.
+
+La acción puede llevar al flujo existente:
+
+«Generar mantenimiento».
+
+---
+
+# 11. INFORME 6 — HORAS HOMBRE
+
+IMPORTANTE:
+
+FINAL-01 determinó que el formulario actual de horas hombre contiene información de operación comercial:
+
+- cliente;
+- material;
+- turno;
+- etc.
+
+Ese dominio NO forma parte de DeltaOps Lite.
+
+Por tanto:
+
+NO intentar reproducir el formulario comercial dentro de DeltaOps.
+
+Únicamente mostrar las horas de mano de obra que realmente existan en el dominio de mantenimiento:
+
+- técnico;
+- OT;
+- equipo;
+- fecha;
+- inicio;
+- fin;
+- duración;
+- estado;
+- valoración si existe.
+
+Si el dato no existe:
+
+NO inventarlo.
+
+---
+
+# 12. INFORME 7 — REPUESTOS / INSUMOS
+
+Mostrar los consumos registrados en OT.
+
+Campos disponibles:
+
+- OT;
+- equipo;
+- fecha;
+- descripción;
+- tipo;
+- cantidad;
+- costo cuando exista;
+- observación cuando exista.
+
+No crear inventario completo.
+
+No crear maestro obligatorio de proveedores.
+
+El proveedor puede continuar como dato transaccional cuando el dominio actual lo permita.
+
+---
+
+# 13. INFORME 8 — COSTOS
+
+Crear una vista de costos únicamente con datos existentes.
+
+Cuando sea posible:
+
+- costo de mano de obra;
+- costo de repuestos/insumos;
+- costo de mantenimiento;
+- costo de combustible;
+- costo por equipo;
+- costo por período.
+
+IMPORTANTE:
+
+No sumar conceptos si sus unidades o significados no son comparables.
+
+No presentar un «costo total» si la fuente no permite construirlo de forma confiable.
+
+Cuando no haya datos suficientes:
+
+«Sin datos suficientes».
+
+---
+
+# 14. INFORME 9 — HOJA DE VIDA
+
+La hoja de vida ya existe.
+
+NO crear otra.
+
+FINAL-02 debe mejorar su capacidad de consulta mediante filtros sobre la información existente.
+
+Permitir, cuando el contrato actual lo soporte:
+
+- rango de fechas;
+- tipo de evento;
+- mantenimiento;
+- preoperacional;
+- combustible;
+- lectura;
+- mano de obra;
+- repuesto/insumo;
+- hallazgo.
+
+Mantener la cronología real.
+
+No cambiar el modelo histórico.
+
+---
+
+# 15. EXPORTACIÓN EXCEL
+
+Implementar exportación Excel únicamente para informes que tengan una tabla consolidada real.
+
+Prioridad:
+
+1. Mantenimiento
+2. Preoperacionales
+3. Combustible
+4. Horómetros
+5. Rutinas
+6. Mano de obra
+7. Repuestos/insumos
+8. Costos
+
+La exportación debe respetar:
+
+- filtros aplicados;
+- tenant;
+- permisos;
+- período;
+- columnas visibles/relevantes.
+
+No exportar datos fuera del alcance del usuario.
+
+---
+
+# 16. EXPORTACIÓN CSV
+
+Implementar CSV cuando sea sencillo reutilizar el mismo dataset del informe.
+
+Debe respetar exactamente:
+
+consulta visual = dataset exportado.
+
+No crear lógica de consulta duplicada.
+
+---
+
+# 17. PDF
+
+NO implementar PDF en FINAL-02.
+
+FINAL-01 lo clasificó como categoría C/D.
+
+Puede quedar para una fase futura si Dirección lo considera necesario.
+
+---
+
+# 18. FILTROS
+
+Los filtros deben ser útiles, no excesivos.
+
+Principales:
+
+- período;
+- equipo;
+- centro de costos;
+- estado;
+- tipo.
+
+No crear formularios con 15 filtros visibles.
+
+Utilizar:
+
+Filtros principales
++
+«Más filtros»
+
+como ya se estableció en la UX de DeltaOps Lite.
+
+---
+
+# 19. RENDIMIENTO
+
+No cargar miles de registros innecesariamente en frontend.
+
+Utilizar:
+
+- paginación;
+- filtros server-side cuando el read model lo permita;
+- consultas eficientes;
+- límites razonables.
+
+No usar:
+
+«traer toda la tabla y filtrar en JavaScript»
+
+cuando el volumen pueda crecer.
+
+---
+
+# 20. MULTICENTRO
+
+Los informes deben respetar el contexto del tenant y permitir filtrar por centro de costos cuando ese dato exista.
+
+IMPORTANTE:
+
+El centro de costos no debe inventarse.
+
+Actualmente existen activos con centro de costos vacío.
+
+Mostrar:
+
+«Sin centro de costos configurado»
+
+cuando corresponda.
+
+No bloquear informes por registros antiguos sin centro.
+
+---
+
+# 21. INDICADORES
+
+Mantener indicadores existentes.
+
+FINAL-02 puede agregar únicamente indicadores que tengan fuente real.
+
+Ejemplos permitidos cuando existan datos:
+
+- equipos;
+- OT;
+- mantenimientos;
+- preoperacionales;
+- hallazgos;
+- combustible;
+- horas hombre;
+- rutinas.
+
+NO implementar:
+
+- MTBF;
+- MTTR;
+- disponibilidad;
+
+si los datos continúan siendo insuficientes.
+
+Cuando no haya datos suficientes:
+
+«Indicador no disponible — sin datos suficientes».
+
+---
+
+# 22. DASHBOARD OPERACIONAL
+
+No crear un dashboard gerencial complejo.
+
+Crear o mejorar únicamente una vista operacional compacta si los datos existentes lo permiten.
+
+Debe responder rápidamente:
+
+### ¿Qué necesita atención?
+
+- rutinas vencidas;
+- preoperacionales NO APTO;
+- hallazgos pendientes;
+- OT abiertas;
+- equipos con problemas.
+
+### ¿Qué está pasando?
+
+- equipos;
+- mantenimiento;
+- combustible;
+- preoperacionales.
+
+La prioridad debe ser operación, no gráficos decorativos.
+
+---
+
+# 23. VISUALIZACIÓN
+
+Mantener el Design System existente.
+
+Debe funcionar correctamente en:
+
+- claro;
+- oscuro;
+- 360 px;
+- 390 px;
+- 768 px;
+- escritorio.
+
+No introducir otro sistema visual.
+
+No usar colores como único significado.
+
+---
+
+# 24. ACCIONES
+
+Los informes deben ser principalmente de lectura.
+
+Las acciones permitidas serán únicamente aquellas que ya existan.
+
+Ejemplo:
+
+Rutina vencida
+→ «Generar mantenimiento»
+
+No crear acciones nuevas de negocio solo para FINAL-02.
+
+---
+
+# 25. DATOS HISTÓRICOS
+
+Los informes deben funcionar con los históricos importados en LITE-09.
+
+Validar especialmente:
+
+- 38 activos;
+- 3.736 preoperacionales;
+- 1.971 jornadas;
+- 109 mantenimientos;
+- 6.564 lecturas;
+- 807 tanqueos según FINAL-01.
+
+No modificar estos datos.
+
+No volver a importar.
+
+No recalcular destructivamente.
+
+---
+
+# 26. FECHAS
+
+Usar fecha operacional real cuando exista.
+
+No utilizar:
+
+selladoAt
+
+como sustituto de fecha operacional si existe la fecha real del evento.
+
+Mantener el comportamiento corregido en LITE-09.
+
+---
+
+# 27. C11 SIGAR
+
+Verificar específicamente que los informes respeten:
+
+C11 SIGAR = equipo alquilado/tercero.
+
+Debe aparecer:
+
+- combustible;
+- preoperacionales históricos cuando existan;
+- hoja de vida;
+
+pero:
+
+mantenimientos internos Delta = 0
+
+No inventar OT ni mantenimientos.
+
+---
+
+# 28. POWER BI
+
+FINAL-02 NO debe crear integración directa con Power BI.
+
+El objetivo es que DeltaOps pueda producir exportaciones estructuradas que posteriormente puedan alimentar Power BI.
+
+Arquitectura:
+
+DELTAOPS
+↓
+Datos operacionales
+↓
+Exportación CSV/Excel
+↓
+POWER BI
+
+No crear API específica de Power BI.
+
+No crear modelo semántico de Power BI.
+
+Eso queda fuera del alcance de FINAL-02.
+
+---
+
+# 29. SEGURIDAD
+
+Toda consulta debe:
+
+- respetar tenant;
+- respetar RBAC;
+- respetar RLS;
+- validar permisos en backend.
+
+Exportar no puede convertirse en una vía de fuga de datos.
+
+Probar explícitamente:
+
+TENANT A
+↓
+exportación
+↓
+NO contiene TENANT B.
+
+CONSULTA
+↓
+exportación permitida solo dentro de lectura.
+
+---
+
+# 30. AUDITORÍA
+
+Registrar auditoría de exportaciones si el mecanismo existente de auditoría permite hacerlo de forma natural.
+
+Como mínimo debe poder conocerse:
+
+- usuario;
+- fecha;
+- tipo de exportación;
+
+siempre que esto pueda componerse sobre mecanismos existentes.
+
+No crear un sistema de auditoría paralelo.
+
+---
+
+# 31. PRUEBAS OBLIGATORIAS
+
+Crear pruebas para:
+
+## Backend
+
+- filtros;
+- tenant;
+- RBAC;
+- paginación;
+- exportación;
+- dataset correcto.
+
+## Seguridad
+
+- aislamiento entre tenants;
+- CONSULTA;
+- usuario sin permisos;
+- exportación.
+
+## Datos
+
+- fechas reales;
+- históricos;
+- C11 SIGAR;
+- registros sin centro de costos;
+- lecturas inconsistentes.
+
+## UI
+
+- claro;
+- oscuro;
+- móvil 360/390;
+- desktop;
+- tablas;
+- filtros.
+
+---
+
+# 32. E2E OBLIGATORIO
+
+Realizar navegador real.
+
+Probar al menos:
+
+1. Login.
+2. Inicio.
+3. Informes.
+4. Mantenimiento.
+5. Aplicar filtros.
+6. Ver resultados.
+7. Exportar Excel.
+8. Exportar CSV.
+9. Preoperacionales.
+10. Combustible.
+11. Rutinas.
+12. Hoja de vida.
+13. CONSULTA.
+14. Técnico.
+15. Administrador.
+16. Tema oscuro.
+17. 390 px.
+18. Datos históricos reales.
+
+---
+
+# 33. CRITERIOS DE ACEPTACIÓN
+
+FINAL-02 será PASS únicamente si:
+
+🟢 los informes utilizan datos reales;
+
+🟢 los filtros funcionan;
+
+🟢 las exportaciones coinciden con la consulta;
+
+🟢 se respeta RLS;
+
+🟢 se respeta RBAC;
+
+🟢 no aparecen datos de otros tenants;
+
+🟢 los históricos son consultables;
+
+🟢 C11 SIGAR conserva su tratamiento;
+
+🟢 rutinas muestran estado real;
+
+🟢 no se inventan indicadores;
+
+🟢 claro/oscuro funciona;
+
+🟢 móvil funciona;
+
+🟢 typecheck verde;
+
+🟢 build verde;
+
+🟢 tests verdes;
+
+🟢 E2E verde.
+
+---
+
+# 34. REGLA DE ALCANCE
+
+Si durante la implementación aparece una funcionalidad que NO pertenece a:
+
+- informes;
+- filtros;
+- exportación;
+- explotación operacional de datos;
+
+NO implementarla.
+
+Documentarla como:
+
+«FUERA DE ALCANCE FINAL-02».
+
+No ampliar la fase.
+
+---
+
+# 35. REVISIÓN INDEPENDIENTE
+
+Antes de cerrar:
+
+realizar revisión independiente.
+
+El revisor debe comprobar:
+
+- que no se creó BI paralelo;
+- que no se creó inventario completo;
+- que no se creó operación comercial;
+- que no se modificó RLS;
+- que no se debilitó RBAC;
+- que los históricos no fueron alterados;
+- que las exportaciones respetan filtros;
+- que las exportaciones respetan tenant;
+- que no existen KPIs ficticios;
+- que el alcance se mantuvo.
+
+---
+
+# 36. ENTREGABLE
+
+Crear:
+
+docs/dgp/DELTAOPS-FINAL-02-CIERRE-INFORMES-EXPORTACION.md
+
+Debe documentar:
+
+1. Discovery.
+2. Arquitectura utilizada.
+3. Informes implementados.
+4. Filtros.
+5. Exportaciones.
+6. Rutinas.
+7. Hoja de vida.
+8. Indicadores.
+9. Seguridad.
+10. Multicentro.
+11. Históricos.
+12. C11 SIGAR.
+13. Pruebas.
+14. E2E.
+15. Revisión independiente.
+16. Gaps.
+17. Deuda técnica.
+18. Límites deliberados.
+19. Criterios de cierre.
+
+---
+
+# 37. REGLA DE DETENCIÓN
+
+Cuando FINAL-02 esté completo:
+
+NO iniciar FINAL-03.
+
+NO crear nuevas funcionalidades.
+
+NO crear otro módulo.
+
+NO comenzar nuevamente un ciclo de discovery.
+
+NO desplegar todavía.
+
+Entregar el informe y detenerse.
+
+La siguiente etapa será:
+
+DEPLOY-01
+
+con arquitectura:
+
+GitHub
+↓
+DigitalOcean Droplet
+↓
+Neon PostgreSQL
+↓
+deltaops.deltalogistica.com.co
+
+Esa etapa será exclusivamente de infraestructura, despliegue, seguridad, configuración y piloto.
+
+# FIN DE DIRECTIVA FINAL-02

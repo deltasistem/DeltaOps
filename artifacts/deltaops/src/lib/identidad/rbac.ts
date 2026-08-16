@@ -227,6 +227,10 @@ export function gruposNavegacion(
   if (tiene("activos")) informacion.push({ clave: "hoja-de-vida", nombre: "Hoja de vida", ruta: "/activos" });
   // «Combustible» reutiliza la superficie de tanqueos de Utilización.
   if (opciones?.utilizacionVisible) informacion.push({ clave: "combustible", nombre: "Combustible", ruta: "/utilizacion/tanqueos" });
+  // FINAL-02 · «Informes» es consulta transversal de SOLO LECTURA sobre read
+  // models existentes; visible a TODO rol con el módulo de activos (incl.
+  // CONSULTA y TECNICO). El backend aplica RBAC/tenant en cada dataset.
+  if (tiene("activos")) informacion.push({ clave: "informes", nombre: "Informes", ruta: "/informes" });
   if (tiene("analytics")) informacion.push({ clave: "analytics", nombre: "Indicadores", ruta: "/analytics" });
   // Costos es una superficie propia (/costos) sin enum de módulo; se ofrece a
   // roles con capacidad de consulta administrativa/supervisión.
