@@ -1,0 +1,932 @@
+# DIRECTIVA OFICIAL — DELTAOPS DEPLOY-01
+## Discovery y Diseño de Infraestructura para Producción
+
+### CONTEXTO
+
+DELTAOPS LITE ha finalizado las fases funcionales LITE-01 a LITE-09 y se encuentra en preparación para su eventual despliegue a producción.
+
+El objetivo NO es desplegar todavía.
+
+Esta fase corresponde exclusivamente al descubrimiento técnico y diseño de la arquitectura de producción.
+
+La aplicación debe conservar toda la seguridad y arquitectura alcanzada durante DGP-023.x y DELTAOPS LITE.
+
+La prioridad es llevar a producción la versión DELTAOPS LITE, no reactivar ni exponer innecesariamente la complejidad de la plataforma original.
+
+---
+
+# REGLA ABSOLUTA DE ESTA FASE
+
+ESTA FASE ES SOLO DISCOVERY.
+
+NO modificar:
+
+- código;
+- base de datos;
+- migraciones;
+- tablas;
+- datos;
+- roles PostgreSQL;
+- RLS;
+- FORCE RLS;
+- grants;
+- ownership;
+- RBAC;
+- permisos;
+- contratos API;
+- OpenAPI;
+- frontend;
+- navegación;
+- UI;
+- workflows;
+- secrets;
+- variables de entorno;
+- DNS;
+- Cloudflare;
+- dominio;
+- servidor;
+- procesos de producción;
+- configuración de despliegue.
+
+NO crear infraestructura.
+
+NO ejecutar migraciones.
+
+NO importar datos.
+
+NO modificar el entorno actual.
+
+NO reiniciar servicios salvo que sea estrictamente necesario para una comprobación de solo lectura; preferiblemente no reiniciar nada.
+
+NO cambiar archivos.
+
+NO instalar paquetes.
+
+NO crear usuarios ni roles.
+
+NO generar ni rotar credenciales.
+
+NO realizar pruebas destructivas.
+
+NO utilizar valores ficticios como si fueran infraestructura real.
+
+Si alguna comprobación requiere una mutación, DETENERSE y documentarla como "NO VERIFICADA — requiere implementación".
+
+---
+
+# OBJETIVO
+
+Determinar exactamente qué necesitamos para pasar DELTAOPS LITE desde el entorno actual de desarrollo hacia una arquitectura de producción segura, mantenible, económica y adecuada al tamaño real de Delta Logística.
+
+La respuesta debe estar basada en:
+
+1. código real;
+2. configuración real;
+3. arquitectura actual;
+4. DGP-023.1–023.6;
+5. DELTAOPS LITE-01–LITE-09;
+6. estructura real de PostgreSQL;
+7. workflows de despliegue existentes;
+8. variables de entorno existentes, SIN revelar sus valores;
+9. dependencias reales;
+10. documentación existente.
+
+NO asumir infraestructura que no esté confirmada.
+
+---
+
+# PRINCIPIO ARQUITECTÓNICO
+
+La arquitectura objetivo debe ser:
+
+PRODUCCIÓN
+    ↓
+DOMINIO / HTTPS
+    ↓
+Cloudflare
+    ↓
+Servidor de aplicación
+    ├── Frontend DELTAOPS LITE
+    └── API / Backend
+             ↓
+       PostgreSQL PRODUCCIÓN
+
+Pero NO asumir todavía:
+
+- proveedor del VPS;
+- proveedor PostgreSQL;
+- IP;
+- dominio definitivo;
+- subdominio;
+- sistema operativo;
+- proxy;
+- Docker;
+- Nginx;
+- Caddy;
+- PM2;
+- systemd;
+- proveedor cloud.
+
+Primero descubrir qué es realmente compatible con la aplicación.
+
+---
+
+# 1. INVENTARIO DE ARQUITECTURA ACTUAL
+
+Identificar y documentar:
+
+- frontend;
+- backend;
+- framework frontend;
+- framework backend;
+- runtime;
+- versión de Node/Python/etc.;
+- package manager;
+- proceso de build;
+- proceso de ejecución;
+- servidor HTTP;
+- servidor de desarrollo;
+- proceso productivo actual;
+- estructura monorepo;
+- paquetes internos;
+- librerías críticas;
+- servicios externos;
+- almacenamiento;
+- autenticación;
+- sesiones;
+- PostgreSQL;
+- correo;
+- Microsoft Graph;
+- QR;
+- cualquier otro servicio externo.
+
+Para cada componente indicar:
+
+ESTADO:
+- VERIFICADO
+- PARCIAL
+- NO VERIFICADO
+
+No inferir.
+
+---
+
+# 2. ARQUITECTURA ACTUAL DE POSTGRESQL
+
+Auditar SIN MODIFICAR.
+
+Documentar:
+
+- proveedor actual;
+- motor;
+- versión;
+- base de datos;
+- esquema;
+- conexión;
+- roles;
+- ownership;
+- runtime role;
+- migration role;
+- RLS;
+- FORCE RLS;
+- tablas globales;
+- tablas tenant-scoped;
+- funciones SECURITY DEFINER;
+- grants relevantes;
+- secuencias;
+- extensiones;
+- dependencias específicas del proveedor.
+
+Confirmar especialmente el resultado de DGP-023.5:
+
+deltaops_owner
+deltaops_app_rw
+deltaops_app
+
+Confirmar que:
+
+deltaops_app NO es:
+
+- superuser;
+- bypassrls;
+- createrole;
+- createdb;
+- replication;
+- owner de objetos.
+
+NO mostrar contraseñas ni connection strings completas.
+
+---
+
+# 3. DEPENDENCIA DEL PROVEEDOR ACTUAL
+
+Determinar qué partes de DELTAOPS dependen específicamente del entorno actual.
+
+Buscar dependencias de:
+
+- Replit;
+- Helium;
+- PostgreSQL administrado actual;
+- filesystem local;
+- variables propietarias;
+- servicios propietarios;
+- procesos de Replit;
+- URLs internas;
+- storage;
+- secrets;
+- mecanismos de deployment.
+
+Clasificar cada dependencia:
+
+A. necesaria para producción
+B. reemplazable
+C. solo desarrollo
+D. legado
+E. desconocida
+
+IMPORTANTE:
+
+No asumir que PostgreSQL puede moverse de proveedor sin consecuencias.
+
+Documentar exactamente qué se debería validar para una eventual migración de PostgreSQL.
+
+---
+
+# 4. VARIABLES DE ENTORNO Y SECRETS
+
+Inventariar TODAS las variables que consume el código.
+
+Mostrar únicamente:
+
+NOMBRE
+ORIGEN ESPERADO
+OBLIGATORIA/OPCIONAL
+ENTORNO
+COMPONENTE QUE LA USA
+RIESGO SI FALTA
+
+NUNCA mostrar:
+
+- valor;
+- contraseña;
+- token;
+- API key;
+- connection string completa;
+- secret;
+- cookie secret.
+
+Revisar especialmente:
+
+- DATABASE_URL;
+- DATABASE_MIGRATION_URL;
+- DELTAOPS_APP_PASSWORD;
+- DELTAOPS_OWNER_PASSWORD;
+- SESSION_SECRET;
+- variables Graph/M365;
+- CORS;
+- NODE_ENV;
+- URLs públicas;
+- cualquier variable de storage;
+- cualquier variable de correo.
+
+Confirmar el hallazgo I-03 de DGP-023.6:
+
+Si falta DELTAOPS_APP_PASSWORD en producción, ¿el sistema todavía puede caer a DATABASE_URL?
+
+Determinar si esto ya fue corregido o continúa pendiente.
+
+NO corregirlo todavía.
+
+---
+
+# 5. CONFIGURACIÓN DE PRODUCCIÓN
+
+Auditar:
+
+NODE_ENV
+CORS
+cookies
+Secure
+SameSite
+httpOnly
+trust proxy
+headers
+CSP si existe
+sesiones
+timeouts
+logs
+errores
+stack traces
+health checks
+ready checks
+graceful shutdown
+
+Confirmar específicamente los hallazgos de DGP-023.6:
+
+I-03
+I-05
+I-09
+I-10
+
+Para cada uno indicar:
+
+ESTADO ACTUAL
+RIESGO
+ACCIÓN NECESARIA PARA PRODUCCIÓN
+SI REQUIERE CAMBIO DE CÓDIGO
+SI REQUIERE SOLO CONFIGURACIÓN
+
+NO realizar los cambios todavía.
+
+---
+
+# 6. HEALTH CHECK Y READINESS
+
+Determinar:
+
+/health
+/ready
+
+Para cada uno indicar:
+
+- qué verifica;
+- si consulta PostgreSQL;
+- si detecta secrets faltantes;
+- si detecta dependencias críticas;
+- si es apropiado para liveness;
+- si es apropiado para readiness.
+
+Recomendar cuál debe utilizar el sistema de producción para:
+
+- health check;
+- readiness;
+- deployment gate.
+
+---
+
+# 7. BUILD Y ARRANQUE PRODUCTIVO
+
+Determinar exactamente:
+
+COMANDO DE BUILD
+COMANDO DE ARRANQUE
+PUERTO
+HOST
+PROCESO
+WORKERS
+TIMEOUTS
+VARIABLES NECESARIAS
+
+Ejemplo de formato:
+
+Build:
+[comando real]
+
+Start:
+[comando real]
+
+Health:
+[ruta real]
+
+Ready:
+[ruta real]
+
+NO inventar comandos.
+
+Si actualmente solo existe configuración para Replit, documentarlo.
+
+---
+
+# 8. ALMACENAMIENTO DE ARCHIVOS
+
+Auditar si la aplicación realmente necesita filesystem persistente.
+
+Determinar:
+
+- imágenes;
+- evidencias;
+- documentos;
+- Excel;
+- archivos históricos;
+- PDFs;
+- adjuntos;
+- QR;
+- reportes.
+
+Para cada uno indicar:
+
+LOCAL
+BASE DE DATOS
+REFERENCIA-ONLY
+STORAGE EXTERNO
+NO IMPLEMENTADO
+
+Confirmar el hallazgo de DGP-023.6 sobre storage reference-only.
+
+IMPORTANTE:
+
+El futuro proceso de importación de Excel NO debe depender de almacenamiento local efímero.
+
+---
+
+# 9. CORREO Y MICROSOFT GRAPH
+
+Determinar:
+
+- qué funcionalidades usan correo;
+- qué funcionalidades usan Microsoft Graph;
+- variables necesarias;
+- permisos necesarios;
+- si el sistema puede arrancar sin Graph;
+- si Graph es requisito de producción;
+- qué sucede cuando Graph no está disponible.
+
+No enviar correos.
+
+No realizar llamadas mutantes.
+
+---
+
+# 10. DOMINIO Y HTTPS
+
+NO modificar DNS.
+
+Determinar únicamente qué necesita la aplicación:
+
+- dominio;
+- subdominio;
+- HTTPS;
+- CORS;
+- cookies;
+- callback URLs;
+- URLs absolutas;
+- QR;
+- enlaces de correo;
+- URLs de archivos.
+
+No asumir todavía el dominio definitivo.
+
+Como posibilidades de análisis, considerar:
+
+deltaops.deltalogistica.com.co
+mantenimiento.deltalogistica.com.co
+
+pero NO elegir ni crear ninguno.
+
+---
+
+# 11. CLOUDFLARE
+
+Determinar qué configuración será necesaria eventualmente:
+
+- DNS;
+- proxy;
+- SSL/TLS;
+- HTTPS;
+- headers;
+- cache;
+- WAF;
+- reglas necesarias;
+- exclusiones necesarias para API;
+- WebSockets si existen;
+- límites de carga;
+- archivos Excel;
+- uploads.
+
+NO modificar Cloudflare.
+
+---
+
+# 12. SERVIDOR
+
+Determinar los requisitos mínimos reales del servidor.
+
+Indicar:
+
+CPU mínima
+RAM mínima
+RAM recomendada
+disco mínimo
+disco recomendado
+sistema operativo
+Node/runtime
+PostgreSQL local o externo
+proxy
+SSL
+backup
+logs
+monitorización
+
+Separar:
+
+REQUISITO MÍNIMO
+RECOMENDADO
+
+No recomendar infraestructura sobredimensionada.
+
+DeltaOps Lite debe ser razonable para una organización de nuestro tamaño.
+
+---
+
+# 13. BACKUPS Y RECUPERACIÓN
+
+Diseñar conceptualmente:
+
+- backup PostgreSQL;
+- frecuencia;
+- retención;
+- recuperación;
+- backup antes de migraciones;
+- backup antes de importaciones históricas;
+- rollback de aplicación;
+- rollback de datos.
+
+NO ejecutar backups destructivos ni modificar políticas actuales.
+
+---
+
+# 14. SEGURIDAD
+
+Revisar:
+
+- PostgreSQL;
+- secrets;
+- sesiones;
+- cookies;
+- CORS;
+- RLS;
+- RBAC;
+- headers;
+- HTTPS;
+- exposición de endpoints;
+- logs;
+- errores;
+- archivos;
+- uploads;
+- Excel.
+
+Confirmar que el backend continúa siendo la autoridad de seguridad.
+
+Nunca recomendar seguridad basada únicamente en ocultar módulos del frontend.
+
+---
+
+# 15. DEPENDENCIAS DE PRODUCCIÓN
+
+Generar una tabla:
+
+| Dependencia | Uso | Obligatoria | Proveedor | Riesgo | Acción |
+|---|---|---|---|---|---|
+
+Incluir:
+
+PostgreSQL
+Cloudflare
+Microsoft Graph
+correo
+storage
+DNS
+HTTPS
+runtime
+etc.
+
+---
+
+# 16. ESTRATEGIA DE MIGRACIÓN
+
+Diseñar conceptualmente la ruta:
+
+DESARROLLO
+↓
+STAGING/PREPRODUCCIÓN
+↓
+PRODUCCIÓN
+
+Indicar:
+
+- qué se copia;
+- qué NO se copia;
+- qué se recrea;
+- qué se migra;
+- qué se valida;
+- qué se debe respaldar;
+- cuándo importar datos históricos.
+
+NO ejecutar ninguna migración.
+
+---
+
+# 17. DATOS HISTÓRICOS
+
+El proyecto tendrá una fase de importación de datos históricos desde Excel.
+
+Documentar las implicaciones de:
+
+- activos;
+- horómetros;
+- mantenimientos;
+- preoperacionales;
+- combustible;
+- horas hombre;
+- repuestos;
+- rutinas;
+- técnicos;
+- fechas históricas.
+
+La importación deberá:
+
+- preservar fechas reales cuando existan;
+- indicar fecha de importación;
+- mantener trazabilidad;
+- no fabricar OT retroactivas;
+- no fabricar imágenes;
+- no inventar datos faltantes;
+- distinguir dato histórico de dato generado actualmente.
+
+No ejecutar ninguna importación en esta fase.
+
+---
+
+# 18. PRODUCCIÓN MULTI-CENTRO
+
+Confirmar qué soporte existe actualmente para:
+
+- empresas;
+- centros de costos;
+- ubicación;
+- activos;
+- responsables;
+- equipos de mantenimiento;
+- usuarios.
+
+No inventar estructura organizacional.
+
+Recordar:
+
+Delta Logística opera con equipos ubicados en diferentes centros y ubicaciones.
+
+No existe necesariamente un coordinador de mantenimiento en cada centro.
+
+La arquitectura NO debe imponer un coordinador universal.
+
+---
+
+# 19. PLANES Y RUTINAS
+
+Confirmar que la producción utilizará:
+
+RUTINAS
+↓
+HORÓMETRO/KM/CICLOS
+↓
+NOTIFICACIÓN / ESTADO
+↓
+GENERAR MANTENIMIENTO
+
+No asumir que:
+
+RUTINA VENCIDA → OT AUTOMÁTICA
+
+porque esa no es la regla definida.
+
+---
+
+# 20. INVENTARIO
+
+Confirmar que el inventario no debe convertirse en dependencia obligatoria del mantenimiento.
+
+La operación debe poder registrar:
+
+- repuesto;
+- insumo;
+- proveedor;
+- costo;
+
+sin exigir un maestro de proveedores complejo para cada compra.
+
+El proveedor puede mantenerse como dato transaccional cuando corresponda.
+
+No cambiar nada ahora.
+
+---
+
+# 21. MATRIZ DE RIESGOS
+
+Crear:
+
+| Riesgo | Severidad | Evidencia | Bloquea producción | Acción |
+|---|---|---|---|---|
+
+Separar claramente:
+
+🔴 BLOQUEANTE
+🟠 ALTO
+🟡 MEDIO
+🟢 BAJO
+⚪ DEUDA TÉCNICA
+
+No inflar riesgos.
+
+---
+
+# 22. CHECKLIST PRE-PRODUCCIÓN
+
+Crear un checklist exhaustivo dividido en:
+
+A. Aplicación
+B. PostgreSQL
+C. Secrets
+D. Seguridad
+E. Servidor
+F. Dominio
+G. Cloudflare
+H. Backups
+I. Datos históricos
+J. Usuarios
+K. Pruebas
+L. Rollback
+
+Cada punto debe tener:
+
+VERIFICADO
+NO VERIFICADO
+NO APLICA
+REQUIERE CAMBIO
+
+---
+
+# 23. ARQUITECTURA OBJETIVO
+
+Proponer una arquitectura de producción concreta basada exclusivamente en lo descubierto.
+
+Mostrar:
+
+ACTUAL
+↓
+CAMBIOS NECESARIOS
+↓
+OBJETIVO
+
+Para cada cambio indicar:
+
+- código;
+- configuración;
+- infraestructura;
+- datos;
+- DNS;
+- secrets.
+
+---
+
+# 24. ORDEN EXACTO DE LAS FUTURAS FASES
+
+Proponer el orden recomendado para ejecutar posteriormente:
+
+DEPLOY-01 Discovery
+DEPLOY-02 PostgreSQL
+DEPLOY-03 Secrets/configuración
+DEPLOY-04 Servidor/aplicación
+DEPLOY-05 Dominio/Cloudflare/HTTPS
+DEPLOY-06 Datos históricos
+DEPLOY-07 Pruebas de aceptación
+DEPLOY-08 Cutover
+
+Puedes fusionar fases si la evidencia demuestra que es más eficiente, pero debes justificarlo.
+
+---
+
+# 25. CRITERIO DE ÉXITO
+
+El Discovery se considera PASS únicamente si:
+
+1. Se conoce la arquitectura actual real.
+2. Se conocen las dependencias de producción.
+3. Se conoce la estrategia PostgreSQL.
+4. Se conocen los secrets requeridos SIN revelar valores.
+5. Se conocen los cambios necesarios para producción.
+6. Se conocen los requisitos del servidor.
+7. Se conoce la estrategia de dominio/HTTPS.
+8. Se conocen los requisitos Cloudflare.
+9. Se conoce la estrategia de backups.
+10. Se conoce la estrategia de migración de datos.
+11. Se conocen los riesgos.
+12. Existe checklist pre-producción.
+13. Existe orden de ejecución.
+14. No quedan bloqueantes ocultos.
+
+---
+
+# 26. REVISIÓN INDEPENDIENTE
+
+Antes de cerrar la fase, realiza una revisión independiente de tu propio Discovery.
+
+No aceptes automáticamente las conclusiones del análisis inicial.
+
+Verifica:
+
+- arquitectura;
+- PostgreSQL;
+- roles;
+- RLS;
+- secrets;
+- dependencias;
+- build;
+- runtime;
+- health;
+- readiness;
+- almacenamiento;
+- dominio;
+- seguridad;
+- backups;
+- migración.
+
+Si encuentras una contradicción, corrígela en el documento de Discovery, NO en el código.
+
+---
+
+# 27. ENTREGABLE ÚNICO
+
+Crear:
+
+docs/dgp/DELTAOPS-DEPLOY-01-DISCOVERY-INFRA-PRODUCCION.md
+
+Debe contener:
+
+1. Resumen ejecutivo
+2. Estado actual
+3. Arquitectura actual
+4. PostgreSQL
+5. Roles/RLS
+6. Secrets
+7. Configuración
+8. Build/runtime
+9. Storage
+10. Graph/correo
+11. Dominio
+12. Cloudflare
+13. Servidor
+14. Backups
+15. Seguridad
+16. Dependencias
+17. Migración
+18. Datos históricos
+19. Multicentro
+20. Rutinas
+21. Inventario
+22. Riesgos
+23. Checklist
+24. Arquitectura objetivo
+25. Roadmap
+26. Criterios de aceptación
+27. Revisión independiente
+28. Conclusión ejecutiva
+
+Toda afirmación técnica debe estar respaldada por:
+
+archivo:línea
+configuración real
+catálogo SQL
+workflow
+o evidencia equivalente.
+
+---
+
+# 28. REGLA FINAL DE DETENCIÓN
+
+Al finalizar:
+
+NO implementar nada.
+
+NO modificar código.
+
+NO modificar base de datos.
+
+NO crear servidor.
+
+NO crear dominio.
+
+NO tocar Cloudflare.
+
+NO importar Excel.
+
+NO crear secrets.
+
+NO modificar configuración.
+
+NO desplegar.
+
+Entregar únicamente el informe:
+
+docs/dgp/DELTAOPS-DEPLOY-01-DISCOVERY-INFRA-PRODUCCION.md
+
+Después de generar el informe, ejecutar una revisión independiente y detenerse.
+
+Veredicto esperado:
+
+DELTAOPS DEPLOY-01 — PASS / PASS CON CONDICIONES / FAIL
+
+Si existen bloqueantes, enumerarlos claramente.
+
+Si NO existen bloqueantes, indicar exactamente qué fase debe ejecutarse a continuación.
+
+DETENERSE Y ESPERAR APROBACIÓN EXPLÍCITA DE DIRECCIÓN.
