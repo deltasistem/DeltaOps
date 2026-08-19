@@ -5,9 +5,11 @@ import { resolveRuntimeConnectionString } from "./runtime-connection";
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
+const runtimeConnectionString = resolveRuntimeConnectionString();
+
+if (!runtimeConnectionString) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "DATABASE_URL debe estar definida fuera de producción. ¿Falta provisionar la base de desarrollo?",
   );
 }
 
@@ -18,7 +20,7 @@ if (!process.env.DATABASE_URL) {
  * crear el pool. Ver ese módulo para el detalle de barreras y rollback.
  */
 export const pool = new Pool({
-  connectionString: resolveRuntimeConnectionString(),
+  connectionString: runtimeConnectionString,
 });
 export const db = drizzle(pool, { schema });
 
@@ -44,6 +46,7 @@ export {
 
 export {
   resolveRuntimeConnectionString,
+  validateNeonProductionConnectionString,
   type EntornoConexion,
 } from "./runtime-connection";
 

@@ -28,6 +28,27 @@ describe("configuración por ambientes", () => {
     ).toThrow(/DATABASE_URL/);
   });
 
+  it("en producción exige NEON_DATABASE_URL y no DATABASE_URL", () => {
+    const config = loadDeltaopsConfig({
+      NODE_ENV: "production",
+      NEON_DATABASE_URL:
+        "postgresql://deltaops_app:x@ep-example.neon.tech/neondb?sslmode=require",
+      SESSION_SECRET: "x",
+    } as NodeJS.ProcessEnv);
+    expect(config.NEON_DATABASE_URL).toContain("neondb");
+    expect(config.DATABASE_URL).toBeUndefined();
+  });
+
+  it("falla explícitamente si falta NEON_DATABASE_URL en producción", () => {
+    expect(() =>
+      loadDeltaopsConfig({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgres://localhost/heliumdb",
+        SESSION_SECRET: "x",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/NEON_DATABASE_URL/);
+  });
+
   it("falla explícitamente si falta SESSION_SECRET (camino triste)", () => {
     expect(() =>
       loadDeltaopsConfig({

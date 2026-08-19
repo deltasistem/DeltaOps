@@ -157,12 +157,13 @@ consumen los `principal*` de cada módulo (contratos congelados), evitando
 | Secreto | Obligatorio | Uso |
 |---|---|---|
 | `SESSION_SECRET` | sí | Firma de cookies de sesión; *fallback* de la clave HMAC de adjuntos |
-| `DELTAOPS_APP_PASSWORD` | sí en prod | Contraseña del runtime `deltaops_app` (RLS efectiva; fail-fast si falta) |
+| `NEON_DATABASE_URL` | sí en prod | URL dedicada de Neon `neondb` como `deltaops_app`, con TLS obligatorio; nunca se registra |
+| `DELTAOPS_APP_PASSWORD` | sí en desarrollo administrado | Contraseña para componer la conexión local `deltaops_app`; producción no la usa como URL |
 | `DELTAOPS_OWNER_PASSWORD` | sí para migración/seed | Contraseña del rol owner |
 | `ATTACHMENT_URL_SECRET` | opcional | Clave HMAC dedicada de URLs firmadas de adjuntos (fallback a `SESSION_SECRET`) |
 | `GRAPH_TENANT_ID` / `GRAPH_CLIENT_ID` / `GRAPH_CLIENT_SECRET` / `GRAPH_SENDER` | sí si `m365-graph` | Microsoft Graph (Mail.Send) |
 | `DEMO_*_PASSWORD`, `DELTAOPS_ADMIN_PASSWORD` | sí en prod (seed) | Contraseñas de usuarios sembrados |
-| `DATABASE_URL` / `PG*` | sí | Conexión admin (runtime-managed); fallback del pool |
+| `DATABASE_URL` / `PG*` | sí fuera de prod | Conexión administrada de desarrollo/test; nunca es fallback en producción |
 
 - **Higiene verificada (DGP-023.6 §2):** cero secretos reales en repositorio,
   docs, tests, fixtures/seeds ni en los últimos 30 commits; los únicos literales
@@ -182,18 +183,19 @@ consumen los `principal*` de cada módulo (contratos congelados), evitando
 `lib/db/src/index.ts` (con `runtime-connection.ts` como función pura testeable):
 
 1. Si `DELTAOPS_DB_ROLE=owner` + `DELTAOPS_OWNER_PASSWORD` → URL de
-   `deltaops_owner` (migración/seed).
-2. Si `DELTAOPS_APP_PASSWORD` (+ `PGHOST/PGDATABASE`) → URL de `deltaops_app`
-   (runtime de mínimo privilegio).
-3. Si no hay secretos → *fallback* a `DATABASE_URL` (admin).
+   `deltaops_owner` (migración/seed explícito; no es runtime normal).
+2. En `NODE_ENV=production` → `NEON_DATABASE_URL`, validada como `neondb` +
+   `deltaops_app` + TLS.
+3. Fuera de producción, si existe `DELTAOPS_APP_PASSWORD` junto con
+   `PGHOST/PGDATABASE` → URL local de `deltaops_app`.
+4. Solo fuera de producción y sin esas variables → fallback a `DATABASE_URL`.
 
-**Hardening (LITE-11 §11/§12, corrige I-03):** en **producción**, si falta
-`DELTAOPS_APP_PASSWORD` y no se pidió rol owner, el resolvedor **LANZA** con
-mensaje claro (sin secretos) en vez de caer al admin superusuario de
-`DATABASE_URL` (que anularía la RLS — DGP-023.5). Fuera de producción, el
-fallback sigue disponible como rollback documentado. Cubierto por
-`lib/db/src/__tests__/runtime-connection.test.ts` (incluye "el error no expone
-secretos").
+**Hardening Neon:** en producción, si falta `NEON_DATABASE_URL`, apunta a otra
+base, declara otro usuario o no exige TLS, el resolvedor **LANZA** con mensaje
+redactado. No existe fallback productivo a `DATABASE_URL`, `PG*` ni heliumdb.
+Fuera de producción se conserva la resolución histórica. Cubierto por
+`lib/db/src/__tests__/runtime-connection.test.ts`, incluidos los casos que
+comprueban que los errores no exponen URL ni credenciales.
 
 ---
 

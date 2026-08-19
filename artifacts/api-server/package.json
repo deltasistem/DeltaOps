@@ -9,6 +9,7 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "seed:demo": "DELTAOPS_DB_ROLE=owner tsx ./src/seed/seed-delta-demo.ts",
     "m365:graph:smoke": "tsx ./scripts/m365-graph-smoke.ts",
+    "neon:diagnostic": "tsx ./scripts/neon-readonly-diagnostic.ts",
     "openapi:identity": "tsx ./scripts/generar-openapi-identity.ts",
     "test": "DELTAOPS_DB_ROLE=owner vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"

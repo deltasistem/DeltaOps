@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveRuntimeConnectionString,
+  validateNeonProductionConnectionString,
   type EntornoConexion,
 } from "../runtime-connection";
 
@@ -15,13 +16,18 @@ const base: EntornoConexion = {
   DATABASE_URL: "postgres://admin:secreto@db.internal:5432/heliumdb",
 };
 
+const neonUrl =
+  "postgresql://deltaops_app:app-pass@ep-example.neon.tech/neondb?sslmode=require";
+
 describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", () => {
   it("compone la conexión del rol de mínimo privilegio cuando hay DELTAOPS_APP_PASSWORD", () => {
     const url = resolveRuntimeConnectionString({
       ...base,
       DELTAOPS_APP_PASSWORD: "app-pass",
     });
-    expect(url).toBe("postgres://deltaops_app:app-pass@db.internal:5432/heliumdb");
+    expect(url).toBe(
+      "postgres://deltaops_app:app-pass@db.internal:5432/heliumdb",
+    );
     // NUNCA cae al admin de DATABASE_URL cuando hay password de app.
     expect(url).not.toContain("admin");
   });
@@ -32,28 +38,45 @@ describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", (
       DELTAOPS_DB_ROLE: "owner",
       DELTAOPS_OWNER_PASSWORD: "owner-pass",
     });
-    expect(url).toBe("postgres://deltaops_owner:owner-pass@db.internal:5432/heliumdb");
+    expect(url).toBe(
+      "postgres://deltaops_owner:owner-pass@db.internal:5432/heliumdb",
+    );
   });
 
-  it("LANZA en producción si falta DELTAOPS_APP_PASSWORD y no es owner (no fallback silencioso)", () => {
+  it("en producción selecciona exclusivamente NEON_DATABASE_URL", () => {
+    const url = resolveRuntimeConnectionString({
+      ...base,
+      NODE_ENV: "production",
+      DELTAOPS_APP_PASSWORD: "password-helium-que-debe-ignorarse",
+      NEON_DATABASE_URL: neonUrl,
+    });
+    expect(url).toBe(neonUrl);
+    expect(url).not.toContain("db.internal");
+    expect(url).not.toContain("heliumdb");
+  });
+
+  it("LANZA en producción si falta NEON_DATABASE_URL (no fallback a heliumdb)", () => {
     expect(() =>
       resolveRuntimeConnectionString({
         ...base,
         NODE_ENV: "production",
-        // sin DELTAOPS_APP_PASSWORD, sin DELTAOPS_DB_ROLE=owner
+        DELTAOPS_APP_PASSWORD: "app-pass",
+        // sin NEON_DATABASE_URL, sin DELTAOPS_DB_ROLE=owner
       }),
-    ).toThrow(/FAIL-FAST .*DELTAOPS_APP_PASSWORD.*producción/i);
+    ).toThrow(/FAIL-FAST.*NEON_DATABASE_URL.*producción/i);
   });
 
-  it("el mensaje de error NO expone secretos ni la cadena admin", () => {
+  it("los errores de validación Neon NO exponen secretos ni la URL", () => {
+    const invalida =
+      "postgresql://deltaops_owner:secreto-neon@ep-example.neon.tech/neondb?sslmode=require";
     let msg = "";
     try {
-      resolveRuntimeConnectionString({ ...base, NODE_ENV: "production" });
+      validateNeonProductionConnectionString(invalida);
     } catch (e) {
       msg = (e as Error).message;
     }
-    expect(msg).not.toContain("secreto");
-    expect(msg).not.toContain(base.DATABASE_URL as string);
+    expect(msg).not.toContain("secreto-neon");
+    expect(msg).not.toContain(invalida);
   });
 
   it("en producción con DELTAOPS_DB_ROLE=owner explícito, permite el camino owner/migración", () => {
@@ -63,11 +86,16 @@ describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", (
       DELTAOPS_DB_ROLE: "owner",
       DELTAOPS_OWNER_PASSWORD: "owner-pass",
     });
-    expect(url).toBe("postgres://deltaops_owner:owner-pass@db.internal:5432/heliumdb");
+    expect(url).toBe(
+      "postgres://deltaops_owner:owner-pass@db.internal:5432/heliumdb",
+    );
   });
 
   it("fuera de producción, sin DELTAOPS_APP_PASSWORD, hace fallback a DATABASE_URL (rollback documentado)", () => {
-    const url = resolveRuntimeConnectionString({ ...base, NODE_ENV: "development" });
+    const url = resolveRuntimeConnectionString({
+      ...base,
+      NODE_ENV: "development",
+    });
     expect(url).toBe(base.DATABASE_URL);
   });
 
@@ -96,5 +124,31 @@ describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", (
       msg = (e as Error).message;
     }
     expect(msg).not.toContain(base.DATABASE_URL as string);
+  });
+
+  it("rechaza un usuario productivo diferente de deltaops_app", () => {
+    expect(() =>
+      validateNeonProductionConnectionString(
+        "postgresql://deltaops_owner:x@ep-example.neon.tech/neondb?sslmode=require",
+      ),
+    ).toThrow(/deltaops_app.*owner\/admin/i);
+  });
+
+  it("rechaza una base productiva diferente de neondb", () => {
+    expect(() =>
+      validateNeonProductionConnectionString(
+        "postgresql://deltaops_app:x@ep-example.neon.tech/heliumdb?sslmode=require",
+      ),
+    ).toThrow(/neondb/i);
+  });
+
+  it.each([
+    "postgresql://deltaops_app:x@ep-example.neon.tech/neondb",
+    "postgresql://deltaops_app:x@ep-example.neon.tech/neondb?sslmode=disable",
+    "postgresql://deltaops_app:x@ep-example.neon.tech/neondb?sslmode=prefer",
+  ])("rechaza Neon sin un sslmode seguro", (url) => {
+    expect(() => validateNeonProductionConnectionString(url)).toThrow(
+      /sslmode=require.*disable/i,
+    );
   });
 });

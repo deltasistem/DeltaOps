@@ -3,12 +3,12 @@
  * conexión de RUNTIME, aislada como función PURA y testeable.
  *
  * El runtime debe conectar como el rol de mínimo privilegio `deltaops_app`
- * (NOSUPERUSER, NOBYPASSRLS, no owner) para que la RLS sea EFECTIVA. La cadena
- * se COMPONE en código desde el entorno — nunca literal en el repositorio ni en
- * logs:
- *   - host/puerto/base: PGHOST/PGPORT/PGDATABASE.
- *   - usuario: `deltaops_app` (fijo, no secreto).
- *   - contraseña: secreto `DELTAOPS_APP_PASSWORD`.
+ * (NOSUPERUSER, NOBYPASSRLS, no owner) para que la RLS sea EFECTIVA:
+ *   - desarrollo/test conserva la conexión actual de heliumdb, compuesta desde
+ *     PGHOST/PGPORT/PGDATABASE + DELTAOPS_APP_PASSWORD cuando están presentes,
+ *     y DATABASE_URL como fallback local documentado;
+ *   - producción usa exclusivamente el secret NEON_DATABASE_URL, que debe
+ *     apuntar a neondb como deltaops_app y exigir TLS.
  *
  * FAIL-FAST en producción (ningún secreto se registra ni aparece en el error):
  *   - (I-03) Si falta `DELTAOPS_APP_PASSWORD` y no se pidió el rol owner
@@ -23,12 +23,81 @@
  */
 export type EntornoConexion = Record<string, string | undefined>;
 
-function composeUrl(env: EntornoConexion, user: string, password: string): string {
+const USUARIO_RUNTIME_PRODUCCION = "deltaops_app";
+const BASE_PRODUCCION = "neondb";
+const MODOS_SSL_SEGUROS = new Set(["require", "verify-ca", "verify-full"]);
+
+function composeUrl(
+  env: EntornoConexion,
+  user: string,
+  password: string,
+): string {
   const host = env.PGHOST as string;
   const port = env.PGPORT ?? "5432";
   const database = env.PGDATABASE as string;
   const auth = `${encodeURIComponent(user)}:${encodeURIComponent(password)}`;
   return `postgres://${auth}@${host}:${port}/${database}`;
+}
+
+/**
+ * Valida la URL dedicada del runtime productivo sin abrir una conexión.
+ * Los errores nunca incluyen el valor recibido para evitar filtrar credenciales.
+ */
+export function validateNeonProductionConnectionString(
+  connectionString: string | undefined,
+): string {
+  if (!connectionString) {
+    throw new Error(
+      "[db] FAIL-FAST: falta el secret NEON_DATABASE_URL para el runtime de producción.",
+    );
+  }
+
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    throw new Error(
+      "[db] FAIL-FAST: NEON_DATABASE_URL no es una URL PostgreSQL válida.",
+    );
+  }
+
+  if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
+    throw new Error(
+      "[db] FAIL-FAST: NEON_DATABASE_URL debe usar el protocolo PostgreSQL.",
+    );
+  }
+
+  let user = "";
+  let database = "";
+  try {
+    user = decodeURIComponent(url.username);
+    database = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+  } catch {
+    throw new Error(
+      "[db] FAIL-FAST: NEON_DATABASE_URL contiene usuario o base inválidos.",
+    );
+  }
+
+  if (user !== USUARIO_RUNTIME_PRODUCCION) {
+    throw new Error(
+      "[db] FAIL-FAST: NEON_DATABASE_URL debe autenticar como deltaops_app, nunca como owner/admin.",
+    );
+  }
+
+  if (database !== BASE_PRODUCCION) {
+    throw new Error(
+      "[db] FAIL-FAST: NEON_DATABASE_URL debe apuntar a la base de producción neondb.",
+    );
+  }
+
+  const sslMode = url.searchParams.get("sslmode")?.toLowerCase();
+  if (!sslMode || !MODOS_SSL_SEGUROS.has(sslMode)) {
+    throw new Error(
+      "[db] FAIL-FAST: NEON_DATABASE_URL debe exigir TLS con sslmode=require, verify-ca o verify-full; sslmode=disable no está permitido.",
+    );
+  }
+
+  return connectionString;
 }
 
 /**
@@ -65,22 +134,17 @@ export function resolveRuntimeConnectionString(
     );
   }
 
+  // Runtime normal de producción: Neon queda aislado de las variables
+  // runtime-managed de Replit. No se permite caer a heliumdb/DATABASE_URL.
+  if (enProduccion) {
+    return validateNeonProductionConnectionString(env.NEON_DATABASE_URL);
+  }
+
   // Runtime de la aplicación: rol de mínimo privilegio deltaops_app.
   const appPassword = env.DELTAOPS_APP_PASSWORD;
   if (appPassword && host && database) {
     const user = env.DELTAOPS_APP_USER ?? "deltaops_app";
     return composeUrl(env, user, appPassword);
-  }
-
-  // FAIL-FAST en producción (I-03): sin fallback silencioso a la conexión admin.
-  if (enProduccion && !owner) {
-    throw new Error(
-      "[db] FAIL-FAST (LITE-11 §11/§12, I-03): falta DELTAOPS_APP_PASSWORD en " +
-        "producción. No se permite el fallback a la conexión admin de DATABASE_URL " +
-        "(superusuario) porque anularía la RLS (DGP-023.5). Configure " +
-        "DELTAOPS_APP_PASSWORD para el rol de runtime deltaops_app, o use " +
-        "DELTAOPS_DB_ROLE=owner solo para procesos de migración/mantenimiento.",
-    );
   }
 
   // Fallback / rollback (fuera de producción): conexión admin del proveedor.

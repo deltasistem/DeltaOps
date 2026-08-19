@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./neon-readonly-diagnostic": "./src/neon-readonly-diagnostic.ts",
     "./schema": "./src/schema/index.ts",
     "./test-guard": "./src/test-guard.ts"
   },
