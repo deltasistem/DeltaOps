@@ -157,8 +157,8 @@ consumen los `principal*` de cada módulo (contratos congelados), evitando
 | Secreto | Obligatorio | Uso |
 |---|---|---|
 | `SESSION_SECRET` | sí | Firma de cookies de sesión; *fallback* de la clave HMAC de adjuntos |
-| `NEON_DATABASE_URL` | sí en prod | URL dedicada de Neon `neondb` como `deltaops_app`, con TLS obligatorio normalizado a `verify-full`; nunca se registra |
-| `DELTAOPS_APP_PASSWORD` | sí en desarrollo administrado | Contraseña para componer la conexión local `deltaops_app`; producción no la usa como URL |
+| `NEON_DATABASE_URL` | sí en prod | Endpoint Neon `neondb` como `deltaops_app`, con TLS obligatorio normalizado a `verify-full`; su contraseña embebida no se usa ni se registra |
+| `DELTAOPS_APP_PASSWORD` | sí en prod | Contraseña efectiva del rol Neon `deltaops_app`; no se usa en heliumdb |
 | `DELTAOPS_OWNER_PASSWORD` | sí para migración/seed | Contraseña del rol owner |
 | `ATTACHMENT_URL_SECRET` | opcional | Clave HMAC dedicada de URLs firmadas de adjuntos (fallback a `SESSION_SECRET`) |
 | `GRAPH_TENANT_ID` / `GRAPH_CLIENT_ID` / `GRAPH_CLIENT_SECRET` / `GRAPH_SENDER` | sí si `m365-graph` | Microsoft Graph (Mail.Send) |
@@ -184,16 +184,15 @@ consumen los `principal*` de cada módulo (contratos congelados), evitando
 
 1. Si `DELTAOPS_DB_ROLE=owner` + `DELTAOPS_OWNER_PASSWORD` → URL de
    `deltaops_owner` (migración/seed explícito; no es runtime normal).
-2. En `NODE_ENV=production` → `NEON_DATABASE_URL`, validada como `neondb` +
-   `deltaops_app` + TLS.
-3. Fuera de producción, si existe `DELTAOPS_APP_PASSWORD` junto con
-   `PGHOST/PGDATABASE` → URL local de `deltaops_app`.
-4. Solo fuera de producción y sin esas variables → fallback a `DATABASE_URL`.
+2. En `NODE_ENV=production` → `NEON_DATABASE_URL` validada como `neondb` +
+   `deltaops_app` + TLS, con `DELTAOPS_APP_PASSWORD` como contraseña efectiva.
+3. Fuera de producción → `DATABASE_URL` de heliumdb, sin reutilizar la
+   contraseña productiva.
 
 **Hardening Neon:** en producción, si falta `NEON_DATABASE_URL`, apunta a otra
 base, declara otro usuario o no exige TLS, el resolvedor **LANZA** con mensaje
 redactado. No existe fallback productivo a `DATABASE_URL`, `PG*` ni heliumdb.
-Fuera de producción se conserva la resolución histórica. Cubierto por
+Fuera de producción se conserva heliumdb mediante `DATABASE_URL`. Cubierto por
 `lib/db/src/__tests__/runtime-connection.test.ts`, incluidos los casos que
 comprueban que los errores no exponen URL ni credenciales.
 

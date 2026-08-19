@@ -10,18 +10,21 @@
 import { runNeonReadonlyDiagnostic } from "@workspace/db/neon-readonly-diagnostic";
 
 async function main(): Promise<void> {
-  if (!process.env.NEON_DATABASE_URL) {
+  if (!process.env.NEON_DATABASE_URL || !process.env.DELTAOPS_APP_PASSWORD) {
     console.error(
-      "NEON DIAGNOSTIC: NO EJECUTADO. Falta el secret NEON_DATABASE_URL.",
+      "NEON DIAGNOSTIC: NO EJECUTADO. Faltan NEON_DATABASE_URL o DELTAOPS_APP_PASSWORD.",
     );
     process.exitCode = 2;
     return;
   }
 
-  const result = await runNeonReadonlyDiagnostic(process.env.NEON_DATABASE_URL);
+  const result = await runNeonReadonlyDiagnostic(
+    process.env.NEON_DATABASE_URL,
+    process.env.DELTAOPS_APP_PASSWORD,
+  );
 
   console.log("=== DeltaOps · diagnóstico Neon (READ-ONLY) ===");
-  console.log("Protección de sesión: default_transaction_read_only=on");
+  console.log("Protección de sesión: BEGIN READ ONLY + ROLLBACK");
   console.log(`current_database: ${result.currentDatabase}`);
   console.log(`current_user: ${result.currentUser}`);
   console.log(`current_schema: ${result.currentSchema ?? "(null)"}`);

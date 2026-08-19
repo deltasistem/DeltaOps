@@ -45,6 +45,7 @@ export {
 } from "./test-guard";
 
 export {
+  resolveNeonProductionConnectionString,
   resolveRuntimeConnectionString,
   validateNeonProductionConnectionString,
   type EntornoConexion,

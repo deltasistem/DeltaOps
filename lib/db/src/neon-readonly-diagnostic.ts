@@ -1,5 +1,5 @@
 import pg from "pg";
-import { validateNeonProductionConnectionString } from "./runtime-connection";
+import { resolveNeonProductionConnectionString } from "./runtime-connection";
 
 const { Pool } = pg;
 
@@ -74,25 +74,32 @@ function safeConnectionError(error: unknown): Error {
 }
 
 /**
- * Diagnóstico aislado y no destructivo. El servidor PostgreSQL fuerza todas las
- * transacciones de esta conexión a READ ONLY antes de ejecutar los SELECT.
+ * Diagnóstico aislado y no destructivo. Cada SELECT se ejecuta dentro de una
+ * transacción explícita BEGIN READ ONLY que siempre finaliza con ROLLBACK.
  */
 export async function runNeonReadonlyDiagnostic(
   connectionString: string | undefined,
+  appPassword: string | undefined,
 ): Promise<NeonReadonlyDiagnosticResult> {
-  const validatedUrl = validateNeonProductionConnectionString(connectionString);
+  const validatedUrl = resolveNeonProductionConnectionString(
+    connectionString,
+    appPassword,
+  );
   const pool = new Pool({
     connectionString: validatedUrl,
     application_name: "deltaops-neon-readonly-diagnostic",
     max: 1,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 1_000,
-    options: "-c default_transaction_read_only=on -c statement_timeout=10000",
   });
 
   try {
     const client = await pool.connect();
+    let transactionOpen = false;
     try {
+      await client.query("BEGIN READ ONLY");
+      transactionOpen = true;
+
       const identity = await client.query<IdentityRow>(`
         SELECT
           current_user,
@@ -149,6 +156,9 @@ export async function runNeonReadonlyDiagnostic(
         exampleTables,
       };
     } finally {
+      if (transactionOpen) {
+        await client.query("ROLLBACK");
+      }
       client.release();
     }
   } catch (error) {

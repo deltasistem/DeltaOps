@@ -4,9 +4,8 @@
  *
  * El runtime debe conectar como el rol de mínimo privilegio `deltaops_app`
  * (NOSUPERUSER, NOBYPASSRLS, no owner) para que la RLS sea EFECTIVA:
- *   - desarrollo/test conserva la conexión actual de heliumdb, compuesta desde
- *     PGHOST/PGPORT/PGDATABASE + DELTAOPS_APP_PASSWORD cuando están presentes,
- *     y DATABASE_URL como fallback local documentado;
+ *   - desarrollo/test conserva la conexión administrada DATABASE_URL de
+ *     heliumdb, sin reutilizar credenciales de Neon;
  *   - producción usa exclusivamente el secret NEON_DATABASE_URL, que debe
  *     apuntar a neondb como deltaops_app y exigir TLS.
  *
@@ -105,6 +104,26 @@ export function validateNeonProductionConnectionString(
 }
 
 /**
+ * Compone la conexión productiva efectiva. La URL de Neon aporta endpoint,
+ * base, usuario y TLS; la contraseña siempre procede del secret independiente
+ * DELTAOPS_APP_PASSWORD para evitar credenciales duplicadas/desincronizadas.
+ */
+export function resolveNeonProductionConnectionString(
+  connectionString: string | undefined,
+  appPassword: string | undefined,
+): string {
+  if (!appPassword) {
+    throw new Error(
+      "[db] FAIL-FAST: falta DELTAOPS_APP_PASSWORD para el runtime de producción.",
+    );
+  }
+
+  const url = new URL(validateNeonProductionConnectionString(connectionString));
+  url.password = appPassword;
+  return url.toString();
+}
+
+/**
  * Resuelve la cadena de conexión de runtime a partir del entorno dado
  * (por defecto `process.env`). Función pura: no crea pools ni conexiones.
  */
@@ -141,16 +160,13 @@ export function resolveRuntimeConnectionString(
   // Runtime normal de producción: Neon queda aislado de las variables
   // runtime-managed de Replit. No se permite caer a heliumdb/DATABASE_URL.
   if (enProduccion) {
-    return validateNeonProductionConnectionString(env.NEON_DATABASE_URL);
+    return resolveNeonProductionConnectionString(
+      env.NEON_DATABASE_URL,
+      env.DELTAOPS_APP_PASSWORD,
+    );
   }
 
-  // Runtime de la aplicación: rol de mínimo privilegio deltaops_app.
-  const appPassword = env.DELTAOPS_APP_PASSWORD;
-  if (appPassword && host && database) {
-    const user = env.DELTAOPS_APP_USER ?? "deltaops_app";
-    return composeUrl(env, user, appPassword);
-  }
-
-  // Fallback / rollback (fuera de producción): conexión admin del proveedor.
+  // Desarrollo/test conserva la conexión administrada de heliumdb. No usa
+  // DELTAOPS_APP_PASSWORD porque ese secret pertenece al rol productivo Neon.
   return env.DATABASE_URL as string;
 }

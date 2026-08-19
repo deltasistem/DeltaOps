@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  resolveNeonProductionConnectionString,
   resolveRuntimeConnectionString,
   validateNeonProductionConnectionString,
   type EntornoConexion,
@@ -20,16 +21,13 @@ const neonUrl =
   "postgresql://deltaops_app:app-pass@ep-example.neon.tech/neondb?sslmode=verify-full";
 
 describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", () => {
-  it("compone la conexión del rol de mínimo privilegio cuando hay DELTAOPS_APP_PASSWORD", () => {
+  it("desarrollo conserva DATABASE_URL de heliumdb aunque exista DELTAOPS_APP_PASSWORD de Neon", () => {
     const url = resolveRuntimeConnectionString({
       ...base,
       DELTAOPS_APP_PASSWORD: "app-pass",
     });
-    expect(url).toBe(
-      "postgres://deltaops_app:app-pass@db.internal:5432/heliumdb",
-    );
-    // NUNCA cae al admin de DATABASE_URL cuando hay password de app.
-    expect(url).not.toContain("admin");
+    expect(url).toBe(base.DATABASE_URL);
+    expect(url).not.toContain("app-pass");
   });
 
   it("usa el rol owner solo cuando se pide EXPLÍCITAMENTE (migración)", () => {
@@ -47,10 +45,10 @@ describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", (
     const url = resolveRuntimeConnectionString({
       ...base,
       NODE_ENV: "production",
-      DELTAOPS_APP_PASSWORD: "password-helium-que-debe-ignorarse",
+      DELTAOPS_APP_PASSWORD: "password-neon-efectivo",
       NEON_DATABASE_URL: neonUrl,
     });
-    expect(url).toBe(neonUrl);
+    expect(new URL(url).password).toBe("password-neon-efectivo");
     expect(url).not.toContain("db.internal");
     expect(url).not.toContain("heliumdb");
   });
@@ -91,7 +89,7 @@ describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", (
     );
   });
 
-  it("fuera de producción, sin DELTAOPS_APP_PASSWORD, hace fallback a DATABASE_URL (rollback documentado)", () => {
+  it("fuera de producción usa DATABASE_URL de desarrollo", () => {
     const url = resolveRuntimeConnectionString({
       ...base,
       NODE_ENV: "development",
@@ -157,5 +155,20 @@ describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", (
       "postgresql://deltaops_app:x@ep-example.neon.tech/neondb?sslmode=require",
     );
     expect(new URL(result).searchParams.get("sslmode")).toBe("verify-full");
+  });
+
+  it("reemplaza la contraseña incluida en la URL por DELTAOPS_APP_PASSWORD", () => {
+    const result = resolveNeonProductionConnectionString(
+      "postgresql://deltaops_app:password-anterior@ep-example.neon.tech/neondb?sslmode=require",
+      "password-actual",
+    );
+    expect(new URL(result).password).toBe("password-actual");
+    expect(result).not.toContain("password-anterior");
+  });
+
+  it("falla si falta DELTAOPS_APP_PASSWORD para conectar a Neon", () => {
+    expect(() =>
+      resolveNeonProductionConnectionString(neonUrl, undefined),
+    ).toThrow(/DELTAOPS_APP_PASSWORD/i);
   });
 });

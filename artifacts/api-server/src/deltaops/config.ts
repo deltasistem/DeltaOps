@@ -13,6 +13,7 @@ const envSchema = z
       .default("development"),
     DATABASE_URL: z.string().min(1).optional(),
     NEON_DATABASE_URL: z.string().min(1).optional(),
+    DELTAOPS_APP_PASSWORD: z.string().min(1).optional(),
     SESSION_SECRET: z.string().min(1, "SESSION_SECRET es obligatoria"),
     LOG_LEVEL: z.string().optional(),
     // DELTAOPS LITE-10 §27 · Lista blanca de orígenes CORS separada por comas
@@ -28,6 +29,14 @@ const envSchema = z
         code: "custom",
         path: ["NEON_DATABASE_URL"],
         message: "NEON_DATABASE_URL es obligatoria en producción",
+      });
+    }
+
+    if (env.NODE_ENV === "production" && !env.DELTAOPS_APP_PASSWORD) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["DELTAOPS_APP_PASSWORD"],
+        message: "DELTAOPS_APP_PASSWORD es obligatoria en producción",
       });
     }
 

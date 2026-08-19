@@ -33,6 +33,7 @@ describe("configuración por ambientes", () => {
       NODE_ENV: "production",
       NEON_DATABASE_URL:
         "postgresql://deltaops_app:x@ep-example.neon.tech/neondb?sslmode=require",
+      DELTAOPS_APP_PASSWORD: "password-productivo",
       SESSION_SECRET: "x",
     } as NodeJS.ProcessEnv);
     expect(config.NEON_DATABASE_URL).toContain("neondb");
@@ -44,9 +45,21 @@ describe("configuración por ambientes", () => {
       loadDeltaopsConfig({
         NODE_ENV: "production",
         DATABASE_URL: "postgres://localhost/heliumdb",
+        DELTAOPS_APP_PASSWORD: "password-productivo",
         SESSION_SECRET: "x",
       } as NodeJS.ProcessEnv),
     ).toThrow(/NEON_DATABASE_URL/);
+  });
+
+  it("falla explícitamente si falta DELTAOPS_APP_PASSWORD en producción", () => {
+    expect(() =>
+      loadDeltaopsConfig({
+        NODE_ENV: "production",
+        NEON_DATABASE_URL:
+          "postgresql://deltaops_app@ep-example.neon.tech/neondb?sslmode=require",
+        SESSION_SECRET: "x",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/DELTAOPS_APP_PASSWORD/);
   });
 
   it("falla explícitamente si falta SESSION_SECRET (camino triste)", () => {

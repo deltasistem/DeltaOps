@@ -153,12 +153,12 @@ El build del frontend produce `dist/public` (estático); el del API produce
 
 | Variable | Propósito | Notas |
 |---|---|---|
-| `DATABASE_URL` | Cadena PostgreSQL de desarrollo/test | Runtime-managed en Replit. Es **fallback solo fuera de producción** (ver §3.3). |
-| `NEON_DATABASE_URL` | Cadena de runtime productivo Neon | Secreto dedicado. Debe apuntar a `neondb` como `deltaops_app` y exigir TLS (`sslmode=require`, `verify-ca` o `verify-full`); el runtime normaliza esos modos a `verify-full`. Nunca se imprime ni se commitea. |
+| `DATABASE_URL` | Cadena PostgreSQL de desarrollo/test | Runtime-managed en Replit. Es la conexión exclusiva de heliumdb fuera de producción (ver §3.3). |
+| `NEON_DATABASE_URL` | Endpoint de runtime productivo Neon | Secreto dedicado. Debe apuntar a `neondb` como `deltaops_app` y exigir TLS (`sslmode=require`, `verify-ca` o `verify-full`); el runtime normaliza esos modos a `verify-full`. Su segmento de contraseña se ignora para evitar duplicación. Nunca se imprime ni se commitea. |
 | `SESSION_SECRET` | Firma de cookies de sesión | Secreto. Sin auto-generación: el arranque falla si falta. También es *fallback* de la clave HMAC de adjuntos si `ATTACHMENT_URL_SECRET` no se define. |
 | `PORT` | Puerto de escucha del API | Obligatoria en runtime; el proceso **lanza** si falta o es inválida. |
 | `NODE_ENV=production` | Gobierna cookie `secure`, proveedor de correo fail-fast y logging | Debe fijarse a `production` en prod (el artefacto lo fija). |
-| `DELTAOPS_APP_PASSWORD` | Contraseña del rol local de mínimo privilegio `deltaops_app` | Secreto usado para componer la conexión de desarrollo/test cuando existen `PGHOST` y `PGDATABASE`. Producción usa exclusivamente `NEON_DATABASE_URL`. |
+| `DELTAOPS_APP_PASSWORD` | Contraseña del rol productivo de mínimo privilegio `deltaops_app` | Contraseña efectiva del runtime Neon. No se reutiliza para heliumdb de desarrollo/test. |
 
 **Obligatorias sólo para migración/seed:**
 
@@ -218,17 +218,18 @@ pnpm --filter @workspace/db run push          # drizzle-kit push (aplica migraci
 
 - El runtime del API conecta como **`deltaops_app`** (NOSUPERUSER, NOBYPASSRLS,
   sin DDL, no owner) para que la **RLS sea efectiva**.
-- En desarrollo/test, la URL de runtime se **compone** desde
-  `PGHOST/PGPORT/PGDATABASE` + usuario fijo + `DELTAOPS_APP_PASSWORD`; el fallback
-  a `DATABASE_URL` se conserva únicamente para esos entornos.
-- En producción, el runtime usa **exclusivamente `NEON_DATABASE_URL`**. El
-  resolvedor valida antes de abrir el pool que la URL apunte a `neondb`, use
-  `deltaops_app` y exija TLS (normalizado a `verify-full`); si falta o es
-  inválida, el arranque falla sin registrar su valor. Nunca cae a `DATABASE_URL`
+- En desarrollo/test, el runtime usa exclusivamente `DATABASE_URL` de heliumdb.
+  No reutiliza `DELTAOPS_APP_PASSWORD`, que pertenece al rol productivo Neon.
+- En producción, el runtime usa **`NEON_DATABASE_URL` +
+  `DELTAOPS_APP_PASSWORD`**. El resolvedor valida antes de abrir el pool que la
+  URL apunte a `neondb`, use `deltaops_app` y exija TLS (normalizado a
+  `verify-full`); sustituye su segmento de contraseña por
+  `DELTAOPS_APP_PASSWORD` para evitar valores duplicados. Si falta o es
+  inválida, el arranque falla sin registrar valores. Nunca cae a `DATABASE_URL`
   ni a heliumdb.
 - Diagnóstico manual no destructivo:
   `pnpm --filter @workspace/api-server neon:diagnostic`. Solo se ejecuta cuando
-  existe `NEON_DATABASE_URL`; fuerza `default_transaction_read_only=on`, ejecuta
+  existe `NEON_DATABASE_URL`; usa `BEGIN READ ONLY` y `ROLLBACK`, ejecuta
   exclusivamente SELECT de identidad/catálogo y nunca carga Drizzle Kit, seeds
   ni migraciones.
 
