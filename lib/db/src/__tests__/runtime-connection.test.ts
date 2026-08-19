@@ -17,7 +17,7 @@ const base: EntornoConexion = {
 };
 
 const neonUrl =
-  "postgresql://deltaops_app:app-pass@ep-example.neon.tech/neondb?sslmode=require";
+  "postgresql://deltaops_app:app-pass@ep-example.neon.tech/neondb?sslmode=verify-full";
 
 describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", () => {
   it("compone la conexión del rol de mínimo privilegio cuando hay DELTAOPS_APP_PASSWORD", () => {
@@ -150,5 +150,12 @@ describe("resolveRuntimeConnectionString · runtime deltaops_app y FAIL-FAST", (
     expect(() => validateNeonProductionConnectionString(url)).toThrow(
       /sslmode=require.*disable/i,
     );
+  });
+
+  it("normaliza sslmode=require a verify-full para conservar validación estricta", () => {
+    const result = validateNeonProductionConnectionString(
+      "postgresql://deltaops_app:x@ep-example.neon.tech/neondb?sslmode=require",
+    );
+    expect(new URL(result).searchParams.get("sslmode")).toBe("verify-full");
   });
 });

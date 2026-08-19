@@ -97,7 +97,11 @@ export function validateNeonProductionConnectionString(
     );
   }
 
-  return connectionString;
+  // node-postgres 8 trata require/verify-ca como verify-full, pero cambiará esa
+  // semántica en v9. Normalizar ahora conserva verificación estricta de
+  // certificado y hostname sin exigir que el operador reescriba la URL de Neon.
+  url.searchParams.set("sslmode", "verify-full");
+  return url.toString();
 }
 
 /**

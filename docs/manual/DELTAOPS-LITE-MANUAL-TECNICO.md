@@ -157,7 +157,7 @@ consumen los `principal*` de cada módulo (contratos congelados), evitando
 | Secreto | Obligatorio | Uso |
 |---|---|---|
 | `SESSION_SECRET` | sí | Firma de cookies de sesión; *fallback* de la clave HMAC de adjuntos |
-| `NEON_DATABASE_URL` | sí en prod | URL dedicada de Neon `neondb` como `deltaops_app`, con TLS obligatorio; nunca se registra |
+| `NEON_DATABASE_URL` | sí en prod | URL dedicada de Neon `neondb` como `deltaops_app`, con TLS obligatorio normalizado a `verify-full`; nunca se registra |
 | `DELTAOPS_APP_PASSWORD` | sí en desarrollo administrado | Contraseña para componer la conexión local `deltaops_app`; producción no la usa como URL |
 | `DELTAOPS_OWNER_PASSWORD` | sí para migración/seed | Contraseña del rol owner |
 | `ATTACHMENT_URL_SECRET` | opcional | Clave HMAC dedicada de URLs firmadas de adjuntos (fallback a `SESSION_SECRET`) |

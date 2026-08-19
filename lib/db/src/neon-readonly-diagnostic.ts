@@ -33,6 +33,46 @@ export type NeonReadonlyDiagnosticResult = {
   exampleTables: string[];
 };
 
+function safeConnectionError(error: unknown): Error {
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : undefined;
+
+  const detail = (() => {
+    switch (code) {
+      case "28P01":
+      case "28000":
+        return "Neon rechazó la autenticación de deltaops_app. Verifique la contraseña de ese rol.";
+      case "3D000":
+        return "La base neondb no existe o no es accesible para deltaops_app.";
+      case "42501":
+        return "deltaops_app no tiene permiso para una de las consultas de catálogo autorizadas.";
+      case "ENOTFOUND":
+      case "EAI_AGAIN":
+        return "No fue posible resolver por DNS el endpoint configurado.";
+      case "ECONNREFUSED":
+        return "El endpoint rechazó la conexión de red.";
+      case "ETIMEDOUT":
+      case "ECONNRESET":
+        return "La conexión de red a Neon expiró o fue reiniciada.";
+      case "DEPTH_ZERO_SELF_SIGNED_CERT":
+      case "SELF_SIGNED_CERT_IN_CHAIN":
+      case "CERT_HAS_EXPIRED":
+      case "ERR_TLS_CERT_ALTNAME_INVALID":
+        return "La validación TLS del certificado de Neon falló.";
+      default:
+        return "Revise NEON_DATABASE_URL, acceso de red, TLS y permisos de deltaops_app.";
+    }
+  })();
+
+  const safeCode = code && /^[A-Z0-9_]+$/.test(code) ? ` Código: ${code}.` : "";
+  return new Error(`[neon-diagnostic] ${detail}${safeCode}`);
+}
+
 /**
  * Diagnóstico aislado y no destructivo. El servidor PostgreSQL fuerza todas las
  * transacciones de esta conexión a READ ONLY antes de ejecutar los SELECT.
@@ -111,10 +151,8 @@ export async function runNeonReadonlyDiagnostic(
     } finally {
       client.release();
     }
-  } catch {
-    throw new Error(
-      "[neon-diagnostic] No se pudo completar la conexión READ-ONLY a Neon. Revise NEON_DATABASE_URL, acceso de red, TLS y permisos de deltaops_app.",
-    );
+  } catch (error) {
+    throw safeConnectionError(error);
   } finally {
     await pool.end();
   }

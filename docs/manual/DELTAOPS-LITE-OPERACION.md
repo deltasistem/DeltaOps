@@ -154,7 +154,7 @@ El build del frontend produce `dist/public` (estático); el del API produce
 | Variable | Propósito | Notas |
 |---|---|---|
 | `DATABASE_URL` | Cadena PostgreSQL de desarrollo/test | Runtime-managed en Replit. Es **fallback solo fuera de producción** (ver §3.3). |
-| `NEON_DATABASE_URL` | Cadena de runtime productivo Neon | Secreto dedicado. Debe apuntar a `neondb` como `deltaops_app` y exigir TLS (`sslmode=require`, `verify-ca` o `verify-full`). Nunca se imprime ni se commitea. |
+| `NEON_DATABASE_URL` | Cadena de runtime productivo Neon | Secreto dedicado. Debe apuntar a `neondb` como `deltaops_app` y exigir TLS (`sslmode=require`, `verify-ca` o `verify-full`); el runtime normaliza esos modos a `verify-full`. Nunca se imprime ni se commitea. |
 | `SESSION_SECRET` | Firma de cookies de sesión | Secreto. Sin auto-generación: el arranque falla si falta. También es *fallback* de la clave HMAC de adjuntos si `ATTACHMENT_URL_SECRET` no se define. |
 | `PORT` | Puerto de escucha del API | Obligatoria en runtime; el proceso **lanza** si falta o es inválida. |
 | `NODE_ENV=production` | Gobierna cookie `secure`, proveedor de correo fail-fast y logging | Debe fijarse a `production` en prod (el artefacto lo fija). |
@@ -223,8 +223,9 @@ pnpm --filter @workspace/db run push          # drizzle-kit push (aplica migraci
   a `DATABASE_URL` se conserva únicamente para esos entornos.
 - En producción, el runtime usa **exclusivamente `NEON_DATABASE_URL`**. El
   resolvedor valida antes de abrir el pool que la URL apunte a `neondb`, use
-  `deltaops_app` y exija TLS; si falta o es inválida, el arranque falla sin
-  registrar su valor. Nunca cae a `DATABASE_URL` ni a heliumdb.
+  `deltaops_app` y exija TLS (normalizado a `verify-full`); si falta o es
+  inválida, el arranque falla sin registrar su valor. Nunca cae a `DATABASE_URL`
+  ni a heliumdb.
 - Diagnóstico manual no destructivo:
   `pnpm --filter @workspace/api-server neon:diagnostic`. Solo se ejecuta cuando
   existe `NEON_DATABASE_URL`; fuerza `default_transaction_read_only=on`, ejecuta
