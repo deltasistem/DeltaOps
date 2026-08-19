@@ -1,0 +1,174 @@
+Necesito configurar DeltaOps para conectarse a la base de datos PostgreSQL de PRODUCCIÓN en Neon.
+
+IMPORTANTE:
+- NO modificar el esquema de la base de datos.
+- NO crear tablas.
+- NO eliminar tablas.
+- NO ejecutar migraciones.
+- NO ejecutar CREATE, ALTER, DROP, TRUNCATE ni INSERT sobre Neon.
+- NO modificar la estructura actual de heliumdb.
+- NO reemplazar todavía la conexión de desarrollo a heliumdb.
+- Primero realizar únicamente configuración, diagnóstico y prueba de conectividad.
+
+CONTEXTO ACTUAL:
+
+El proyecto DeltaOps actualmente utiliza una base PostgreSQL interna de Replit:
+
+DATABASE_URL:
+postgresql://...@helium/heliumdb?sslmode=disable
+
+Esta base se debe conservar como entorno de desarrollo.
+
+En heliumdb existe actualmente el esquema:
+deltaops
+
+y ya verificamos que contiene aproximadamente 174 tablas.
+
+El proyecto tiene sus migraciones oficiales en:
+
+lib/db/migrations/deltaops/
+
+La base de producción será Neon:
+
+- Proyecto Neon: DeltaOpsLite
+- Branch: production
+- Database: neondb
+- Schema objetivo: deltaops
+- PostgreSQL administrado por Neon
+
+En Neon ya fueron creados los roles:
+
+deltaops_owner
+deltaops_app_rw
+deltaops_app
+
+Y verificamos que:
+
+deltaops_app pertenece a deltaops_app_rw.
+
+El usuario de ejecución de la aplicación NO debe ser deltaops_owner.
+La aplicación debe utilizar el usuario de menor privilegio:
+
+deltaops_app
+
+Los secretos de Neon ya existen en el entorno seguro de Replit. Entre ellos están:
+
+DELTAOPS_APP_PASSWORD
+DELTAOPS_OWNER_PASSWORD
+
+NO mostrar ni imprimir ningún secreto, contraseña, token o DATABASE_URL completo en consola, logs, respuestas o archivos versionados.
+
+OBJETIVO DE ESTA TAREA:
+
+1. Inspecciona primero cómo DeltaOps obtiene actualmente DATABASE_URL y cómo se inicializa el cliente PostgreSQL/Drizzle.
+
+2. Identifica exactamente qué archivos utilizan:
+   - DATABASE_URL
+   - PGHOST
+   - PGDATABASE
+   - DELTAOPS_APP_PASSWORD
+   - DELTAOPS_OWNER_PASSWORD
+
+3. No rompas la conexión actual con heliumdb.
+
+4. Implementa una configuración preparada para separar claramente:
+
+   DESARROLLO:
+   heliumdb
+
+   PRODUCCIÓN:
+   Neon production / neondb
+
+5. La conexión de producción debe utilizar el usuario:
+   deltaops_app
+
+6. Preferiblemente utilizar una variable secreta independiente para producción, por ejemplo:
+
+   NEON_DATABASE_URL
+
+   Si el proyecto ya tiene una arquitectura de configuración equivalente, reutilízala en lugar de inventar otra.
+
+7. La cadena de conexión de Neon debe permanecer únicamente en Secrets/Environment Variables y nunca quedar escrita directamente en el código.
+
+8. Configura SSL correctamente para Neon.
+   No utilizar:
+   sslmode=disable
+
+9. No ejecutes migraciones automáticamente.
+
+10. No ejecutes comandos destructivos.
+
+11. Después de realizar únicamente la configuración, crea/usa una prueba de conexión READ-ONLY que consulte:
+
+   SELECT
+     current_user,
+     current_database(),
+     current_schema(),
+     version();
+
+12. La prueba debe ejecutarse contra Neon solamente cuando exista la variable de entorno de producción correspondiente.
+
+13. La prueba debe comprobar que:
+
+   current_database = neondb
+
+   y que el usuario conectado sea:
+
+   deltaops_app
+
+14. También comprobar si existe el schema:
+
+   deltaops
+
+   usando una consulta READ-ONLY:
+
+   SELECT schema_name
+   FROM information_schema.schemata
+   WHERE schema_name = 'deltaops';
+
+15. Si el schema deltaops todavía NO existe en Neon, NO crearlo automáticamente.
+   Simplemente informar:
+
+   "Neon está conectado correctamente, pero el schema deltaops todavía no ha sido desplegado."
+
+16. Si el schema deltaops existe pero está vacío, NO crear tablas todavía.
+   Informar cuántas tablas existen actualmente:
+
+   SELECT count(*)
+   FROM information_schema.tables
+   WHERE table_schema = 'deltaops';
+
+17. Si existen tablas, informar únicamente el número total y algunos nombres de ejemplo. No modificar nada.
+
+18. Mantener intacta la conexión de desarrollo a heliumdb.
+
+19. No cambiar docker-compose, Dockerfiles ni configuración de producción del VPS todavía.
+
+20. No hacer deploy todavía.
+
+21. No crear nuevas migraciones.
+
+22. No modificar las migraciones existentes.
+
+23. No modificar el esquema Drizzle.
+
+24. No realizar ningún cambio de datos.
+
+AL FINAL NECESITO UN INFORME CORTO CON:
+
+A. Archivos modificados.
+B. Variables de entorno/secrets utilizados (solo nombres, nunca valores).
+C. Cómo se selecciona desarrollo vs producción.
+D. Usuario utilizado para producción.
+E. Resultado de la prueba de conexión a Neon.
+F. current_database.
+G. current_user.
+H. existencia del schema deltaops.
+I. cantidad de tablas en deltaops.
+J. Confirmación explícita de que NO se ejecutaron migraciones ni cambios de esquema.
+
+Si alguna variable o credencial necesaria no existe, NO inventarla y NO pedir que se coloque una contraseña dentro del código. Indicar exactamente qué Secret/Environment Variable falta.
+
+La prioridad es SEGURIDAD y NO DESTRUCTIVIDAD.
+Primero conexión y diagnóstico.
+La migración del esquema heliumdb -> Neon será una tarea posterior y separada.
