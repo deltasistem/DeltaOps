@@ -60,3 +60,4 @@
 - [Informes FINAL-02](deltaops-final02-informes.md) — suites PG con PGDATABASE=deltaops_test; ventanas de contrato con advertencia explícita; export request→updateProgress→complete; CSV anti-fórmulas; _origen histórico en contexto.
 - [Correcciones pre-deploy](deltaops-correcciones-predeploy.md) — tenant productivo `delta` por re-import (catálogos base primero); extras de demo eran doble generación de parser; reproyectar no drena outbox.
 - [Tema global DeltaOps](deltaops-tema-global.md) — ThemeProvider raíz única autoridad; jamás data-do-theme en descendientes; guardas de fuente anti-regresión; contención de overflow móvil con min() y min-width:0.
+- [Diagnóstico Neon read-only](neon-readonly-diagnostic.md) — el startup `options` causó 08P01; imponer lectura con `BEGIN READ ONLY` + `ROLLBACK`.
