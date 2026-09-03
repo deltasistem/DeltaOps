@@ -1,0 +1,292 @@
+/**
+ * Capa visual de DELTA — Control de Horas Máquina.
+ *
+ * Lenguaje inspirado en iOS: fondo agrupado, tarjetas de esquinas amplias,
+ * sombras muy suaves, barras translúcidas y tipografía del sistema. El rojo
+ * y el océano del Brandbook DELTA aportan la identidad; el resto de la paleta
+ * son grises neutros para que el dato sea el protagonista.
+ */
+
+@import 'tailwindcss';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+
+@custom-variant dark (&:where(.oscuro, .oscuro *));
+
+:root {
+  --dh-rojo: #d2002b;
+  --dh-rojo-fuerte: #ba0c2f;
+  --dh-oceano: #080a16;
+
+  --dh-fondo: #f2f2f7;
+  --dh-superficie: #ffffff;
+  --dh-superficie-2: #f7f7fa;
+  --dh-superficie-alta: rgba(255, 255, 255, 0.82);
+  --dh-borde: rgba(8, 10, 22, 0.08);
+  --dh-borde-fuerte: rgba(8, 10, 22, 0.16);
+  --dh-texto: #0b0b12;
+  --dh-texto-2: #61616b;
+  --dh-texto-3: #8e8e97;
+  --dh-relleno: rgba(118, 118, 128, 0.12);
+  --dh-relleno-2: rgba(118, 118, 128, 0.08);
+
+  --dh-exito: #12894a;
+  --dh-exito-suave: rgba(18, 137, 74, 0.12);
+  --dh-aviso: #b25e00;
+  --dh-aviso-suave: rgba(178, 94, 0, 0.12);
+  --dh-error: #d2002b;
+  --dh-error-suave: rgba(210, 0, 43, 0.1);
+  --dh-info: #1d4ed8;
+  --dh-info-suave: rgba(29, 78, 216, 0.1);
+
+  --dh-sombra-1: 0 1px 2px rgba(8, 10, 22, 0.04), 0 1px 12px rgba(8, 10, 22, 0.04);
+  --dh-sombra-2: 0 4px 16px rgba(8, 10, 22, 0.08);
+  --dh-sombra-3: 0 -8px 40px rgba(8, 10, 22, 0.18);
+
+  --dh-radio: 18px;
+  --dh-radio-sm: 12px;
+  --dh-nav-alto: 56px;
+
+  --dh-serie-1: #d2002b;
+  --dh-serie-2: #1d4ed8;
+  --dh-serie-3: #12894a;
+  --dh-serie-4: #b25e00;
+  --dh-serie-5: #7c3aed;
+  --dh-serie-6: #0e7490;
+  --dh-serie-7: #be123c;
+}
+
+.oscuro {
+  --dh-fondo: #000000;
+  --dh-superficie: #1c1c1e;
+  --dh-superficie-2: #2c2c2e;
+  --dh-superficie-alta: rgba(28, 28, 30, 0.82);
+  --dh-borde: rgba(255, 255, 255, 0.1);
+  --dh-borde-fuerte: rgba(255, 255, 255, 0.22);
+  --dh-texto: #f5f5f7;
+  --dh-texto-2: #a1a1aa;
+  --dh-texto-3: #7c7c85;
+  --dh-relleno: rgba(118, 118, 128, 0.24);
+  --dh-relleno-2: rgba(118, 118, 128, 0.16);
+
+  --dh-rojo: #ff4d6a;
+  --dh-exito: #34d17c;
+  --dh-exito-suave: rgba(52, 209, 124, 0.16);
+  --dh-aviso: #ffb340;
+  --dh-aviso-suave: rgba(255, 179, 64, 0.16);
+  --dh-error: #ff4d6a;
+  --dh-error-suave: rgba(255, 77, 106, 0.16);
+  --dh-info: #6f9dff;
+  --dh-info-suave: rgba(111, 157, 255, 0.16);
+
+  --dh-sombra-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --dh-sombra-2: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --dh-sombra-3: 0 -8px 40px rgba(0, 0, 0, 0.6);
+
+  --dh-serie-1: #ff4d6a;
+  --dh-serie-2: #6f9dff;
+  --dh-serie-3: #34d17c;
+  --dh-serie-4: #ffb340;
+  --dh-serie-5: #b58cff;
+  --dh-serie-6: #3fc4d8;
+  --dh-serie-7: #ff7a94;
+}
+
+@theme inline {
+  --color-fondo: var(--dh-fondo);
+  --color-superficie: var(--dh-superficie);
+  --color-superficie-2: var(--dh-superficie-2);
+  --color-borde: var(--dh-borde);
+  --color-borde-fuerte: var(--dh-borde-fuerte);
+  --color-texto: var(--dh-texto);
+  --color-texto-2: var(--dh-texto-2);
+  --color-texto-3: var(--dh-texto-3);
+  --color-relleno: var(--dh-relleno);
+  --color-relleno-2: var(--dh-relleno-2);
+  --color-marca: var(--dh-rojo);
+  --color-exito: var(--dh-exito);
+  --color-exito-suave: var(--dh-exito-suave);
+  --color-aviso: var(--dh-aviso);
+  --color-aviso-suave: var(--dh-aviso-suave);
+  --color-error: var(--dh-error);
+  --color-error-suave: var(--dh-error-suave);
+  --color-info: var(--dh-info);
+  --color-info-suave: var(--dh-info-suave);
+
+  --radius-tarjeta: var(--dh-radio);
+  --radius-control: var(--dh-radio-sm);
+
+  --shadow-suave: var(--dh-sombra-1);
+  --shadow-media: var(--dh-sombra-2);
+  --shadow-hoja: var(--dh-sombra-3);
+
+  --font-titulo: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    background: var(--dh-fondo);
+    color: var(--dh-texto);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-titulo);
+    letter-spacing: -0.015em;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* En iOS un tamaño menor a 16px hace que Safari acerque la pantalla. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--dh-rojo);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Tarjeta base: la unidad de composición de toda la aplicación. */
+  .dh-tarjeta {
+    background: var(--dh-superficie);
+    border-radius: var(--dh-radio);
+    box-shadow: var(--dh-sombra-1);
+  }
+
+  /* Barras superior e inferior translúcidas, como en iOS. */
+  .dh-translucido {
+    background: var(--dh-superficie-alta);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+
+  /* Respeta el área segura de los iPhone con notch o isla dinámica. */
+  .dh-seguro-abajo {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+
+  .dh-seguro-arriba {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+
+  /* Etiqueta en mayúsculas de las secciones agrupadas de iOS. */
+  .dh-seccion-titulo {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dh-texto-3);
+  }
+
+  /* Retroalimentación táctil: la pieza se hunde levemente al pulsar. */
+  .dh-pulsable {
+    transition:
+      transform 140ms cubic-bezier(0.2, 0, 0, 1),
+      background-color 140ms ease,
+      opacity 140ms ease;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .dh-pulsable:active {
+    transform: scale(0.975);
+  }
+
+  .dh-numero {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tabla tipo hoja de cálculo: encabezado y primera columna fijos. */
+  .dh-hoja {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .dh-hoja th,
+  .dh-hoja td {
+    white-space: nowrap;
+    border-bottom: 1px solid var(--dh-borde);
+    padding: 10px 14px;
+    text-align: left;
+  }
+
+  .dh-hoja thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--dh-superficie-2);
+    color: var(--dh-texto-2);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .dh-hoja tbody tr:hover td {
+    background: var(--dh-relleno-2);
+  }
+
+  .dh-scroll::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .dh-scroll::-webkit-scrollbar-thumb {
+    background: var(--dh-borde-fuerte);
+    border-radius: 99px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  .dh-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Oculta la barra de desplazamiento en carruseles horizontales de chips. */
+  .dh-sin-barra {
+    scrollbar-width: none;
+  }
+
+  .dh-sin-barra::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

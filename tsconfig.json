@@ -52,6 +52,12 @@
       "path": "./lib/module-manodeobra"
     },
     {
+      "path": "./lib/module-utilizacion"
+    },
+    {
+      "path": "./lib/horas-maquina"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {
