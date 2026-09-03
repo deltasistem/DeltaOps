@@ -144,8 +144,23 @@ export function NuevoRegistro({ registroId }: { readonly registroId?: string }) 
     [base.registros, entrada, maquina, registroId],
   );
 
-  const errorDe = (campo: keyof EntradaRegistro) =>
-    errores.find((e) => e.campo === campo)?.mensaje;
+  /**
+   * El horómetro invertido se avisa en cuanto se escribe, sin esperar a que el
+   * usuario intente guardar: es un error que el sistema ya conoce.
+   */
+  const errorHorometroInvertido =
+    entrada.horometroInicial !== null &&
+    entrada.horometroFinal !== null &&
+    entrada.horometroFinal < entrada.horometroInicial
+      ? 'El horómetro final no puede ser menor al horómetro inicial.'
+      : undefined;
+
+  const errorDe = (campo: keyof EntradaRegistro) => {
+    if (campo === 'horometroFinal' && errorHorometroInvertido) {
+      return errorHorometroInvertido;
+    }
+    return errores.find((e) => e.campo === campo)?.mensaje;
+  };
 
   const actualizar = (cambio: Partial<EntradaRegistro>) => {
     setEntrada((previa) => ({ ...previa, ...cambio }));
@@ -384,29 +399,28 @@ export function NuevoRegistro({ registroId }: { readonly registroId?: string }) 
               error={errorDe('horometroInicial')}
               ayuda="Ejemplo: 650.3. Use punto decimal."
             >
-              <div className="flex gap-2">
-                <EntradaDecimal
-                  value={textoInicial}
-                  placeholder="0.0"
-                  onChange={(e) => {
-                    setTextoInicial(e.target.value);
-                    actualizar({ horometroInicial: interpretarDecimal(e.target.value) });
-                  }}
-                  invalido={Boolean(errorDe('horometroInicial'))}
-                />
-                {ultimo && entrada.horometroInicial !== ultimo.valor && (
-                  <Boton
-                    onClick={() => {
-                      setTextoInicial(String(ultimo.valor));
-                      actualizar({ horometroInicial: ultimo.valor });
-                    }}
-                    className="shrink-0 px-3"
-                  >
-                    Usar último
-                  </Boton>
-                )}
-              </div>
+              <EntradaDecimal
+                value={textoInicial}
+                placeholder="0.0"
+                onChange={(e) => {
+                  setTextoInicial(e.target.value);
+                  actualizar({ horometroInicial: interpretarDecimal(e.target.value) });
+                }}
+                invalido={Boolean(errorDe('horometroInicial'))}
+              />
             </Campo>
+
+            {ultimo && entrada.horometroInicial !== ultimo.valor && (
+              <Boton
+                onClick={() => {
+                  setTextoInicial(String(ultimo.valor));
+                  actualizar({ horometroInicial: ultimo.valor });
+                }}
+                className="self-start px-3"
+              >
+                Usar último horómetro
+              </Boton>
+            )}
 
             {consistencia.tipo === 'consistente' && (
               <p className="flex items-center gap-2 text-[13px] font-semibold text-exito">

@@ -10,7 +10,6 @@ import { useMemo, useState } from 'react';
 import { useSearch } from 'wouter';
 
 import {
-  compararRecientes,
   filtrarRegistros,
   formatearEntero,
   formatearHoras,
@@ -54,12 +53,11 @@ export function Registros() {
     [base.registros, usuario.id, usuario.rol],
   );
 
-  const resultados = useMemo(() => {
-    const filtrados = filtrarRegistros(visibles, filtro);
-    return vista === 'tabla'
-      ? ordenarRegistros(filtrados, orden, descendente)
-      : [...filtrados].sort(compararRecientes);
-  }, [descendente, filtro, orden, visibles, vista]);
+  // El orden vale para las dos vistas: en escritorio la tabla es la principal.
+  const resultados = useMemo(
+    () => ordenarRegistros(filtrarRegistros(visibles, filtro), orden, descendente),
+    [descendente, filtro, orden, visibles],
+  );
 
   const totalHoras = resultados
     .filter((r) => r.estado === 'activo')

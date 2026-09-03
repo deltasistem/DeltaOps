@@ -55,25 +55,33 @@ export function crearAlmacenLocal(
     }
   };
 
+  const leer = (): string | null => {
+    try {
+      return almacenamiento?.getItem(CLAVE) ?? null;
+    } catch {
+      return null;
+    }
+  };
+
   return {
     async cargar() {
-      if (memoria) return memoria;
       const hoy = hoyEnBogota();
-      const crudo = almacenamiento?.getItem(CLAVE);
-      if (!crudo) {
-        const semilla = crearSemilla(hoy);
-        persistir(semilla);
-        return semilla;
+      const crudo = leer();
+      if (crudo !== null) {
+        try {
+          const base = reconciliar(JSON.parse(crudo) as Partial<BaseDatos>, hoy);
+          memoria = base;
+          return base;
+        } catch {
+          // Base ilegible: se reconstruye desde la semilla más abajo.
+        }
+      } else if (!almacenamiento && memoria) {
+        // Sin almacenamiento disponible, la sesión vive solo en memoria.
+        return memoria;
       }
-      try {
-        const base = reconciliar(JSON.parse(crudo) as Partial<BaseDatos>, hoy);
-        memoria = base;
-        return base;
-      } catch {
-        const semilla = crearSemilla(hoy);
-        persistir(semilla);
-        return semilla;
-      }
+      const semilla = crearSemilla(hoy);
+      persistir(semilla);
+      return semilla;
     },
 
     async guardar(base) {

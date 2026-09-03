@@ -70,6 +70,9 @@ export function Selector({
     <>
       <button
         type="button"
+        aria-label={titulo}
+        aria-haspopup="listbox"
+        aria-expanded={abierta}
         disabled={deshabilitado}
         onClick={() => setAbierta(true)}
         className={cn(
