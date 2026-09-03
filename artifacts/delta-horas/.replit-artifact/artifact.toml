@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/horas/"
+title = "DELTA — Control de Horas Máquina"
+description = "Aplicación de control de horas máquina de DELTA LOGÍSTICA & EQUIPOS S.A.S. Formulario de registro, base de registros tipo Excel, dashboard dinámico, maestros (máquinas, operadores, supervisores, clientes, operaciones, materiales, proveedores, turnos), usuarios y permisos, alertas y auditoría. Sustituye el flujo Microsoft Forms + Excel."
+version = "1.0.0"
+id = "artifacts/delta-horas"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/horas/" ]
+localPort = 18152
+
+[services.development]
+run = "pnpm --filter @workspace/delta-horas run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/delta-horas", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/delta-horas/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18152"
+BASE_PATH = "/horas/"

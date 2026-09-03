@@ -104,7 +104,7 @@ function componerRegistro(
 
     propiedad: maquina?.propiedad ?? 'propio',
     proveedorId: maquina?.proveedorId ?? null,
-    proveedorNombre: proveedor?.nombre ?? (maquina?.propietario ?? ''),
+    proveedorNombre: proveedor?.nombre ?? '',
 
     recibo: entrada.recibo.trim(),
     horometroInicial: entrada.horometroInicial ?? 0,

@@ -75,7 +75,6 @@ function maquinaPropia(
     serial,
     propiedad: 'propio',
     proveedorId: 'pro-delta',
-    propietario: 'DELTA',
   };
 }
 
@@ -97,7 +96,6 @@ export const MAQUINAS: readonly Maquina[] = [
     serial: 'SEM655D-0306',
     propiedad: 'tercerizado',
     proveedorId: 'pro-gpr',
-    propietario: 'GPR',
   },
 ];
 

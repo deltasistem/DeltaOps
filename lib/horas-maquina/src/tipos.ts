@@ -55,9 +55,11 @@ export interface Maquina extends Base {
   readonly modelo: string;
   readonly serial: string;
   readonly propiedad: Propiedad;
-  /** Propietario cuando es propia; proveedor cuando es tercerizada. */
+  /**
+   * Propietario cuando la máquina es propia, proveedor cuando es tercerizada.
+   * En ambos casos apunta al maestro de proveedores.
+   */
   readonly proveedorId: string | null;
-  readonly propietario: string;
 }
 
 /** Operadores y supervisores comparten estructura y se administran por separado. */

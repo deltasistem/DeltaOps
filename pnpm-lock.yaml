@@ -66,6 +66,9 @@ catalogs:
     vite:
       specifier: ^7.3.2
       version: 7.3.3
+    wouter:
+      specifier: ^3.3.5
+      version: 3.10.0
     zod:
       specifier: 3.25.76
       version: 3.25.76
@@ -289,7 +292,58 @@ importers:
         version: 4.21.0
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
+
+  artifacts/delta-horas:
+    devDependencies:
+      '@fontsource/montserrat':
+        specifier: ^5.2.5
+        version: 5.3.0
+      '@tailwindcss/vite':
+        specifier: 'catalog:'
+        version: 4.3.0(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 5.2.0(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@workspace/horas-maquina':
+        specifier: workspace:*
+        version: link:../../lib/horas-maquina
+      clsx:
+        specifier: 'catalog:'
+        version: 2.1.1
+      framer-motion:
+        specifier: 'catalog:'
+        version: 12.38.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 0.545.0(react@19.1.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.1.0
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.1.0(react@19.1.0)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.0
+      vite:
+        specifier: 'catalog:'
+        version: 7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
+      wouter:
+        specifier: 'catalog:'
+        version: 3.10.0(react@19.1.0)
 
   artifacts/deltaops:
     devDependencies:
@@ -499,7 +553,7 @@ importers:
         version: 7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
       wouter:
         specifier: ^3.3.5
         version: 3.10.0(react@19.1.0)
@@ -731,7 +785,7 @@ importers:
         version: 8.20.0
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/db:
     dependencies:
@@ -759,7 +813,7 @@ importers:
         version: 0.31.10
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/design-system:
     dependencies:
@@ -805,7 +859,7 @@ importers:
         version: 19.1.0(react@19.1.0)
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/dynamic-forms:
     dependencies:
@@ -839,7 +893,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/horas-maquina:
     devDependencies:
@@ -848,7 +902,7 @@ importers:
         version: 25.6.2
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/kernel:
     dependencies:
@@ -870,7 +924,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-abastecimiento:
     dependencies:
@@ -901,7 +955,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-activos:
     dependencies:
@@ -932,7 +986,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-analytics:
     dependencies:
@@ -960,7 +1014,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-correctivo:
     dependencies:
@@ -991,7 +1045,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-costos:
     dependencies:
@@ -1019,7 +1073,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-inventario:
     dependencies:
@@ -1050,7 +1104,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-manodeobra:
     dependencies:
@@ -1078,7 +1132,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-ordenes:
     dependencies:
@@ -1115,7 +1169,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-planes:
     dependencies:
@@ -1146,7 +1200,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-preventivo:
     dependencies:
@@ -1180,7 +1234,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-reference:
     dependencies:
@@ -1208,7 +1262,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/module-utilizacion:
     dependencies:
@@ -1233,7 +1287,7 @@ importers:
         version: 8.20.0
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/platform:
     dependencies:
@@ -1258,7 +1312,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   lib/workflow-engine:
     dependencies:
@@ -1289,7 +1343,7 @@ importers:
         version: link:../db
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
   scripts:
     dependencies:
@@ -4437,6 +4491,7 @@ packages:
       '@vitest/ui': 4.1.10
       happy-dom: '*'
       jsdom: '*'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
@@ -7699,7 +7754,7 @@ snapshots:
       tsx: 4.21.0
       yaml: 2.8.4
 
-  vitest@4.1.10(@types/node@25.6.2)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4):
+  vitest@4.1.10(@types/node@25.6.2)(jsdom@26.1.0)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)):
     dependencies:
       '@vitest/expect': 4.1.10
       '@vitest/mocker': 4.1.10(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
@@ -7725,17 +7780,7 @@ snapshots:
       '@types/node': 25.6.2
       jsdom: 26.1.0
     transitivePeerDependencies:
-      - jiti
-      - less
-      - lightningcss
       - msw
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - terser
-      - tsx
-      - yaml
 
   w3c-xmlserializer@5.0.0:
     dependencies:
