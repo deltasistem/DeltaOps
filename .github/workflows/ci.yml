@@ -44,3 +44,7 @@ jobs:
         run: pnpm --filter @workspace/dynamic-forms run test
       - name: Pruebas del Módulo Órdenes de Trabajo
         run: pnpm --filter @workspace/module-ordenes run test
+      - name: Pruebas del núcleo de Horas Máquina
+        run: pnpm --filter @workspace/horas-maquina run test
+      - name: Pruebas de DELTA — Control de Horas Máquina
+        run: pnpm --filter @workspace/delta-horas run test
